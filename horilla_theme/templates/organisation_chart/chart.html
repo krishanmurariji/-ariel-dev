@@ -351,6 +351,14 @@
     	$(".genealogy-tree li .member-view-box")
     		.off("click")
     		.on("click", function (e) {
+    			// stopPropagation() below keeps this event from ever bubbling up
+    			// to the parent <a href="#">, so its onclick="event.preventDefault()"
+    			// never runs. Without our own preventDefault() here, the browser
+    			// falls back to the anchor's native "#" navigation, which fires a
+    			// popstate event and triggers the global reload-on-popstate handler
+    			// in components/sidebar.html — reloading the whole page on every click.
+    			e.preventDefault();
+
     			const $children = $(this).closest("li").children("ul");
     			$(this).find("span").toggleClass("upArrow");
 
