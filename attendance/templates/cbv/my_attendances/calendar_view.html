@@ -1,0 +1,134 @@
+{% load i18n %}
+<style>
+    .ka-cal-wrap {
+        background: #fff;
+        border-radius: 8px;
+        border: 1px solid #e8e8ee;
+    }
+    .ka-cal-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 18px;
+        border-bottom: 1px solid #eeeef3;
+    }
+    .ka-cal-head__title { font-weight: 600; font-size: 15px; color: #2b2b3c; }
+    .ka-cal-nav { display: flex; align-items: center; gap: 10px; }
+    .ka-cal-nav__btn {
+        border: 1px solid #e3e3ea;
+        background: #fff;
+        border-radius: 6px;
+        width: 32px; height: 32px;
+        display: inline-flex; align-items: center; justify-content: center;
+        cursor: pointer; font-size: 16px; color: #55556b;
+    }
+    .ka-cal-nav__label { font-weight: 600; font-size: 14px; color: #33334a; min-width: 130px; text-align: center; }
+    .ka-cal-summary {
+        display: flex; flex-wrap: wrap; gap: 18px;
+        padding: 12px 18px;
+        border-bottom: 1px solid #eeeef3;
+        font-size: 12.5px; color: #5c5c70;
+    }
+    .ka-cal-summary b { color: #2b2b3c; }
+    .ka-cal-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .ka-cal-grid th {
+        font-size: 11px; letter-spacing: .6px; text-transform: uppercase;
+        color: #7a7a8c; background: #f7f7fa;
+        padding: 8px 6px; border: 1px solid #ececf2; text-align: center;
+    }
+    .ka-cal-grid td {
+        border: 1px solid #ececf2;
+        height: 86px; vertical-align: top;
+        padding: 6px 8px;
+        font-size: 12px;
+    }
+    .ka-cal-day__num { font-weight: 600; font-size: 13px; color: #44445a; }
+    .ka-cal-day--today .ka-cal-day__num {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 24px; height: 24px; border-radius: 50%;
+        background: hsl(var(--primary-h, 258), 62%, 52%); color: #fff;
+    }
+    .ka-cal-chip {
+        display: inline-block; margin-top: 6px;
+        font-size: 10.5px; font-weight: 700; letter-spacing: .4px;
+        padding: 2px 7px; border-radius: 10px;
+    }
+    .ka-cal-chip--present { background: #e2f4e6; color: #3d8b4e; }
+    .ka-cal-chip--absent { background: #fbe3e3; color: #c04747; }
+    .ka-cal-chip--weekoff { background: #efece1; color: #93896c; }
+    .ka-cal-chip--holiday { background: #fcf0d8; color: #c08a2d; }
+    .ka-cal-chip--leave { background: #ece2fb; color: #7a52c7; }
+    .ka-cal-hours { display: block; margin-top: 5px; color: #6c6c80; font-size: 11.5px; }
+    .ka-cal-late { color: #d98a2b; font-size: 10.5px; display: block; margin-top: 2px; }
+    td.ka-cal-day--weekoff, td.ka-cal-day--holiday { background: #fafaf5; }
+</style>
+
+<div class="ka-cal-wrap">
+    <div class="ka-cal-head">
+        <span class="ka-cal-head__title">{% trans "Attendance Calendar" %}</span>
+        <div class="ka-cal-nav">
+            <button type="button" class="ka-cal-nav__btn"
+                hx-get="{% url 'my-attendance-calendar' %}?month={{ prev_month }}"
+                hx-target="#listContainer" hx-swap="innerHTML">
+                <ion-icon name="chevron-back-outline"></ion-icon>
+            </button>
+            <span class="ka-cal-nav__label">{{ month_label }}</span>
+            <button type="button" class="ka-cal-nav__btn"
+                hx-get="{% url 'my-attendance-calendar' %}?month={{ next_month }}"
+                hx-target="#listContainer" hx-swap="innerHTML">
+                <ion-icon name="chevron-forward-outline"></ion-icon>
+            </button>
+        </div>
+    </div>
+
+    <div class="ka-cal-summary">
+        <span>{% trans "Present" %}: <b>{{ summary.present }}</b></span>
+        <span>{% trans "Absent" %}: <b>{{ summary.absent }}</b></span>
+        <span>{% trans "On Leave" %}: <b>{{ summary.leave }}</b></span>
+        <span>{% trans "Weekly Off" %}: <b>{{ summary.weekoff }}</b></span>
+        <span>{% trans "Holidays" %}: <b>{{ summary.holiday }}</b></span>
+        <span>{% trans "Worked Hours" %}: <b>{{ summary.worked }}</b></span>
+    </div>
+
+    <div style="overflow-x:auto;">
+    <table class="ka-cal-grid">
+        <thead>
+            <tr>
+                <th>{% trans "Mon" %}</th><th>{% trans "Tue" %}</th><th>{% trans "Wed" %}</th>
+                <th>{% trans "Thu" %}</th><th>{% trans "Fri" %}</th><th>{% trans "Sat" %}</th>
+                <th>{% trans "Sun" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for week in weeks %}
+            <tr>
+                {% for day in week %}
+                {% if day %}
+                <td class="ka-cal-day--{{ day.kind }} {% if day.is_today %}ka-cal-day--today{% endif %}">
+                    <span class="ka-cal-day__num">{{ day.date.day }}</span>
+                    {% if day.kind == 'present' %}
+                        <span class="ka-cal-chip ka-cal-chip--present">{% trans "PRESENT" %}</span>
+                        <span class="ka-cal-hours">{{ day.effective }}</span>
+                        {% if day.arrival == 'late' %}
+                        <span class="ka-cal-late">{{ day.late_by }} {% trans "late" %}</span>
+                        {% endif %}
+                    {% elif day.kind == 'absent' %}
+                        <span class="ka-cal-chip ka-cal-chip--absent">{% trans "ABSENT" %}</span>
+                    {% elif day.kind == 'weekoff' %}
+                        <span class="ka-cal-chip ka-cal-chip--weekoff">W-OFF</span>
+                    {% elif day.kind == 'holiday' %}
+                        <span class="ka-cal-chip ka-cal-chip--holiday">{{ day.holiday.name }}</span>
+                    {% elif day.kind == 'leave' %}
+                        <span class="ka-cal-chip ka-cal-chip--leave">{{ day.leave.leave_type_id }}</span>
+                    {% endif %}
+                </td>
+                {% else %}
+                <td></td>
+                {% endif %}
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>

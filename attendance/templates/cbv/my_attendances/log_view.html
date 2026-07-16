@@ -1,0 +1,362 @@
+{% load i18n %}
+<style>
+    .ka-log-wrap {
+        background: #fff;
+        border-radius: 8px;
+        border: 1px solid #e8e8ee;
+        overflow: visible;
+    }
+    .ka-log-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 18px;
+        border-bottom: 1px solid #eeeef3;
+    }
+    .ka-log-head__title {
+        font-weight: 600;
+        font-size: 15px;
+        color: #2b2b3c;
+    }
+    .ka-tabs {
+        display: flex;
+        border: 1px solid #e3e3ea;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    .ka-tabs__tab {
+        padding: 8px 18px;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: hsl(var(--primary-h, 258), 60%, 55%);
+        background: #fff;
+        border: none;
+        border-right: 1px solid #e3e3ea;
+        cursor: pointer;
+        letter-spacing: 0.4px;
+    }
+    .ka-tabs__tab:last-child { border-right: none; }
+    .ka-tabs__tab--active {
+        background: hsl(var(--primary-h, 258), 62%, 52%);
+        color: #fff;
+    }
+    .ka-table { width: 100%; border-collapse: collapse; }
+    .ka-table th {
+        text-align: left;
+        font-size: 11px;
+        letter-spacing: 0.6px;
+        color: #7a7a8c;
+        font-weight: 600;
+        text-transform: uppercase;
+        padding: 10px 14px;
+        background: #f7f7fa;
+        border-bottom: 1px solid #ececf2;
+    }
+    .ka-table td {
+        padding: 12px 14px;
+        font-size: 13.5px;
+        color: #3c3c4e;
+        border-bottom: 1px solid #f0f0f5;
+        vertical-align: middle;
+    }
+    .ka-row--off td { background: #f6f4ee; color: #8c8674; }
+    .ka-offlabel { text-align: center; font-size: 13px; }
+    .ka-badge {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        background: #b1a98c;
+        color: #fff;
+        border-radius: 3px;
+        padding: 2px 6px;
+        margin-left: 8px;
+        vertical-align: 1px;
+    }
+    .ka-badge--leave { background: #9b7bd4; }
+    .ka-badge--holiday { background: #e0a23c; }
+    .ka-badge--absent { background: #e05c5c; }
+    /* timeline */
+    .ka-visual {
+        position: relative;
+        height: 14px;
+        width: 260px;
+        background-image: repeating-linear-gradient(
+            to right,
+            #e4e4ec 0px, #e4e4ec 6px, transparent 6px, transparent 11px
+        );
+        background-position: 0 center;
+        background-size: 100% 8px;
+        background-repeat: no-repeat;
+        border-radius: 3px;
+    }
+    .ka-visual__seg {
+        position: absolute;
+        top: 2px;
+        height: 10px;
+        background: #6fc4cf;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+    .ka-visual__seg .ka-tip {
+        display: none;
+        position: absolute;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #43435a;
+        color: #fff;
+        white-space: nowrap;
+        font-size: 11.5px;
+        border-radius: 4px;
+        padding: 5px 9px;
+        z-index: 30;
+    }
+    .ka-visual__seg:hover .ka-tip { display: block; }
+    .ka-visual__mark {
+        position: absolute;
+        top: 13px;
+        width: 0; height: 0;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-bottom: 5px solid #b9b9c9;
+        transform: translateX(-50%);
+    }
+    .ka-dot {
+        display: inline-block;
+        width: 13px; height: 13px;
+        border-radius: 50%;
+        background: #6fc4cf;
+        margin-right: 7px;
+        vertical-align: -2px;
+    }
+    .ka-dot--open { background: #fff; border: 2px solid #8fd0d9; }
+    .ka-arrival__ok { color: #58b268; font-size: 14px; vertical-align: -2px; margin-right: 5px; }
+    .ka-arrival--late { color: #d98a2b; }
+    /* log icon + popover */
+    .ka-logcell { position: relative; text-align: center; }
+    .ka-logbtn {
+        background: none; border: none; cursor: pointer;
+        font-size: 21px; line-height: 1; padding: 2px;
+    }
+    .ka-logbtn--ok ion-icon { color: #58b268; }
+    .ka-logbtn--warn ion-icon { color: #e8a13c; }
+    .ka-logbtn--absent ion-icon { color: #e05c5c; }
+    .ka-logbtn--muted ion-icon { color: #b9b9c9; }
+    .ka-pop {
+        display: none;
+        position: absolute;
+        right: 30px;
+        top: 50%;
+        transform: translateY(-45%);
+        width: 250px;
+        background: #fff;
+        border: 1px solid #e3e3ea;
+        border-radius: 8px;
+        box-shadow: 0 8px 26px rgba(40,40,70,.16);
+        z-index: 40;
+        text-align: left;
+    }
+    .ka-pop--open { display: block; }
+    .ka-pop__head {
+        padding: 12px 15px;
+        border-bottom: 1px solid #efeff4;
+    }
+    .ka-pop__shift { font-weight: 600; color: #33334a; font-size: 13.5px; }
+    .ka-pop__time { color: #6c6c80; font-size: 12.5px; margin-top: 2px; }
+    .ka-pop__body { padding: 12px 15px; }
+    .ka-pop__reg {
+        color: hsl(var(--primary-h, 258), 62%, 55%);
+        font-size: 13px; font-weight: 600;
+        text-decoration: none; cursor: pointer;
+        display: inline-flex; align-items: center; gap: 6px;
+    }
+    .ka-pop__loc { font-weight: 700; font-size: 13px; color: #33334a; margin: 12px 0 6px; }
+    .ka-pop__swipes { font-size: 13px; color: #4c4c60; }
+    .ka-pop__swipes .in { color: #58b268; margin-right: 4px; }
+    .ka-pop__swipes .out { color: #e05c5c; margin: 0 4px 0 14px; }
+    .ka-pop__missing { color: #e05c5c; font-weight: 600; letter-spacing: .3px; }
+    .ka-status-note { font-size: 12px; color: #9a9aac; }
+</style>
+
+<div class="ka-log-wrap">
+    <div class="ka-log-head">
+        <span class="ka-log-head__title">{% trans "Attendance Log" %}</span>
+        <div class="ka-tabs">
+            <button type="button"
+                class="ka-tabs__tab {% if active_tab == '30days' %}ka-tabs__tab--active{% endif %}"
+                hx-get="{% url 'my-attendance-log' %}"
+                hx-target="#listContainer" hx-swap="innerHTML">
+                {% trans "30 DAYS" %}
+            </button>
+            {% for tab in month_tabs %}
+            <button type="button"
+                class="ka-tabs__tab {% if active_tab == tab.param %}ka-tabs__tab--active{% endif %}"
+                hx-get="{% url 'my-attendance-log' %}?log_month={{ tab.param }}"
+                hx-target="#listContainer" hx-swap="innerHTML">
+                {{ tab.label }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div style="overflow-x:auto;">
+    <table class="ka-table">
+        <thead>
+            <tr>
+                <th>{% trans "Date" %}</th>
+                <th>{% trans "Attendance Visual" %}</th>
+                <th>{% trans "Effective Hours" %}</th>
+                <th>{% trans "Break Taken" %}</th>
+                <th>{% trans "Gross Hours" %}</th>
+                <th>{% trans "Arrival" %}</th>
+                <th style="text-align:center;">{% trans "Log" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for day in days %}
+            {% if day.kind == 'weekoff' or day.kind == 'holiday' or day.kind == 'leave' %}
+            <tr class="ka-row--off">
+                <td style="white-space:nowrap;">
+                    {{ day.date|date:"D, d M" }}
+                    {% if day.kind == 'weekoff' %}<span class="ka-badge">W-OFF</span>
+                    {% elif day.kind == 'holiday' %}<span class="ka-badge ka-badge--holiday">{% trans "HOLIDAY" %}</span>
+                    {% else %}<span class="ka-badge ka-badge--leave">{% trans "LEAVE" %}</span>{% endif %}
+                </td>
+                <td colspan="5" class="ka-offlabel">
+                    {% if day.kind == 'weekoff' %}{% trans "Full day Weekly-off" %}
+                    {% elif day.kind == 'holiday' %}{{ day.holiday.name }}
+                    {% else %}{{ day.leave.leave_type_id }}{% endif %}
+                </td>
+                <td class="ka-logcell">
+                    <button type="button" class="ka-logbtn ka-logbtn--muted" onclick="kaTogglePop(this)">
+                        <ion-icon name="ellipsis-horizontal-outline"></ion-icon>
+                    </button>
+                    <div class="ka-pop">
+                        <div class="ka-pop__head">
+                            <div class="ka-pop__shift">
+                                {% if day.kind == 'weekoff' %}{% trans "Weekly Off" %}
+                                {% elif day.kind == 'holiday' %}{{ day.holiday.name }}
+                                {% else %}{{ day.leave.leave_type_id }}{% endif %}
+                                ({{ day.date|date:"d M" }})
+                            </div>
+                        </div>
+                        <div class="ka-pop__body">
+                            <a class="ka-pop__reg"
+                               data-toggle="oh-modal-toggle" data-target="#objectCreateModal"
+                               hx-get="{% url 'request-new-attendance' %}" hx-target="#objectCreateModalTarget">
+                                <ion-icon name="create-outline"></ion-icon>{% trans "Regularize" %}
+                            </a>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            {% elif day.kind == 'future' %}
+            {# future dates are skipped #}
+            {% else %}
+            <tr>
+                <td style="white-space:nowrap;">{{ day.date|date:"D, d M" }}</td>
+                <td>
+                    <div class="ka-visual">
+                        {% for seg in day.segments %}
+                        <div class="ka-visual__seg" style="left:{{ seg.left }}%;width:{{ seg.width }}%;">
+                            <span class="ka-tip">{{ seg.tooltip }}</span>
+                        </div>
+                        <div class="ka-visual__mark" style="left:{{ seg.left }}%;"></div>
+                        {% endfor %}
+                    </div>
+                </td>
+                <td>
+                    {% if day.attendance %}
+                        <span class="ka-dot {% if day.open_swipe %}ka-dot--open{% endif %}"></span>{{ day.effective }}
+                    {% elif day.kind == 'absent' %}
+                        <span class="ka-status-note">{% trans "Absent" %}</span>
+                    {% else %}
+                        <span class="ka-status-note">-</span>
+                    {% endif %}
+                </td>
+                <td>{% if day.attendance %}{{ day.break_taken }}{% endif %}</td>
+                <td>{% if day.attendance %}{{ day.gross }}{% endif %}</td>
+                <td>
+                    {% if day.arrival == 'ontime' %}
+                        <ion-icon name="checkmark-outline" class="ka-arrival__ok"></ion-icon>{% trans "On Time" %}
+                    {% elif day.arrival == 'late' %}
+                        <span class="ka-arrival--late">{{ day.late_by }} {% trans "late" %}</span>
+                    {% endif %}
+                </td>
+                <td class="ka-logcell">
+                    {% if day.attendance %}
+                    <button type="button"
+                        class="ka-logbtn {% if day.missing_swipe or day.open_swipe %}ka-logbtn--warn{% else %}ka-logbtn--ok{% endif %}"
+                        title="{% if day.missing_swipe or day.open_swipe %}{% trans 'Present | Missing Swipe(s)' %}{% else %}{% trans 'Present' %}{% endif %}"
+                        onclick="kaTogglePop(this)">
+                        <ion-icon name="{% if day.missing_swipe or day.open_swipe %}alert-circle-outline{% else %}checkmark-circle-outline{% endif %}"></ion-icon>
+                    </button>
+                    {% else %}
+                    <button type="button" class="ka-logbtn ka-logbtn--absent"
+                        title="{% trans 'Absent' %}" onclick="kaTogglePop(this)">
+                        <ion-icon name="close-circle-outline"></ion-icon>
+                    </button>
+                    {% endif %}
+                    <div class="ka-pop">
+                        <div class="ka-pop__head">
+                            {% if day.shift_name %}
+                            <div class="ka-pop__shift">{{ day.shift_name }} ({{ day.date|date:"d M" }})</div>
+                            {% endif %}
+                            {% if day.schedule.start_time %}
+                            <div class="ka-pop__time">{{ day.schedule.start_time|time:"G:i" }} - {{ day.schedule.end_time|time:"G:i" }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="ka-pop__body">
+                            <a class="ka-pop__reg"
+                               data-toggle="oh-modal-toggle" data-target="#objectCreateModal"
+                               hx-get="{% url 'request-new-attendance' %}" hx-target="#objectCreateModalTarget">
+                                <ion-icon name="create-outline"></ion-icon>{% trans "Regularize" %}
+                            </a>
+                            {% if day.location %}
+                            <div class="ka-pop__loc">{{ day.location }}</div>
+                            {% endif %}
+                            {% if day.swipes %}
+                            <div class="ka-pop__swipes">
+                                {% for swipe in day.swipes %}
+                                <div style="margin-top:4px;">
+                                    <span class="in">&#8601;</span>{{ swipe.in_full }}
+                                    <span class="out">&#8599;</span>{% if swipe.out_full %}{{ swipe.out_full }}{% else %}<span class="ka-pop__missing">{% trans "MISSING" %}</span>{% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<script>
+    function kaTogglePop(btn) {
+        var pop = btn.parentElement.querySelector(".ka-pop");
+        var wasOpen = pop.classList.contains("ka-pop--open");
+        document.querySelectorAll(".ka-pop--open").forEach(function (p) {
+            p.classList.remove("ka-pop--open");
+        });
+        if (!wasOpen) {
+            pop.classList.add("ka-pop--open");
+            if (typeof htmx !== "undefined") { htmx.process(pop); }
+        }
+    }
+    if (!window.__kaPopCloser) {
+        window.__kaPopCloser = true;
+        document.addEventListener("click", function (e) {
+            if (!e.target.closest(".ka-logcell")) {
+                document.querySelectorAll(".ka-pop--open").forEach(function (p) {
+                    p.classList.remove("ka-pop--open");
+                });
+            }
+        });
+    }
+</script>

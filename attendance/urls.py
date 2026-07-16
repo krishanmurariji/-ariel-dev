@@ -660,6 +660,16 @@ urlpatterns = [
         name="my-attendance-nav",
     ),
     path(
+        "my-attendance-calendar/",
+        my_attendances.MyAttendanceCalendar.as_view(),
+        name="my-attendance-calendar",
+    ),
+    path(
+        "my-attendance-log/",
+        my_attendances.MyAttendanceLog.as_view(),
+        name="my-attendance-log",
+    ),
+    path(
         "my-attendance-detail/<int:pk>/",
         my_attendances.MyAttendancesDetailView.as_view(),
         name="my-attendance-detail",
