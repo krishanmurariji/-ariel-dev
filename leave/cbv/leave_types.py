@@ -301,9 +301,13 @@ class LeaveTypeCardView(HorillaCardView):
         {
             "action": _("Edit"),
             "attrs": """
-            class="oh-dropdown__link"
-            onclick="window.location.href='{get_update_url}' "
-            """,
+                    data-toggle = "oh-modal-toggle"
+                    data-target = "#genericModal"
+                    hx-target="#genericModalBody"
+                    hx-get ='{get_update_url}'
+                    class="oh-dropdown__link"
+                    style="cursor: pointer;"
+                    """,
         },
         {
             "action": _("Delete"),

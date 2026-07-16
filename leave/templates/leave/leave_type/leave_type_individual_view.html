@@ -172,12 +172,18 @@
                 {% if perms.leave.change_leavetype and perms.leave.add_availableleave and perms.leave.delete_leavetype %}
                     <div class="oh-btn-group">
                         {% if compensatory %}
-                            <a href="{% url 'type-update' leave_type.id %}?compensatory=True" class="oh-btn oh-btn--info w-100">
+                            <a href="#" data-toggle="oh-modal-toggle" data-target="#objectCreateModal"
+                                hx-get="{% url 'type-update' leave_type.id %}?compensatory=True" hx-target="#objectCreateModalTarget"
+                                hx-on:click="$('#objectCreateModalTarget').css('max-width', '980px');"
+                                class="oh-btn oh-btn--info w-100">
                                 <ion-icon class="me-1" name="create-outline"></ion-icon>
                                 {% trans "Edit" %}
                             </a>
                         {% else %}
-                            <a href="{% url 'type-update' leave_type.id %}" class="oh-btn oh-btn--info w-50">
+                            <a href="#" data-toggle="oh-modal-toggle" data-target="#objectCreateModal"
+                                hx-get="{% url 'type-update' leave_type.id %}" hx-target="#objectCreateModalTarget"
+                                hx-on:click="$('#objectCreateModalTarget').css('max-width', '980px');"
+                                class="oh-btn oh-btn--info w-50">
                                 <ion-icon class="me-1" name="create-outline"></ion-icon>
                                 {% trans "Edit" %}
                             </a>

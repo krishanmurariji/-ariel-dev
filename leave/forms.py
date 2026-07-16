@@ -269,26 +269,6 @@ class UpdateLeaveTypeForm(ConditionForm):
         super().__init__(*args, **kwargs)
         self.fields["payment_percentage"].required = False
 
-        # Fields that must always be visible regardless of current value
-        js_managed = {"payment_type", "payment_percentage", "icon", "color", "name"}
-
-        for field_name, field in self.fields.items():
-            if field_name in js_managed:
-                continue
-            if isinstance(field.widget, forms.HiddenInput):
-                continue
-            instance_value = self.instance.__dict__.get(field_name)
-            # For FK fields Django stores the id with _id suffix
-            if instance_value is None:
-                instance_value = self.instance.__dict__.get(f"{field_name}_id")
-            if instance_value is None or instance_value == "":
-                field.widget.attrs["style"] = (
-                    "display:none;width:100%; height:50px;"
-                    "border: 1px solid hsl(213deg,22%,84%);"
-                    "border-radius: 0rem;padding: 0.8rem 1.25rem;"
-                )
-                field.widget.attrs["data-hidden"] = True
-
         if expire_date := self.instance.carryforward_expire_date:
             self.fields["carryforward_expire_date"].initial = expire_date
 

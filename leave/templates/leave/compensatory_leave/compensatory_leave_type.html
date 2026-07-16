@@ -58,7 +58,9 @@
                     <ul class="oh-dropdown__items">
                       {% if perms.leave.change_leavetype %}
                       <li class="oh-dropdown__item">
-                        <a href="{% url 'type-update' leave_type.id %}?compensatory=True" class="oh-dropdown__link">{% trans "Edit" %}</a>
+                        <a href="#" data-toggle="oh-modal-toggle" data-target="#objectDetailsModal"
+                          hx-get="{% url 'type-update' leave_type.id %}?compensatory=True" hx-target="#objectDetailsModalTarget"
+                          class="oh-dropdown__link">{% trans "Edit" %}</a>
                       </li>
                       {% endif %}
                     </ul>
