@@ -162,3 +162,10 @@ CLAUDE.md
 .mcp.json
 .mcp.safe.json
 .claudeignore
+
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
+
+# Local development databases
+db_new.sqlite3

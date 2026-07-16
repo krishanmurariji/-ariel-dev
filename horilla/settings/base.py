@@ -295,7 +295,7 @@ DJANGO_NOTIFICATIONS_CONFIG = {
 # ========================================
 # HORILLA-SPECIFIC SETTINGS
 # ========================================
-WHITE_LABELLING = False
+WHITE_LABELLING = True
 NESTED_SUBORDINATE_VISIBILITY = False
 TWO_FACTORS_AUTHENTICATION = False
 
