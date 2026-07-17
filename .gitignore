@@ -169,3 +169,5 @@ CLAUDE.md
 
 # Local development databases
 db_new.sqlite3
+TestDB.sqlite3
+*.enc
