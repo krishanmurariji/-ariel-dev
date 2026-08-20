@@ -1,0 +1,53 @@
+{% load i18n %}
+{% include "generic/horilla_form.html" %}
+<script>
+(function () {
+    function reloadStages(selectedStageId) {
+        var recId = $('#id_recruitment_id').val();
+        var $stageSelect = $('#id_stage_id');
+        if (!recId) {
+            $stageSelect.html('<option value="">{% trans "---Choose job opening first---" %}</option>');
+            return;
+        }
+        var url = "{% url 'recruitment-stage-options' 0 %}".replace('0', recId);
+        $.get(url, function (data) {
+            var options = '<option value="">{% trans "---Choose Stage---" %}</option>';
+            (data.stages || []).forEach(function (s) {
+                var pick = selectedStageId ? (String(s.id) === String(selectedStageId)) : s.initial;
+                options += '<option value="' + s.id + '"' + (pick ? ' selected' : '') + '>' + s.stage + '</option>';
+            });
+            $stageSelect.html(options);
+        });
+    }
+
+    $(document).off('change.movePipeline', '#id_recruitment_id')
+        .on('change.movePipeline', '#id_recruitment_id', function () {
+            reloadStages(null);
+        });
+
+    if ($('#id_recruitment_id').val()) {
+        reloadStages(null);
+    }
+
+    // HorillaFormView's own close-on-success script depends on a
+    // DOM-position lookup (.closest('.oh-modal--show')) off the <script>
+    // tag it injects, which htmx event-based hooks (htmx:afterSwap,
+    // htmx:afterRequest) proved unreliable at re-triggering from inside
+    // this modal. A MutationObserver sidesteps htmx's event system
+    // entirely: it reacts directly to the modal body's content actually
+    // changing, which is guaranteed to happen the instant the swap
+    // occurs. Once the job-opening field disappears from the modal body
+    // (a validation error would leave it in place), the move succeeded -
+    // force the modal closed.
+    var modalBody = document.getElementById('genericModalBody');
+    if (modalBody && window.MutationObserver) {
+        var moveModalObserver = new MutationObserver(function () {
+            if (!document.getElementById('id_recruitment_id')) {
+                $('#genericModal').removeClass('oh-modal--show');
+                moveModalObserver.disconnect();
+            }
+        });
+        moveModalObserver.observe(modalBody, { childList: true, subtree: true });
+    }
+})();
+</script>

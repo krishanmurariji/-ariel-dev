@@ -1,0 +1,26 @@
+{% load i18n %}
+<div onclick="event.stopPropagation();" class="oh-btn-group">
+    {% if perms.recruitment.change_candidateintakemailbox %}
+    <button
+      class="oh-btn oh-btn--light-bkg w-100"
+      title="{% trans 'Edit' %}"
+      data-toggle="oh-modal-toggle"
+      data-target="#genericModal"
+      hx-get="{% url 'candidate-intake-mailbox-update' instance.id %}?{{pd}}"
+      hx-target="#genericModalBody"
+    >
+      <ion-icon name="create-outline"></ion-icon>
+    </button>
+    {% endif %}
+    {% if perms.recruitment.delete_candidateintakemailbox %}
+    <a
+      class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100"
+      hx-confirm="{% trans 'Do you want to disconnect this mailbox?' %}"
+      hx-post="{% url 'candidate-intake-mailbox-delete' instance.id %}"
+      hx-target="#listContainer"
+      title="{% trans 'Disconnect' %}"
+    >
+      <ion-icon name="trash-outline"></ion-icon>
+    </a>
+    {% endif %}
+</div>

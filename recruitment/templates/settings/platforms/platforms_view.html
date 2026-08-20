@@ -1,0 +1,32 @@
+{% extends 'settings.html' %}
+{% block settings %}
+{% include "generic/components.html" %}
+<meta name="csrf-token" content="{{ csrf_token }}">
+{% load i18n static %}
+<div class="oh-inner-sidebar-content">
+  {% if perms.recruitment.add_recruitment %}
+  <div hx-get="{% url 'platforms-nav-view' %}" hx-trigger="load"></div>
+  {% endif %}
+  <div
+    class="oh-checkpoint-badge mb-2"
+    id="selectedInstances"
+    data-ids="[]"
+    data-clicked=""
+    style="display: none"
+  ></div>
+  <div class="oh-wrapper" id="listContainer">
+    <div class="animated-background"></div>
+  </div>
+</div>
+
+<div class="oh-modal" id="platformsModal" role="dialog" aria-hidden="true">
+  <div class="oh-modal__dialog" style="max-width: 550px">
+    <div class="oh-modal__dialog-header">
+      <button type="button" class="oh-modal__close" aria-label="Close"><ion-icon name="close-outline"></ion-icon></button>
+    </div>
+    <div class="oh-modal__dialog-body" id="platformsModalBody"></div>
+  </div>
+</div>
+
+<script src="{% static 'cbv/deleteFunc.js' %}"></script>
+{% endblock %}

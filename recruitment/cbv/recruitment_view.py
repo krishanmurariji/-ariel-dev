@@ -3,14 +3,18 @@ recruitment
 """
 
 from typing import Any
+from urllib.parse import quote
 
 from django import forms
 from django.contrib import messages
 from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, render
 from django.urls import reverse, reverse_lazy
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
+from django.views import View
 
+from base.forms import Form
 from base.models import IntegrationApps
 from horilla_views.cbv_methods import login_required, permission_required
 from horilla_views.generic.cbv.views import (
@@ -22,8 +26,75 @@ from horilla_views.generic.cbv.views import (
 )
 from recruitment.filters import RecruitmentFilter
 from recruitment.forms import AddCandidateForm, RecruitmentCreationForm, SkillsForm
-from recruitment.models import Candidate, Recruitment, Skill
+from recruitment.models import Candidate, Platform, Recruitment, Skill
 from recruitment.views.linkedin import delete_post, post_recruitment_in_linkedin
+
+
+class DynamicLinkForm(Form):
+    """
+    Form used to pick (or create) a Platform when generating a
+    dynamic, source-tagged application link for a Job Opening.
+    """
+
+    platform = forms.ModelChoiceField(
+        queryset=Platform.objects.all(),
+        required=False,
+        label=_("Source"),
+    )
+    new_platform = forms.CharField(
+        required=False,
+        label=_("Or type a new source name (e.g. LinkedIn, Indeed)"),
+    )
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(
+    permission_required(perm="recruitment.change_recruitment"), name="dispatch"
+)
+class RecruitmentDynamicLinkView(View):
+    """
+    Generates a shareable application-form link for a Recruitment,
+    tagged with a Platform (LinkedIn, Indeed, ...) via the standard
+    `utm_source` query parameter, so submissions can be traced back
+    to the channel they came from.
+    """
+
+    def get(self, *args, **kwargs):
+        request = self.request
+        recruitment = get_object_or_404(Recruitment, pk=self.kwargs.get("pk"))
+        form = DynamicLinkForm()
+        return render(
+            request,
+            "cbv/recruitment/dynamic_link_form.html",
+            {"form": form, "recruitment": recruitment},
+        )
+
+    def post(self, *args, **kwargs):
+        request = self.request
+        recruitment = get_object_or_404(Recruitment, pk=self.kwargs.get("pk"))
+        form = DynamicLinkForm(request.POST)
+        platform = None
+        if form.is_valid():
+            new_platform = form.cleaned_data.get("new_platform", "").strip()
+            if new_platform:
+                platform, _created = Platform.objects.get_or_create(
+                    title__iexact=new_platform, defaults={"title": new_platform}
+                )
+            else:
+                platform = form.cleaned_data.get("platform")
+
+        link = (
+            f"{request.scheme}://{request.get_host()}"
+            f"{reverse('application-form')}?recruitmentId={recruitment.pk}"
+        )
+        if platform:
+            link += f"&utm_source={quote(platform.title)}"
+
+        return render(
+            request,
+            "cbv/recruitment/dynamic_link_result.html",
+            {"link": link, "recruitment": recruitment},
+        )
 
 
 @method_decorator(login_required, name="dispatch")
@@ -69,13 +140,13 @@ class RecruitmentList(HorillaListView):
 
     columns = [
         (_("Recruitment"), "recruitment_column"),
-        (_("Managers"), "managers_column"),
+        (_("Interviewers"), "managers_column"),
         (_("Open Jobs"), "open_job_col"),
-        (_("Vaccancy"), "vacancy"),
+        (_("Vacancy"), "vacancy"),
         (_("Total Hires"), "tot_hires"),
         (_("Start Date"), "start_date"),
         (_("End date"), "end_date"),
-        (_("Status"), "status_col"),
+        (_("Status"), "closed_toggle"),
     ]
     action_method = "rec_actions"
 
@@ -113,7 +184,7 @@ class RecruitmentList(HorillaListView):
 
     sortby_mapping = [
         (_("Recruitment"), "recruitment_column"),
-        (_("Vaccancy"), "vacancy"),
+        (_("Vacancy"), "vacancy"),
         (_("Start Date"), "start_date"),
         (_("End date"), "end_date"),
     ]
@@ -176,8 +247,9 @@ class RecruitmentCreationFormExtended(RecruitmentCreationForm):
         fields = [
             "title",
             "description",
-            "open_positions",
             "recruitment_managers",
+            "recruitment_heads",
+            "open_positions",
             "start_date",
             "end_date",
             "vacancy",
@@ -204,7 +276,8 @@ class RecruitmentCreationFormExtended(RecruitmentCreationForm):
             "is_published": _("Is Published?"),
             "vacancy": _("Vacancy"),
             "open_positions": _("Job Position"),
-            "recruitment_managers": _("Managers"),
+            "recruitment_managers": _("Interviewers"),
+            "recruitment_heads": _("Recruitment Heads"),
             "optional_profile_image": _("Optional Profile Image?"),
             "optional_resume": _("Optional Resume?"),
         }
@@ -275,6 +348,8 @@ class RecruitmentForm(HorillaFormView):
             recruitment_managers = self.request.POST.getlist("recruitment_managers")
             if recruitment_managers:
                 recruitment.recruitment_managers.set(recruitment_managers)
+            recruitment_heads = self.request.POST.getlist("recruitment_heads")
+            recruitment.recruitment_heads.set(recruitment_heads)
             if recruitment.publish_in_linkedin and recruitment.linkedin_account_id:
                 delete_post(recruitment)
                 post_recruitment_in_linkedin(
@@ -286,6 +361,8 @@ class RecruitmentForm(HorillaFormView):
             recruitment_managers = self.request.POST.getlist("recruitment_managers")
             if recruitment_managers:
                 recruitment.recruitment_managers.set(recruitment_managers)
+            recruitment_heads = self.request.POST.getlist("recruitment_heads")
+            recruitment.recruitment_heads.set(recruitment_heads)
             if recruitment.publish_in_linkedin and recruitment.linkedin_account_id:
                 post_recruitment_in_linkedin(
                     self.request, recruitment, recruitment.linkedin_account_id
@@ -396,9 +473,9 @@ class RecruitmentDetailView(HorillaDetailedView):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.body = [
-            (_("Managers"), "managers_detail"),
+            (_("Interviewers"), "managers_detail"),
             (_("Open Jobs"), "open_job_detail"),
-            (_("Vaccancy"), "vacancy"),
+            (_("Vacancy"), "vacancy"),
             (_("Total Hires"), "tot_hires"),
             (_("Start Date"), "start_date"),
             (_("End date"), "end_date"),

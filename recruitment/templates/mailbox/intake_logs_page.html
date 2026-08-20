@@ -1,0 +1,46 @@
+{% extends 'index.html' %}
+{% block content %}
+{% load i18n %}{% load static %}
+{% include "generic/components.html" %}
+
+<div class="oh-wrapper">
+  <div hx-get="{% url "candidate-intake-log-nav" %}" hx-trigger="load">
+  </div>
+
+  <div
+    class="oh-checkpoint-badge mb-2"
+    id="selectedInstances"
+    data-ids="[]"
+    data-clicked=""
+    style="display: none"
+  ></div>
+
+  <div
+    id="listContainer"
+    hx-get="{% url "candidate-intake-log-list" %}"
+    hx-trigger="load, refreshIntakeLog from:body"
+  >
+    <div class="animated-background"></div>
+  </div>
+
+  <span
+    id="retrySelectedSpan"
+    hx-post="{% url 'candidate-intake-log-retry-selected' %}"
+    hx-swap="none"
+  ></span>
+</div>
+<script>
+  function retrySelectedIntakeLogs() {
+    var ids = JSON.parse($("#selectedInstances").attr("data-ids") || "[]");
+    if (ids.length === 0) {
+      alert("{% trans 'No rows selected.' %}");
+      return;
+    }
+    if (confirm("{% trans 'Retry processing for the selected emails? This re-fetches and reprocesses them regardless of their current status.' %}")) {
+      var hxVals = JSON.stringify(ids);
+      $("#retrySelectedSpan").attr("hx-vals", `{"ids":${hxVals}}`);
+      $("#retrySelectedSpan").click();
+    }
+  }
+</script>
+{% endblock %}

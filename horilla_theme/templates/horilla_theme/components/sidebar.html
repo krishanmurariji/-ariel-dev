@@ -222,16 +222,6 @@
         display: none !important;
     }
 
-    /* Collapsed: show the brand logo centred at the top of the rail, overriding
-       the general oh-sidebar-label opacity:0 rule just for this element. */
-    #sidebar:not(:hover):not(.sidebar-pinned) > div > div:first-child img.oh-sidebar-label {
-        flex: 0 0 auto !important;
-        width: 2rem !important;
-        height: 2rem !important;
-        overflow: visible !important;
-        opacity: 1 !important;
-    }
-
     /* Collapsed: circular icon buttons — full-circle, centred within the 48 px
        inner container with 4 px breathing room each side.
        The oh.css gray background is preserved (no override here) so buttons
@@ -369,7 +359,7 @@
                 {% if request.session.selected_company_instance %}
                     <img
                         src="{{ request.session.selected_company_instance.icon }}"
-                        class="oh-sidebar-label w-7 h-7 rounded-full flex-shrink-0"
+                        class="hidden"
                         title="{{ request.session.selected_company_instance.company }}"
                         alt="{{ request.session.selected_company_instance.company }}"
                     >
@@ -386,7 +376,7 @@
                     <img
                         src="{% if request.user.employee_get.employee_work_info.company_id.icon %}{{ request.user.employee_get.employee_work_info.company_id.icon.url }}{% else %}/static/horilla_theme/assets/img/horilla-logo.png{% endif %}"
                         alt="{% trans 'Company logo' %}"
-                        class="oh-sidebar-label w-7 h-7 rounded-full flex-shrink-0"
+                        class="hidden"
                     >
                     <div class="oh-sidebar__company-details oh-sidebar-label min-w-0">
                         <span

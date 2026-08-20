@@ -1,0 +1,48 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+
+  <div class="flex items-center justify-between gap-3 mb-5 flex-wrap">
+    <h1 class="text-xl font-bold">{% if edit_instance %}{% trans "Edit Tax Regime" %} — {{ edit_instance.name }}{% else %}{% trans "Create Tax Regime" %}{% endif %}</h1>
+    <a href="{% url 'pp-tax-regimes' %}" class="text-primary-600 text-sm font-semibold flex items-center gap-1">
+      <ion-icon name="arrow-back-outline"></ion-icon>{% trans "Back" %}
+    </a>
+  </div>
+
+  {% if locked %}
+  <div class="bg-warning-light border border-warning-light rounded-md p-3.5 mb-4 flex items-center gap-3 flex-wrap text-xs">
+    <span>
+      {% blocktrans count counter=edit_instance.current_employee_count %}This regime is currently taxing {{ counter }} employee — only the name and description can be changed. Duplicate it to change slabs or deduction rules.{% plural %}This regime is currently taxing {{ counter }} employees — only the name and description can be changed. Duplicate it to change slabs or deduction rules.{% endblocktrans %}
+    </span>
+    <span class="flex-1"></span>
+    {% if perms.payroll_pro.add_taxregime %}
+    <form method="post" action="{% url 'pp-tax-regime-duplicate' edit_instance.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="oh-btn oh-btn--secondary oh-btn--small">
+        <ion-icon name="copy-outline" class="me-1"></ion-icon>{% trans "Duplicate" %}
+      </button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5">
+    <form id="regimeForm" method="post" action="{% url 'pp-tax-regime-save' %}">
+      {% csrf_token %}
+      {% if edit_instance %}<input type="hidden" name="pk" value="{{ edit_instance.pk }}">{% endif %}
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
+        <div>{% include "payroll_pro/_form_fields.html" %}</div>
+        <div class="mt-2 lg:mt-0 lg:border-l lg:border-[#ebebeb] lg:pl-8">
+          {% include "payroll_pro/_slab_rows.html" with prefix="form" slabs=edit_instance.ordered_slabs locked=locked %}
+        </div>
+      </div>
+    </form>
+    <div class="flex justify-end gap-2 pt-4 mt-4 border-t border-[#ebebeb]">
+      <a href="{% url 'pp-tax-regimes' %}" class="oh-btn oh-btn--light">{% trans "Cancel" %}</a>
+      <button type="submit" form="regimeForm" class="oh-btn oh-btn--secondary">{% trans "Save" %}</button>
+    </div>
+  </div>
+</div>
+{% endblock %}

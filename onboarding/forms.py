@@ -34,7 +34,14 @@ from django.utils.translation import gettext_lazy as _
 from base.forms import ModelForm
 from base.methods import reload_queryset
 from employee.filters import EmployeeFilter
-from employee.models import Employee, EmployeeBankDetails
+from employee.models import (
+    Employee,
+    EmployeeBankDetails,
+    EmployeeEducation,
+    EmployeeEmergencyContact,
+    EmployeeExperience,
+    phone_validator,
+)
 from horilla_auth.models import HorillaUser
 from horilla_widgets.widgets.horilla_multi_select_field import HorillaMultiSelectField
 from horilla_widgets.widgets.select_widgets import HorillaMultiSelectWidget
@@ -330,23 +337,18 @@ class EmployeeCreationForm(ModelForm):
 
     employee_first_name = forms.CharField(required=True, label=_("First Name"))
     employee_last_name = forms.CharField(required=False, label=_("Last Name"))
-    phone = forms.CharField(required=True, label=_("Phone"))
+    # Overriding the field like this bypasses the model field's own
+    # validators=[phone_validator] (ModelForm only auto-applies those to
+    # fields it generates itself from the model) - re-declared explicitly
+    # here so phone format is still actually checked.
+    phone = forms.CharField(
+        required=True, label=_("Phone"), validators=[phone_validator]
+    )
     address = forms.CharField(required=True, label=_("Address"))
     country = forms.CharField(required=True, label=_("Country"))
     state = forms.CharField(required=True, label=_("State"))
     zip = forms.CharField(required=True, label=_("Zip"))
-    qualification = forms.CharField(required=True, label=_("Qualification"))
-    experience = forms.IntegerField(required=True, label=_("Experience"))
     children = forms.IntegerField(required=True, label=_("Children"))
-    emergency_contact = forms.CharField(
-        required=True, label=_("Emergency Contact Number")
-    )
-    emergency_contact_name = forms.CharField(
-        required=True, label=_("Emergency Contact Name")
-    )
-    emergency_contact_relation = forms.CharField(
-        required=True, label=_("Emergency Contact Relation")
-    )
 
     class Meta:
         """
@@ -363,23 +365,213 @@ class EmployeeCreationForm(ModelForm):
             "additional_info",
             "is_from_onboarding",
             "is_directly_converted",
+            # Replaced by build_employee_emergency_contact_formset below - a single
+            # employee can have more than one emergency contact now, these
+            # three flat fields only ever held one. Kept on the model
+            # itself (existing reports/exports/API still read them).
+            "emergency_contact",
+            "emergency_contact_name",
+            "emergency_contact_relation",
+            # Replaced by EmployeeEducationFormSet/EmployeeExperienceFormSet
+            # below - the candidate already gave this as multiple
+            # structured entries on the application form, so this onboarding
+            # step reviews/edits those instead of asking for one flat
+            # summary. Kept on the model itself (existing reports/exports/
+            # API still read them) but no longer collected here.
+            "qualification",
+            "experience",
         )
         widgets = {
             "dob": DateInput(attrs={"type": "date"}),
         }
 
+    def clean_dob(self):
+        # Mirrors recruitment.forms.ApplicationForm.clean_dob - same rule
+        # applied on the candidate side, kept consistent here.
+        dob = self.cleaned_data.get("dob")
+        if dob:
+            today = date.today()
+            if dob > today:
+                raise ValidationError(_("Date of birth cannot be in the future."))
+            age = (
+                today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+            )
+            if age < 15:
+                raise ValidationError(_("Employee must be at least 15 years old."))
+            if age > 100:
+                raise ValidationError(_("Enter a valid date of birth."))
+        return dob
+
     def clean(self):
         cleaned_data = self.cleaned_data
-        if cleaned_data["experience"] and cleaned_data["experience"] < 0:
-            raise ValidationError(
-                {"experience": _("Experience should be a postive integier")}
-            )
         if cleaned_data["children"] and cleaned_data["children"] < 0:
             raise ValidationError(
                 {"children": _("No of children should be a postive integier")}
             )
 
         return super().clean()
+
+
+_TEXT_INPUT_CLASS = "oh-input w-100 mb-2"
+_DATE_INPUT_CLASS = "oh-input w-100 mb-2"
+
+
+class EmployeeEducationForm(forms.ModelForm):
+    """Adds date-ordering validation on top of the plain ModelForm the
+    factory would otherwise auto-generate - inlineformset_factory doesn't
+    let you attach a clean() without passing a real form class."""
+
+    class Meta:
+        model = EmployeeEducation
+        fields = [
+            "degree",
+            "specialization",
+            "percentage_cgpa",
+            "start_date",
+            "end_date",
+            "university",
+            "location",
+        ]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("DELETE"):
+            return cleaned_data
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+        if start_date and start_date > date.today():
+            self.add_error(
+                "start_date", _("Start of course cannot be in the future.")
+            )
+        if start_date and end_date and end_date < start_date:
+            self.add_error(
+                "end_date", _("End of course cannot be before the start of course.")
+            )
+        return cleaned_data
+
+
+class EmployeeExperienceForm(forms.ModelForm):
+    """See EmployeeEducationForm docstring."""
+
+    class Meta:
+        model = EmployeeExperience
+        fields = ["company_name", "designation", "start_date", "end_date", "location"]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("DELETE"):
+            return cleaned_data
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+        today = date.today()
+        if start_date and start_date > today:
+            self.add_error(
+                "start_date", _("Date of joining cannot be in the future.")
+            )
+        if end_date and end_date > today:
+            self.add_error(
+                "end_date", _("Date of relieving cannot be in the future.")
+            )
+        if start_date and end_date and end_date < start_date:
+            self.add_error(
+                "end_date",
+                _("Date of relieving cannot be before the date of joining."),
+            )
+        return cleaned_data
+
+
+def build_employee_education_formset(extra=0):
+    """
+    extra is set by the caller based on how many rows need to be shown
+    blank/prefilled (see onboarding.views.employee_creation) - inline
+    formsets only render `extra` rows beyond whatever the bound instance
+    already has saved, so a fixed extra=0 factory can't also be used to
+    seed rows from the candidate's application data.
+    """
+    return forms.inlineformset_factory(
+        Employee,
+        EmployeeEducation,
+        form=EmployeeEducationForm,
+        fields=[
+            "degree",
+            "specialization",
+            "percentage_cgpa",
+            "start_date",
+            "end_date",
+            "university",
+            "location",
+        ],
+        widgets={
+            "degree": forms.TextInput(attrs={"class": _TEXT_INPUT_CLASS}),
+            "specialization": forms.TextInput(attrs={"class": _TEXT_INPUT_CLASS}),
+            "percentage_cgpa": forms.TextInput(attrs={"class": _TEXT_INPUT_CLASS}),
+            "university": forms.TextInput(attrs={"class": _TEXT_INPUT_CLASS}),
+            "location": forms.TextInput(attrs={"class": _TEXT_INPUT_CLASS}),
+            "start_date": DateInput(
+                attrs={"type": "date", "class": _DATE_INPUT_CLASS}
+            ),
+            "end_date": DateInput(attrs={"type": "date", "class": _DATE_INPUT_CLASS}),
+        },
+        extra=extra,
+        can_delete=True,
+    )
+
+
+def build_employee_experience_formset(extra=0):
+    """
+    See build_employee_education_formset docstring re: extra.
+
+    is_current_job is deliberately NOT in fields - by the time someone
+    reaches this onboarding step they've already been hired here, so
+    "currently working" at a *different* company no longer makes sense to
+    offer as an option. onboarding.views.employee_creation forces every
+    row back to is_current_job=False on save regardless of what was set
+    when the candidate originally applied, so the template only ever
+    needs to show a relieving date, never the checkbox.
+    """
+    return forms.inlineformset_factory(
+        Employee,
+        EmployeeExperience,
+        form=EmployeeExperienceForm,
+        fields=[
+            "company_name",
+            "designation",
+            "start_date",
+            "end_date",
+            "location",
+        ],
+        widgets={
+            "company_name": forms.TextInput(attrs={"class": _TEXT_INPUT_CLASS}),
+            "designation": forms.TextInput(attrs={"class": _TEXT_INPUT_CLASS}),
+            "location": forms.TextInput(attrs={"class": _TEXT_INPUT_CLASS}),
+            "start_date": DateInput(
+                attrs={"type": "date", "class": _DATE_INPUT_CLASS}
+            ),
+            "end_date": DateInput(attrs={"type": "date", "class": _DATE_INPUT_CLASS}),
+        },
+        extra=extra,
+        can_delete=True,
+    )
+
+
+def build_employee_emergency_contact_formset(extra=0):
+    """
+    See build_employee_education_formset docstring re: extra - a fixed
+    extra=0 factory can't also seed rows from the candidate's own
+    emergency contacts.
+    """
+    return forms.inlineformset_factory(
+        Employee,
+        EmployeeEmergencyContact,
+        fields=["name", "phone", "relation"],
+        widgets={
+            "name": forms.TextInput(attrs={"class": _TEXT_INPUT_CLASS}),
+            "phone": forms.TextInput(attrs={"class": _TEXT_INPUT_CLASS}),
+            "relation": forms.TextInput(attrs={"class": _TEXT_INPUT_CLASS}),
+        },
+        extra=extra,
+        can_delete=True,
+    )
 
 
 class BankDetailsCreationForm(ModelForm):

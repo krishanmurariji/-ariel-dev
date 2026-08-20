@@ -1,0 +1,115 @@
+<style>
+/* ============================================================
+   Payroll Pro — native Horilla skin.
+   Colors/spacing come from the app's Tailwind theme (primary-*)
+   and oh-* components; only widgets the design system doesn't
+   ship (month chips, wizard tiles, payslip sheet, statutory
+   cards) are styled here, with body.dark overrides for each.
+   ============================================================ */
+
+/* page entrance animation */
+.pp-fade { animation: ppFadeIn .28s ease both; }
+@keyframes ppFadeIn { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform:none; } }
+.pp-fade > * { animation: ppFadeIn .34s ease both; }
+.pp-fade > *:nth-child(2){ animation-delay:.04s; }
+.pp-fade > *:nth-child(3){ animation-delay:.08s; }
+.pp-fade > *:nth-child(4){ animation-delay:.12s; }
+
+/* card hover lift (used with bg-white rounded-md shadow-card) */
+.pp-lift { transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease; }
+.pp-lift:hover { box-shadow: 0 10px 24px rgba(0,0,0,.09); transform: translateY(-2px); }
+body.dark .pp-lift:hover { box-shadow: 0 10px 24px rgba(0,0,0,.55); }
+
+/* month strip */
+.pp-month-strip { display:flex; gap:.375rem; overflow-x:auto; padding:.25rem .125rem .5rem; }
+.pp-month-chip { min-width:86px; text-align:center; border:1px solid #e5e7eb; border-radius:.5rem;
+  background:#fff; padding:.5rem .375rem; font-size:.75rem; flex-shrink:0; text-decoration:none;
+  color:inherit; transition: all .18s ease; }
+.pp-month-chip:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+.pp-month-chip .m { font-weight:700; display:block; font-size:.78rem; }
+.pp-month-chip .st { font-size:.62rem; display:block; margin-top:.2rem; color:#9ca3af; text-transform:uppercase; letter-spacing:.03em; }
+.pp-month-chip.completed .st { color:#22c55e; }
+.pp-month-chip.completed { border-color:#86efac; }
+body.dark .pp-month-chip { background:#242424; border-color:#3a3a3a; }
+body.dark .pp-month-chip .st { color:#8a8a8a; }
+
+/* avatar stack */
+.pp-avatars { display:flex; align-items:center; }
+.pp-avatars img { width:30px; height:30px; border-radius:9999px; object-fit:cover;
+  border:2px solid #fff; margin-left:-8px; transition: transform .15s ease; }
+.pp-avatars img:first-child { margin-left:0; }
+.pp-avatars img:hover { transform: translateY(-3px) scale(1.12); z-index:5; position:relative; }
+.pp-avatars .pp-avatars__more { width:30px; height:30px; border-radius:9999px; margin-left:-8px;
+  display:flex; align-items:center; justify-content:center; font-size:.65rem; font-weight:700;
+  background:#f3f4f6; color:#4b5563; border:2px solid #fff; }
+body.dark .pp-avatars img, body.dark .pp-avatars .pp-avatars__more { border-color:#242424; }
+body.dark .pp-avatars .pp-avatars__more { background:#3a3a3a; color:#cfcfcf; }
+
+/* payslip sheet — header uses the theme primary via inline tailwind classes */
+.pp-payslip-table { width:100%; border-collapse:collapse; font-size:.8rem; }
+.pp-payslip-table td { padding:.5rem .875rem; border-bottom:1px solid #f3f4f6; vertical-align:top; }
+.pp-payslip-table td.amt { text-align:right; white-space:nowrap; }
+.pp-payslip-table td.divider { border-left:1px solid #e5e7eb; }
+body.dark .pp-payslip-table td { border-bottom-color:#333; }
+body.dark .pp-payslip-table td.divider { border-left-color:#333; }
+
+/* number inputs inside step tables */
+.pp-num { max-width:110px; }
+
+/* smooth default transition for interactive things in pp pages */
+.pp-fade a, .pp-fade button { transition: background-color .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease; }
+
+/* statutory-component cards (Salary Structure form) */
+.pp-stat-card { background:#fff; border:1px solid #ebebeb; border-radius:.5rem; padding:1rem; }
+body.dark .pp-stat-card { background:#242424; border-color:#3a3a3a; }
+.pp-stat-card__head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.75rem; }
+.pp-stat-card__head h4 { font-size:.85rem; font-weight:600; }
+.pp-stat-card__hint { font-size:.72rem; color:#9ca3af; font-style:italic; margin-top:.6rem; line-height:1.4; }
+</style>
+
+<!-- Shared payroll_pro modal — one small centered .oh-modal shell, reused
+     for delete-dependency summaries, the Tax Regime "View" detail, and the
+     Run Payroll review row detail. Triggers just need:
+     hx-get="<url>" hx-target="#ppMiniModalTarget" hx-swap="innerHTML"
+     data-toggle="oh-modal-toggle" data-target="#ppMiniModal" -->
+<div class="oh-modal" id="ppMiniModal" role="dialog" aria-hidden="true">
+  <div class="oh-modal__dialog" id="ppMiniModalTarget" style="max-width:760px;"></div>
+</div>
+
+<script>
+function ppLinkedDays(input, otherName, total){
+  var v = parseFloat(input.value)||0;
+  if(v<0) v=0; if(v>total) v=total;
+  input.value=v;
+  var other = input.closest('tr').querySelector('[name="'+otherName+'"]');
+  if(other) other.value = (total - v);
+  var payable = input.closest('tr').querySelector('.pp-payable');
+  if(payable){
+    var lop = input.name.indexOf('_lop')>-1 ? v : (total - v);
+    payable.textContent = (total-lop) + ' / ' + total;
+  }
+}
+function ppAddSlabRow(btn, prefix){
+  var tbody = document.getElementById(prefix + '-slab-body');
+  var row = tbody.querySelector('tr').cloneNode(true);
+  row.querySelectorAll('input').forEach(function(i){ i.value=''; });
+  tbody.appendChild(row);
+}
+function ppRemoveSlabRow(btn){
+  var tbody = btn.closest('tbody');
+  if(tbody.querySelectorAll('tr').length > 1){ btn.closest('tr').remove(); }
+  else { btn.closest('tr').querySelectorAll('input').forEach(function(i){ i.value=''; }); }
+}
+function ppEditComponentRow(pk){
+  var display = document.getElementById('comprow' + pk);
+  var edit = document.getElementById('compedit' + pk);
+  if(display) display.classList.add('hidden');
+  if(edit) edit.classList.remove('hidden');
+}
+function ppCancelComponentRow(pk){
+  var display = document.getElementById('comprow' + pk);
+  var edit = document.getElementById('compedit' + pk);
+  if(edit) edit.classList.add('hidden');
+  if(display) display.classList.remove('hidden');
+}
+</script>

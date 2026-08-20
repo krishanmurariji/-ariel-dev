@@ -1,0 +1,220 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+
+  <div class="flex items-center justify-between gap-3 mb-5 flex-wrap">
+    <h1 class="text-xl font-bold">{% if edit_instance %}{% trans "Edit Structure" %} — {{ edit_instance.name }}{% else %}{% trans "Create Salary Structure" %}{% endif %}</h1>
+    <a href="{% if edit_instance %}{% url 'pp-structure-detail' edit_instance.pk %}{% else %}{% url 'pp-structures' %}{% endif %}"
+       class="text-primary-600 text-sm font-semibold flex items-center gap-1">
+      <ion-icon name="arrow-back-outline"></ion-icon>{% trans "Back" %}
+    </a>
+  </div>
+
+  {% if locked %}
+  <div class="bg-warning-light border border-warning-light rounded-md p-3.5 mb-4 flex items-center gap-3 flex-wrap text-xs">
+    <span>
+      {% blocktrans count counter=edit_instance.assigned_employee_count %}This structure is currently assigned to {{ counter }} employee — only the name and description can be changed. Duplicate it to change PF, PT, gratuity, TDS or components.{% plural %}This structure is currently assigned to {{ counter }} employees — only the name and description can be changed. Duplicate it to change PF, PT, gratuity, TDS or components.{% endblocktrans %}
+    </span>
+    <span class="flex-1"></span>
+    {% if perms.payroll_pro.add_salarystructure %}
+    <form method="post" action="{% url 'pp-structure-duplicate' edit_instance.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="oh-btn oh-btn--secondary oh-btn--small">
+        <ion-icon name="copy-outline" class="me-1"></ion-icon>{% trans "Duplicate" %}
+      </button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <form id="structureForm" method="post"
+        action="{% if edit_instance %}{% url 'pp-structure-update' edit_instance.pk %}{% else %}{% url 'pp-structure-create' %}{% endif %}">
+    {% csrf_token %}
+
+    <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5 mb-4">
+      <h3 class="text-sm font-semibold mb-3">{% trans "General" %}</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+        <div class="mb-2 sm:col-span-2">
+          <label class="oh-label" for="{{ form.name.id_for_label }}">{{ form.name.label }} <span class="text-danger">*</span></label>
+          {{ form.name }}
+          {% for error in form.name.errors %}<div class="text-xs text-danger mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="mb-2 sm:col-span-2">
+          <label class="oh-label" for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+          {{ form.description }}
+        </div>
+        <div class="mb-2">
+          <label class="oh-label" for="{{ form.gross_mode.id_for_label }}">{{ form.gross_mode.label }} <span class="text-danger">*</span></label>
+          {{ form.gross_mode }}
+        </div>
+        <div class="mb-2" id="grossPctField" {% if form.gross_mode.value != 'pct' %}style="display:none"{% endif %}>
+          <label class="oh-label" for="{{ form.gross_pct.id_for_label }}">{{ form.gross_pct.label }} <span class="text-danger">*</span></label>
+          {{ form.gross_pct }}
+          {% for error in form.gross_pct.errors %}<div class="text-xs text-danger mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="mb-2 sm:col-span-2" id="grossFormulaField" {% if form.gross_mode.value != 'formula' %}style="display:none"{% endif %}>
+          <label class="oh-label" for="{{ form.gross_formula.id_for_label }}">{{ form.gross_formula.label }} <span class="text-danger">*</span></label>
+          {{ form.gross_formula }}
+          {% if form.gross_formula.help_text %}<div class="text-xs text-dark-400 mt-1">{{ form.gross_formula.help_text }}</div>{% endif %}
+          {% for error in form.gross_formula.errors %}<div class="text-xs text-danger mt-1">{{ error }}</div>{% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <h3 class="text-sm font-semibold mb-3">{% trans "Statutory components" %}</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+
+      <!-- Provident Fund -->
+      <div class="pp-stat-card">
+        <div class="pp-stat-card__head">
+          <h4>{% trans "Provident Fund (PF)" %}</h4>
+          <div class="oh-switch">{{ form.pf_enabled }}</div>
+        </div>
+        <div class="grid grid-cols-2 gap-x-3">
+          <div class="mb-2">
+            <label class="oh-label" for="{{ form.pf_employee_pct.id_for_label }}">{{ form.pf_employee_pct.label }}</label>
+            {{ form.pf_employee_pct }}
+            {% for error in form.pf_employee_pct.errors %}<div class="text-xs text-danger mt-1">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="mb-2">
+            <label class="oh-label" for="{{ form.pf_employer_pct.id_for_label }}">{{ form.pf_employer_pct.label }}</label>
+            {{ form.pf_employer_pct }}
+            {% for error in form.pf_employer_pct.errors %}<div class="text-xs text-danger mt-1">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="mb-2">
+            <label class="oh-label block" for="{{ form.pf_ceiling_enabled.id_for_label }}">{% trans "Cap PF contribution amount?" %}</label>
+            <div class="oh-switch">{{ form.pf_ceiling_enabled }}</div>
+          </div>
+          <div class="mb-2">
+            <label class="oh-label" for="{{ form.pf_wage_ceiling.id_for_label }}">{% trans "Maximum PF (₹/month)" %}</label>
+            {{ form.pf_wage_ceiling }}
+          </div>
+        </div>
+        <p class="pp-stat-card__hint">{% trans "Maximum PF caps the computed Employee & Employer PF amount itself." %}</p>
+      </div>
+
+      <!-- Professional Tax -->
+      <div class="pp-stat-card">
+        <div class="pp-stat-card__head">
+          <h4>{% trans "Professional Tax (PT)" %}</h4>
+          <div class="oh-switch">{{ form.pt_enabled }}</div>
+        </div>
+        <div class="grid grid-cols-2 gap-x-3">
+          <div class="mb-2">
+            <label class="oh-label" for="{{ form.pt_threshold.id_for_label }}">{% trans "Slab threshold (₹/mo gross)" %}</label>
+            {{ form.pt_threshold }}
+          </div>
+          <div class="mb-2">
+            <label class="oh-label" for="{{ form.pt_amount.id_for_label }}">{% trans "PT amount above threshold (₹)" %}</label>
+            {{ form.pt_amount }}
+          </div>
+        </div>
+        <p class="pp-stat-card__hint">{% trans "A flat PT amount applies once monthly gross crosses the threshold." %}</p>
+      </div>
+
+      <!-- TDS -->
+      <div class="pp-stat-card">
+        <div class="pp-stat-card__head">
+          <h4>{% trans "TDS (Income Tax)" %}</h4>
+          <div class="oh-switch">{{ form.tds_enabled }}</div>
+        </div>
+        <div class="mb-2">
+          <label class="oh-label" for="{{ form.tax_regime_id.id_for_label }}">{{ form.tax_regime_id.label }}</label>
+          {{ form.tax_regime_id }}
+          {% for error in form.tax_regime_id.errors %}<div class="text-xs text-danger mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <p class="pp-stat-card__hint">{% trans "Every employee on this structure is taxed under this regime — new/old slabs with Section 87A rebate and cess, divided over 12 months. Can be overridden per employee in Run Payroll → Override." %}</p>
+      </div>
+
+      <!-- Gratuity -->
+      <div class="pp-stat-card">
+        <div class="pp-stat-card__head">
+          <h4>{% trans "Gratuity" %}</h4>
+          <div class="oh-switch">{{ form.gratuity_enabled }}</div>
+        </div>
+        <div class="mb-2">
+          <label class="oh-label" for="{{ form.gratuity_pct.id_for_label }}">{{ form.gratuity_pct.label }}</label>
+          {{ form.gratuity_pct }}
+          {% for error in form.gratuity_pct.errors %}<div class="text-xs text-danger mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <p class="pp-stat-card__hint">{% trans "Standard statutory formula: Basic × 15 ÷ 26 per year of service ≈ 4.81% of Basic per month. This is an employer cost accrual — not deducted from employee pay." %}</p>
+      </div>
+    </div>
+
+    {% if not edit_instance %}
+      <p class="text-xs text-dark-400 mb-4">{% trans "Seeded with Basic, HRA, Conveyance, Medical Allowance and a balancing Special Allowance — fine-tune them after creating." %}</p>
+    {% endif %}
+
+    <div class="flex justify-end gap-2">
+      <a href="{% if edit_instance %}{% url 'pp-structure-detail' edit_instance.pk %}{% else %}{% url 'pp-structures' %}{% endif %}" class="oh-btn oh-btn--light">{% trans "Cancel" %}</a>
+      <button type="submit" class="oh-btn oh-btn--secondary">{% if edit_instance %}{% trans "Save" %}{% else %}{% trans "Create" %}{% endif %}</button>
+    </div>
+  </form>
+</div>
+<script>
+function ppToggleGrossFields(sel){
+  document.getElementById('grossPctField').style.display = sel.value === 'pct' ? '' : 'none';
+  document.getElementById('grossFormulaField').style.display = sel.value === 'formula' ? '' : 'none';
+}
+document.getElementById('{{ form.gross_mode.id_for_label }}').addEventListener('change', function(){ ppToggleGrossFields(this); });
+
+{% if not locked %}
+// Master/sub-field hierarchy: a disabled master greys out its dependents.
+//
+// Two flavours on purpose:
+// - ppSetFieldDisabled: for fields that are safe to omit entirely (optional
+//   FK / a boolean sub-toggle) — disabled inputs are dropped from the POST,
+//   which is fine here since the server treats "missing" as empty/False.
+// - ppSetFieldReadOnly: for the numeric PF/PT/Gratuity values, which the
+//   model requires a number for even while their section is off. Using
+//   `disabled` on these would drop them from the submission and make the
+//   server reject the whole save with "This field is required" — readOnly
+//   still submits the current value (so it's preserved if re-enabled later)
+//   while still blocking the user from editing it.
+function ppSetFieldDisabled(id, enabled){
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.disabled = !enabled;
+  el.style.opacity = enabled ? '' : '0.5';
+}
+function ppSetFieldReadOnly(id, enabled){
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.readOnly = !enabled;
+  el.style.opacity = enabled ? '' : '0.5';
+}
+function ppUpdatePfHierarchy(){
+  var pfOn = document.getElementById('{{ form.pf_enabled.id_for_label }}').checked;
+  var ceilingCheckbox = document.getElementById('{{ form.pf_ceiling_enabled.id_for_label }}');
+  ppSetFieldReadOnly('{{ form.pf_employee_pct.id_for_label }}', pfOn);
+  ppSetFieldReadOnly('{{ form.pf_employer_pct.id_for_label }}', pfOn);
+  ppSetFieldDisabled('{{ form.pf_ceiling_enabled.id_for_label }}', pfOn);
+  ppSetFieldReadOnly('{{ form.pf_wage_ceiling.id_for_label }}', pfOn && ceilingCheckbox.checked);
+}
+function ppUpdatePtHierarchy(){
+  var on = document.getElementById('{{ form.pt_enabled.id_for_label }}').checked;
+  ppSetFieldReadOnly('{{ form.pt_threshold.id_for_label }}', on);
+  ppSetFieldReadOnly('{{ form.pt_amount.id_for_label }}', on);
+}
+function ppUpdateGratuityHierarchy(){
+  var on = document.getElementById('{{ form.gratuity_enabled.id_for_label }}').checked;
+  ppSetFieldReadOnly('{{ form.gratuity_pct.id_for_label }}', on);
+}
+function ppUpdateTdsHierarchy(){
+  var on = document.getElementById('{{ form.tds_enabled.id_for_label }}').checked;
+  ppSetFieldDisabled('{{ form.tax_regime_id.id_for_label }}', on);
+}
+document.getElementById('{{ form.pf_enabled.id_for_label }}').addEventListener('change', ppUpdatePfHierarchy);
+document.getElementById('{{ form.pf_ceiling_enabled.id_for_label }}').addEventListener('change', ppUpdatePfHierarchy);
+document.getElementById('{{ form.pt_enabled.id_for_label }}').addEventListener('change', ppUpdatePtHierarchy);
+document.getElementById('{{ form.gratuity_enabled.id_for_label }}').addEventListener('change', ppUpdateGratuityHierarchy);
+document.getElementById('{{ form.tds_enabled.id_for_label }}').addEventListener('change', ppUpdateTdsHierarchy);
+ppUpdatePfHierarchy();
+ppUpdatePtHierarchy();
+ppUpdateGratuityHierarchy();
+ppUpdateTdsHierarchy();
+{% endif %}
+</script>
+{% endblock %}

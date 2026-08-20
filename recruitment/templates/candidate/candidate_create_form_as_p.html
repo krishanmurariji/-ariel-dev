@@ -42,3 +42,38 @@
         {% endif %}
     {% endfor %}
 </div>
+<script>
+  (function () {
+    var CREATE_VALUE = "__create_new__";
+    var platformSelect = document.getElementById("{{ form.platform.id_for_label }}");
+    var newPlatformInput = document.getElementById("{{ form.new_platform.id_for_label }}");
+    if (!platformSelect || !newPlatformInput) {
+      return;
+    }
+    var newPlatformGroup = newPlatformInput.closest(".oh-input__group") || newPlatformInput.closest(".col-lg-6");
+
+    if (!platformSelect.querySelector('option[value="' + CREATE_VALUE + '"]')) {
+      var createOption = document.createElement("option");
+      createOption.value = CREATE_VALUE;
+      createOption.textContent = "{% trans 'Create New Source' %}";
+      platformSelect.appendChild(createOption);
+    }
+
+    function syncPlatformMode() {
+      var isCreate = platformSelect.value === CREATE_VALUE;
+      if (newPlatformGroup) {
+        newPlatformGroup.style.display = isCreate ? "" : "none";
+      }
+      // A real Platform pk must reach the "platform" field, so the select
+      // is only submitted under that name when it holds a real choice -
+      // otherwise "__create_new__" would fail ModelChoiceField validation.
+      platformSelect.name = isCreate ? "" : "platform";
+      if (isCreate) {
+        newPlatformInput.value = "";
+      }
+    }
+
+    platformSelect.addEventListener("change", syncPlatformMode);
+    syncPlatformMode();
+  })();
+</script>

@@ -6,12 +6,16 @@ from typing import Any
 
 from django.contrib import messages
 from django.core.cache import cache as CACHE
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models import F
+from django.http import HttpResponse, JsonResponse
 from django.urls import reverse, reverse_lazy
 from django.utils.decorators import method_decorator
 from django.utils.http import urlencode
 from django.utils.translation import gettext_lazy as _
 
 from horilla.decorators import hx_request_required
+from horilla.decorators import login_required as fbv_login_required
 from horilla_views.cbv_methods import login_required
 from horilla_views.generic.cbv.kanban import HorillaKanbanView
 from horilla_views.generic.cbv.views import (
@@ -24,10 +28,13 @@ from horilla_views.generic.cbv.views import (
 )
 from recruitment import filters, forms, models
 from recruitment.cbv_decorators import manager_can_enter
+from recruitment.decorators import manager_can_enter as fbv_manager_can_enter
 from recruitment.templatetags.recruitmentfilters import (
     recruitment_manages,
     stage_manages,
 )
+from recruitment.views import ai_scoring
+from recruitment.views.views import is_recruitmentmanager, is_stagemanager
 
 
 @method_decorator(login_required, name="dispatch")
@@ -273,6 +280,8 @@ class CandidateList(HorillaListView):
         (_("Email"), "mail_indication"),
         (_("Stage"), "stage_drop_down"),
         (_("Rating"), "rating_bar"),
+        (_("AI Score"), "ai_score_number"),
+        (_("Date of Apply"), "applied_on_display"),
         (_("Hired Date"), "hired_date"),
         (_("Scheduled Interview"), "get_interview_count"),
         (_("Job Position"), "job_position_id__job_position"),
@@ -284,6 +293,7 @@ class CandidateList(HorillaListView):
         (_("Email"), "mail_indication"),
         (_("Stage"), "stage_id"),
         (_("Rating"), "get_avg_rating"),
+        (_("Date of Apply"), "applied_on_display"),
         (_("Hired Date"), "hired_date"),
         (_("Scheduled Interview"), "get_total_interview"),
         (_("Job Position"), "job_position_id__job_position"),
@@ -294,6 +304,8 @@ class CandidateList(HorillaListView):
         (_("Name"), "candidate_name", "get_avatar"),
         (_("Email"), "mail_indication"),
         (_("Stage"), "stage_drop_down"),
+        (_("AI Score"), "ai_score_number"),
+        (_("Date of Apply"), "applied_on_display"),
     ]
 
     bulk_update_fields = [
@@ -382,6 +394,17 @@ class CandidateList(HorillaListView):
                 href="{get_resume_url}" target="_blank"
             """,
         },
+        {
+            "action": _("Move to Pipeline"),
+            "icon": "swap-horizontal-outline",
+            "attrs": """
+                class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100"
+                hx-get="{get_move_pipeline_url}"
+                data-toggle="oh-modal-toggle"
+                data-target="#genericModal"
+                hx-target="#genericModalBody"
+            """,
+        },
     ]
 
     def get_bulk_form(self):
@@ -428,6 +451,9 @@ class CandidateList(HorillaListView):
                 "candidates"
             ].filter(stage_id=self.kwargs["stage_id"])
             queryset = queryset.filter(stage_id=self.kwargs["stage_id"])
+            # Highest AI-scored candidate first; not-yet-scored candidates
+            # (NULL) sort last regardless of DB backend.
+            queryset = queryset.order_by(F("latest_ai_score").desc(nulls_last=True))
             super().get_queryset(queryset=queryset, filtered=True)
 
         return self.queryset
@@ -445,6 +471,9 @@ class CandidateCard(HorillaKanbanView):
     records_per_page = 10
     filter_keys_to_remove = ["rec_id", "obj_id"]
     group_label_key = "stage"
+    # Highest AI-scored candidate first within each stage by default;
+    # not-yet-scored candidates (NULL) sort last regardless of DB backend.
+    instance_order_by = F("latest_ai_score").desc(nulls_last=True)
 
     kanban_attrs = """
         onclick="window.location.href = '{get_profile_url}?next=' + encodeURIComponent(window.location.pathname + window.location.search)"
@@ -455,7 +484,16 @@ class CandidateCard(HorillaKanbanView):
         "title": "{get_full_name}",
         "email": "{email}",
         "position": "{job_position_id__job_position}",
+        "date of apply": "{applied_on_display}",
+        "rating": "{rating_bar}",
     }
+
+    # The generic kanban card template derives each detail row's label from
+    # its dict key via Django's `title` filter, which mangles the "AI"
+    # acronym into "Ai" (and leaves the underscore in "ai_score" untouched)
+    # - so this row is rendered separately with the label spelled out
+    # correctly instead of going through `details`.
+    custom_card_content_template = "cbv/pipeline/ai_score_kanban_row.html"
 
     group_actions = [
         {
@@ -590,6 +628,16 @@ class CandidateCard(HorillaKanbanView):
             """,
         },
         {
+            "action": _("Move to Pipeline"),
+            "attrs": """
+                data-toggle="oh-modal-toggle"
+                data-target="#genericModal"
+                hx-get="{get_move_pipeline_url}"
+                hx-target="#genericModalBody"
+                class="oh-dropdown__link"
+            """,
+        },
+        {
             "action": "archive_status",
             "attrs": """
                 class="oh-dropdown__link"
@@ -613,6 +661,150 @@ class CandidateCard(HorillaKanbanView):
             related_groups = related_groups.filter(recruitment_id=rec_id)
 
         return related_groups
+
+
+@fbv_login_required
+@fbv_manager_can_enter(perm="recruitment.change_candidate")
+def recruitment_stage_options(request, rec_id):
+    """
+    JSON list of {id, stage, initial} for a recruitment's stages -
+    powers the job-opening -> stage cascading dropdown on the "Move to
+    Pipeline" modal (candidate/move_pipeline_form.html).
+    """
+    stages = models.Stage.objects.filter(recruitment_id=rec_id).order_by("sequence")
+    return JsonResponse(
+        {
+            "stages": [
+                {
+                    "id": stage.pk,
+                    "stage": stage.stage,
+                    "initial": stage.stage_type == "initial",
+                }
+                for stage in stages
+            ]
+        }
+    )
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(
+    manager_can_enter(perm="recruitment.change_candidate"), name="dispatch"
+)
+class CandidateMovePipelineFormView(HorillaFormView):
+    """
+    Modal form to move a candidate from their current recruitment
+    pipeline to a different open job (and a specific stage in it) in the
+    same company - available as an action from the Pipeline card and
+    list views, and as the "Move to suggested job" action on the AI Job
+    Match card (see recruitment/templates/candidate/job_suggestion_status.html).
+    """
+
+    model = models.Candidate
+    form_class = forms.CandidateMovePipelineForm
+    new_display_title = _("Move to Pipeline")
+    template_name = "candidate/move_pipeline_form.html"
+
+    def get_initial(self):
+        initial = super().get_initial()
+        suggested_recruitment_id = self.request.GET.get("suggested_recruitment")
+        if suggested_recruitment_id:
+            initial["recruitment_id"] = suggested_recruitment_id
+        return initial
+
+    def form_valid(self, form: forms.CandidateMovePipelineForm) -> HttpResponse:
+        if not form.is_valid():
+            return super().form_valid(form)
+
+        candidate = form.instance
+        target_recruitment = form.cleaned_data["recruitment_id"]
+        target_stage = form.cleaned_data["stage_id"]
+
+        is_authorized = (
+            self.request.user.is_superuser
+            or is_stagemanager(self.request)[1]
+            .filter(recruitment_id=target_recruitment)
+            .exists()
+            or is_recruitmentmanager(self.request, rec_id=target_recruitment.id)[0]
+        )
+        if not is_authorized:
+            messages.error(
+                self.request, _("You don't have manager access to the target job.")
+            )
+            return self.HttpResponse()
+
+        # Candidate.save() requires job_position_id to be one of the target
+        # recruitment's open_positions whenever recruitment_id changes -
+        # without reassigning it here, the save below raises a
+        # ValidationError that htmx silently swallows. recruitment.job_position_id
+        # is frequently unset even for non-event-based postings (only
+        # open_positions gets filled in when the recruitment is created), so
+        # that field can't be trusted on its own - fall back to open_positions.
+        target_job_position = target_recruitment.job_position_id
+        if (
+            target_job_position is None
+            or not target_recruitment.open_positions.filter(
+                pk=target_job_position.pk
+            ).exists()
+        ):
+            target_job_position = target_recruitment.open_positions.first()
+
+        if target_job_position is None:
+            messages.error(
+                self.request,
+                _(
+                    "%(job)s has no open job position configured, so no "
+                    "candidate can be moved into it. Add one under Open "
+                    "Positions on that recruitment first."
+                )
+                % {"job": target_recruitment},
+            )
+            return self.HttpResponse()
+
+        candidate.job_position_id = target_job_position
+        candidate.stage_id = target_stage
+        candidate.hired = bool(target_stage and target_stage.stage_type == "hired")
+        candidate.canceled = bool(
+            target_stage and target_stage.stage_type == "cancelled"
+        )
+        candidate.start_onboard = False
+        candidate.has_better_job_suggestion = False
+        try:
+            candidate.save()
+        except DjangoValidationError as exc:
+            messages.error(
+                self.request, _("Could not move candidate: %(error)s") % {"error": exc}
+            )
+            return self.HttpResponse()
+
+        # Keep the AI Job Match card's "already moved" state in sync,
+        # regardless of whether the move happened via this generic modal
+        # or the AI-suggestion-specific flow.
+        from recruitment.models import CandidateJobSuggestion
+
+        CandidateJobSuggestion.objects.filter(
+            candidate=candidate,
+            status="suggested",
+            acted_on=False,
+            suggested_recruitment=target_recruitment,
+        ).update(acted_on=True)
+
+        # The Pipeline board caches its candidate queryset per session (see
+        # RecruitmentTabView/GetStages above) - without clearing it here,
+        # the old recruitment's board keeps showing this candidate under
+        # their old stage until that cache naturally expires.
+        if self.request.session.session_key:
+            CACHE.delete(self.request.session.session_key + "pipeline")
+
+        # The AI Score was computed against the job the candidate just
+        # left - refresh it in the background so it doesn't keep showing
+        # a score against a job they're no longer applying for.
+        ai_scoring.kick_off_rescoring(candidate.pk)
+
+        messages.success(
+            self.request,
+            _("Candidate moved to %(job)s.") % {"job": target_recruitment},
+        )
+        return self.HttpResponse()
 
 
 @method_decorator(login_required, name="dispatch")

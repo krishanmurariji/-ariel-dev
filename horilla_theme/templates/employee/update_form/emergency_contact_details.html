@@ -1,0 +1,124 @@
+{% load i18n %}
+<div class="oh-wrapper">
+    <div class="oh-general__tab-target oh-profile-section mb-4{% if not active_tab or active_tab != 'emergency' %} d-none{% endif %}" id="emergency">
+        <div class="oh-profile-section__card">
+            {% include 'employee/update_form/edit_form_back_button.html' %}
+            <form
+                method="post"
+                hx-post="{% url 'employee-view-update' obj_id %}"
+                hx-target="#employee-update-form-root"
+                hx-swap="outerHTML"
+                hx-push-url="{% url 'employee-view-update' obj_id %}{% if container_mode %}?container=true{% endif %}"
+                hx-on::after-request="if(event.detail.successful){var b=document.getElementById('reloadMessagesButton');if(b)b.click();}"
+                action="{% url 'employee-view-update' obj_id %}"
+            >
+                <div id="emergencyMessage"></div>
+                {% csrf_token %}
+                {% if container_mode %}<input type="hidden" name="container" value="true">{% endif %}
+                <input type="hidden" name="form" value="emergency">
+                {{ emergency_contact_formset.management_form }}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <label class="oh-label mb-0">{% trans "Emergency Contacts" %}</label>
+                    <button type="button" id="addEmergencyContactRow" class="oh-btn oh-btn--light-bkg oh-btn--sm">
+                        <ion-icon name="add-outline"></ion-icon> {% trans "Add Contact" %}
+                    </button>
+                </div>
+                <div id="emergencyContactRows">
+                    {% for contact_form in emergency_contact_formset %}
+                        <div class="formset-row" style="border:1px solid #e5e5e5; border-radius:4px; padding:14px 14px 4px; margin-bottom:10px; position:relative;">
+                            {{ contact_form.id }}
+                            <div style="display:none;">{{ contact_form.DELETE }}</div>
+                            <button type="button" class="formset-remove-row" data-existing="{% if contact_form.instance.pk %}true{% else %}false{% endif %}" style="position:absolute; top:10px; right:10px; border:none; background:none; color:#dc3545;" title="{% trans 'Remove' %}">
+                                <ion-icon name="close-outline"></ion-icon>
+                            </button>
+                            <div class="oh-input-group">
+                                <label class="oh-label">{% trans "Name" %}</label>
+                                {{ contact_form.name }}
+                            </div>
+                            <div class="oh-input-group">
+                                <label class="oh-label">{% trans "Phone" %}</label>
+                                {{ contact_form.phone }}
+                            </div>
+                            <div class="oh-input-group">
+                                <label class="oh-label">{% trans "Relation" %}</label>
+                                {{ contact_form.relation }}
+                            </div>
+                            {{ contact_form.errors }}
+                        </div>
+                    {% endfor %}
+                </div>
+                <template id="emergencyContactRowTemplate">
+                    <div class="formset-row" style="border:1px solid #e5e5e5; border-radius:4px; padding:14px 14px 4px; margin-bottom:10px; position:relative;">
+                        <button type="button" class="formset-remove-row" data-existing="false" style="position:absolute; top:10px; right:10px; border:none; background:none; color:#dc3545;" title="{% trans 'Remove' %}">
+                            <ion-icon name="close-outline"></ion-icon>
+                        </button>
+                        <div class="oh-input-group">
+                            <label class="oh-label">{% trans "Name" %}</label>
+                            <input type="text" class="oh-input w-100 mb-2" name="emergency-__PREFIX__-name">
+                        </div>
+                        <div class="oh-input-group">
+                            <label class="oh-label">{% trans "Phone" %}</label>
+                            <input type="text" class="oh-input w-100 mb-2" name="emergency-__PREFIX__-phone">
+                        </div>
+                        <div class="oh-input-group">
+                            <label class="oh-label">{% trans "Relation" %}</label>
+                            <input type="text" class="oh-input w-100 mb-2" name="emergency-__PREFIX__-relation" placeholder="{% trans 'e.g. Father, Spouse' %}">
+                        </div>
+                    </div>
+                </template>
+                <hr class="mt-5 mb-3">
+                <div class="w-100 d-flex align-items-center justify-content-end">
+                    <button type="submit" class="oh-btn oh-btn--secondary oh-btn--w-100-resp">
+                        {% trans "Save" %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+    (function () {
+        // See education_details.html for the wireFormsetSection pattern
+        // this mirrors (existing rows are soft-deleted via the DELETE
+        // checkbox, unsaved rows are just dropped from the DOM).
+        function wireFormsetSection(containerId, addBtnId, templateId, totalFormsName) {
+            var container = document.getElementById(containerId);
+            var addBtn = document.getElementById(addBtnId);
+            var template = document.getElementById(templateId);
+            var totalFormsInput = document.querySelector('input[name="' + totalFormsName + '"]');
+            if (!container || !addBtn || !template || !totalFormsInput) {
+                return;
+            }
+            function wireRemove(rowEl) {
+                var removeBtn = rowEl.querySelector(".formset-remove-row");
+                if (!removeBtn) {
+                    return;
+                }
+                removeBtn.addEventListener("click", function () {
+                    if (removeBtn.dataset.existing === "true") {
+                        var deleteBox = rowEl.querySelector('input[type="checkbox"][name$="-DELETE"]');
+                        if (deleteBox) {
+                            deleteBox.checked = true;
+                        }
+                        rowEl.style.display = "none";
+                    } else {
+                        rowEl.remove();
+                    }
+                });
+            }
+            addBtn.addEventListener("click", function () {
+                var index = parseInt(totalFormsInput.value, 10) || 0;
+                var html = template.innerHTML.split("__PREFIX__").join(index);
+                var wrapper = document.createElement("div");
+                wrapper.innerHTML = html.trim();
+                var rowEl = wrapper.firstElementChild;
+                container.appendChild(rowEl);
+                totalFormsInput.value = index + 1;
+                wireRemove(rowEl);
+            });
+            container.querySelectorAll(".formset-row").forEach(wireRemove);
+        }
+
+        wireFormsetSection("emergencyContactRows", "addEmergencyContactRow", "emergencyContactRowTemplate", "emergency-TOTAL_FORMS");
+    })();
+</script>

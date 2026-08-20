@@ -1,0 +1,56 @@
+{% load i18n payroll_pro_tags %}
+<div class="oh-modal__dialog-header">
+  <span class="oh-modal__dialog-title">{{ regime.name }}</span>
+  <button class="oh-modal__close" onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')" aria-label="{% trans 'Close' %}">
+    <ion-icon name="close-outline"></ion-icon>
+  </button>
+</div>
+<div class="oh-modal__dialog-body">
+  {% if regime.is_locked %}
+    <div class="flex flex-wrap gap-2 mb-3">
+      <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-warning-light text-warning-dark">{% trans "Locked — in use" %}</span>
+    </div>
+  {% endif %}
+  {% if regime.description %}<p class="text-xs text-dark-400 mb-3">{{ regime.description }}</p>{% endif %}
+
+  <div class="border border-[#ebebeb] rounded-md overflow-hidden mb-3">
+    <table class="w-full text-xs">
+      <thead>
+        <tr class="text-left text-dark-400 uppercase text-[10px] tracking-wide border-b border-[#ebebeb]">
+          <th class="px-3 py-2">{% trans "Taxable income (yearly)" %}</th>
+          <th class="px-3 py-2 text-right">{% trans "Rate" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for slab in regime.ordered_slabs %}
+        <tr class="border-b border-[#ebebeb] last:border-b-0">
+          <td class="px-3 py-2">{{ slab.min_amount|pp_money0 }} — {% if slab.max_amount %}{{ slab.max_amount|pp_money0 }}{% else %}{% trans "above" %}{% endif %}</td>
+          <td class="px-3 py-2 text-right font-semibold">{{ slab.rate_pct }}%</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="2" class="px-3 py-3 text-dark-400">{% trans "No slabs configured yet." %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="flex flex-wrap gap-x-5 gap-y-1 mb-4 text-xs text-dark-400">
+    <span>{% trans "Std. deduction" %}: <b class="font-semibold">{{ regime.standard_deduction|pp_money0 }}</b></span>
+    <span>{% trans "Rebate ≤" %} <b class="font-semibold">{{ regime.rebate_limit|pp_money0 }}</b></span>
+    <span>{% trans "Cess" %}: <b class="font-semibold">{{ regime.cess_pct }}%</b></span>
+  </div>
+
+  <div class="border-t border-[#ebebeb] pt-3">
+    <h4 class="text-xs font-semibold mb-2">{% trans "Linked Salary Structures" %} ({{ dependents.structures|length }})</h4>
+    {% if dependents.structures %}
+      <div class="flex flex-wrap gap-1.5 mb-2">
+        {% for structure in dependents.structures %}
+          <a href="{% url 'pp-structure-detail' structure.pk %}" class="text-[11px] px-2 py-0.5 rounded-full bg-primary-100 text-primary-600 hover:bg-primary-200 transition duration-200">{{ structure.name }}</a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-xs text-dark-400 mb-2">{% trans "No structures use this regime yet." %}</p>
+    {% endif %}
+    <p class="text-xs text-dark-400">{% blocktrans count counter=dependents.employee_count %}{{ counter }} employee currently taxed under this regime.{% plural %}{{ counter }} employees currently taxed under this regime.{% endblocktrans %}</p>
+  </div>
+</div>

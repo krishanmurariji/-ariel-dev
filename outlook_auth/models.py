@@ -2,11 +2,14 @@
 outlook_auth/models.py
 """
 
+from django.apps import apps
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from base.models import Company
+from employee.models import Employee
+from horilla.models import HorillaModel, NoPermissionModel
 from horilla_views.cbv_methods import render_template
 from outlook_auth.methods import sec_to_hm
 
@@ -82,3 +85,48 @@ class AzureApi(models.Model):
             if duration_seconds > expires_in_seconds:
                 return True
             return False
+
+
+class OutlookMeeting(HorillaModel):
+    """
+    A Teams meeting created via Microsoft Graph (calendar event with
+    isOnlineMeeting=True / onlineMeetingProvider="teamsForBusiness").
+    Mirrors horilla_meet.GoogleMeeting.
+    """
+
+    employee_id = models.ForeignKey(
+        Employee, on_delete=models.CASCADE, related_name="outlook_meetings"
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    start_time = models.DateTimeField()
+    join_url = models.URLField(blank=True)
+    event_id = models.CharField(max_length=255, null=True, blank=True)
+    duration = models.PositiveIntegerField(
+        default=60, help_text=_("Duration in minutes")
+    )
+    attendees = models.JSONField(default=list, blank=True, null=True)
+
+    class Meta:
+        ordering = ["-start_time"]
+
+    def __str__(self):
+        return f"{self.title} - {self.start_time.strftime('%Y-%m-%d %H:%M')}"
+
+    @property
+    def end_time(self):
+        from datetime import timedelta
+
+        return self.start_time + timedelta(minutes=self.duration)
+
+
+if apps.is_installed("recruitment"):
+    from recruitment.models import InterviewSchedule
+
+    class InterviewOutlookMeetingLink(models.Model, NoPermissionModel):
+        interview = models.OneToOneField(
+            InterviewSchedule,
+            on_delete=models.CASCADE,
+            related_name="outlook_interviews",
+        )
+        meeting = models.OneToOneField(OutlookMeeting, on_delete=models.CASCADE)

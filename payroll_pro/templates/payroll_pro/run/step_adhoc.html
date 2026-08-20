@@ -1,0 +1,93 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+  {% include "payroll_pro/run/_strip.html" %}
+  <form id="stepform" method="post" action="{% url 'pp-run-step-save' %}">
+    {% csrf_token %}
+    <input type="hidden" name="run_id" value="{{ run.pk }}">
+    <input type="hidden" name="step" value="adhoc">
+    {% include "payroll_pro/run/_stephead.html" %}
+
+    <div class="bg-primary-100 border border-primary-300 rounded-md p-3 text-xs mb-4">
+      {% trans "One-off additions and deductions for this month only. Reimbursement covers approved claims paid through payroll; Adhoc Deduction covers recoveries such as damages or excess payouts." %}
+    </div>
+
+    <div class="bg-white rounded-md shadow-card border border-[#ebebeb] mb-4">
+      <div class="px-5 py-3 border-b border-[#ebebeb]">
+        <h3 class="text-sm font-semibold">{% trans "Reimbursement requests pending payout" %} <span class="text-xs font-normal text-dark-400">({{ pending_claims|length }})</span></h3>
+      </div>
+      {% if pending_claims %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="text-left text-dark-400 uppercase text-[10px] tracking-wide border-b border-[#ebebeb]">
+              <th class="px-5 py-2">{% trans "Employee" %}</th><th class="px-2 py-2">{% trans "Title" %}</th>
+              <th class="px-2 py-2">{% trans "Amount" %}</th><th class="px-2 py-2">{% trans "Date" %}</th><th class="px-5 py-2">{% trans "Actions" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for claim in pending_claims %}
+            <tr class="border-b border-[#ebebeb] last:border-b-0 hover:bg-primary-100 transition duration-200">
+              <td class="px-5 py-2.5">
+                <div class="flex items-center gap-2">
+                  <img src="{{ claim.employee_id.get_avatar }}" class="w-7 h-7 rounded-full object-cover" alt="">
+                  <span class="font-semibold">{{ claim.employee_id.get_full_name }}</span>
+                </div>
+              </td>
+              <td class="px-2 py-2.5">{{ claim.title }}{% if claim.attachment %} <a href="{{ claim.attachment.url }}" target="_blank" class="text-primary-600"><ion-icon name="attach-outline"></ion-icon></a>{% endif %}</td>
+              <td class="px-2 py-2.5">{{ claim.amount|pp_money0 }}</td>
+              <td class="px-2 py-2.5">{{ claim.allowance_on }}</td>
+              <td class="px-5 py-2.5 whitespace-nowrap">
+                {% if not run.is_locked %}
+                <form method="post" action="{% url 'pp-claim-approve' run.pk claim.pk %}" class="inline">{% csrf_token %}
+                  <button type="submit" class="oh-btn oh-btn--secondary oh-btn--x-small">{% trans "Approve & Pay" %}</button>
+                </form>
+                <form method="post" action="{% url 'pp-claim-reject' run.pk claim.pk %}" class="inline">{% csrf_token %}
+                  <button type="submit" class="oh-btn oh-btn--light-danger oh-btn--x-small">{% trans "Reject" %}</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-8 text-center text-dark-400">
+        <ion-icon name="file-tray-outline" class="text-3xl"></ion-icon>
+        <p class="text-sm mt-1">{% trans "No pending reimbursement requests" %}</p>
+        <p class="text-xs mt-0.5">{% trans "Employees raise claims from My Finance → My Pay → Reimbursement." %}</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="bg-white rounded-md shadow-card border border-[#ebebeb] overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="text-left text-dark-400 uppercase text-[10px] tracking-wide border-b border-[#ebebeb]">
+            <th class="px-5 py-2">{% trans "Employee" %}</th><th class="px-2 py-2">{% trans "Reimbursement" %}</th>
+            <th class="px-2 py-2">{% trans "Adhoc Payment" %}</th><th class="px-2 py-2">{% trans "Adhoc Deduction" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for record in records %}
+          <tr class="border-b border-[#ebebeb] last:border-b-0 hover:bg-primary-100 transition duration-200">
+            <td class="px-5 py-2.5">
+              <div class="flex items-center gap-2">
+                <img src="{{ record.employee_id.get_avatar }}" class="w-7 h-7 rounded-full object-cover" alt="">
+                <span class="font-semibold">{{ record.employee_id.get_full_name }}</span>
+              </div>
+            </td>
+            <td class="px-2 py-2.5"><input type="number" step="0.01" min="0" name="r{{ record.pk }}_reimbursement" class="oh-input pp-num" value="{{ record.reimbursement|floatformat:"-2" }}" {% if run.is_locked %}disabled{% endif %}></td>
+            <td class="px-2 py-2.5"><input type="number" step="0.01" min="0" name="r{{ record.pk }}_adhoc_pay" class="oh-input pp-num" value="{{ record.adhoc_pay|floatformat:"-2" }}" {% if run.is_locked %}disabled{% endif %}></td>
+            <td class="px-2 py-2.5"><input type="number" step="0.01" min="0" name="r{{ record.pk }}_adhoc_deduction" class="oh-input pp-num" value="{{ record.adhoc_deduction|floatformat:"-2" }}" {% if run.is_locked %}disabled{% endif %}></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+</div>
+{% endblock %}

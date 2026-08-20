@@ -10,6 +10,7 @@ from base.views import add_remove_dynamic_fields, object_duplicate
 from recruitment import cbvs
 from recruitment import dashboard as rec_dashboard
 from recruitment.cbv import (
+    candidate_intake,
     candidate_mail_log,
     candidate_profile,
     candidate_reject_reason,
@@ -17,6 +18,7 @@ from recruitment.cbv import (
     dashboard,
     interview,
     pipeline,
+    platforms,
     recruitment_survey,
     recruitment_view,
     skill_zone,
@@ -26,8 +28,14 @@ from recruitment.cbv import (
 from recruitment.forms import QuestionForm, RecruitmentCreationForm, StageCreationForm
 from recruitment.models import Candidate, Recruitment, RecruitmentSurvey, Stage
 from recruitment.views import actions
+from recruitment.views import ai_history_summary as ai_history_summary_views
+from recruitment.views import ai_scoring as ai_scoring_views
+from recruitment.views import ai_settings as ai_settings_views
+from recruitment.views import candidate_intake as candidate_intake_views
 from recruitment.views import dashboard as views_dashboard
+from recruitment.views import job_suggestion as job_suggestion_views
 from recruitment.views import linkedin, search, surveys, views
+from recruitment.views import resume_autofill as resume_autofill_views
 
 urlpatterns = [
     path(
@@ -58,6 +66,16 @@ urlpatterns = [
         "recruitment-create/",
         recruitment_view.RecruitmentForm.as_view(),
         name="recruitment-create",
+    ),
+    path(
+        "generate-recruitment-description/",
+        views.generate_recruitment_description,
+        name="generate-recruitment-description",
+    ),
+    path(
+        "sync-recruitment-skills/",
+        views.sync_recruitment_skills,
+        name="sync-recruitment-skills",
     ),
     # path("recruitment-view/", views.recruitment_view, name="recruitment-view"),
     path(
@@ -119,6 +137,11 @@ urlpatterns = [
         "recruitment-reopen-pipeline/<int:rec_id>/",
         views.recruitment_reopen_pipeline,
         name="recruitment-reopen-pipeline",
+    ),
+    path(
+        "update-recruitment-closed/<int:obj_id>/",
+        views.update_recruitment_closed,
+        name="update-recruitment-closed",
     ),
     path("pipeline/", views.recruitment_pipeline, name="pipeline"),
     path("pipeline-search/", views.filter_pipeline, name="pipeline-search"),
@@ -722,6 +745,26 @@ urlpatterns = [
         name="candidate-self-tracking-rating-option",
     ),
     path(
+        "candidate-portal-mail-setting/",
+        views.candidate_portal_mail_setting,
+        name="candidate-portal-mail-setting",
+    ),
+    path(
+        "platform-conversion-widget-setting/",
+        views.platform_conversion_widget_setting,
+        name="platform-conversion-widget-setting",
+    ),
+    path(
+        "default-meeting-provider/",
+        views.default_meeting_provider,
+        name="default-meeting-provider",
+    ),
+    path(
+        "create-interview-meeting/",
+        views.create_interview_meeting,
+        name="create-interview-meeting",
+    ),
+    path(
         "candidate-self-status-tracking/",
         views.candidate_self_status_tracking,
         name="candidate-self-status-tracking",
@@ -768,6 +811,11 @@ urlpatterns = [
         "resume-completion/",
         views.resume_completion,
         name="resume-completion",
+    ),
+    path(
+        "resume-ai-autofill/",
+        resume_autofill_views.resume_ai_autofill,
+        name="resume-ai-autofill",
     ),
     path("candidate-view/", candidates.CandidatesView.as_view(), name="candidate-view"),
     path("list-candidate/", candidates.ListCandidates.as_view(), name="list-candidate"),
@@ -848,6 +896,41 @@ urlpatterns = [
         "delete-skills/",
         views.delete_skills,
         name="delete-skills",
+    ),
+    path(
+        "platforms-list-view/",
+        platforms.PlatformListView.as_view(),
+        name="platforms-list-view",
+    ),
+    path(
+        "platforms-nav-view/",
+        platforms.PlatformNavView.as_view(),
+        name="platforms-nav-view",
+    ),
+    path(
+        "settings/platforms-view/",
+        views.platforms_view,
+        name="platforms-view",
+    ),
+    path(
+        "settings-create-platforms/",
+        platforms.PlatformCreateForm.as_view(),
+        name="settings-create-platforms",
+    ),
+    path(
+        "settings-update-platforms/<int:pk>/",
+        platforms.PlatformCreateForm.as_view(),
+        name="settings-update-platforms",
+    ),
+    path(
+        "delete-platforms/",
+        views.delete_platforms,
+        name="delete-platforms",
+    ),
+    path(
+        "recruitment-dynamic-link/<int:pk>/",
+        recruitment_view.RecruitmentDynamicLinkView.as_view(),
+        name="recruitment-dynamic-link",
     ),
     path(
         "add-bulk-resume/",
@@ -968,6 +1051,16 @@ urlpatterns = [
         name="candidate-card-cbv",
     ),
     path(
+        "candidate-move-pipeline-form/<int:pk>/",
+        pipeline.CandidateMovePipelineFormView.as_view(),
+        name="candidate-move-pipeline-form",
+    ),
+    path(
+        "recruitment-stage-options/<int:rec_id>/",
+        pipeline.recruitment_stage_options,
+        name="recruitment-stage-options",
+    ),
+    path(
         "cbv-change-stage/<int:pk>/",
         pipeline.ChangeStage.as_view(),
         name="cbv-change-stage",
@@ -1011,6 +1104,115 @@ urlpatterns = [
     path(
         "val-linkedin/<int:pk>/", linkedin.validate_linkedin_token, name="val-linkedin"
     ),
+    path(
+        "ai-settings/",
+        ai_settings_views.ai_settings_view,
+        name="ai-settings",
+    ),
+    # Candidate Email Intake urls
+    path(
+        "candidate-intake-mailbox-settings/",
+        candidate_intake_views.candidate_intake_mailbox_settings,
+        name="candidate-intake-mailbox-settings",
+    ),
+    path(
+        "candidate-intake-mailbox-nav/",
+        candidate_intake.CandidateIntakeMailboxNav.as_view(),
+        name="candidate-intake-mailbox-nav",
+    ),
+    path(
+        "candidate-intake-mailbox-list/",
+        candidate_intake.CandidateIntakeMailboxListView.as_view(),
+        name="candidate-intake-mailbox-list",
+    ),
+    path(
+        "candidate-intake-mailbox-create/",
+        candidate_intake.CandidateIntakeMailboxFormView.as_view(),
+        name="candidate-intake-mailbox-create",
+    ),
+    path(
+        "candidate-intake-mailbox-update/<int:pk>/",
+        candidate_intake.CandidateIntakeMailboxFormView.as_view(),
+        name="candidate-intake-mailbox-update",
+    ),
+    path(
+        "candidate-intake-mailbox-delete/<int:pk>/",
+        candidate_intake_views.delete_intake_mailbox,
+        name="candidate-intake-mailbox-delete",
+    ),
+    path(
+        "update-isactive-intake-mailbox/<int:obj_id>/",
+        candidate_intake_views.update_isactive_intake_mailbox,
+        name="update-isactive-intake-mailbox",
+    ),
+    path(
+        "candidate-intake-logs/",
+        candidate_intake_views.candidate_intake_logs,
+        name="candidate-intake-logs",
+    ),
+    path(
+        "candidate-intake-log-nav/",
+        candidate_intake.CandidateIntakeLogNav.as_view(),
+        name="candidate-intake-log-nav",
+    ),
+    path(
+        "candidate-intake-log-list/",
+        candidate_intake.CandidateIntakeLogListView.as_view(),
+        name="candidate-intake-log-list",
+    ),
+    path(
+        "candidate-intake-poll-now/",
+        candidate_intake_views.trigger_intake_poll,
+        name="candidate-intake-poll-now",
+    ),
+    path(
+        "candidate-intake-poll-status/",
+        candidate_intake_views.intake_poll_status,
+        name="candidate-intake-poll-status",
+    ),
+    path(
+        "candidate-intake-log-detail/<int:pk>/",
+        candidate_intake_views.candidate_intake_log_detail,
+        name="candidate-intake-log-detail",
+    ),
+    path(
+        "candidate-intake-log-retry-selected/",
+        candidate_intake_views.retry_selected_intake_logs,
+        name="candidate-intake-log-retry-selected",
+    ),
+    # Candidate AI Scoring urls
+    path(
+        "candidate-ai-score-status/<int:pk>/",
+        ai_scoring_views.candidate_ai_score_status,
+        name="candidate-ai-score-status",
+    ),
+    path(
+        "candidate-ai-score-trigger/<int:pk>/",
+        ai_scoring_views.trigger_candidate_ai_score,
+        name="candidate-ai-score-trigger",
+    ),
+    # Candidate AI Job Match Suggestion urls
+    path(
+        "candidate-job-suggestion-status/<int:pk>/",
+        job_suggestion_views.candidate_job_suggestion_status,
+        name="candidate-job-suggestion-status",
+    ),
+    path(
+        "candidate-job-suggestion-trigger/<int:pk>/",
+        job_suggestion_views.trigger_candidate_job_suggestion,
+        name="candidate-job-suggestion-trigger",
+    ),
+    # Candidate History AI Summary urls
+    path(
+        "candidate-history-summary-status/<int:pk>/",
+        ai_history_summary_views.candidate_history_summary_status,
+        name="candidate-history-summary-status",
+    ),
+    path(
+        "candidate-history-summary-trigger/<int:pk>/",
+        ai_history_summary_views.trigger_candidate_history_summary,
+        name="candidate-history-summary-trigger",
+    ),
     # ── Recruitment Modern Dashboard ─────────────────────────────────────────
     path(
         "dashboard/",
@@ -1053,11 +1255,6 @@ urlpatterns = [
         name="recruitment-dashboard-managers",
     ),
     path(
-        "dashboard/api/source-of-hire/",
-        rec_dashboard.recruitment_source_of_hire,
-        name="recruitment-dashboard-source",
-    ),
-    path(
         "dashboard/api/upcoming-interviews/",
         rec_dashboard.recruitment_upcoming_interviews,
         name="recruitment-dashboard-interviews",
@@ -1073,13 +1270,23 @@ urlpatterns = [
         name="recruitment-dashboard-conversion",
     ),
     path(
-        "dashboard/api/source-conversion/",
-        rec_dashboard.recruitment_source_conversion,
-        name="recruitment-dashboard-source-conv",
+        "dashboard/api/platform-conversion/",
+        rec_dashboard.recruitment_platform_conversion,
+        name="recruitment-dashboard-platform-conv",
     ),
     path(
         "dashboard/api/joinings/",
         rec_dashboard.recruitment_joinings_monthly,
         name="recruitment-dashboard-joinings",
+    ),
+    path(
+        "dashboard/api/candidates-by-date/",
+        rec_dashboard.recruitment_candidates_by_date,
+        name="recruitment-dashboard-candidates-by-date",
+    ),
+    path(
+        "dashboard/api/response-status/",
+        rec_dashboard.recruitment_response_status,
+        name="recruitment-dashboard-response-status",
     ),
 ]

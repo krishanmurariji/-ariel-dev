@@ -1,0 +1,41 @@
+{% load i18n %}
+{# Editable slab rows inside a regime modal. Vars: prefix, slabs #}
+<div class="mt-3">
+  <div class="flex items-center justify-between">
+    <span class="oh-label">{% trans "Tax Slabs (yearly taxable income)" %}</span>
+    {% if not locked %}
+    <button type="button" class="oh-btn oh-btn--light oh-btn--small" onclick="ppAddSlabRow(this, '{{ prefix }}')">
+      <ion-icon name="add-outline"></ion-icon> {% trans "Add Slab" %}
+    </button>
+    {% endif %}
+  </div>
+  <table class="w-full text-xs mt-1">
+    <thead>
+      <tr class="text-left text-dark-400 uppercase text-[10px]">
+        <th class="py-1 pr-2">{% trans "From" %} <span class="text-danger">*</span></th>
+        <th class="py-1 pr-2">{% trans "To (empty = above)" %}</th>
+        <th class="py-1 pr-2">{% trans "Rate %" %} <span class="text-danger">*</span></th>
+        <th class="py-1 w-8"></th>
+      </tr>
+    </thead>
+    <tbody id="{{ prefix }}-slab-body">
+      {% for slab in slabs %}
+      <tr>
+        <td class="py-1 pr-2"><input type="number" step="any" min="0" name="{{ prefix }}-slab_min" value="{{ slab.min_amount|floatformat:'-2' }}" class="oh-input w-full" {% if locked %}disabled{% else %}required{% endif %}></td>
+        <td class="py-1 pr-2"><input type="number" step="any" min="0" name="{{ prefix }}-slab_max" value="{% if slab.max_amount is not None %}{{ slab.max_amount|floatformat:'-2' }}{% endif %}" class="oh-input w-full" {% if locked %}disabled{% endif %}></td>
+        <td class="py-1 pr-2"><input type="number" step="any" min="0" max="100" name="{{ prefix }}-slab_rate" value="{{ slab.rate_pct|floatformat:'-2' }}" class="oh-input w-full" {% if locked %}disabled{% else %}required{% endif %}></td>
+        <td class="py-1">{% if not locked %}<button type="button" class="oh-btn oh-btn--light-danger oh-btn--x-small" onclick="ppRemoveSlabRow(this)"><ion-icon name="close-outline"></ion-icon></button>{% endif %}</td>
+      </tr>
+      {% endfor %}
+      {% if not slabs and not locked %}
+      <tr>
+        <td class="py-1 pr-2"><input type="number" step="any" min="0" name="{{ prefix }}-slab_min" class="oh-input w-full" placeholder="0" value="0" required></td>
+        <td class="py-1 pr-2"><input type="number" step="any" min="0" name="{{ prefix }}-slab_max" class="oh-input w-full" placeholder="{% trans 'empty = above' %}"></td>
+        <td class="py-1 pr-2"><input type="number" step="any" min="0" max="100" name="{{ prefix }}-slab_rate" class="oh-input w-full" placeholder="0" required></td>
+        <td class="py-1"><button type="button" class="oh-btn oh-btn--light-danger oh-btn--x-small" onclick="ppRemoveSlabRow(this)"><ion-icon name="close-outline"></ion-icon></button></td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+  <p class="text-[11px] text-dark-400 mt-2">{% trans "Slabs must start from 0 and be contiguous — each slab should begin where the previous one ends." %}</p>
+</div>

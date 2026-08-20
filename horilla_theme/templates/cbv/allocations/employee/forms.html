@@ -36,6 +36,39 @@
             >
                 {% trans "Bank Info" %}
             </li>
+            <li
+                class="oh-general__tab-link inline-block text-sm font-semibold p-0 mb-2"
+                role="button"
+                hx-get="{% url 'education-form' %}?{{request.GET.urlencode}}"
+                hx-target="#educationInfo"
+                data-url="{% url 'education-form' %}"
+                data-action="general-tab"
+                data-target="#educationInfo"
+            >
+                {% trans "Education" %}
+            </li>
+            <li
+                class="oh-general__tab-link inline-block text-sm font-semibold p-0 mb-2"
+                role="button"
+                hx-get="{% url 'experience-form' %}?{{request.GET.urlencode}}"
+                hx-target="#experienceInfo"
+                data-url="{% url 'experience-form' %}"
+                data-action="general-tab"
+                data-target="#experienceInfo"
+            >
+                {% trans "Experience" %}
+            </li>
+            <li
+                class="oh-general__tab-link inline-block text-sm font-semibold p-0 mb-2"
+                role="button"
+                hx-get="{% url 'emergency-form' %}?{{request.GET.urlencode}}"
+                hx-target="#emergencyInfo"
+                data-url="{% url 'emergency-form' %}"
+                data-action="general-tab"
+                data-target="#emergencyInfo"
+            >
+                {% trans "Emergency Contact" %}
+            </li>
         </ul>
     </div>
 
@@ -53,6 +86,21 @@
         <div
             class="oh-general__tab-target oh-profile-section mb-4 d-none"
             id="bankInfo"
+        >
+        </div>
+        <div
+            class="oh-general__tab-target oh-profile-section mb-4 d-none"
+            id="educationInfo"
+        >
+        </div>
+        <div
+            class="oh-general__tab-target oh-profile-section mb-4 d-none"
+            id="experienceInfo"
+        >
+        </div>
+        <div
+            class="oh-general__tab-target oh-profile-section mb-4 d-none"
+            id="emergencyInfo"
         >
         </div>
 

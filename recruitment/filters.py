@@ -22,7 +22,7 @@ def _filter_has_referral(qs, name, value):
 
 def _filter_source_not_set(qs, name, value):
     if value:
-        return qs.filter(Q(source__isnull=True) | Q(source=""), referral__isnull=True)
+        return qs.filter(platform__isnull=True, referral__isnull=True)
     return qs
 
 
@@ -37,8 +37,11 @@ from base.filters import FilterSet
 from horilla.filters import HorillaFilterSet, filter_by_name
 from recruitment.models import (
     Candidate,
+    CandidateIntakeLog,
+    CandidateIntakeMailbox,
     InterviewSchedule,
     LinkedInAccount,
+    Platform,
     Recruitment,
     RecruitmentSurvey,
     RecruitmentSurveyAnswer,
@@ -151,6 +154,9 @@ class CandidateFilter(HorillaFilterSet):
     recruitment = django_filters.CharFilter(
         field_name="recruitment_id__title", lookup_expr="icontains"
     )
+    platform = django_filters.ModelChoiceFilter(
+        queryset=Platform.objects.all(), label=_("Source")
+    )
 
     portal_sent = django_filters.BooleanFilter(
         field_name="onboarding_portal",
@@ -226,7 +232,6 @@ class CandidateFilter(HorillaFilterSet):
             "offer_letter_status",
             "candidate_rating__rating",
             "candidate_interview__employee_id",
-            "source",
         ]
 
     def __init__(self, *args, **kwargs):
@@ -476,6 +481,17 @@ class SkillsFilter(FilterSet):
 
     class Meta:
         model = Skill
+        fields = [
+            "title",
+        ]
+
+
+class PlatformFilter(FilterSet):
+
+    search = django_filters.CharFilter(field_name="title", lookup_expr="icontains")
+
+    class Meta:
+        model = Platform
         fields = [
             "title",
         ]
@@ -833,5 +849,46 @@ class LinkedInAccountFilter(FilterSet):
                 empty
                 | (queryset.filter(username__icontains=split))
                 | (queryset.filter(email__icontains=split))
+            )
+        return empty.distinct()
+
+
+class CandidateIntakeMailboxFilter(FilterSet):
+    """CandidateIntakeMailbox filter"""
+
+    search = django_filters.CharFilter(method="search_method")
+
+    class Meta:
+        model = CandidateIntakeMailbox
+        fields = ["provider", "is_active", "company_id"]
+
+    def search_method(self, queryset, _, value: str):
+        """Method is used to search through CandidateIntakeMailbox"""
+        return (
+            queryset.filter(azure_api__outlook_email__icontains=value)
+            | queryset.filter(azure_api__outlook_display_name__icontains=value)
+            | queryset.filter(google_api__google_email__icontains=value)
+            | queryset.filter(google_api__google_display_name__icontains=value)
+        )
+
+
+class CandidateIntakeLogFilter(FilterSet):
+    """CandidateIntakeLog filter"""
+
+    search = django_filters.CharFilter(method="search_method")
+
+    class Meta:
+        model = CandidateIntakeLog
+        fields = ["status", "mailbox", "company_id"]
+
+    def search_method(self, queryset, _, value: str):
+        """Method is used to search through CandidateIntakeLog"""
+        values = value.split(" ")
+        empty = queryset.model.objects.none()
+        for split in values:
+            empty = (
+                empty
+                | (queryset.filter(subject__icontains=split))
+                | (queryset.filter(from_email__icontains=split))
             )
         return empty.distinct()

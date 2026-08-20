@@ -12,5 +12,6 @@ from outlook_auth import models
 admin.site.register(
     [
         models.AzureApi,
+        models.OutlookMeeting,
     ]
 )

@@ -25,10 +25,28 @@
           </div>
 
 </div>
+
+<div class="oh-inner-sidebar-content__header mt-4">
+    <h2 class="oh-inner-sidebar-content__title">{% trans 'Interview Meeting' %}</h2>
+</div>
+<div class="row d-flex">
+        <div class="oh-label__info" for="default_meeting_provider">
+            <label class="oh-label" for="default_meeting_provider">{% trans "Default Meeting Provider" %}</label>
+            <span class="oh-info mr-2" title="{% trans "Platform used to create the meeting link when 'Send Meeting Link' is clicked on an interview" %}">
+            </span>
+            <select class="oh-select oh-select-2" id="default_meeting_provider" onchange="defaultMeetingProvider($(this))">
+                <option value="google_meet" {% if check_default_meeting_provider == "google_meet" %} selected {% endif %}>{% trans "Google Meet" %}</option>
+                <option value="teams" {% if check_default_meeting_provider == "teams" %} selected {% endif %}>{% trans "Microsoft Teams" %}</option>
+            </select>
+        </div>
+</div>
+
 <div class="oh-inner-sidebar-content__footer"></div>
 <button id="selfTrackButton" hx-get="{% url 'candidate-self-tracking' %}" hx-target="#reloadMessages" hidden>
 </button>
 <button id="ratingButton" hx-get="{% url 'candidate-self-tracking-rating-option' %}" hx-target="#reloadMessages" hidden>
+</button>
+<button id="meetingProviderButton" hx-get="{% url 'default-meeting-provider' %}" hx-target="#reloadMessages" hidden>
 </button>
 
 <script>
@@ -41,6 +59,11 @@
         var value = $(element).is(':checked')
         $('#ratingButton').attr('hx-vals', `{"candidate_self_tracking":${value}}`);
         $('#ratingButton').click()
+    }
+    function defaultMeetingProvider(element){
+        var value = $(element).val()
+        $('#meetingProviderButton').attr('hx-vals', `{"default_meeting_provider":"${value}"}`);
+        $('#meetingProviderButton').click()
     }
 </script>
 {% endblock settings %}

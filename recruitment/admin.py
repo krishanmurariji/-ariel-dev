@@ -8,6 +8,8 @@ from django.contrib import admin
 
 from recruitment.models import (
     Candidate,
+    CandidateIntakeLog,
+    CandidateIntakeMailbox,
     CandidateRating,
     InterviewSchedule,
     LinkedInAccount,
@@ -32,3 +34,5 @@ admin.site.register(CandidateRating)
 admin.site.register(SkillZone)
 admin.site.register(InterviewSchedule)
 admin.site.register(LinkedInAccount)
+admin.site.register(CandidateIntakeMailbox)
+admin.site.register(CandidateIntakeLog)

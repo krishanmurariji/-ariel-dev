@@ -1,0 +1,9 @@
+{% load i18n %}
+{% if instance.has_better_job_suggestion %}
+  <span
+    title="{% trans 'AI found a stronger-matching open job for this candidate - see the AI Score tab.' %}"
+    style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:#FEF3C7;"
+  >
+    <ion-icon name="bulb-outline" style="color:#B7791F; font-size:12px;"></ion-icon>
+  </span>
+{% endif %}

@@ -1,0 +1,77 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+
+  <div class="flex items-center gap-3 mb-5 flex-wrap">
+    <h1 class="text-xl font-bold">{{ structure.name }}</h1>
+    {% if structure.tax_regime_id %}
+      <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-primary-200 text-primary-600">{{ structure.tax_regime_id.name }}</span>
+    {% endif %}
+    {% if structure.is_locked %}
+      <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-warning-light text-warning-dark">{% trans "Locked — in use" %}</span>
+    {% endif %}
+    <span class="flex-1"></span>
+    {% if structure.is_locked and perms.payroll_pro.add_salarystructure %}
+      <form method="post" action="{% url 'pp-structure-duplicate' structure.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="oh-btn oh-btn--secondary">
+          <ion-icon name="copy-outline" class="me-1"></ion-icon>{% trans "Duplicate" %}
+        </button>
+      </form>
+    {% endif %}
+    <a href="{% url 'pp-structures' %}" class="text-primary-600 text-sm font-semibold flex items-center gap-1">
+      <ion-icon name="arrow-back-outline"></ion-icon>{% trans "Back" %}
+    </a>
+  </div>
+
+  {% if structure.is_locked %}
+  <div class="bg-warning-light border border-warning-light rounded-md p-3.5 mb-4 text-xs">
+    {% blocktrans count counter=structure.assigned_employee_count %}This structure is currently assigned to {{ counter }} employee and its components can't be edited — Duplicate it to make changes.{% plural %}This structure is currently assigned to {{ counter }} employees and its components can't be edited — Duplicate it to make changes.{% endblocktrans %}
+  </div>
+  {% endif %}
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    {% include "payroll_pro/_structure_components.html" %}
+
+    <!-- Right column: employees + formula box -->
+    <div class="flex flex-col gap-4">
+      <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5">
+        <h3 class="text-sm font-semibold mb-3">{% trans "Employees on this structure" %} <span class="text-xs font-normal text-dark-400">({{ employees|length }})</span></h3>
+        {% if employees %}
+        <div class="flex flex-col gap-2 max-h-64 overflow-y-auto pr-1">
+          {% for revision in employees %}
+          <a href="{% url 'pp-salary-timeline' revision.employee_id.pk %}" class="flex items-center gap-2 p-1.5 rounded-md hover:bg-primary-100 transition duration-200">
+            <img src="{{ revision.employee_id.get_avatar }}" class="w-8 h-8 rounded-full object-cover" alt="">
+            <div class="min-w-0">
+              <div class="text-xs font-semibold truncate">{{ revision.employee_id.get_full_name }}</div>
+              <div class="text-[11px] text-dark-400 truncate">{{ revision.monthly_ctc|pp_money0 }} /mo</div>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-xs text-dark-400">{% trans "No employees assigned yet." %}</p>
+        {% endif %}
+      </div>
+
+      <div class="bg-primary-100 border border-primary-300 rounded-md p-4 text-xs leading-6">
+        <b class="block mb-1">{% trans "Formula logic used by this structure" %}</b>
+        {% if structure.gross_mode == 'pct' %}
+          <code class="bg-white px-1 rounded">{% trans "Monthly Gross" %}</code> = {% trans "Monthly CTC" %} × {{ structure.gross_pct }}%<br>
+        {% elif structure.gross_mode == 'formula' %}
+          <code class="bg-white px-1 rounded">{% trans "Monthly Gross" %}</code> = {{ structure.gross_formula|default:"CTC" }} <i>({% trans "monthly CTC" %})</i><br>
+        {% else %}
+          <code class="bg-white px-1 rounded">{% trans "Monthly Gross" %}</code> = {% trans "Monthly CTC ÷ (1 + Employer PF% × Basic%)" %}{% if not structure.include_employer_pf_in_ctc %} — {% trans "employer PF outside CTC" %}{% endif %}<br>
+        {% endif %}
+        <code class="bg-white px-1 rounded">{% trans "Payable Days" %}</code> = {% trans "Actual Working Days − LOP Days" %}<br>
+        <code class="bg-white px-1 rounded">PF</code> {% if structure.pf_enabled %}= {{ structure.pf_employee_pct }}%/{{ structure.pf_employer_pct }}% {% trans "of" %} {% if structure.pf_ceiling_enabled %}min({% trans "Basic" %}, {{ structure.pf_wage_ceiling|pp_money0 }}){% else %}{% trans "prorated Basic" %}{% endif %}{% else %}= {% trans "disabled" %}{% endif %}<br>
+        <code class="bg-white px-1 rounded">PT</code> {% if structure.pt_enabled %}= {{ structure.pt_amount|pp_money0 }} {% trans "if gross >" %} {{ structure.pt_threshold|pp_money0 }}{% else %}= {% trans "disabled" %}{% endif %}<br>
+        <code class="bg-white px-1 rounded">Gratuity</code> {% if structure.gratuity_enabled %}= {{ structure.gratuity_pct }}% {% trans "of prorated Basic (employer cost only)" %}{% else %}= {% trans "disabled" %}{% endif %}<br>
+        <code class="bg-white px-1 rounded">TDS</code> {% if structure.tds_enabled %}= <b>{{ structure.tax_regime_id|default:"—" }}</b> {% trans "slab tax ÷ 12" %}{% else %}= {% trans "disabled" %}{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

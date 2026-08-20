@@ -1,0 +1,125 @@
+{% load i18n payroll_pro_tags %}
+{# Earning-components editor card (structure, component_types, component_error). Rendered on the full page and as an htmx swap target after add/update/delete, so the table stays in sync without a page reload. #}
+<div id="componentsCard" class="lg:col-span-2 bg-white rounded-md shadow-card border border-[#ebebeb] p-5">
+  <div class="flex items-center justify-between mb-3">
+    <h3 class="text-sm font-semibold">{% trans "Earning Components" %} <span class="text-xs font-normal text-dark-400">({% trans "computed top to bottom" %})</span></h3>
+    <div class="flex items-center gap-2">
+      {% if perms.payroll_pro.change_salarystructure %}
+        <a class="oh-btn oh-btn--light-bkg oh-btn--small" href="{% url 'pp-structure-edit' structure.pk %}">
+          <ion-icon name="settings-outline" class="me-1"></ion-icon>{% trans "Structure Settings" %}
+        </a>
+      {% endif %}
+      {% if perms.payroll_pro.change_salarystructure and not structure.is_locked %}
+        <button type="button" class="oh-btn oh-btn--light-bkg oh-btn--small" onclick="document.getElementById('newComponentRow').classList.remove('hidden'); this.classList.add('hidden');" id="showAddComponentBtn">
+          <ion-icon name="add-outline"></ion-icon>{% trans "Add Component" %}
+        </button>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if component_error %}
+    <div class="bg-danger-light border border-danger-light text-danger-dark rounded-md p-2.5 mb-3 text-xs">{{ component_error }}</div>
+  {% endif %}
+
+  {% if perms.payroll_pro.change_salarystructure and not structure.is_locked %}
+    {% for comp in structure.ordered_components %}
+      <form id="compform{{ comp.pk }}" method="post" action="{% url 'pp-component-update' comp.pk %}"
+            hx-post="{% url 'pp-component-update' comp.pk %}" hx-target="#componentsCard" hx-swap="outerHTML">
+        {% csrf_token %}
+      </form>
+      <form id="compdel{{ comp.pk }}" method="post" action="{% url 'pp-component-delete' comp.pk %}"
+            hx-post="{% url 'pp-component-delete' comp.pk %}" hx-target="#componentsCard" hx-swap="outerHTML">
+        {% csrf_token %}
+      </form>
+    {% endfor %}
+    <form id="compAddForm" method="post" action="{% url 'pp-component-add' structure.pk %}"
+          hx-post="{% url 'pp-component-add' structure.pk %}" hx-target="#componentsCard" hx-swap="outerHTML">
+      {% csrf_token %}<input type="hidden" name="sequence" value="{{ structure.ordered_components|length }}">
+    </form>
+  {% endif %}
+
+  <div class="overflow-x-auto">
+    <table class="w-full text-xs">
+      <thead>
+        <tr class="text-left text-dark-400 uppercase text-[10px] tracking-wide border-b border-[#ebebeb]">
+          <th class="px-2 py-2">{% trans "Component" %}</th>
+          <th class="px-2 py-2">{% trans "Type" %}</th>
+          <th class="px-2 py-2">{% trans "Value" %}</th>
+          <th class="px-2 py-2">{% trans "Formula" %}</th>
+          <th class="px-2 py-2"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for comp in structure.ordered_components %}
+          {% if perms.payroll_pro.change_salarystructure and not structure.is_locked %}
+          <tr id="comprow{{ comp.pk }}" class="group border-b border-[#ebebeb] last:border-b-0 hover:bg-primary-100 transition duration-200">
+            <td class="px-2 py-2">{{ comp.name }}{% if comp.is_basic %} <span class="text-[10px] text-dark-400">({% trans "basic" %})</span>{% endif %}</td>
+            <td class="px-2 py-2 text-dark-400">{{ comp.get_component_type_display }}</td>
+            <td class="px-2 py-2">{% if comp.component_type == 'balance' %}<span class="text-dark-400">{% trans "auto" %}</span>{% else %}{{ comp.value }}{% endif %}</td>
+            <td class="px-2 py-2"><span class="text-primary-600 bg-primary-100 rounded px-1.5 py-0.5 font-mono text-[10.5px]">{{ comp.formula_text }}</span></td>
+            <td class="px-2 py-2 text-right whitespace-nowrap">
+              <div class="inline-flex items-center justify-end gap-1">
+                <button type="button" class="oh-btn oh-btn--light-bkg oh-btn--x-small opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition duration-150"
+                  title="{% trans 'Edit' %}" onclick="ppEditComponentRow({{ comp.pk }})"><ion-icon name="create-outline"></ion-icon></button>
+                <button form="compdel{{ comp.pk }}" type="submit" class="oh-btn oh-btn--light-danger oh-btn--x-small opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition duration-150"
+                  title="{% if comp.is_basic %}{% trans 'This is the Basic component — PF and Gratuity are calculated as a % of it.' %}{% elif comp.component_type == 'balance' %}{% trans 'This is the balancing component that absorbs the remaining gross.' %}{% else %}{% trans 'Remove' %}{% endif %}"
+                ><ion-icon name="trash-outline"></ion-icon></button>
+              </div>
+            </td>
+          </tr>
+          <tr id="compedit{{ comp.pk }}" class="hidden border-b border-[#ebebeb] last:border-b-0 bg-primary-50">
+            <td class="px-2 py-2"><input form="compform{{ comp.pk }}" type="text" name="name" class="oh-input w-full" value="{{ comp.name }}" {% if comp.is_basic %}readonly{% endif %}></td>
+            <td class="px-2 py-2">
+              <select form="compform{{ comp.pk }}" name="component_type" class="oh-select w-full" {% if comp.is_basic %}disabled{% endif %}>
+                {% for value, label in component_types %}
+                  <option value="{{ value }}" {% if comp.component_type == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td class="px-2 py-2">
+              {% if comp.component_type == 'balance' %}<span class="text-dark-400">{% trans "auto" %}</span>
+              {% else %}<input form="compform{{ comp.pk }}" type="number" step="0.1" name="value" class="oh-input pp-num" value="{{ comp.value }}">{% endif %}
+            </td>
+            <td class="px-2 py-2"></td>
+            <td class="px-2 py-2 text-right whitespace-nowrap">
+              <div class="inline-flex items-center justify-end gap-1">
+                <button form="compform{{ comp.pk }}" type="submit" class="oh-btn oh-btn--secondary oh-btn--x-small">{% trans "Save" %}</button>
+                <button type="button" class="oh-btn oh-btn--light oh-btn--x-small" onclick="ppCancelComponentRow({{ comp.pk }})">{% trans "Cancel" %}</button>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr class="border-b border-[#ebebeb] last:border-b-0 hover:bg-primary-100 transition duration-200">
+            <td class="px-2 py-2">{{ comp.name }}</td>
+            <td class="px-2 py-2">{{ comp.get_component_type_display }}</td>
+            <td class="px-2 py-2">{{ comp.value }}</td>
+            <td class="px-2 py-2"><span class="text-primary-600 bg-primary-100 rounded px-1.5 py-0.5 font-mono text-[10.5px]">{{ comp.formula_text }}</span></td>
+            <td></td>
+          </tr>
+          {% endif %}
+        {% endfor %}
+        {% if perms.payroll_pro.change_salarystructure and not structure.is_locked %}
+        <tr id="newComponentRow" class="hidden border-b border-[#ebebeb] last:border-b-0 bg-primary-50">
+          <td class="px-2 py-2"><input form="compAddForm" type="text" name="name" class="oh-input w-full" placeholder="{% trans 'New Allowance' %}" required></td>
+          <td class="px-2 py-2">
+            <select form="compAddForm" name="component_type" class="oh-select w-full">
+              {% for value, label in component_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+            </select>
+          </td>
+          <td class="px-2 py-2"><input form="compAddForm" type="number" step="0.1" name="value" class="oh-input pp-num" placeholder="0" value="0"></td>
+          <td class="px-2 py-2"></td>
+          <td class="px-2 py-2 text-right whitespace-nowrap">
+            <div class="inline-flex items-center justify-end gap-1">
+              <button form="compAddForm" type="submit" class="oh-btn oh-btn--secondary oh-btn--x-small">{% trans "Save" %}</button>
+              <button type="button" class="oh-btn oh-btn--light oh-btn--x-small"
+                onclick="var r=document.getElementById('newComponentRow'); r.classList.add('hidden'); r.querySelector('input[name=name]').value=''; r.querySelector('input[name=value]').value='0'; document.getElementById('showAddComponentBtn').classList.remove('hidden');">
+                {% trans "Cancel" %}
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>

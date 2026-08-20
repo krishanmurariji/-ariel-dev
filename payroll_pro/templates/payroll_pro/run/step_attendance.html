@@ -1,0 +1,53 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+  {% include "payroll_pro/run/_strip.html" %}
+  <form id="stepform" method="post" action="{% url 'pp-run-step-save' %}">
+    {% csrf_token %}
+    <input type="hidden" name="run_id" value="{{ run.pk }}">
+    <input type="hidden" name="step" value="attendance">
+    {% include "payroll_pro/run/_stephead.html" %}
+    <div class="bg-primary-100 border border-primary-300 rounded-md p-3 text-xs mb-4">
+      {% trans "LOP Summary — attendance is prefilled from the attendance & leave modules (approved unpaid leaves count as LOP). Working Days and LOP Days are linked: editing either recalculates the other, and Payable Days = Actual Working Days − LOP Days. Actual Working Days this month:" %}
+      <b>{{ run.total_days|floatformat:"-2" }}</b>
+    </div>
+    <div class="bg-white rounded-md shadow-card border border-[#ebebeb] overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="text-left text-dark-400 uppercase text-[10px] tracking-wide border-b border-[#ebebeb]">
+            <th class="px-5 py-2">{% trans "Employee" %}</th><th class="px-2 py-2">{% trans "Working Days" %}</th>
+            <th class="px-2 py-2">{% trans "LOP Days" %}</th><th class="px-2 py-2">{% trans "Payable Days" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for record in records %}
+          <tr class="border-b border-[#ebebeb] last:border-b-0 hover:bg-primary-100 transition duration-200">
+            <td class="px-5 py-2.5">
+              <div class="flex items-center gap-2">
+                <img src="{{ record.employee_id.get_avatar }}" class="w-7 h-7 rounded-full object-cover" alt="">
+                <div>
+                  <div class="font-semibold">{{ record.employee_id.get_full_name }}</div>
+                  <div class="text-dark-400 text-[11px]">{{ record.salary_revision_id.salary_structure_id.name|default:"—" }}</div>
+                </div>
+              </div>
+            </td>
+            <td class="px-2 py-2.5"><input type="number" step="0.5" min="0" max="{{ run.total_days }}" class="oh-input pp-num"
+                       name="r{{ record.pk }}_present" value="{{ record.present_days|floatformat:"-2" }}"
+                       oninput="ppLinkedDays(this,'r{{ record.pk }}_lop',{{ run.total_days }})" {% if run.is_locked %}disabled{% endif %}></td>
+            <td class="px-2 py-2.5"><input type="number" step="0.5" min="0" max="{{ run.total_days }}" class="oh-input pp-num"
+                       name="r{{ record.pk }}_lop" value="{{ record.lop_days|floatformat:"-2" }}"
+                       oninput="ppLinkedDays(this,'r{{ record.pk }}_present',{{ run.total_days }})" {% if run.is_locked %}disabled{% endif %}></td>
+            <td class="px-2 py-2.5"><b class="pp-payable">{{ record.payable_days|floatformat:"-2" }} / {{ run.total_days|floatformat:"-2" }}</b></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="px-5 py-8 text-center text-dark-400">
+            {% trans "No employees with salary assignments" %} — {% trans "assign employees in Salary Overview first." %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+</div>
+{% endblock %}

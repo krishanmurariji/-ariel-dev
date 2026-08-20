@@ -22,6 +22,7 @@ class YourForm(forms.Form):
 """
 
 import logging
+import re
 import uuid
 from ast import Dict
 from datetime import date, datetime
@@ -45,12 +46,18 @@ from horilla_widgets.widgets.horilla_multi_select_field import HorillaMultiSelec
 from horilla_widgets.widgets.select_widgets import HorillaMultiSelectWidget
 from recruitment import widgets
 from recruitment.models import (
+    AISettings,
     Candidate,
     CandidateDocument,
     CandidateDocumentRequest,
+    CandidateEducation,
+    CandidateEmergencyContact,
+    CandidateExperience,
+    CandidateIntakeMailbox,
     InterviewSchedule,
     JobPosition,
     LinkedInAccount,
+    Platform,
     Recruitment,
     RecruitmentSurvey,
     RejectedCandidate,
@@ -309,7 +316,13 @@ class RecruitmentCreationForm(BaseModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         reload_queryset(self.fields)
-        if not self.instance.pk:
+        if "open_positions" in self.fields:
+            # Only actually required when publishing (see clean()), but marked
+            # required here so the form shows the "*" indicator - the common
+            # case is publishing, and the field being silently optional in the
+            # UI was confusing.
+            self.fields["open_positions"].required = True
+        if "recruitment_managers" in self.fields:
             self.fields["recruitment_managers"] = HorillaMultiSelectField(
                 queryset=Employee.objects.filter(is_active=True),
                 widget=HorillaMultiSelectWidget(
@@ -321,6 +334,22 @@ class RecruitmentCreationForm(BaseModelForm):
                 ),
                 label=f"{self._meta.model()._meta.get_field('recruitment_managers').verbose_name}",
             )
+        if "recruitment_heads" in self.fields:
+            self.fields["recruitment_heads"] = HorillaMultiSelectField(
+                queryset=Employee.objects.filter(is_active=True),
+                required=False,
+                widget=HorillaMultiSelectWidget(
+                    filter_route_name="employee-widget-filter",
+                    filter_class=EmployeeFilter,
+                    filter_instance_context_name="f",
+                    filter_template_path="employee_filters.html",
+                    required=False,
+                ),
+                label=f"{self._meta.model()._meta.get_field('recruitment_heads').verbose_name}",
+            )
+            # The model field has blank=True but the HorillaMultiSelectField
+            # widget still needs required explicitly cleared on edit-mode too.
+            self.fields["recruitment_heads"].required = False
 
         skill_choices = [("", _("---Choose Skills---"))] + list(
             self.fields["skills"].queryset.values_list("id", "title")
@@ -342,9 +371,13 @@ class RecruitmentCreationForm(BaseModelForm):
             ids = self.data.getlist("recruitment_managers")
             if ids:
                 self.errors.pop("recruitment_managers", None)
+        if isinstance(self.fields.get("recruitment_heads"), HorillaMultiSelectField):
+            self.errors.pop("recruitment_heads", None)
         open_positions = self.cleaned_data.get("open_positions")
         is_published = self.cleaned_data.get("is_published")
-        if is_published and not open_positions:
+        if not is_published:
+            self.errors.pop("open_positions", None)
+        elif not open_positions:
             raise forms.ValidationError(
                 _("Job position is required if the recruitment is publishing.")
             )
@@ -385,15 +418,20 @@ class StageCreationForm(BaseModelForm):
         if not self.instance.pk:
             self.fields["stage_managers"] = HorillaMultiSelectField(
                 queryset=Employee.objects.filter(is_active=True),
+                required=False,
                 widget=HorillaMultiSelectWidget(
                     filter_route_name="employee-widget-filter",
                     filter_class=EmployeeFilter,
                     filter_instance_context_name="f",
                     filter_template_path="employee_filters.html",
-                    required=True,
+                    required=False,
                 ),
                 label=f"{self._meta.model()._meta.get_field('stage_managers').verbose_name}",
             )
+        # The model field itself has no blank=True, so the edit-mode form
+        # (which uses the default ModelForm-generated field instead of the
+        # HorillaMultiSelectField above) would otherwise still require it.
+        self.fields["stage_managers"].required = False
 
     def clean(self):
         if isinstance(self.fields["stage_managers"], HorillaMultiSelectField):
@@ -409,10 +447,14 @@ class CandidateCreationForm(BaseModelForm):
     """
 
     load = forms.CharField(widget=widgets.RecruitmentAjaxWidget, required=False)
+    new_platform = forms.CharField(
+        required=False,
+        label=_("Or type a new source name (e.g. LinkedIn, Indeed)"),
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["source"].initial = "software"
+        self.fields["platform"].required = False
         self.fields["profile"].widget.attrs["accept"] = ".jpg, .jpeg, .png"
         self.fields["profile"].required = False
         self.fields["resume"].widget.attrs["accept"] = ".pdf"
@@ -443,7 +485,7 @@ class CandidateCreationForm(BaseModelForm):
             "dob",
             "gender",
             "address",
-            "source",
+            "platform",
             "country",
             "state",
             "zip",
@@ -460,6 +502,12 @@ class CandidateCreationForm(BaseModelForm):
 
     def save(self, commit: bool = ...):
         candidate = self.instance
+        new_platform = (self.cleaned_data.get("new_platform") or "").strip()
+        if new_platform:
+            platform_obj, _created = Platform.objects.get_or_create(
+                title__iexact=new_platform, defaults={"title": new_platform}
+            )
+            candidate.platform = platform_obj
         recruitment = candidate.recruitment_id
         stage = candidate.stage_id
         candidate.hired = False
@@ -540,7 +588,8 @@ class ApplicationForm(RegistrationForm):
             "joining_date",
             "sequence",
             "offerletter_status",
-            "source",
+            "platform",
+            "skills",
         )
         widgets = {
             "recruitment_id": forms.TextInput(
@@ -568,6 +617,54 @@ class ApplicationForm(RegistrationForm):
         if request and request.user.has_perm("recruitment.add_candidate"):
             self.fields["profile"].required = False
 
+        # Only name/email/mobile are mandatory on the public application
+        # form - resume/profile follow the recruitment's own
+        # optional_resume/optional_profile_image flags (handled in clean()
+        # below), everything else (gender, address, country, state, city,
+        # zip, portfolio) is optional.
+        self.fields["mobile"].required = True
+        self.fields["gender"].required = False
+
+    def clean_name(self):
+        name = (self.cleaned_data.get("name") or "").strip()
+        name = re.sub(r"\s+", " ", name)
+        if not re.match(r"^[A-Za-z ]+$", name):
+            raise ValidationError(
+                _("Name can only contain letters and spaces.")
+            )
+        return name
+
+    def clean_mobile(self):
+        mobile = (self.cleaned_data.get("mobile") or "").strip()
+        if not re.match(r"^\d{7,15}$", mobile):
+            raise ValidationError(
+                _("Contact number must contain 7 to 15 digits only.")
+            )
+        return mobile
+
+    def clean_dob(self):
+        dob = self.cleaned_data.get("dob")
+        if dob:
+            today = date.today()
+            if dob > today:
+                raise ValidationError(_("Date of birth cannot be in the future."))
+            age = (
+                today.year
+                - dob.year
+                - ((today.month, today.day) < (dob.month, dob.day))
+            )
+            if age < 18:
+                raise ValidationError(
+                    _("Candidate must be at least 18 years old.")
+                )
+            if age > 100:
+                raise ValidationError(_("Enter a valid date of birth."))
+        return dob
+
+    def clean_reason_to_leave(self):
+        reason = (self.cleaned_data.get("reason_to_leave") or "").strip()
+        return reason
+
     def clean(self, *args, **kwargs):
         name = self.cleaned_data.get("name")
         request = getattr(_thread_locals, "request", None)
@@ -575,13 +672,32 @@ class ApplicationForm(RegistrationForm):
         errors = {}
         profile = self.cleaned_data.get("profile")
         resume = self.cleaned_data.get("resume")
+        email = self.cleaned_data.get("email")
+        mobile = self.cleaned_data.get("mobile")
         recruitment: Recruitment = self.cleaned_data.get("recruitment_id")
 
         if recruitment:
             if not resume and not recruitment.optional_resume:
                 errors["resume"] = _("This field is required")
-            if not profile and not recruitment.optional_profile_image:
+            # Unlike resume, the profile image section is hidden entirely
+            # on the public form unless a recruitment opts in via
+            # optional_profile_image - so it's only required when that
+            # flag is on (the opposite polarity of optional_resume).
+            if recruitment.optional_profile_image and not profile:
                 errors["profile"] = _("This field is required")
+
+            if email and Candidate.objects.filter(
+                email__iexact=email, recruitment_id=recruitment
+            ).exists():
+                errors["email"] = _(
+                    "A candidate with this email has already applied for this job."
+                )
+            if mobile and Candidate.objects.filter(
+                mobile=mobile, recruitment_id=recruitment
+            ).exists():
+                errors["mobile"] = _(
+                    "A candidate with this phone number has already applied for this job."
+                )
 
         if errors:
             raise ValidationError(errors)
@@ -596,6 +712,176 @@ class ApplicationForm(RegistrationForm):
 
         super().clean()
         return self.cleaned_data
+
+
+# Shared with the education/experience formsets below. Mirrors the
+# client-side pattern used on the public application form (see
+# TEXT_FIELD_PATTERN in application_form.html) so a submission that
+# bypasses the JS (a forged POST, JS disabled) is still held to the
+# same rule server-side: must start with a letter/digit, then only
+# letters, digits, spaces and common name/address punctuation - no
+# stray symbols, markup, or emoji-only garbage.
+CANDIDATE_TEXT_FIELD_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 .,'()&/-]*$")
+CANDIDATE_CGPA_PATTERN = re.compile(r"^\d{1,3}(\.\d{1,2})?$")
+
+
+def _validate_candidate_text_field(form, field_name, label, required=False, min_length=2):
+    """
+    Applies the shared min-length + character-set rule to one field on
+    one formset row. max_length is already enforced by the model
+    field's own CharField validator before this runs.
+    """
+    value = (form.cleaned_data.get(field_name) or "").strip()
+    if not value:
+        if required:
+            form.add_error(field_name, _("%(label)s is required.") % {"label": label})
+        return
+    if len(value) < min_length:
+        form.add_error(
+            field_name,
+            _("%(label)s must be at least %(min)d characters.")
+            % {"label": label, "min": min_length},
+        )
+        return
+    if not CANDIDATE_TEXT_FIELD_PATTERN.match(value):
+        form.add_error(
+            field_name,
+            _("%(label)s contains characters that aren't allowed.")
+            % {"label": label},
+        )
+
+
+class CandidateEducationBaseFormSet(forms.BaseInlineFormSet):
+    """
+    Validates each education row's required/text fields, date range,
+    and CGPA/percentage format - the model fields themselves are
+    largely unconstrained (plain CharFields with no character-set or
+    numeric rules) so this is the only place any of that gets checked.
+    """
+
+    def clean(self):
+        super().clean()
+        for form in self.forms:
+            if not hasattr(form, "cleaned_data") or not form.cleaned_data:
+                continue
+            if form.cleaned_data.get("DELETE"):
+                continue
+
+            _validate_candidate_text_field(
+                form, "degree", _("Course"), required=True
+            )
+            _validate_candidate_text_field(
+                form, "specialization", _("Branch/Specialization")
+            )
+            _validate_candidate_text_field(form, "university", _("University/College"))
+            _validate_candidate_text_field(form, "location", _("Location"))
+
+            start_date = form.cleaned_data.get("start_date")
+            end_date = form.cleaned_data.get("end_date")
+            if start_date and end_date and end_date < start_date:
+                form.add_error(
+                    "end_date",
+                    _("End of course cannot be before the start of course."),
+                )
+
+            percentage_cgpa = (form.cleaned_data.get("percentage_cgpa") or "").strip()
+            if percentage_cgpa:
+                if not CANDIDATE_CGPA_PATTERN.match(percentage_cgpa) or not (
+                    0 <= float(percentage_cgpa) <= 100
+                ):
+                    form.add_error(
+                        "percentage_cgpa",
+                        _(
+                            "Enter a valid CGPA (0-10) or percentage (0-100), e.g. 8.5 or 82."
+                        ),
+                    )
+
+
+# Inline formsets used on the public application form so a candidate can
+# add any number of education/experience/emergency-contact entries. extra=0
+# because the form template renders its own starting row and "Add another"
+# button in JS rather than relying on Django's blank-extra-forms rendering.
+CandidateEducationFormSet = forms.inlineformset_factory(
+    Candidate,
+    CandidateEducation,
+    fields=[
+        "degree",
+        "specialization",
+        "percentage_cgpa",
+        "start_date",
+        "end_date",
+        "university",
+        "location",
+    ],
+    formset=CandidateEducationBaseFormSet,
+    extra=0,
+    can_delete=True,
+)
+
+class CandidateExperienceBaseFormSet(forms.BaseInlineFormSet):
+    """
+    Restricts "Currently working here" to at most one experience entry -
+    a candidate can only be currently employed at one place at a time -
+    and validates each row's required/text fields and date range.
+    """
+
+    def clean(self):
+        super().clean()
+        current_job_count = 0
+        for form in self.forms:
+            if not hasattr(form, "cleaned_data") or not form.cleaned_data:
+                continue
+            if form.cleaned_data.get("DELETE"):
+                continue
+            if form.cleaned_data.get("is_current_job"):
+                current_job_count += 1
+
+            _validate_candidate_text_field(
+                form, "company_name", _("Company Name"), required=True
+            )
+            _validate_candidate_text_field(
+                form, "designation", _("Job Title"), required=True
+            )
+            _validate_candidate_text_field(form, "location", _("Location"))
+
+            start_date = form.cleaned_data.get("start_date")
+            end_date = form.cleaned_data.get("end_date")
+            if start_date and end_date and end_date < start_date:
+                form.add_error(
+                    "end_date",
+                    _("Date of relieving cannot be before the date of joining."),
+                )
+        if current_job_count > 1:
+            raise ValidationError(
+                _(
+                    'Only one experience entry can be marked as "Currently working here".'
+                )
+            )
+
+
+CandidateExperienceFormSet = forms.inlineformset_factory(
+    Candidate,
+    CandidateExperience,
+    fields=[
+        "company_name",
+        "designation",
+        "is_current_job",
+        "start_date",
+        "end_date",
+        "location",
+    ],
+    formset=CandidateExperienceBaseFormSet,
+    extra=0,
+    can_delete=True,
+)
+
+CandidateEmergencyContactFormSet = forms.inlineformset_factory(
+    Candidate,
+    CandidateEmergencyContact,
+    fields=["name", "phone", "relation"],
+    extra=0,
+    can_delete=True,
+)
 
 
 class RecruitmentDropDownForm(DropDownForm):
@@ -668,6 +954,32 @@ class AddCandidateForm(ModelForm):
         self.fields["gender"].empty_label = None
         self.fields["job_position_id"].empty_label = None
         self.fields["stage_id"].empty_label = None
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # recruitment_id isn't a form field (it's set from the stage in
+        # __init__ above), so Django's automatic unique_together
+        # validation for ("email", "recruitment_id") never runs on this
+        # form - check it explicitly here instead, or a duplicate
+        # candidate + recruitment combination hits the DB's unique
+        # constraint unhandled and surfaces as a 500 to the user.
+        email = cleaned_data.get("email")
+        recruitment = self.instance.recruitment_id
+        if email and recruitment:
+            duplicates = Candidate.objects.filter(
+                email=email, recruitment_id=recruitment
+            )
+            if self.instance.pk:
+                duplicates = duplicates.exclude(pk=self.instance.pk)
+            if duplicates.exists():
+                self.add_error(
+                    "email",
+                    _(
+                        "A candidate with this email has already applied "
+                        "to this recruitment."
+                    ),
+                )
+        return cleaned_data
 
     def as_p(self, *args, **kwargs):
         """
@@ -1020,6 +1332,57 @@ exclude_fields = [
 ]
 
 
+class CandidateMovePipelineForm(ModelForm):
+    """
+    Form to move a candidate from their current recruitment pipeline to a
+    different open job (and a specific stage within it) in the same company.
+    """
+
+    # Full width, stacked - side-by-side (the "col" filter's default half
+    # width) made this small two-field modal render unusually wide.
+    cols = {"recruitment_id": 12, "stage_id": 12}
+
+    class Meta:
+        model = Candidate
+        fields = ["recruitment_id", "stage_id"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["recruitment_id"].label = _("Move to job opening")
+        self.fields["recruitment_id"].empty_label = _("---Choose job opening---")
+        self.fields["recruitment_id"].required = True
+        self.fields["recruitment_id"].widget = forms.Select(
+            attrs={"class": "oh-select w-100", "id": "id_recruitment_id"}
+        )
+        current_recruitment = self.instance.recruitment_id
+        queryset = Recruitment.objects.filter(closed=False)
+        if current_recruitment:
+            queryset = queryset.filter(
+                company_id=current_recruitment.company_id
+            ).exclude(pk=current_recruitment.pk)
+        self.fields["recruitment_id"].queryset = queryset
+
+        self.fields["stage_id"].label = _("Stage")
+        self.fields["stage_id"].required = True
+        self.fields["stage_id"].widget = forms.Select(
+            attrs={"class": "oh-select w-100", "id": "id_stage_id"}
+        )
+        # The stage dropdown is populated client-side via JS once a job
+        # opening is picked (see candidate/move_pipeline_form.html) - the
+        # queryset here only needs to match whatever recruitment_id was
+        # actually submitted, so validation accepts exactly what the user
+        # was shown regardless of client-side timing/JS state.
+        selected_recruitment_id = self.data.get("recruitment_id") if self.is_bound else None
+        if selected_recruitment_id:
+            self.fields["stage_id"].queryset = Stage.objects.filter(
+                recruitment_id=selected_recruitment_id
+            )
+            self.fields["stage_id"].empty_label = _("---Choose Stage---")
+        else:
+            self.fields["stage_id"].queryset = Stage.objects.none()
+            self.fields["stage_id"].empty_label = _("---Choose job opening first---")
+
+
 class CandidateExportForm(forms.Form):
     model_fields = Candidate._meta.get_fields()
     field_choices = [
@@ -1120,6 +1483,21 @@ class SkillZoneCandidateForm(ModelForm):
                 queryset=Candidate.objects.all(),
                 widget=forms.Select(attrs={"class": "oh-select oh-select2 w-100"}),
                 label=_("Candidate"),
+                # candidate_id is a manually-declared field, not one of
+                # Meta.fields - Django's ModelForm.__init__ only
+                # auto-populates initial values from the instance for
+                # fields listed in Meta.fields, so without this the
+                # dropdown always opens blank on edit even though a
+                # candidate is already set.
+                initial=self.instance.candidate_id,
+                # Which candidate a Skill Zone entry belongs to is that
+                # entry's identity (see verbose_name above) - editing is
+                # only meant to change skill_zone_id/reason, never
+                # reassign the record to a different candidate. disabled
+                # (not just excluded from Meta.fields) so it renders
+                # visibly non-interactive instead of looking like a
+                # working dropdown that silently does nothing on save.
+                disabled=True,
             )
 
     def save(self, commit: bool = True) -> SkillZoneCandidate:
@@ -1248,6 +1626,9 @@ class RejectedCandidateForm(ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["reject_reason_id"].empty_label = None
         self.fields["candidate_id"].widget = self.fields["candidate_id"].hidden_widget()
+        reject_reason_widget = self.fields["reject_reason_id"].widget
+        existing_class = reject_reason_widget.attrs.get("class", "")
+        reject_reason_widget.attrs["class"] = f"{existing_class} reject-reason-select".strip()
 
 
 class ScheduleInterviewForm(BaseModelForm):
@@ -1389,6 +1770,16 @@ class SkillsForm(ModelForm):
         fields = ["title"]
 
 
+class PlatformForm(ModelForm):
+    cols = {
+        "title": 12,
+    }
+
+    class Meta:
+        model = Platform
+        fields = ["title"]
+
+
 class ResumeForm(ModelForm):
     class Meta:
         model = Resume
@@ -1486,3 +1877,79 @@ class LinkedInAccountForm(BaseModelForm):
             "is_active",
             "company_id",
         ]
+
+
+class CandidateIntakeMailboxForm(BaseModelForm):
+    """
+    CandidateIntakeMailbox form
+    """
+
+    class Meta:
+        model = CandidateIntakeMailbox
+        fields = [
+            "provider",
+            "azure_api",
+            "google_api",
+            "fallback_recruitment_id",
+            "daily_candidate_cap",
+            "is_active",
+            "company_id",
+        ]
+        widgets = {
+            "provider": forms.Select(
+                attrs={"onchange": "candidateIntakeProviderChange($(this))"}
+            ),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        provider = cleaned_data.get("provider")
+        azure_api = cleaned_data.get("azure_api")
+        google_api = cleaned_data.get("google_api")
+        if provider == "outlook":
+            if not azure_api:
+                self.add_error(
+                    "azure_api", _("Choose an Outlook mailbox for this provider.")
+                )
+            if google_api:
+                self.add_error(
+                    "google_api", _("Leave this empty when the provider is Outlook.")
+                )
+        elif provider == "gmail":
+            if not google_api:
+                self.add_error(
+                    "google_api", _("Choose a Gmail mailbox for this provider.")
+                )
+            if azure_api:
+                self.add_error(
+                    "azure_api", _("Leave this empty when the provider is Gmail.")
+                )
+        return cleaned_data
+
+
+class AISettingsForm(BaseModelForm):
+    """
+    AISettings form. `provider` is driven entirely by the switch in
+    recruitment/ai_settings.html (see aiProviderChange() there) - it stays
+    a real <select> for the form to submit, just hidden from view, so
+    there's exactly one control the user actually interacts with.
+    """
+
+    openai_api_key = forms.CharField(
+        required=False,
+        label=_("OpenAI API Key"),
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
+
+    class Meta:
+        model = AISettings
+        fields = [
+            "provider",
+            "openai_api_key",
+            "openai_model",
+            "ollama_base_url",
+            "ollama_model",
+        ]
+        widgets = {
+            "provider": forms.Select(attrs={"onchange": "aiProviderChange($(this))"}),
+        }

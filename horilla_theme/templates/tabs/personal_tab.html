@@ -31,26 +31,124 @@
                 <p class="text-xs font-semibold">{{ employee.city|default:_('None') }}</p>
             </div>
             <div class="mb-2">
-                <span class="font-medium text-xs text-[#565E6C]">{% trans 'Qualification' %}</span>
-                <p class="text-xs font-semibold">{{ employee.qualification|default:_('None') }}</p>
+                <span class="font-medium text-xs text-[#565E6C]">{% trans 'Zip' %}</span>
+                <p class="text-xs font-semibold">{{ employee.zip|default:_('None') }}</p>
             </div>
             <div class="mb-2">
-                <span class="font-medium text-xs text-[#565E6C]">{% trans 'Experience' %}</span>
-                <p class="text-xs font-semibold">{{ employee.experience|default:_('None') }}</p>
+                <span class="font-medium text-xs text-[#565E6C]">{% trans 'Marital Status' %}</span>
+                <p class="text-xs font-semibold">{{ employee.get_marital_status_display|default:_('None') }}</p>
             </div>
             <div class="mb-2">
-                <span class="font-medium text-xs text-[#565E6C]">{% trans 'Emergency Contact' %}</span>
-                <p class="text-xs font-semibold">{{ employee.emergency_contact|default:_('None') }}</p>
-            </div>
-            <div class="mb-2">
-                <span class="font-medium text-xs text-[#565E6C]">{% trans 'Emergency Contact Name' %}</span>
-                <p class="text-xs font-semibold">{{ employee.emergency_contact_name|default:_('None') }}</p>
-            </div>
-            <div class="mb-2">
-                <span class="font-medium text-xs text-[#565E6C]">{% trans 'Emergency Contact Relation' %}</span>
-                <p class="text-xs font-semibold">{{ employee.emergency_contact_relation|default:_('None') }}</p>
+                <span class="font-medium text-xs text-[#565E6C]">{% trans 'Children' %}</span>
+                <p class="text-xs font-semibold">{{ employee.children|default:_('None') }}</p>
             </div>
         </div>
     </div>
     <div class="col-span-9" hx-get="{% url 'work-tab' %}?pk={{employee.pk}}" hx-trigger="load"></div>
+
+    {% if employee.education_set.all %}
+        <div class="col-span-12 mb-3">
+            <div class="border border-dark-50 rounded-md p-3 h-full">
+                <h5 class="mb-1 font-bold">{% trans 'Education Details' %}</h5>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead>
+                            <tr class="text-left text-[#565E6C]">
+                                <th class="font-medium pr-3 py-1">{% trans 'Course' %}</th>
+                                <th class="font-medium pr-3 py-1">{% trans 'Branch/Specialization' %}</th>
+                                <th class="font-medium pr-3 py-1">{% trans 'CGPA/Percentage' %}</th>
+                                <th class="font-medium pr-3 py-1">{% trans 'University/College' %}</th>
+                                <th class="font-medium pr-3 py-1">{% trans 'Duration' %}</th>
+                                <th class="font-medium pr-3 py-1">{% trans 'Location' %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for edu in employee.education_set.all %}
+                                <tr class="border-t border-dark-50">
+                                    <td class="font-semibold pr-3 py-1">{{ edu.degree }}</td>
+                                    <td class="font-semibold pr-3 py-1">{{ edu.specialization }}</td>
+                                    <td class="font-semibold pr-3 py-1">{{ edu.percentage_cgpa }}</td>
+                                    <td class="font-semibold pr-3 py-1">{{ edu.university }}</td>
+                                    <td class="font-semibold pr-3 py-1">{% if edu.start_date or edu.end_date %}{{ edu.start_date }} - {{ edu.end_date }}{% endif %}</td>
+                                    <td class="font-semibold pr-3 py-1">{{ edu.location }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% elif employee.qualification %}
+        <div class="col-span-12 mb-3">
+            <div class="border border-dark-50 rounded-md p-3 h-full">
+                <span class="font-medium text-xs text-[#565E6C]">{% trans 'Qualification' %}</span>
+                <p class="text-xs font-semibold">{{ employee.qualification }}</p>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if employee.experience_set.all %}
+        <div class="col-span-12 mb-3">
+            <div class="border border-dark-50 rounded-md p-3 h-full">
+                <h5 class="mb-1 font-bold">{% trans 'Experience Details' %}</h5>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead>
+                            <tr class="text-left text-[#565E6C]">
+                                <th class="font-medium pr-3 py-1">{% trans 'Company Name' %}</th>
+                                <th class="font-medium pr-3 py-1">{% trans 'Job Title' %}</th>
+                                <th class="font-medium pr-3 py-1">{% trans 'Duration' %}</th>
+                                <th class="font-medium pr-3 py-1">{% trans 'Location' %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for exp in employee.experience_set.all %}
+                                <tr class="border-t border-dark-50">
+                                    <td class="font-semibold pr-3 py-1">{{ exp.company_name }}</td>
+                                    <td class="font-semibold pr-3 py-1">{{ exp.designation }}</td>
+                                    <td class="font-semibold pr-3 py-1">{{ exp.start_date }} - {% if exp.is_current_job %}{% trans 'Present' %}{% else %}{{ exp.end_date }}{% endif %}</td>
+                                    <td class="font-semibold pr-3 py-1">{{ exp.location }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% elif employee.experience %}
+        <div class="col-span-12 mb-3">
+            <div class="border border-dark-50 rounded-md p-3 h-full">
+                <span class="font-medium text-xs text-[#565E6C]">{% trans 'Experience' %}</span>
+                <p class="text-xs font-semibold">{{ employee.experience }}</p>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if employee.emergency_contact_set.all %}
+        <div class="col-span-12 mb-3">
+            <div class="border border-dark-50 rounded-md p-3 h-full">
+                <h5 class="mb-1 font-bold">{% trans 'Emergency Contacts' %}</h5>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead>
+                            <tr class="text-left text-[#565E6C]">
+                                <th class="font-medium pr-3 py-1">{% trans 'Name' %}</th>
+                                <th class="font-medium pr-3 py-1">{% trans 'Phone' %}</th>
+                                <th class="font-medium pr-3 py-1">{% trans 'Relation' %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for contact in employee.emergency_contact_set.all %}
+                                <tr class="border-t border-dark-50">
+                                    <td class="font-semibold pr-3 py-1">{{ contact.name }}</td>
+                                    <td class="font-semibold pr-3 py-1">{{ contact.phone }}</td>
+                                    <td class="font-semibold pr-3 py-1">{{ contact.relation|default:_('None') }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% endif %}
 </div>

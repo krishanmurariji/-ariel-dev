@@ -26,9 +26,9 @@ SUBMENUS = [
         "redirect": reverse("recruitment-dashboard"),
     },
     {
-        "menu": _("Recruitment Pipeline"),
-        "redirect": reverse("cbv-pipeline"),
-        "accessibility": "recruitment.sidebar.pipeline_accessibility",
+        "menu": _("Job Openings"),
+        "redirect": reverse("recruitment-view"),
+        "accessibility": "recruitment.sidebar.recruitment_accessibility",
     },
     {
         "menu": _("Open Jobs"),
@@ -46,9 +46,9 @@ SUBMENUS = [
         "accessibility": "recruitment.sidebar.interview_accessibility",
     },
     {
-        "menu": _("Job Openings"),
-        "redirect": reverse("recruitment-view"),
-        "accessibility": "recruitment.sidebar.recruitment_accessibility",
+        "menu": _("Recruitment Pipeline"),
+        "redirect": reverse("cbv-pipeline"),
+        "accessibility": "recruitment.sidebar.pipeline_accessibility",
     },
     {
         "menu": _("Recruitment Survey"),
@@ -64,6 +64,16 @@ SUBMENUS = [
         "menu": _("Skill Zone"),
         "redirect": reverse("skill-zone-view"),
         "accessibility": "recruitment.sidebar.skill_zone_accessibility",
+    },
+    {
+        "menu": _("Email Applications"),
+        "redirect": reverse("candidate-intake-logs"),
+        "accessibility": "recruitment.sidebar.candidate_intake_log_accessibility",
+    },
+    {
+        "menu": _("Candidate Intake Mailbox"),
+        "redirect": reverse("candidate-intake-mailbox-settings"),
+        "accessibility": "recruitment.sidebar.candidate_intake_mailbox_accessibility",
     },
 ]
 
@@ -158,6 +168,18 @@ def skills_accessibility(request, submenu, user_perms, *args, **kwargs):
     return request.user.has_perm("recruitment.add_recruitment")
 
 
+def platforms_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("recruitment.add_recruitment")
+
+
+def candidate_intake_mailbox_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("recruitment.view_candidateintakemailbox")
+
+
+def candidate_intake_log_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("recruitment.view_candidateintakelog")
+
+
 @settings_menu.register
 class RecruitmentSettings:
     title = _("Recruitment")
@@ -178,5 +200,10 @@ class RecruitmentSettings:
             "label": _("Skills"),
             "url": reverse_lazy("skills-view"),
             "accessibility": skills_accessibility,
+        },
+        {
+            "label": _("Sources"),
+            "url": reverse_lazy("platforms-view"),
+            "accessibility": platforms_accessibility,
         },
     ]

@@ -1,0 +1,26 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+
+  <div class="flex items-center gap-3 mb-5 flex-wrap">
+    <a href="{% url 'pp-auto-settings' %}" class="text-primary-600 text-sm font-semibold flex items-center gap-1">
+      <ion-icon name="arrow-back-outline"></ion-icon>{% trans "Back" %}
+    </a>
+    <h1 class="text-xl font-bold">{% if edit_instance %}{% trans "Edit Setting" %}{% else %}{% trans "Add Setting" %}{% endif %}</h1>
+  </div>
+
+  <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5 max-w-2xl">
+    <form id="autoSettingForm" method="post" action="{% url 'pp-auto-settings-save' %}">
+      {% csrf_token %}
+      {% if edit_instance %}<input type="hidden" name="pk" value="{{ edit_instance.pk }}">{% endif %}
+      {% include "payroll_pro/_form_fields.html" %}
+    </form>
+    <div class="flex justify-end gap-2 pt-4 mt-4 border-t border-[#ebebeb]">
+      <a href="{% url 'pp-auto-settings' %}" class="oh-btn oh-btn--light">{% trans "Cancel" %}</a>
+      <button type="submit" form="autoSettingForm" class="oh-btn oh-btn--secondary">{% trans "Save Setting" %}</button>
+    </div>
+  </div>
+</div>
+{% endblock %}

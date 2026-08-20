@@ -1,0 +1,31 @@
+<div>{% include "generic/horilla_form.html" %}</div>
+
+<style>
+    #id_azure_api_parent_div,
+    #id_google_api_parent_div {
+        display: none;
+    }
+</style>
+
+<script>
+    function candidateIntakeProviderChange(selectElement) {
+        var provider = selectElement.val();
+
+        $("#id_azure_api_parent_div, #id_google_api_parent_div").hide();
+
+        switch (provider) {
+            case "outlook":
+                $("#id_azure_api_parent_div").show();
+                break;
+            case "gmail":
+                $("#id_google_api_parent_div").show();
+                break;
+            default:
+                break;
+        }
+    }
+
+    $(document).ready(function (e) {
+        $('select[name="provider"]').change();
+    });
+</script>

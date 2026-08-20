@@ -70,6 +70,15 @@ class GoogleCloudCredential(models.Model):
         """
         return reverse_lazy("delete-gmeet-credentials", kwargs={"obj_id": self.pk})
 
+    def get_authenticate_url(self):
+        """
+        Returns the URL to start the Google OAuth consent flow for this credential's company.
+
+        Returns:
+            str: The URL to authenticate with Google.
+        """
+        return reverse_lazy("authenticate-gmeet")
+
     def get_instance_id(self):
         """
         Returns the unique identifier (primary key) of the GoogleCloudCredential instance.

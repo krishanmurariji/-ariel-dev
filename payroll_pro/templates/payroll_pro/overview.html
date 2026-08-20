@@ -1,0 +1,143 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+
+  <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
+    <div>
+      <h1 class="text-xl font-bold">{% trans "Salary Overview" %}</h1>
+      <p class="text-sm text-dark-400 mt-1">{% trans "Link employees to salary structures — every change is a new revision, history stays intact" %}</p>
+    </div>
+    {% if perms.payroll_pro.add_employeesalary %}
+      <button type="button" class="oh-btn oh-btn--secondary toggleSidemenu" data-sidebar="assignCanvas">
+        <ion-icon name="add-outline" class="me-1"></ion-icon>{% trans "Assign Salary" %}
+      </button>
+    {% endif %}
+  </div>
+
+  <div class="bg-white rounded-md shadow-card border border-[#ebebeb] mb-4">
+    <div class="px-5 py-3 border-b border-[#ebebeb] flex items-center justify-between">
+      <h3 class="text-sm font-semibold">{% trans "Employees on payroll" %} <span class="text-xs font-normal text-dark-400">({{ assigned|length }})</span></h3>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="text-left text-dark-400 uppercase text-[10px] tracking-wide border-b border-[#ebebeb]">
+            <th class="px-5 py-2">{% trans "Employee" %}</th>
+            <th class="px-2 py-2">{% trans "Salary Structure" %}</th>
+            <th class="px-2 py-2">{% trans "Tax Regime" %}</th>
+            <th class="px-2 py-2">{% trans "Annual CTC" %}</th>
+            <th class="px-2 py-2">{% trans "Monthly CTC" %}</th>
+            <th class="px-2 py-2">{% trans "Effective From" %}</th>
+            <th class="px-5 py-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in assigned %}
+          <tr class="border-b border-[#ebebeb] last:border-b-0 hover:bg-primary-100 transition duration-200">
+            <td class="px-5 py-2.5">
+              <div class="flex items-center gap-2">
+                <img src="{{ row.employee.get_avatar }}" class="w-7 h-7 rounded-full object-cover" alt="">
+                <div>
+                  <div class="font-semibold">{{ row.employee.get_full_name }}</div>
+                  <div class="text-dark-400 text-[11px]">{{ row.employee.get_job_position|default:"" }}</div>
+                </div>
+              </div>
+            </td>
+            <td class="px-2 py-2.5"><span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-primary-200 text-primary-600">{{ row.revision.salary_structure_id.name }}</span></td>
+            <td class="px-2 py-2.5">{{ row.revision.effective_tax_regime|default:"—" }}
+              {% if row.revision.tax_regime_id %}<span class="text-[10px] text-primary-600 font-bold uppercase ml-1">{% trans "override" %}</span>{% endif %}</td>
+            <td class="px-2 py-2.5">{{ row.revision.annual_ctc|pp_money0 }}</td>
+            <td class="px-2 py-2.5">{{ row.revision.monthly_ctc|pp_money0 }}</td>
+            <td class="px-2 py-2.5">{{ row.revision.effective_date }}</td>
+            <td class="px-5 py-2.5 text-right">
+              <a href="{% url 'pp-salary-timeline' row.employee.pk %}" class="oh-btn oh-btn--light-bkg oh-btn--x-small">{% trans "Salary Details" %}</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="px-5 py-8 text-center text-dark-400">{% trans "No employees assigned yet" %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-md shadow-card border border-[#ebebeb]">
+    <div class="px-5 py-3 border-b border-[#ebebeb]">
+      <h3 class="text-sm font-semibold">{% trans "Employees without a salary assignment" %} <span class="text-xs font-normal text-dark-400">({{ unassigned|length }})</span></h3>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs">
+        <tbody>
+          {% for row in unassigned %}
+          <tr class="border-b border-[#ebebeb] last:border-b-0 hover:bg-primary-100 transition duration-200">
+            <td class="px-5 py-2.5">
+              <div class="flex items-center gap-2">
+                <img src="{{ row.employee.get_avatar }}" class="w-7 h-7 rounded-full object-cover" alt="">
+                <span class="font-semibold">{{ row.employee.get_full_name }}</span>
+              </div>
+            </td>
+            <td class="px-2 py-2.5 text-dark-400">{{ row.employee.get_job_position|default:"—" }}</td>
+            <td class="px-5 py-2.5 text-right text-dark-400">{% trans "Use Assign Salary above" %}</td>
+          </tr>
+          {% empty %}
+          <tr><td class="px-5 py-4 text-dark-400">{% trans "Everyone has a salary assignment." %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Assign Salary offcanvas — a sibling of .pp-fade so its animated
+     ancestor never breaks position:fixed on the panel. Employee field is a
+     multi-select: pick one employee, or several to bulk-assign the same
+     structure/CTC/regime/date to all of them at once. First-time
+     assignment only — the employee list here excludes anyone already on
+     payroll (see BulkEmployeeSalaryForm); revising an existing assignment
+     happens in Pay Revisions. -->
+<div class="sidebarModal {% if show_canvas %}active{% endif %}" id="assignCanvas">
+  <div class="flex flex-col h-full">
+    <div class="flex items-center justify-between pb-3 border-b border-[#ebebeb] flex-shrink-0">
+      <h3 class="text-base font-semibold">{% trans "Assign Salary" %}</h3>
+      <button type="button" class="closeSidemenu text-dark-400 hover:text-dark-600 text-lg" data-sidebar="assignCanvas">
+        <ion-icon name="close-outline"></ion-icon>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto py-4">
+      <form id="assignForm" method="post" action="{% url 'pp-salary-assign' %}">
+        {% csrf_token %}
+        <div class="mb-2">
+          <label class="oh-label block">{{ form.employee_ids.label }} <span class="text-danger">*</span></label>
+          {{ form.employee_ids }}
+          {% for error in form.employee_ids.errors %}<div class="text-xs text-danger mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="mb-2">
+          <label class="oh-label block">{{ form.salary_structure_id.label }} <span class="text-danger">*</span></label>
+          {{ form.salary_structure_id }}
+          {% for error in form.salary_structure_id.errors %}<div class="text-xs text-danger mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="mb-2">
+          <label class="oh-label block">{{ form.annual_ctc.label }} <span class="text-danger">*</span></label>
+          {{ form.annual_ctc }}
+          {% for error in form.annual_ctc.errors %}<div class="text-xs text-danger mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="mb-2">
+          <label class="oh-label block">{{ form.effective_date.label }} <span class="text-danger">*</span></label>
+          {{ form.effective_date }}
+          {% for error in form.effective_date.errors %}<div class="text-xs text-danger mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="mb-2">
+          <label class="oh-label block">{{ form.note.label }}</label>
+          {{ form.note }}
+        </div>
+      </form>
+    </div>
+    <div class="flex justify-end gap-2 pt-3 border-t border-[#ebebeb] flex-shrink-0">
+      <button type="button" class="oh-btn oh-btn--light closeSidemenu" data-sidebar="assignCanvas" onclick="document.getElementById('assignForm').reset();">{% trans "Cancel" %}</button>
+      <button type="submit" form="assignForm" class="oh-btn oh-btn--secondary">{% trans "Assign Salary" %}</button>
+    </div>
+  </div>
+</div>
+{% endblock %}

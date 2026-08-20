@@ -1,0 +1,68 @@
+{% load i18n %}
+<div class="oh-modal__dialog-header">
+  <h2 class="oh-modal__dialog-title" id="dynamicLinkFormLabel">
+    {% trans "Create Dynamic Link" %}
+  </h2>
+  <button class="oh-modal__close" aria-label="Close">
+    <ion-icon name="close-outline"></ion-icon>
+  </button>
+</div>
+<div class="oh-modal__dialog-body">
+  <p class="text-muted mb-3">
+    {% trans "Pick a source to generate an application link tagged with it." %}
+  </p>
+  <form
+    hx-post="{% url 'recruitment-dynamic-link' recruitment.id %}"
+    hx-target="#genericModalBody"
+    hx-swap="innerHTML"
+    onsubmit="event.stopPropagation();"
+  >
+    {% csrf_token %}
+    <div class="oh-input-group mb-3">
+      <label class="oh-label" for="{{ form.platform.id_for_label }}">{% trans "Source" %}</label>
+      {{ form.platform }}
+    </div>
+    <div class="oh-input-group mb-3" id="newPlatformGroup" style="display:none;">
+      <label class="oh-label" for="{{ form.new_platform.id_for_label }}">{{ form.new_platform.label }}</label>
+      {{ form.new_platform }}
+    </div>
+    <button type="submit" class="oh-btn oh-btn--secondary w-100">
+      {% trans "Generate Link" %}
+    </button>
+  </form>
+</div>
+<script>
+  (function () {
+    var CREATE_VALUE = "__create_new__";
+    var platformSelect = document.getElementById("{{ form.platform.id_for_label }}");
+    var newPlatformGroup = document.getElementById("newPlatformGroup");
+    var newPlatformInput = document.getElementById("{{ form.new_platform.id_for_label }}");
+    if (!platformSelect || !newPlatformGroup || !newPlatformInput) {
+      return;
+    }
+
+    if (!platformSelect.querySelector('option[value="' + CREATE_VALUE + '"]')) {
+      var createOption = document.createElement("option");
+      createOption.value = CREATE_VALUE;
+      createOption.textContent = "{% trans 'Create New Source' %}";
+      platformSelect.appendChild(createOption);
+    }
+
+    function syncPlatformMode() {
+      var isCreate = platformSelect.value === CREATE_VALUE;
+      newPlatformGroup.style.display = isCreate ? "" : "none";
+      newPlatformInput.required = isCreate;
+      // A real Platform pk must reach the "platform" field, so the select
+      // is only submitted under that name when it holds a real choice -
+      // otherwise "__create_new__" would fail ModelChoiceField validation.
+      platformSelect.name = isCreate ? "" : "platform";
+      if (isCreate) {
+        newPlatformInput.value = "";
+        newPlatformInput.focus();
+      }
+    }
+
+    platformSelect.addEventListener("change", syncPlatformMode);
+    syncPlatformMode();
+  })();
+</script>

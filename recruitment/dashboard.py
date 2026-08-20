@@ -4,12 +4,13 @@ Modern recruitment dashboard views — KPI summary + ApexCharts.
 Accessible at /recruitment/dashboard/modern/ alongside the existing dashboard.
 """
 
-from datetime import date
+from datetime import date, timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.utils.translation import gettext_lazy as _
 
 from employee.models import Employee
 from horilla.methods import handle_no_permission
@@ -26,6 +27,24 @@ def _has_recruitment_permission(request):
         Stage.objects.filter(stage_managers=employee).exists()
         or Recruitment.objects.filter(recruitment_managers=employee).exists()
     )
+
+
+def _platform_conversion_widget_enabled(request):
+    """Whether the Source Conversion Rate widget is enabled for the
+    currently selected company (defaults to enabled, mirrors
+    base.context_processors.check_platform_conversion_widget)."""
+    from recruitment.models import RecruitmentGeneralSetting
+
+    selected_company = request.session.get("selected_company")
+    if selected_company and selected_company != "all":
+        settings = RecruitmentGeneralSetting.objects.filter(
+            company_id_id=selected_company
+        ).first()
+    else:
+        settings = RecruitmentGeneralSetting.objects.filter(
+            company_id__isnull=True
+        ).first()
+    return settings.show_platform_conversion if settings else True
 
 
 def _parse_period(request):
@@ -292,52 +311,6 @@ def recruitment_managers_data(request):
 
 
 @login_required
-def recruitment_source_of_hire(request):
-    """Candidate count grouped by source (Application, Inside software, Other)."""
-    if not _has_recruitment_permission(request):
-        return JsonResponse({"no_permission": True})
-    from django.db.models import Q
-
-    from recruitment.models import Candidate
-
-    base_qs = Candidate.objects.filter(is_active=True)
-    sources = []
-
-    try:
-        source_labels = {
-            "application": "Application Form",
-            "software": "Inside Software",
-            "other": "Other",
-        }
-
-        for key, label in source_labels.items():
-            count = base_qs.filter(source=key).count()
-            if count > 0:
-                sources.append({"source": label, "key": key, "count": count})
-
-        referral_count = base_qs.filter(referral__isnull=False).count()
-        if referral_count > 0:
-            sources.append(
-                {"source": "Referral", "key": "referral", "count": referral_count}
-            )
-
-        not_set_count = base_qs.filter(
-            Q(source__isnull=True) | Q(source=""), referral__isnull=True
-        ).count()
-        if not_set_count > 0:
-            sources.append(
-                {"source": "Not Specified", "key": "not_set", "count": not_set_count}
-            )
-
-        sources.sort(key=lambda x: x["count"], reverse=True)
-
-    except Exception:
-        pass
-
-    return JsonResponse({"sources": sources})
-
-
-@login_required
 def recruitment_upcoming_interviews(request):
     """Interviews scheduled within the selected period."""
     if not _has_recruitment_permission(request):
@@ -463,10 +436,9 @@ def recruitment_stage_conversion(request):
             canceled=False,
         ).count()
 
-        prev_count = total
         for st in stage_types:
             current = counts.get(st, 0)
-            rate = round((current / prev_count * 100), 1) if prev_count > 0 else 0
+            rate = round((current / total * 100), 1) if total > 0 else 0
             conversions.append(
                 {
                     "stage": str(stage_labels.get(st, st)),
@@ -475,8 +447,6 @@ def recruitment_stage_conversion(request):
                     "conversion_rate": rate,
                 }
             )
-            if current > 0:
-                prev_count = current
     except Exception:
         pass
 
@@ -488,69 +458,80 @@ def recruitment_stage_conversion(request):
     )
 
 
+# Chart stays readable regardless of how many Platform records a company
+# has configured - beyond this many, the rest are collapsed into "Other".
+PLATFORM_CONVERSION_TOP_N = 6
+
+
 @login_required
-def recruitment_source_conversion(request):
-    """Hire rate per candidate source."""
+def recruitment_platform_conversion(request):
+    """Hire rate per candidate source (LinkedIn, Indeed, Manual Entry, etc.).
+    Powers the "Source Conversion Rate" dashboard widget."""
     if not _has_recruitment_permission(request):
         return JsonResponse({"no_permission": True})
-    from django.db.models import Q
+    if not _platform_conversion_widget_enabled(request):
+        return JsonResponse({"disabled": True})
+    from recruitment.models import Platform
 
     candidates = _candidates_in_period(request)
 
-    sources = []
+    platforms = []
     try:
-        source_choices = [
-            ("application", "Application Form"),
-            ("software", "Inside Software"),
-            ("other", "Other"),
-        ]
-        for key, label in source_choices:
-            total = candidates.filter(source=key).count()
+        platform_ids = (
+            candidates.filter(platform__isnull=False)
+            .values_list("platform_id", flat=True)
+            .distinct()
+        )
+        totals = []
+        for platform in Platform.objects.filter(id__in=platform_ids):
+            total = candidates.filter(platform_id=platform.id).count()
+            if total == 0:
+                continue
             hired = (
-                candidates.filter(source=key)
+                candidates.filter(platform_id=platform.id)
                 .filter(Q(hired=True) | Q(stage_id__stage_type="hired"))
                 .distinct()
                 .count()
             )
-            rate = round((hired / total * 100), 1) if total > 0 else 0
-            if total > 0:
-                sources.append(
-                    {"source": label, "total": total, "hired": hired, "rate": rate}
-                )
-        # Referrals
-        total_ref = candidates.filter(referral__isnull=False).count()
-        hired_ref = (
-            candidates.filter(referral__isnull=False)
-            .filter(Q(hired=True) | Q(stage_id__stage_type="hired"))
-            .distinct()
-            .count()
+            totals.append({"source": platform.title, "total": total, "hired": hired})
+
+        totals.sort(key=lambda p: p["total"], reverse=True)
+        top, rest = (
+            totals[:PLATFORM_CONVERSION_TOP_N],
+            totals[PLATFORM_CONVERSION_TOP_N:],
         )
-        if total_ref > 0:
-            sources.append(
+        for p in top:
+            p["rate"] = round((p["hired"] / p["total"] * 100), 1)
+            platforms.append(p)
+
+        if rest:
+            rest_total = sum(p["total"] for p in rest)
+            rest_hired = sum(p["hired"] for p in rest)
+            platforms.append(
                 {
-                    "source": "Referral",
-                    "total": total_ref,
-                    "hired": hired_ref,
-                    "rate": round((hired_ref / total_ref * 100), 1),
+                    "source": str(_("Other")),
+                    "total": rest_total,
+                    "hired": rest_hired,
+                    "rate": (
+                        round((rest_hired / rest_total * 100), 1)
+                        if rest_total
+                        else 0
+                    ),
                 }
             )
 
-        # Not Specified — candidates with no source and no referral
-        total_ns = candidates.filter(
-            Q(source__isnull=True) | Q(source=""), referral__isnull=True
-        ).count()
+        # Candidates with no platform tagged at all.
+        total_ns = candidates.filter(platform__isnull=True).count()
         if total_ns > 0:
             hired_ns = (
-                candidates.filter(
-                    Q(source__isnull=True) | Q(source=""), referral__isnull=True
-                )
+                candidates.filter(platform__isnull=True)
                 .filter(Q(hired=True) | Q(stage_id__stage_type="hired"))
                 .distinct()
                 .count()
             )
-            sources.append(
+            platforms.append(
                 {
-                    "source": "Not Specified",
+                    "source": str(_("Not Specified")),
                     "total": total_ns,
                     "hired": hired_ns,
                     "rate": round((hired_ns / total_ns * 100), 1),
@@ -558,7 +539,7 @@ def recruitment_source_conversion(request):
             )
     except Exception:
         pass
-    return JsonResponse({"sources": sources})
+    return JsonResponse({"platforms": platforms})
 
 
 @login_required
@@ -622,3 +603,107 @@ def recruitment_joinings_monthly(request):
     data = [b["count"] for b in buckets]
 
     return JsonResponse({"labels": labels, "data": data, "buckets": buckets})
+
+
+@login_required
+def recruitment_candidates_by_date(request):
+    """Candidates applied, bucketed by day within the selected period."""
+    if not _has_recruitment_permission(request):
+        return JsonResponse({"no_permission": True})
+
+    from_date, to_date = _parse_period(request)
+
+    buckets = []
+    cursor = from_date
+    while cursor <= to_date:
+        buckets.append({"date": cursor.isoformat(), "count": 0})
+        cursor += timedelta(days=1)
+    bucket_by_date = {b["date"]: b for b in buckets}
+
+    for applied_date in _candidates_in_period(request).values_list(
+        "created_at", flat=True
+    ):
+        if not applied_date:
+            continue
+        bucket = bucket_by_date.get(applied_date.date().isoformat())
+        if bucket:
+            bucket["count"] += 1
+
+    labels = [date.fromisoformat(b["date"]).strftime("%b %d") for b in buckets]
+    data = [b["count"] for b in buckets]
+
+    return JsonResponse({"labels": labels, "data": data, "buckets": buckets})
+
+
+def _candidate_is_assisted(candidate):
+    """A candidate counts as "assisted" once there's any recruiter trace on
+    them - a note, a scheduled interview, or having moved past the initial
+    stage - even if one of those happened without the others. Stage
+    movement alone isn't required, since a recruiter can engage (leave a
+    note, book an interview) before formally advancing the stage."""
+    if candidate.has_note or candidate.has_interview:
+        return True
+    stage_type = candidate.stage_id.stage_type if candidate.stage_id else None
+    return stage_type not in (None, "initial", "applied")
+
+
+@login_required
+def recruitment_response_status(request):
+    """Assisted vs. not-yet-assisted candidates within the period, plus a
+    list of the not-yet-assisted ones so recruiters can see exactly who's
+    still waiting and for how long."""
+    if not _has_recruitment_permission(request):
+        return JsonResponse({"no_permission": True})
+    from django.db.models import Exists, OuterRef
+
+    from recruitment.models import InterviewSchedule, StageNote
+
+    candidates = (
+        _candidates_in_period(request)
+        .select_related("stage_id", "recruitment_id")
+        .annotate(
+            has_note=Exists(StageNote.objects.filter(candidate_id=OuterRef("pk"))),
+            has_interview=Exists(
+                InterviewSchedule.objects.filter(candidate_id=OuterRef("pk"))
+            ),
+        )
+    )
+
+    today = date.today()
+    assisted_count = 0
+    pending = []
+    for candidate in candidates:
+        if _candidate_is_assisted(candidate):
+            assisted_count += 1
+        else:
+            applied_date = candidate.created_at.date() if candidate.created_at else None
+            pending.append(
+                {
+                    "id": candidate.id,
+                    "name": str(candidate),
+                    "applied_on": candidate.applied_on_display(),
+                    "days_waiting": (
+                        (today - applied_date).days if applied_date else None
+                    ),
+                    "recruitment": (
+                        str(candidate.recruitment_id)
+                        if candidate.recruitment_id
+                        else ""
+                    ),
+                    "profile_url": str(candidate.get_profile_url()),
+                    "_sort_key": applied_date or today,
+                }
+            )
+
+    pending.sort(key=lambda c: c["_sort_key"])
+    for row in pending:
+        del row["_sort_key"]
+
+    return JsonResponse(
+        {
+            "assisted": assisted_count,
+            "not_assisted": len(pending),
+            "total": assisted_count + len(pending),
+            "pending": pending[:50],
+        }
+    )

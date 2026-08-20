@@ -1,0 +1,57 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+  {% include "payroll_pro/run/_strip.html" %}
+  <form id="stepform" method="post" action="{% url 'pp-run-step-save' %}">
+    {% csrf_token %}
+    <input type="hidden" name="run_id" value="{{ run.pk }}">
+    <input type="hidden" name="step" value="overrides">
+    {% include "payroll_pro/run/_stephead.html" %}
+
+    <div class="bg-primary-100 border border-primary-300 rounded-md p-3 text-xs mb-4">
+      {% trans "Leave a field blank to use the auto-calculated value (shown below the field). Enter an amount to override the statutory component for this month only — e.g. a one-off TDS correction." %}
+    </div>
+    <div class="bg-white rounded-md shadow-card border border-[#ebebeb] overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="text-left text-dark-400 uppercase text-[10px] tracking-wide border-b border-[#ebebeb]">
+            <th class="px-5 py-2">{% trans "Employee" %}</th><th class="px-2 py-2">{% trans "Professional Tax" %}</th><th class="px-2 py-2">{% trans "TDS" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for record, calc in override_rows %}
+          <tr class="border-b border-[#ebebeb] last:border-b-0 hover:bg-primary-100 transition duration-200">
+            <td class="px-5 py-2.5">
+              <div class="flex items-center gap-2">
+                <img src="{{ record.employee_id.get_avatar }}" class="w-7 h-7 rounded-full object-cover" alt="">
+                <span class="font-semibold">{{ record.employee_id.get_full_name }}</span>
+              </div>
+            </td>
+            <td class="px-2 py-2.5">
+              <input type="number" step="0.01" min="0" name="r{{ record.pk }}_override_pt" class="oh-input pp-num"
+                     placeholder="0"
+                     value="{% if record.override_pt is not None %}{{ record.override_pt|floatformat:"-2" }}{% endif %}"
+                     {% if run.is_locked %}disabled{% endif %}>
+              <div class="text-[10px] text-dark-400 mt-0.5">{% trans "Auto-calculated" %}: {{ calc.pt|pp_money0 }}</div>
+              {% if record.override_pt is not None %}<div class="text-[10px] font-bold uppercase text-primary-600 mt-0.5">{% trans "Overridden" %}</div>{% endif %}
+            </td>
+            <td class="px-2 py-2.5">
+              <input type="number" step="0.01" min="0" name="r{{ record.pk }}_override_tds" class="oh-input pp-num"
+                     placeholder="0"
+                     value="{% if record.override_tds is not None %}{{ record.override_tds|floatformat:"-2" }}{% endif %}"
+                     {% if run.is_locked %}disabled{% endif %}>
+              <div class="text-[10px] text-dark-400 mt-0.5">{% trans "Auto-calculated" %}: {{ calc.tds|pp_money0 }}</div>
+              {% if record.override_tds is not None %}<div class="text-[10px] font-bold uppercase text-primary-600 mt-0.5">{% trans "Overridden" %}</div>{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="px-5 py-8 text-center text-dark-400">{% trans "No processable employees" %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,100 @@
+{% load i18n payroll_pro_tags horillafilters %}
+{# Renders one payslip from the frozen snapshot: expects `record`, `calc`, `month_names` #}
+{% get_company as theme_obj %}
+{% with run=record.run_id employee=record.employee_id %}
+<div class="bg-white rounded-md shadow-card border border-[#ebebeb] max-w-[840px] mx-auto overflow-hidden">
+  <div class="flex justify-between items-start gap-5 px-8 py-6" style="background-color:{{ theme_obj.primary_800|default:'#AC3B2A' }};">
+    <div>
+      <div class="text-lg font-extrabold text-white">{{ employee.get_company|default:"Company" }}</div>
+      <div class="text-[11px] mt-0.5" style="color:{{ theme_obj.primary_300|default:'#FCEDEB' }};">{% if employee.get_company.address %}{{ employee.get_company.address }}{% endif %}</div>
+    </div>
+    <div class="text-right">
+      <div class="text-xl font-extrabold tracking-wide text-white">{% trans "PAYSLIP" %}</div>
+      <div class="text-xs mt-1" style="color:{{ theme_obj.primary_300|default:'#FCEDEB' }};">{% trans "Pay Period" %} <b class="text-white">{{ run.month|month_name }} {{ run.year }}</b></div>
+    </div>
+  </div>
+  <div class="p-8">
+    <div class="border border-[#ebebeb] rounded-md bg-primary-50 p-4 mb-3.5">
+      <h5 class="text-[11px] uppercase tracking-wide font-extrabold text-primary-600 mb-3">{% trans "Employee Details" %}</h5>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-5 gap-y-2.5 text-xs">
+        <div><span class="block text-dark-400 text-[10.5px] uppercase mb-0.5">{% trans "Employee ID" %}</span><b>{{ employee.badge_id|default:employee.pk }}</b></div>
+        <div><span class="block text-dark-400 text-[10.5px] uppercase mb-0.5">{% trans "Employee Name" %}</span><b>{{ employee.get_full_name }}</b></div>
+        <div><span class="block text-dark-400 text-[10.5px] uppercase mb-0.5">{% trans "Designation" %}</span><b>{{ employee.get_job_position|default:"—" }}</b></div>
+        <div><span class="block text-dark-400 text-[10.5px] uppercase mb-0.5">{% trans "Salary Structure" %}</span><b>{{ calc.structure.name }}</b></div>
+        <div><span class="block text-dark-400 text-[10.5px] uppercase mb-0.5">{% trans "Tax Regime" %}</span><b>{{ calc.regime_name|default:"—" }}</b></div>
+        <div><span class="block text-dark-400 text-[10.5px] uppercase mb-0.5">{% trans "Monthly CTC" %}</span><b>{{ calc.monthly_ctc|pp_money0 }}</b></div>
+      </div>
+    </div>
+    {% with bank=employee.employee_bank_details %}
+    {% if bank %}
+    <div class="border border-[#ebebeb] rounded-md bg-primary-50 p-4 mb-3.5">
+      <h5 class="text-[11px] uppercase tracking-wide font-extrabold text-primary-600 mb-3">{% trans "Bank Details" %}</h5>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-5 gap-y-2.5 text-xs">
+        <div><span class="block text-dark-400 text-[10.5px] uppercase mb-0.5">{% trans "Bank Name" %}</span><b>{{ bank.bank_name|default:"—" }}</b></div>
+        <div><span class="block text-dark-400 text-[10.5px] uppercase mb-0.5">{% trans "Account Number" %}</span><b>{{ bank.account_number|default:"—" }}</b></div>
+        <div><span class="block text-dark-400 text-[10.5px] uppercase mb-0.5">{% trans "Code" %}</span><b>{{ bank.any_other_code1|default:"—" }}</b></div>
+      </div>
+    </div>
+    {% endif %}
+    {% endwith %}
+    <div class="flex flex-wrap gap-6 bg-primary-50 rounded-md px-4 py-2.5 mb-3.5 text-xs">
+      <div><span class="text-dark-400 text-[11px]">{% trans "Actual Working Days" %}:</span> {{ calc.total_days|floatformat:"-2" }}</div>
+      <div><span class="text-dark-400 text-[11px]">{% trans "Working Days" %}:</span> {{ calc.present_days|floatformat:"-2" }}</div>
+      <div><span class="text-dark-400 text-[11px]">{% trans "LOP Days" %}:</span> {{ calc.lop_days|floatformat:"-2" }}</div>
+      <div><span class="text-dark-400 text-[11px]">{% trans "Payable Days" %}:</span> {{ calc.payable_days|floatformat:"-2" }}</div>
+    </div>
+
+    <div class="border border-[#ebebeb] rounded-md overflow-hidden">
+      <table class="pp-payslip-table">
+        <thead>
+          <tr style="background-color:{{ theme_obj.primary_800|default:'#AC3B2A' }};">
+            <th class="text-left text-white uppercase text-[10.5px] font-bold px-3.5 py-2">{% trans "Earnings" %}</th>
+            <th class="text-right text-white uppercase text-[10.5px] font-bold px-3.5 py-2 amt">{% trans "Amount" %}</th>
+            <th class="text-left text-white uppercase text-[10.5px] font-bold px-3.5 py-2 divider">{% trans "Deductions" %}</th>
+            <th class="text-right text-white uppercase text-[10.5px] font-bold px-3.5 py-2 amt">{% trans "Amount" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for comp in calc.components %}
+          <tr class="{% cycle '' 'bg-primary-50' %}">
+            <td>{{ comp.name }}</td><td class="amt">{{ comp.prorated|pp_money }}</td>
+            <td class="divider">
+              {% if forloop.counter == 1 and calc.employee_pf %}{% trans "Provident Fund (Employee)" %}{% endif %}
+              {% if forloop.counter == 2 and calc.pt %}{% trans "Professional Tax" %}{% endif %}
+              {% if forloop.counter == 3 and calc.tds %}{% trans "TDS (Income Tax)" %}{% endif %}
+              {% if forloop.counter == 4 and calc.adhoc_deduction %}{% trans "Adhoc Deduction" %}{% endif %}
+            </td>
+            <td class="amt">
+              {% if forloop.counter == 1 and calc.employee_pf %}{{ calc.employee_pf|pp_money }}{% endif %}
+              {% if forloop.counter == 2 and calc.pt %}{{ calc.pt|pp_money }}{% endif %}
+              {% if forloop.counter == 3 and calc.tds %}{{ calc.tds|pp_money }}{% endif %}
+              {% if forloop.counter == 4 and calc.adhoc_deduction %}{{ calc.adhoc_deduction|pp_money }}{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          {% if calc.bonus %}<tr><td>{% trans "Bonus" %}</td><td class="amt">{{ calc.bonus|pp_money }}</td><td class="divider"></td><td class="amt"></td></tr>{% endif %}
+          {% if calc.overtime %}<tr><td>{% trans "Overtime" %}</td><td class="amt">{{ calc.overtime|pp_money }}</td><td class="divider"></td><td class="amt"></td></tr>{% endif %}
+          {% if calc.reimbursement %}<tr><td>{% trans "Reimbursement" %}</td><td class="amt">{{ calc.reimbursement|pp_money }}</td><td class="divider"></td><td class="amt"></td></tr>{% endif %}
+          {% if calc.adhoc_pay %}<tr><td>{% trans "Adhoc Payment" %}</td><td class="amt">{{ calc.adhoc_pay|pp_money }}</td><td class="divider"></td><td class="amt"></td></tr>{% endif %}
+          <tr class="font-bold bg-primary-100">
+            <td>{% trans "Gross Earnings" %}</td><td class="amt">{{ calc.gross_earnings|pp_money }}</td>
+            <td class="divider">{% trans "Total Deductions" %}</td><td class="amt">{{ calc.total_deductions|pp_money }}</td>
+          </tr>
+          {% if calc.employer_pf %}
+          <tr>
+            <td colspan="4" class="text-dark-400 italic !border-b-0 pt-3">{% trans "Employer Contribution — Provident Fund (Employer):" %}
+              <b class="not-italic">{{ calc.employer_pf|pp_money }}</b>
+              <span class="text-dark-400">({% trans "cost to company, not deducted from your pay" %})</span></td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+    <div class="flex justify-between items-center bg-primary-100 rounded-md px-5 py-3.5 mt-4">
+      <div>{% trans "Net Pay for" %} {{ run.month|month_name }} {{ run.year }}</div>
+      <div class="text-xl font-extrabold text-primary-600">{{ calc.net_pay|pp_money }}</div>
+    </div>
+    <p class="text-[11px] text-dark-400 mt-3.5">{% trans "This is a system-generated payslip and does not require a signature." %}</p>
+  </div>
+</div>
+{% endwith %}

@@ -1,0 +1,14 @@
+{% load i18n %}
+<div class="oh-switch p-3">
+    {% if url %}
+        <input type="checkbox" name="open" id="recruitmentOpenToggle{{ instance.pk }}"
+        hx-post={{url}}
+        hx-trigger="change" hx-target="#genericModalBody"
+        class="oh-switch__checkbox"
+        title="{% if instance.closed %}{% trans 'Closed' %}{% else %}{% trans 'Open' %}{% endif %}"
+        {% if not instance.closed %} checked {% endif %}>
+    {% else %}
+        <input type="checkbox" id="recruitmentOpenToggle{{ instance.pk }}" class="oh-switch__checkbox"
+        {% if not instance.closed %} checked {% endif %} disabled>
+    {% endif %}
+</div>

@@ -142,15 +142,6 @@
                             {% endif %}
                             <div>
                                 <div class="flex gap-1 lg:justify-end">
-                                    <button
-                                        class="toggleSidemenu w-20 justify-center px-4 py-2 border border-[{{theme_obj.primary_600}}] text-[{{theme_obj.primary_700}}] rounded-md text-xs flex items-center gap-2 hover:text-white hover:bg-[{{theme_obj.primary_800}}] transition duration-300"
-                                        data-target="#activitySidebar"
-                                        hx-get="{% url 'recruitment-details' recruitment.id %}"
-                                        hx-target="#commentContainer"
-                                        onclick="sidebarToggle()"
-                                    >
-                                        {% trans "View" %}
-                                    </button>
                                     <a
                                         href="{% url 'application-form' %}?recruitmentId={{ recruitment.id }}"
                                         target="_blank"

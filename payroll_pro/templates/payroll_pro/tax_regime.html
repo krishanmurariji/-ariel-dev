@@ -1,0 +1,92 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+
+  <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
+    <div>
+      <h1 class="text-xl font-bold">{% trans "Tax Regime" %}</h1>
+      <p class="text-sm text-dark-400 mt-1">{% trans "Income-tax regimes, slabs, rebates and deduction rules" %}</p>
+    </div>
+    {% if perms.payroll_pro.add_taxregime %}
+      <a class="oh-btn oh-btn--secondary" href="{% url 'pp-tax-regime-new' %}">
+        <ion-icon name="add-outline" class="me-1"></ion-icon>{% trans "Create Tax Regime" %}
+      </a>
+    {% endif %}
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {% for regime in regimes %}
+    <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5 pp-lift relative">
+      <div class="absolute right-3 top-4 flex items-center gap-1.5">
+        {% if perms.payroll_pro.change_taxregime %}
+          <a href="{% url 'pp-tax-regime-edit' regime.pk %}" class="oh-btn oh-btn--light-bkg oh-btn--x-small" title="{% if regime.is_locked %}{% trans 'Locked — currently in use' %}{% else %}{% trans 'Edit' %}{% endif %}">
+            {% if regime.is_locked %}
+              <i class="fa-solid fa-lock text-[11px]"></i>
+            {% else %}
+              <i class="fa-solid fa-pen text-[11px]"></i>
+            {% endif %}
+          </a>
+        {% endif %}
+        {% if perms.payroll_pro.add_taxregime %}
+          <form method="post" action="{% url 'pp-tax-regime-duplicate' regime.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="oh-btn oh-btn--light-bkg oh-btn--x-small" title="{% trans 'Duplicate' %}">
+              <i class="fa-solid fa-copy text-[11px]"></i>
+            </button>
+          </form>
+        {% endif %}
+        {% if perms.payroll_pro.delete_taxregime %}
+          <a hx-get="{% url 'pp-tax-regime-delete-confirm' regime.pk %}" hx-target="#ppMiniModalTarget" hx-swap="innerHTML"
+             data-toggle="oh-modal-toggle" data-target="#ppMiniModal"
+             class="oh-btn oh-btn--light-danger oh-btn--x-small" title="{% trans 'Delete' %}">
+            <i class="fa-solid fa-trash text-[11px]"></i>
+          </a>
+        {% endif %}
+      </div>
+
+      <div class="flex items-center gap-2 pr-8">
+        <h3 class="text-base font-semibold">{{ regime.name }}</h3>
+      </div>
+      {% if regime.description %}<p class="text-xs text-dark-400 mt-1">{{ regime.description }}</p>{% endif %}
+
+      <div class="mt-4 border border-[#ebebeb] rounded-md overflow-hidden">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="text-left text-dark-400 uppercase text-[10px] tracking-wide border-b border-[#ebebeb]">
+              <th class="px-3 py-2">{% trans "Taxable income (yearly)" %}</th>
+              <th class="px-3 py-2 text-right">{% trans "Rate" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for slab in regime.ordered_slabs %}
+            <tr class="border-b border-[#ebebeb] last:border-b-0 hover:bg-primary-100 transition duration-200">
+              <td class="px-3 py-2">{{ slab.min_amount|pp_money0 }} — {% if slab.max_amount %}{{ slab.max_amount|pp_money0 }}{% else %}{% trans "above" %}{% endif %}</td>
+              <td class="px-3 py-2 text-right font-semibold">{{ slab.rate_pct }}%</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="2" class="px-3 py-3 text-dark-400">{% trans "No slabs configured yet." %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="flex flex-wrap gap-x-5 gap-y-1 mt-4 text-xs text-dark-400">
+        <span>{% trans "Std. deduction" %}: <b class="font-semibold">{{ regime.standard_deduction|pp_money0 }}</b></span>
+        <span>{% trans "Rebate ≤" %} <b class="font-semibold">{{ regime.rebate_limit|pp_money0 }}</b></span>
+        <span>{% trans "Cess" %}: <b class="font-semibold">{{ regime.cess_pct }}%</b></span>
+        <span>{% trans "Structures linked" %}: <b class="font-semibold">{{ regime.salary_structures.count }}</b></span>
+        <span>{% trans "Employees taxed under this regime" %}: <b class="font-semibold">{{ regime.current_employee_count }}</b>{% if regime.current_employee_count > regime.salary_structures.count %} <span class="text-[10px] text-dark-400">({% trans "incl. per-employee overrides" %})</span>{% endif %}</span>
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-span-2 bg-white rounded-md shadow-card border border-[#ebebeb] p-10 text-center">
+      <ion-icon name="file-tray-outline" class="text-4xl text-dark-100"></ion-icon>
+      <p class="font-semibold mt-2">{% trans "No tax regimes yet" %}</p>
+      <p class="text-xs text-dark-400 mt-1">{% trans "Create the New / Old regime here — salary structures link to them." %}</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

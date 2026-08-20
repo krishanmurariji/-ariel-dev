@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 
 from django.apps import apps
@@ -53,6 +54,12 @@ def google_authenticate(request):
     )
 
     request.session["oauth_state"] = state
+    # Flow.authorization_url() auto-generates a PKCE code_verifier that
+    # only lives on this in-memory Flow instance - the callback request
+    # builds a brand-new Flow, so the verifier has to be persisted here
+    # (mirroring oauth_state) or Google rejects the token exchange with
+    # "Missing code verifier". Mirrors gmail_auth's GoogleApi.oauth_code_verifier.
+    request.session["oauth_code_verifier"] = flow.code_verifier
     return redirect(auth_url)
 
 
@@ -60,6 +67,7 @@ def google_authenticate(request):
 def google_auth_callback(request):
 
     state = request.session.pop("oauth_state", None)
+    code_verifier = request.session.pop("oauth_code_verifier", None)
     if not state or state != request.GET.get("state"):
         return HttpResponse("Invalid state", status=400)
 
@@ -83,9 +91,29 @@ def google_auth_callback(request):
             "https://www.googleapis.com/auth/meetings.space.created",
         ],
         redirect_uri=redirect_uri,
+        code_verifier=code_verifier,
     )
 
-    flow.fetch_token(authorization_response=request.build_absolute_uri())
+    authorization_response_uri = request.build_absolute_uri()
+    # Google requires https in production, but explicitly allows plain
+    # http for localhost redirect URIs during local testing - only
+    # force-upgrade the scheme when it's not a localhost callback, so
+    # local dev (manage.py runserver, no TLS) keeps working. Mirrors
+    # gmail_auth.views.gmail_callback's handling of the same issue.
+    is_localhost = request.get_host().split(":")[0] in ("localhost", "127.0.0.1")
+    if not is_localhost:
+        authorization_response_uri = authorization_response_uri.replace(
+            "http://", "https://"
+        )
+    else:
+        os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+    # include_granted_scopes="true" above means Google can hand back
+    # previously-granted scopes from other clients under the same Cloud
+    # project/consent screen (e.g. gmail_auth's gmail.readonly) alongside
+    # the ones requested here - oauthlib treats that mismatch as a hard
+    # warning-turned-exception unless told to relax the check.
+    os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
+    flow.fetch_token(authorization_response=authorization_response_uri)
 
     credentials = flow.credentials
     GoogleCredential.from_google_credentials(request.user.employee_get, credentials)

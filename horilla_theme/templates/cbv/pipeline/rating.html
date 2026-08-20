@@ -6,7 +6,7 @@
             <form hx-swap="none" hx-post="{% url 'update-candidate-rating' instance.id %}" method="post">
                 {% csrf_token %}
                 <div class="d-block mb-0" style="width: max-content">
-                    <div class="oh-rate star-group" onclick="$(this).closest('form').find('button').click()">
+                    <div class="oh-rate star-group" onclick="if (event.target.tagName === 'LABEL') { $(this).closest('form').find('button').click(); }">
                         {% for i in "54321" %}
                             <input
                                 type="radio"
@@ -35,7 +35,7 @@
                 <div class="d-block mb-0" style="width: max-content">
                     <div
                         class="oh-rate star-group"
-                        onclick="setTimeout(function () {$(this).closest('form').find('button').click()},100)"
+                        onclick="if (event.target.tagName === 'LABEL') { var self = this; setTimeout(function () {$(self).closest('form').find('button').click()},100); }"
                     >
                         {% for i in "54321" %}
                             <input

@@ -1,0 +1,19 @@
+{% load i18n %}
+<!DOCTYPE html>
+<html>
+<body style="font-family:Helvetica,Arial,sans-serif; color:#252A3D; font-size:14px;">
+  <div style="max-width:560px; margin:0 auto; border:1px solid #E4E7F0; border-radius:10px; overflow:hidden;">
+    <div style="background:#3A2F94; color:#fff; padding:18px 24px;">
+      <h2 style="margin:0; font-size:17px;">{% trans "Your payslip is ready" %}</h2>
+    </div>
+    <div style="padding:22px 24px;">
+      <p>{% blocktrans with name=employee.get_full_name %}Hello {{ name }},{% endblocktrans %}</p>
+      <p>{% blocktrans %}Your payslip for <b>{{ period }}</b> has been processed and is attached to this email as a PDF.{% endblocktrans %}</p>
+      <p>{% trans "You can also view it anytime under" %} <b>{% trans "Payroll Pro → My Finance → My Pay → Pay Slips" %}</b>.</p>
+      <p style="color:#6B7085; font-size:12px; margin-top:24px;">
+        {% trans "This is an automated message from the payroll system. Please do not share your payslip with others." %}
+      </p>
+    </div>
+  </div>
+</body>
+</html>

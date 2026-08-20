@@ -10,6 +10,8 @@ from datetime import datetime
 
 from django.conf import settings
 from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.db.models import Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -39,6 +41,11 @@ from horilla_views.generic.cbv.views import (
     HorillaFormView,
     HorillaListView,
     TemplateView,
+)
+from onboarding.forms import (
+    build_employee_education_formset,
+    build_employee_emergency_contact_formset,
+    build_employee_experience_formset,
 )
 
 if app_installed("asset"):
@@ -91,26 +98,49 @@ class AllocationView(HorillaDetailedView):
             request.employee_candidate = candidate
             instance = candidate.converted_employee_id
             if instance is None and (candidate.hired or candidate.onboarding_stage):
-                instance = Employee.objects.get_or_create(
-                    employee_first_name=candidate.name,
-                    email=candidate.email,
-                    phone=candidate.mobile,
-                    address=candidate.address,
-                    country=candidate.country,
-                    state=candidate.country,
-                    city=candidate.city,
-                    zip=candidate.zip,
-                    dob=candidate.dob,
-                    gender=candidate.gender,
-                )[0]
+                # A candidate's email may already belong to an existing
+                # Employee (re-application, prior manual conversion, etc.) —
+                # Employee.email is unique, so blindly creating a new row
+                # with get_or_create() (whose lookup kwargs rarely match an
+                # existing row exactly) crashes with a raw ValidationError.
+                # Reuse the existing employee by email first.
+                instance = Employee.objects.filter(email=candidate.email).first()
+                if instance is None:
+                    try:
+                        instance = Employee.objects.create(
+                            employee_first_name=candidate.name,
+                            email=candidate.email,
+                            phone=candidate.mobile,
+                            address=candidate.address,
+                            country=candidate.country,
+                            state=candidate.state,
+                            city=candidate.city,
+                            zip=candidate.zip,
+                            dob=candidate.dob,
+                            gender=candidate.gender,
+                        )
+                    except ValidationError as error:
+                        messages.error(
+                            request,
+                            _(
+                                "Couldn't allocate this candidate: %(error)s"
+                            )
+                            % {
+                                "error": "; ".join(error.messages)
+                                if hasattr(error, "messages")
+                                else str(error)
+                            },
+                        )
+                        return HorillaFormView.HttpResponse()
                 # Candidate may fail business validation on unrelated fields
                 # during allocation, so only persist the link directly.
                 model.objects.filter(pk=candidate.pk).update(
                     converted_employee_id=instance
                 )
                 candidate.converted_employee_id = instance
-                instance.employee_user_id.is_active = False
-                instance.employee_user_id.save()
+                if instance.employee_user_id:
+                    instance.employee_user_id.is_active = False
+                    instance.employee_user_id.save()
 
             elif not instance:
                 messages.info(
@@ -157,16 +187,11 @@ class PersonalForm(ModelForm):
         "zip": 4,
         "dob": 4,
         "gender": 4,
-        "emergency_contact": 4,
-        "emergency_contact_name": 4,
-        "emergency_contact_relation": 4,
     }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["emergency_contact_name"].label = _("Contact name")
-        self.fields["emergency_contact_relation"].label = _("Contact Relation")
-        self.fields["badge_id"].label = "Badge ID"
+        self.fields["badge_id"].label = "Employee ID"
 
         self.fields["dob"].widget = forms.DateInput(
             attrs={"type": "date", "class": "oh-input w-100"}
@@ -194,6 +219,13 @@ class PersonalForm(ModelForm):
             "employee_user_id",
             "additional_info",
             "is_active",
+            # Replaced by the Emergency Contact tab (EmergencyContactFormView
+            # below) - a single employee can have more than one emergency
+            # contact now, these three flat fields only ever held one.
+            # Matches employee.forms.EmployeeForm's exclude.
+            "emergency_contact",
+            "emergency_contact_name",
+            "emergency_contact_relation",
         ]
 
 
@@ -255,6 +287,11 @@ class BankInfo(ModelForm):
         self.fields["country"].widget = forms.Select(attrs=attrs)
         attrs["id"] = "state"
         self.fields["state"].widget = forms.Select(attrs=attrs)
+        # Optional on the model (existing employees may not have them on
+        # file yet) but required going forward for every new save, since
+        # Payroll Pro can't process anyone without them.
+        self.fields["pan_number"].required = True
+        self.fields["uan_number"].required = True
 
     class Meta:
         """
@@ -303,7 +340,7 @@ class PersonalFormView(HorillaFormView):
 
     def get(self, request, *args, pk=None, **kwargs):
         self.instance = request.GET.get("instance_id")
-        return super().post(request, *args, pk=pk, **kwargs)
+        return super().get(request, *args, pk=pk, **kwargs)
 
     def form_valid(self, form: PersonalForm):
 
@@ -363,7 +400,7 @@ class WorkFormView(HorillaFormView):
 
     def get(self, request, *args, pk=None, **kwargs):
         self.instance = request.GET.get("instance_id")
-        return super().post(request, *args, pk=pk, **kwargs)
+        return super().get(request, *args, pk=pk, **kwargs)
 
 
 @method_decorator(login_required, name="dispatch")
@@ -417,8 +454,17 @@ class BankFormView(HorillaFormView):
                 form.instance.employee_id = Employee.objects.get(
                     pk=self.request.POST["instance_id"]
                 )
-            form.save()
-            messages.success(self.request, _("Bank Info Updated"))
+            try:
+                form.save()
+                messages.success(self.request, _("Bank Info Updated"))
+            except IntegrityError:
+                messages.error(
+                    self.request,
+                    _(
+                        "Couldn't save — that PAN or PF/UAN number is "
+                        "already on file for another employee."
+                    ),
+                )
             return render(
                 request=self.request,
                 template_name=self.template_name,
@@ -426,13 +472,149 @@ class BankFormView(HorillaFormView):
             )
         return super().form_valid(form)
 
+    def form_invalid(self, form: BankInfo):
+        messages.error(
+            self.request,
+            _(
+                "Couldn't save bank details — please fix the highlighted "
+                "fields below."
+            ),
+        )
+        return super().form_invalid(form)
+
     def post(self, request, *args, pk=None, **kwargs):
         self.instance = request.POST.get("instance_id")
         return super().post(request, *args, pk=pk, **kwargs)
 
     def get(self, request, *args, pk=None, **kwargs):
         self.instance = request.GET.get("instance_id")
-        return super().post(request, *args, pk=pk, **kwargs)
+        return super().get(request, *args, pk=pk, **kwargs)
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(
+    all_manager_can_enter(perm="recruitment.view_recruitment"), name="dispatch"
+)
+class EducationFormView(View):
+    """
+    EducationFormView - same repeatable-row formset used on
+    employee_view_update's Education tab (employee/views.py), adapted to
+    this screen's instance_id-in-querystring/hidden-field convention
+    (see PersonalFormView/WorkFormView/BankFormView above) since a
+    formset doesn't fit HorillaFormView's single-ModelForm machinery.
+    """
+
+    template_name = "cbv/allocations/employee/formset_structure.html"
+
+    def get(self, request, *args, **kwargs):
+        employee = Employee.objects.filter(pk=request.GET.get("instance_id")).first()
+        FormSet = build_employee_education_formset()
+        formset = FormSet(instance=employee, prefix="education")
+        return render(
+            request,
+            self.template_name,
+            {"formset": formset, "formset_title": _("Education")},
+        )
+
+    def post(self, request, *args, **kwargs):
+        employee = Employee.objects.filter(pk=request.POST.get("instance_id")).first()
+        FormSet = build_employee_education_formset()
+        formset = FormSet(request.POST, instance=employee, prefix="education")
+        if formset.is_valid():
+            formset.save()
+            messages.success(request, _("Education Details Updated"))
+        return render(
+            request,
+            self.template_name,
+            {"formset": formset, "formset_title": _("Education")},
+        )
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(
+    all_manager_can_enter(perm="recruitment.view_recruitment"), name="dispatch"
+)
+class ExperienceFormView(View):
+    """
+    ExperienceFormView - see EducationFormView docstring.
+    """
+
+    template_name = "cbv/allocations/employee/formset_structure.html"
+
+    def get(self, request, *args, **kwargs):
+        employee = Employee.objects.filter(pk=request.GET.get("instance_id")).first()
+        FormSet = build_employee_experience_formset()
+        formset = FormSet(instance=employee, prefix="experience")
+        return render(
+            request,
+            self.template_name,
+            {"formset": formset, "formset_title": _("Experience")},
+        )
+
+    def post(self, request, *args, **kwargs):
+        employee = Employee.objects.filter(pk=request.POST.get("instance_id")).first()
+        FormSet = build_employee_experience_formset()
+        formset = FormSet(request.POST, instance=employee, prefix="experience")
+        if formset.is_valid():
+            formset.save()
+            messages.success(request, _("Experience Details Updated"))
+        return render(
+            request,
+            self.template_name,
+            {"formset": formset, "formset_title": _("Experience")},
+        )
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(
+    all_manager_can_enter(perm="recruitment.view_recruitment"), name="dispatch"
+)
+class EmergencyContactFormView(View):
+    """
+    EmergencyContactFormView - see EducationFormView docstring. Also
+    mirrors employee_view_update's candidate-fallback: if this employee
+    has no emergency contacts of their own yet, prefill from whatever
+    their originating candidate listed on their application
+    (Employee.candidate_get is Candidate.converted_employee_id's
+    related_name) instead of showing an empty tab.
+    """
+
+    template_name = "cbv/allocations/employee/formset_structure.html"
+
+    def get(self, request, *args, **kwargs):
+        employee = Employee.objects.filter(pk=request.GET.get("instance_id")).first()
+        initial, extra = None, 0
+        if employee and not employee.emergency_contact_set.exists():
+            source_candidate = employee.candidate_get.first()
+            initial = (
+                [
+                    {"name": c.name, "phone": c.phone, "relation": c.relation}
+                    for c in source_candidate.emergency_contact_set.all()
+                ]
+                if source_candidate
+                else []
+            )
+            extra = len(initial)
+        FormSet = build_employee_emergency_contact_formset(extra=extra)
+        formset = FormSet(instance=employee, initial=initial, prefix="emergency")
+        return render(
+            request,
+            self.template_name,
+            {"formset": formset, "formset_title": _("Emergency Contact")},
+        )
+
+    def post(self, request, *args, **kwargs):
+        employee = Employee.objects.filter(pk=request.POST.get("instance_id")).first()
+        FormSet = build_employee_emergency_contact_formset()
+        formset = FormSet(request.POST, instance=employee, prefix="emergency")
+        if formset.is_valid():
+            formset.save()
+            messages.success(request, _("Emergency Contact Details Updated"))
+        return render(
+            request,
+            self.template_name,
+            {"formset": formset, "formset_title": _("Emergency Contact")},
+        )
 
 
 @method_decorator(login_required, name="dispatch")

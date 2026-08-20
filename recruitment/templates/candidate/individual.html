@@ -373,6 +373,15 @@ style="display: none">
                                         </li>
                                         <li class="oh-profile__card-info-item">
                                             <span class="oh-profile__info-label mb-1">
+                                                <ion-icon name="mail-outline"></ion-icon>
+                                                <span>{% trans "Zip Code" %}</span>
+                                            </span>
+                                            <span class="oh-profile__info-value">
+                                                {{candidate.zip}}
+                                            </span>
+                                        </li>
+                                        <li class="oh-profile__card-info-item">
+                                            <span class="oh-profile__info-label mb-1">
                                                 <ion-icon name="brush-outline"></ion-icon>
                                                 <span>{% trans "Portfolio" %}</span>
                                             </span>
@@ -412,11 +421,11 @@ style="display: none">
                                                 </li>
                                                 <li class="oh-profile__card-info-item">
                                                     <span class="oh-profile__info-label mb-1">
-                                                        <ion-icon name="file-tray-stacked-outline"></ion-icon>
+                                                        <ion-icon name="link-outline"></ion-icon>
                                                         <span>{% trans "Source" %}</span>
                                                     </span>
-                                                    {% if candidate.get_source_display != None %}
-                                                        <span class="oh-profile__info-value">{{candidate.get_source_display}}</span>
+                                                    {% if candidate.platform %}
+                                                        <span class="oh-profile__info-value">{{candidate.platform}}</span>
                                                     {% endif %}
                                                 </li>
                                             </ul>
@@ -453,6 +462,149 @@ style="display: none">
                             </div>
                         </div>
                     </div>
+
+                    <div class="row mt-4">
+                        <div class="col-sm-12 col-md-12 col-lg-12">
+                            <div class="oh-card oh-card--margin">
+                                <div class="oh-card__header">
+                                    <span class="oh-card__title oh-card__title--sm fw-bold me-2">{% trans "Career Details" %}</span>
+                                </div>
+                                <div class="oh-card__body mt-4">
+                                    <div class="row">
+                                        <div class="col-12 col-sm-12 col-md-12 col-lg-6">
+                                            <ul class="oh-profile__card-info-list">
+                                                <li class="oh-profile__card-info-item">
+                                                    <span class="oh-profile__info-label mb-1">
+                                                        <ion-icon name="time-outline"></ion-icon>
+                                                        <span>{% trans "Total Experience" %}</span>
+                                                    </span>
+                                                    <span class="oh-profile__info-value">{% if candidate.experience_years or candidate.experience_months %}{{candidate.experience_years|default:0}} {% trans "Years" %} {{candidate.experience_months|default:0}} {% trans "Months" %}{% endif %}</span>
+                                                </li>
+                                                <li class="oh-profile__card-info-item">
+                                                    <span class="oh-profile__info-label mb-1">
+                                                        <ion-icon name="calendar-number-outline"></ion-icon>
+                                                        <span>{% trans "Available To Join" %}</span>
+                                                    </span>
+                                                    <span class="oh-profile__info-value">{% if candidate.available_to_join_days %}{{candidate.available_to_join_days}} {% trans "Days" %}{% endif %}</span>
+                                                </li>
+                                                <li class="oh-profile__card-info-item">
+                                                    <span class="oh-profile__info-label mb-1">
+                                                        <ion-icon name="cash-outline"></ion-icon>
+                                                        <span>{% trans "Current Salary" %}</span>
+                                                    </span>
+                                                    <span class="oh-profile__info-value">{% if candidate.current_salary %}{{candidate.current_salary|currency_symbol_position}}{% endif %}</span>
+                                                </li>
+                                                <li class="oh-profile__card-info-item">
+                                                    <span class="oh-profile__info-label mb-1">
+                                                        <ion-icon name="cash-outline"></ion-icon>
+                                                        <span>{% trans "Expected Salary" %}</span>
+                                                    </span>
+                                                    <span class="oh-profile__info-value">{% if candidate.expected_salary %}{{candidate.expected_salary|currency_symbol_position}}{% endif %}</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                        <div class="col-12 col-sm-12 col-md-12 col-lg-6">
+                                            <ul class="oh-profile__card-info-list">
+                                                <li class="oh-profile__card-info-item">
+                                                    <span class="oh-profile__info-label mb-1">
+                                                        <ion-icon name="ribbon-outline"></ion-icon>
+                                                        <span>{% trans "Skills" %}</span>
+                                                    </span>
+                                                    <span class="oh-profile__info-value">{% for skill in candidate.skills.all %}{{skill.title}}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+                                                </li>
+                                                <li class="oh-profile__card-info-item">
+                                                    <span class="oh-profile__info-label mb-1">
+                                                        <ion-icon name="exit-outline"></ion-icon>
+                                                        <span>{% trans "Reason to Leave" %}</span>
+                                                    </span>
+                                                    <p class="oh-profile__info-value mb-0">{{candidate.reason_to_leave}}</p>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if candidate.education_set.all %}
+                    <div class="row mt-4">
+                        <div class="col-sm-12 col-md-12 col-lg-12">
+                            <div class="oh-card oh-card--margin">
+                                <div class="oh-card__header">
+                                    <span class="oh-card__title oh-card__title--sm fw-bold me-2">{% trans "Education Details" %}</span>
+                                </div>
+                                <div class="oh-card__body mt-4">
+                                    <div class="table-responsive">
+                                        <table class="oh-table w-100">
+                                            <thead>
+                                                <tr>
+                                                    <th>{% trans "Course" %}</th>
+                                                    <th>{% trans "Branch/Specialization" %}</th>
+                                                    <th>{% trans "CGPA/Percentage" %}</th>
+                                                    <th>{% trans "University/College" %}</th>
+                                                    <th>{% trans "Duration" %}</th>
+                                                    <th>{% trans "Location" %}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for edu in candidate.education_set.all %}
+                                                <tr>
+                                                    <td>{{edu.degree}}</td>
+                                                    <td>{{edu.specialization}}</td>
+                                                    <td>{{edu.percentage_cgpa}}</td>
+                                                    <td>{{edu.university}}</td>
+                                                    <td>{% if edu.start_date or edu.end_date %}{{edu.start_date}} - {{edu.end_date}}{% endif %}</td>
+                                                    <td>{{edu.location}}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if candidate.experience_set.all %}
+                    <div class="row mt-4">
+                        <div class="col-sm-12 col-md-12 col-lg-12">
+                            <div class="oh-card oh-card--margin">
+                                <div class="oh-card__header">
+                                    <span class="oh-card__title oh-card__title--sm fw-bold me-2">{% trans "Experience Details" %}</span>
+                                </div>
+                                <div class="oh-card__body mt-4">
+                                    <div class="table-responsive">
+                                        <table class="oh-table w-100">
+                                            <thead>
+                                                <tr>
+                                                    <th>{% trans "Company Name" %}</th>
+                                                    <th>{% trans "Job Title" %}</th>
+                                                    <th>{% trans "Duration" %}</th>
+                                                    <th>{% trans "Location" %}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for exp in candidate.experience_set.all %}
+                                                <tr>
+                                                    <td>{{exp.company_name}}</td>
+                                                    <td>{{exp.designation}}</td>
+                                                    <td>
+                                                        {{exp.start_date}} -
+                                                        {% if exp.is_current_job %}{% trans "Present" %}{% else %}{{exp.end_date}}{% endif %}
+                                                    </td>
+                                                    <td>{{exp.location}}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <div class="oh-general__tab-target oh-profile__info-tab mb-4 d-none" id="note">

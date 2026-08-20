@@ -1,0 +1,314 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+
+  <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-4 mb-4 flex items-center gap-4 flex-wrap">
+    <img src="{{ employee.get_avatar }}" class="w-12 h-12 rounded-full object-cover" alt="">
+    <div>
+      <div class="text-base font-bold">{{ employee.get_full_name }}</div>
+      <div class="text-xs text-dark-400">{{ employee.get_job_position|default:"" }}</div>
+    </div>
+    <span class="flex-1"></span>
+    {% if can_switch and employees %}
+    <form method="get" class="min-w-[220px]">
+      <input type="hidden" name="tab" value="{{ tab }}">
+      <input type="hidden" name="paytab" value="{{ paytab }}">
+      <label class="oh-label block">{% trans "Viewing as (admin)" %}</label>
+      <select name="employee" class="oh-select" onchange="this.form.submit()">
+        {% for emp in employees %}
+          <option value="{{ emp.pk }}" {% if emp.pk == employee.pk %}selected{% endif %}>{{ emp.get_full_name }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="flex gap-1 border-b border-[#ebebeb] mb-4 flex-wrap">
+    <a class="px-4 py-2 text-xs font-semibold border-b-2 transition duration-200 {% if tab == 'summary' %}border-primary-600 text-primary-600{% else %}border-transparent text-dark-400 hover:text-primary-600{% endif %}"
+       href="?tab=summary{% if can_switch %}&employee={{ employee.pk }}{% endif %}">{% trans "Summary" %}</a>
+    <a class="px-4 py-2 text-xs font-semibold border-b-2 transition duration-200 {% if tab == 'mypay' %}border-primary-600 text-primary-600{% else %}border-transparent text-dark-400 hover:text-primary-600{% endif %}"
+       href="?tab=mypay&paytab=salary{% if can_switch %}&employee={{ employee.pk }}{% endif %}">{% trans "My Pay" %}</a>
+  </div>
+
+  {% if tab == 'summary' %}
+    <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5 mb-4">
+      <h3 class="text-sm font-semibold mb-3">{% trans "Payroll summary" %}</h3>
+      {% if latest_record %}
+      {% with calc=latest_record.computed run=latest_record.run_id %}
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 text-xs">
+        <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "Last Processed Cycle" %}</span>{{ run.month|month_name }} {{ run.year }}</div>
+        <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "Payable Days" %}</span>{{ calc.payable_days|floatformat:"-2" }}</div>
+        <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "LOP Days" %}</span>{{ calc.lop_days|floatformat:"-2" }}</div>
+        <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "Net Pay" %}</span><b>{{ calc.net_pay|pp_money0 }}</b></div>
+      </div>
+      {% endwith %}
+      {% else %}
+      <div class="text-center py-6">
+        <ion-icon name="file-tray-outline" class="text-3xl text-dark-100"></ion-icon>
+        <p class="font-semibold mt-2 text-sm">{% trans "No released payslips yet" %}</p>
+        <p class="text-xs text-dark-400 mt-1">{% trans "Payslips appear here after the admin finalizes a run and releases them." %}</p>
+      </div>
+      {% endif %}
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5">
+        <h3 class="text-sm font-semibold mb-3">{% trans "Current Salary" %}</h3>
+        {% if current %}
+        <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+          <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "Annual CTC" %}</span><b>{{ current.annual_ctc|pp_money0 }}</b></div>
+          <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "Monthly CTC" %}</span><b>{{ current.monthly_ctc|pp_money0 }}</b></div>
+          <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "Salary Structure" %}</span><b>{{ current.salary_structure_id.name }}</b></div>
+          <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "Tax Regime" %}</span><b>{{ current.effective_tax_regime|default:"—" }}</b></div>
+        </div>
+        {% else %}
+        <p class="text-xs text-dark-400">{% trans "No salary assigned yet. Contact HR." %}</p>
+        {% endif %}
+      </div>
+      <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5">
+        <h3 class="text-sm font-semibold mb-3">{% trans "Statutory Information" %}</h3>
+        {% if current %}
+        {% with structure=current.salary_structure_id %}
+        <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+          <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "PF" %}</span>{% if structure.pf_enabled %}{% trans "Enabled" %}{% else %}{% trans "Disabled" %}{% endif %}</div>
+          <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "Professional Tax" %}</span>{% if structure.pt_enabled %}{% trans "Enabled" %}{% else %}{% trans "Disabled" %}{% endif %}</div>
+          <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "TDS" %}</span>{% if structure.tds_enabled %}{% trans "Enabled" %}{% else %}{% trans "Disabled" %}{% endif %}</div>
+          <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "Regime" %}</span>{{ current.effective_tax_regime|default:"—" }}</div>
+        </div>
+        {% endwith %}
+        {% endif %}
+      </div>
+    </div>
+
+  {% elif tab == 'mypay' %}
+    <div class="flex gap-1 border-b border-[#ebebeb] mb-4 flex-wrap -mt-2">
+      <a class="px-3.5 py-2 text-xs font-semibold border-b-2 transition duration-200 {% if paytab == 'salary' %}border-primary-600 text-primary-600{% else %}border-transparent text-dark-400 hover:text-primary-600{% endif %}"
+         href="?tab=mypay&paytab=salary{% if can_switch %}&employee={{ employee.pk }}{% endif %}">{% trans "My Salary" %}</a>
+      <a class="px-3.5 py-2 text-xs font-semibold border-b-2 transition duration-200 {% if paytab == 'payslips' %}border-primary-600 text-primary-600{% else %}border-transparent text-dark-400 hover:text-primary-600{% endif %}"
+         href="?tab=mypay&paytab=payslips{% if can_switch %}&employee={{ employee.pk }}{% endif %}">{% trans "Pay Slips" %}</a>
+      <a class="px-3.5 py-2 text-xs font-semibold border-b-2 transition duration-200 {% if paytab == 'incometax' %}border-primary-600 text-primary-600{% else %}border-transparent text-dark-400 hover:text-primary-600{% endif %}"
+         href="?tab=mypay&paytab=incometax{% if can_switch %}&employee={{ employee.pk }}{% endif %}">{% trans "Income Tax" %}</a>
+      <a class="px-3.5 py-2 text-xs font-semibold border-b-2 transition duration-200 {% if paytab == 'managetax' %}border-primary-600 text-primary-600{% else %}border-transparent text-dark-400 hover:text-primary-600{% endif %}"
+         href="?tab=mypay&paytab=managetax{% if can_switch %}&employee={{ employee.pk }}{% endif %}">{% trans "Manage Tax" %}</a>
+      <a class="px-3.5 py-2 text-xs font-semibold border-b-2 transition duration-200 {% if paytab == 'revisions' %}border-primary-600 text-primary-600{% else %}border-transparent text-dark-400 hover:text-primary-600{% endif %}"
+         href="?tab=mypay&paytab=revisions{% if can_switch %}&employee={{ employee.pk }}{% endif %}">{% trans "Pay Revisions" %}</a>
+      <a class="px-3.5 py-2 text-xs font-semibold border-b-2 transition duration-200 {% if paytab == 'reimbursement' %}border-primary-600 text-primary-600{% else %}border-transparent text-dark-400 hover:text-primary-600{% endif %}"
+         href="?tab=mypay&paytab=reimbursement{% if can_switch %}&employee={{ employee.pk }}{% endif %}">{% trans "Reimbursement" %}</a>
+    </div>
+
+    {% if paytab == 'salary' %}
+      {% if current and breakup %}
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5">
+          <div class="text-[11px] uppercase text-dark-400">{% trans "Current Compensation" %}</div>
+          <div class="text-xl font-bold mt-1">{{ current.annual_ctc|pp_money0 }} / {% trans "Annum" %}</div>
+        </div>
+        <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5 flex items-center gap-8 flex-wrap">
+          <div><div class="text-xs text-dark-400">{% trans "Pay Cycle" %}</div><b>{% trans "Monthly" %}</b></div>
+          <div><div class="text-xs text-dark-400">{% trans "Salary Structure" %}</div><b>{{ current.salary_structure_id.name }}</b></div>
+          <div><div class="text-xs text-dark-400">{% trans "Tax Regime" %}</div><b>{{ current.effective_tax_regime|default:"—" }}</b></div>
+        </div>
+      </div>
+      <div class="bg-white rounded-md shadow-card border border-[#ebebeb]">
+        <div class="px-5 py-3 border-b border-[#ebebeb]"><h3 class="text-sm font-semibold">{% trans "Salary Breakup" %}</h3></div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead><tr class="text-left text-dark-400 uppercase text-[10px] border-b border-[#ebebeb]">
+              <th class="px-5 py-2">{% trans "Earnings" %}</th><th class="px-2 py-2 text-right">{% trans "Monthly" %}</th><th class="px-5 py-2 text-right">{% trans "Annually" %}</th>
+            </tr></thead>
+            <tbody>
+              {% for comp in breakup.components %}
+              <tr class="border-b border-[#ebebeb]"><td class="px-5 py-2">{{ comp.name }}</td><td class="px-2 py-2 text-right">{{ comp.full|pp_money }}</td><td class="px-5 py-2 text-right">{% widthratio comp.full 1 12 as annual %}{{ annual|pp_money }}</td></tr>
+              {% endfor %}
+              <tr class="border-b border-[#ebebeb] bg-primary-50 font-semibold"><td class="px-5 py-2">{% trans "Total Earnings" %}</td><td class="px-2 py-2 text-right">{{ breakup.gross_monthly|pp_money }}</td>
+                <td class="px-5 py-2 text-right">{% widthratio breakup.gross_monthly 1 12 as ag %}{{ ag|pp_money }}</td></tr>
+              <tr class="border-b border-[#ebebeb]"><td class="px-5 py-2">{% trans "PF Employee" %}</td><td class="px-2 py-2 text-right">{{ breakup.employee_pf|pp_money }}</td><td class="px-5 py-2 text-right">{% widthratio breakup.employee_pf 1 12 as apf %}{{ apf|pp_money }}</td></tr>
+              <tr class="border-b border-[#ebebeb]"><td class="px-5 py-2">{% trans "Professional Tax" %}</td><td class="px-2 py-2 text-right">{{ breakup.pt|pp_money }}</td><td class="px-5 py-2 text-right">{% widthratio breakup.pt 1 12 as apt %}{{ apt|pp_money }}</td></tr>
+              <tr class="border-b border-[#ebebeb]"><td class="px-5 py-2">{% trans "TDS (estimate)" %}</td><td class="px-2 py-2 text-right">{{ breakup.tds|pp_money }}</td><td class="px-5 py-2 text-right">{% widthratio breakup.tds 1 12 as atds %}{{ atds|pp_money }}</td></tr>
+              <tr class="font-semibold"><td class="px-5 py-2">{% trans "Est. Net Pay (full month)" %}</td><td class="px-2 py-2 text-right">{{ breakup.net_pay|pp_money }}</td><td></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% else %}
+      <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-10 text-center text-dark-400">{% trans "No salary assigned yet" %}</div>
+      {% endif %}
+
+    {% elif paytab == 'payslips' %}
+      <div class="bg-white rounded-md shadow-card border border-[#ebebeb]">
+        <div class="px-5 py-3 border-b border-[#ebebeb]"><h3 class="text-sm font-semibold">{% trans "Pay Slips" %}</h3></div>
+        <div class="p-5 flex gap-5 flex-wrap">
+          <div class="w-full sm:w-[190px] flex-shrink-0">
+            {% for rec in released_records %}
+            <a class="block px-2 py-2 text-xs border-b border-[#ebebeb] transition duration-200 {% if record and rec.pk == record.pk %}text-primary-600 font-bold{% else %}hover:text-primary-600{% endif %}"
+               href="?tab=mypay&paytab=payslips&record={{ rec.pk }}{% if can_switch %}&employee={{ employee.pk }}{% endif %}">
+              {{ rec.run_id.month|month_name }} {{ rec.run_id.year }}
+            </a>
+            {% empty %}
+            <p class="text-xs text-dark-400">{% trans "No released payslips yet." %}</p>
+            {% endfor %}
+          </div>
+          <div class="flex-1 min-w-[300px]">
+            {% if record and calc %}
+              <div class="flex justify-end mb-2.5">
+                <a class="oh-btn oh-btn--light-bkg oh-btn--small" href="{% url 'pp-payslip-pdf' record.pk %}">
+                  <ion-icon name="download-outline" class="me-1"></ion-icon>{% trans "Download PDF" %}</a>
+              </div>
+              {% include "payroll_pro/_payslip_doc.html" %}
+            {% else %}
+            <div class="text-center py-8 text-dark-400">{% trans "Select a payslip month" %}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+    {% elif paytab == 'incometax' %}
+      {% if tax_cols %}
+      <div class="bg-white rounded-md shadow-card border border-[#ebebeb]">
+        <div class="px-5 py-3 border-b border-[#ebebeb] flex items-center justify-between flex-wrap gap-2">
+          <h3 class="text-sm font-semibold">{% trans "Income Tax Computation" %}
+            <span class="text-xs font-normal text-dark-400">(APR {{ fy_start }} - MAR {{ fy_start|add:1 }})</span></h3>
+          {% if regime %}<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-primary-200 text-primary-600">{{ regime.name }}</span>{% endif %}
+        </div>
+        <div class="p-5">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div class="bg-primary-50 rounded-md p-3"><div class="text-[10.5px] uppercase text-dark-400">{% trans "Net Taxable Income" %}</div><div class="font-bold mt-1">{{ tax_summary.taxable|pp_money0 }}</div></div>
+            <div class="bg-primary-50 rounded-md p-3"><div class="text-[10.5px] uppercase text-dark-400">{% trans "Total Tax Payable" %}</div><div class="font-bold mt-1">{{ tax_summary.payable|pp_money0 }}</div></div>
+            <div class="bg-primary-50 rounded-md p-3"><div class="text-[10.5px] uppercase text-dark-400">{% trans "Tax Already Paid" %}</div><div class="font-bold mt-1">{{ tax_summary.paid|pp_money0 }}</div></div>
+            <div class="bg-primary-50 rounded-md p-3"><div class="text-[10.5px] uppercase text-dark-400">{% trans "Remaining Tax" %}</div><div class="font-bold mt-1">{{ tax_summary.remaining|pp_money0 }}</div></div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead><tr class="text-left text-dark-400 uppercase text-[10px] border-b border-[#ebebeb]"><th class="py-1.5 pr-2"></th>{% for col in tax_cols %}<th class="py-1.5 px-1.5">{{ col.label }}{% if col.actual %} ✓{% endif %}</th>{% endfor %}</tr></thead>
+              <tbody>
+                <tr class="border-b border-[#ebebeb]"><td class="py-1.5 pr-2">{% trans "Gross Earnings" %}</td>
+                  {% for col in tax_cols %}<td class="py-1.5 px-1.5 {% if col.actual %}bg-primary-100 font-semibold{% endif %}">{{ col.gross|pp_money0 }}</td>{% endfor %}</tr>
+                <tr class="border-b border-[#ebebeb]"><td class="py-1.5 pr-2">{% trans "Employee PF" %}</td>
+                  {% for col in tax_cols %}<td class="py-1.5 px-1.5 {% if col.actual %}bg-primary-100{% endif %}">{{ col.pf|pp_money0 }}</td>{% endfor %}</tr>
+                <tr><td class="py-1.5 pr-2">{% trans "Monthly TDS" %}</td>
+                  {% for col in tax_cols %}<td class="py-1.5 px-1.5 {% if col.actual %}bg-primary-100 font-semibold{% endif %}">{{ col.tds|pp_money0 }}</td>{% endfor %}</tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-[11px] text-dark-400 mt-3">
+            {% trans "Months marked ✓ show actual processed payroll (frozen snapshots). Unprocessed months are projected at full attendance; the remaining tax is spread evenly across them." %}
+          </p>
+        </div>
+      </div>
+      {% else %}
+      <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-10 text-center text-dark-400">{% trans "No salary assigned — income tax cannot be computed" %}</div>
+      {% endif %}
+
+    {% elif paytab == 'managetax' %}
+      <div class="bg-primary-100 border border-primary-300 rounded-md p-3.5 flex items-center gap-3 flex-wrap mb-4 text-xs">
+        <span>ⓘ {% trans "Your income and tax liability is computed as per" %}
+          <b>{{ regime|default:_("no regime configured") }}</b>.</span>
+        <span class="flex-1"></span>
+        <form method="post" action="{% url 'pp-regime-choice-save' %}" class="flex items-center gap-2">
+          {% csrf_token %}
+          {% if can_switch %}<input type="hidden" name="employee" value="{{ employee.pk }}">{% endif %}
+          <label class="text-xs font-semibold">{% trans "Choose Tax Regime:" %}</label>
+          <select name="regime" class="oh-select" style="max-width:170px;">
+            {% for r in regimes %}<option value="{{ r.pk }}" {% if regime and r.pk == regime.pk %}selected{% endif %}>{{ r.name }}</option>{% endfor %}
+          </select>
+          <button type="submit" class="oh-btn oh-btn--secondary oh-btn--small">{% trans "Apply" %}</button>
+        </form>
+      </div>
+      <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-10 text-center">
+        <p class="font-semibold text-sm">{% trans "Investment declarations aren't available yet" %}</p>
+        <p class="text-xs text-dark-400 mt-1">{% trans "This feature is being rebuilt — check back later." %}</p>
+      </div>
+
+    {% elif paytab == 'revisions' %}
+      <div class="bg-white rounded-md shadow-card border border-[#ebebeb]">
+        <div class="px-5 py-3 border-b border-[#ebebeb]"><h3 class="text-sm font-semibold">{% trans "Pay Revisions History" %}</h3></div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead><tr class="text-left text-dark-400 uppercase text-[10px] border-b border-[#ebebeb]">
+              <th class="px-5 py-2">{% trans "Effective Date" %}</th><th class="px-2 py-2">{% trans "Annual CTC" %}</th>
+              <th class="px-2 py-2">{% trans "Monthly" %}</th><th class="px-2 py-2">{% trans "Structure" %}</th><th class="px-5 py-2">{% trans "Note" %}</th>
+            </tr></thead>
+            <tbody>
+              {% for revision in revisions %}
+              <tr class="border-b border-[#ebebeb] last:border-b-0 hover:bg-primary-100 transition duration-200">
+                <td class="px-5 py-2.5">{{ revision.effective_date }} {% if revision == current %}<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-success-light text-success-dark ml-1">{% trans "Current" %}</span>{% endif %}</td>
+                <td class="px-2 py-2.5">{{ revision.annual_ctc|pp_money0 }}</td>
+                <td class="px-2 py-2.5">{{ revision.monthly_ctc|pp_money0 }}</td>
+                <td class="px-2 py-2.5">{{ revision.salary_structure_id.name }}</td>
+                <td class="px-5 py-2.5">{{ revision.note|default:"" }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="5" class="px-5 py-6 text-center text-dark-400">{% trans "No revisions yet" %}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    {% elif paytab == 'reimbursement' %}
+      <div class="grid grid-cols-3 gap-3 mb-4">
+        <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-4">
+          <div class="text-[10.5px] uppercase text-dark-400">{% trans "Pending" %}</div>
+          <div class="text-lg font-bold mt-1">{{ claim_totals.requested }}</div>
+        </div>
+        <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-4">
+          <div class="text-[10.5px] uppercase text-dark-400">{% trans "Approved" %}</div>
+          <div class="text-lg font-bold mt-1 text-success">{{ claim_totals.approved }}</div>
+        </div>
+        <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-4">
+          <div class="text-[10.5px] uppercase text-dark-400">{% trans "Rejected" %}</div>
+          <div class="text-lg font-bold mt-1 text-danger">{{ claim_totals.rejected }}</div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5 mb-4">
+        <h3 class="text-sm font-semibold mb-3">{% trans "Request Reimbursement" %}</h3>
+        <form method="post" action="{% url 'pp-reimbursement-request' %}" enctype="multipart/form-data">
+          {% csrf_token %}
+          {% if can_switch %}<input type="hidden" name="employee" value="{{ employee.pk }}">{% endif %}
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+            {% for field in claim_form %}
+            <div class="mb-2">
+              <label class="oh-label block">{{ field.label }}</label>
+              {{ field }}
+              {% for error in field.errors %}<div class="text-xs text-danger mt-1">{{ error }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+          </div>
+          <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Submit Request" %}</button>
+          <p class="text-xs text-dark-400 mt-2">{% trans "Pending requests land in the admin's Run Payroll → Reimbursement, Adhoc Payment, Deduction step for approval & payout." %}</p>
+        </form>
+      </div>
+
+      <div class="bg-white rounded-md shadow-card border border-[#ebebeb]">
+        <div class="px-5 py-3 border-b border-[#ebebeb]"><h3 class="text-sm font-semibold">{% trans "Reimbursement History" %}</h3></div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead><tr class="text-left text-dark-400 uppercase text-[10px] border-b border-[#ebebeb]">
+              <th class="px-5 py-2">{% trans "Title" %}</th><th class="px-2 py-2">{% trans "Amount" %}</th>
+              <th class="px-2 py-2">{% trans "Date" %}</th><th class="px-5 py-2">{% trans "Status" %}</th>
+            </tr></thead>
+            <tbody>
+              {% for claim in claims %}
+              <tr class="border-b border-[#ebebeb] last:border-b-0 hover:bg-primary-100 transition duration-200">
+                <td class="px-5 py-2.5">{{ claim.title }}</td>
+                <td class="px-2 py-2.5">{{ claim.amount|pp_money0 }}</td>
+                <td class="px-2 py-2.5">{{ claim.allowance_on }}</td>
+                <td class="px-5 py-2.5">
+                  {% if claim.status == 'approved' %}<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-success-light text-success-dark">{% trans "Approved" %}</span>
+                  {% elif claim.status == 'rejected' %}<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-danger-light text-danger-dark">{% trans "Rejected" %}</span>
+                  {% else %}<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-warning-light text-warning-dark">{% trans "Pending" %}</span>{% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="4" class="px-5 py-6 text-center text-dark-400">{% trans "No claims yet" %}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

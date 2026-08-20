@@ -41,7 +41,8 @@
         <div class="row">
             <div class="col-lg-6">
               <label class="oh-label" for="country">{% trans "Country" %}</label>
-              <select name="country" style="border:1px solid #cdd5df;" class="w-100 oh-select oh-select-2" id="country">
+              <select name="country" style="border:1px solid #cdd5df;" class="w-100 oh-select oh-select-2" id="country"
+                data-selected="{{ form.country.value|default:'' }}">
                 <option value="{{form.instance.country}}" selected>{{form.instance.country}}</option>
               </select>
               {{form.country.errors}}
@@ -50,7 +51,8 @@
             </div>
             <div class="col-lg-6">
               <label class="oh-label d-block" for="state">{% trans "State" %}</label>
-              <select name="state" style="border:1px solid #cdd5df;" class="w-100 oh-select oh-select-2" id="state">
+              <select name="state" style="border:1px solid #cdd5df;" class="w-100 oh-select oh-select-2" id="state"
+                data-selected="{{ form.state.value|default:'' }}">
                 <option value="{{form.instance.state}}" selected>{{form.instance.state}}</option>
 
               </select>

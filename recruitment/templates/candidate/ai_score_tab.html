@@ -1,0 +1,47 @@
+{% load i18n %}
+<div class="p-4">
+  <!--
+    Hidden refresh triggers picked up by HorillaFormView's own
+    ".reload-record" convention (see horilla_views/generic/cbv/views.py) -
+    so the "Move to Pipeline" modal's success handler also refreshes
+    these two sections live, without needing its own custom response.
+  -->
+  <button
+    hidden
+    class="reload-record"
+    hx-get="{% url 'candidate-ai-score-status' candidate.id %}"
+    hx-target="#aiScoreStatus"
+    hx-swap="outerHTML"
+  ></button>
+  <button
+    hidden
+    class="reload-record"
+    hx-get="{% url 'candidate-job-suggestion-status' candidate.id %}"
+    hx-target="#jobSuggestionStatus"
+    hx-swap="outerHTML"
+  ></button>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+    <div>
+      <h6 class="text-xs font-semibold uppercase tracking-wide text-[#8891A1] mb-3">{% trans "AI Score" %}</h6>
+      <div
+        id="aiScoreStatus"
+        hx-get="{% url 'candidate-ai-score-status' candidate.id %}"
+        hx-trigger="load"
+      >
+        <div class="animated-background" style="height:200px;"></div>
+      </div>
+    </div>
+
+    <div class="lg:border-l lg:border-dark-50 lg:pl-4">
+      <h6 class="text-xs font-semibold uppercase tracking-wide text-[#8891A1] mb-3">{% trans "AI Job Match" %}</h6>
+      <div
+        id="jobSuggestionStatus"
+        hx-get="{% url 'candidate-job-suggestion-status' candidate.id %}"
+        hx-trigger="load"
+      >
+        <div class="animated-background" style="height:150px;"></div>
+      </div>
+    </div>
+  </div>
+</div>

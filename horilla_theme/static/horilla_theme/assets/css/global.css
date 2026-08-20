@@ -436,6 +436,26 @@
   outline: 0;
 }
 
+/* Show a dropdown arrow on the Reject Reason multi-select so it reads as a dropdown */
+.reject-reason-select+.select2-container .select2-selection.select2-selection--multiple {
+  position: relative;
+  padding-right: 24px !important;
+}
+
+.reject-reason-select+.select2-container .select2-selection--multiple::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 0;
+  height: 0;
+  margin-top: -2px;
+  border-style: solid;
+  border-width: 5px 4px 0 4px;
+  border-color: #888 transparent transparent transparent;
+  pointer-events: none;
+}
+
 .select2-container .select2-search--inline .select2-search__field {
   height: 25px;
 }

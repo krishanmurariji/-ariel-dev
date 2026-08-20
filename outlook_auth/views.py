@@ -32,7 +32,11 @@ def outlook_login(request):
     oauth = OAuth2Session(
         api.outlook_client_id,
         redirect_uri=api.outlook_redirect_uri,
-        scope=["Mail.Send", "offline_access"],
+        # Calendars.ReadWrite added for Teams meeting creation (planned
+        # recruitment interview integration, mirrors horilla_meet's Google
+        # Meet flow). Existing connected accounts need to re-consent once
+        # to pick up this scope - see outlook_login's docs/settings page.
+        scope=["Mail.Send", "Mail.Read", "Calendars.ReadWrite", "offline_access"],
     )
     authorization_url, state = oauth.authorization_url(api.outlook_authorization_url)
 
@@ -158,6 +162,75 @@ def send_outlook_email(request, email_data=None):
         messages.error(_("Something went wrong"))
         messages.info(_("Outlook authentication required/expired"))
         return None, email_data
+
+
+def get_valid_oauth_session(api: models.AzureApi):
+    """
+    Build an OAuth2Session for the given AzureApi, refreshing the token
+    first if it has already expired.
+    """
+    if api.token and api.is_token_expired():
+        api = refresh_outlook_token(api)
+    return OAuth2Session(
+        api.outlook_client_id,
+        token=api.token,
+        auto_refresh_kwargs={
+            "client_id": api.outlook_client_id,
+            "client_secret": api.outlook_client_secret,
+        },
+        auto_refresh_url=api.outlook_token_url,
+    )
+
+
+def list_inbox_messages(
+    api: models.AzureApi, since: datetime = None, next_link: str = None
+):
+    """
+    List one page of inbox messages (with attachments expanded inline)
+    received after `since`, from the mailbox connected via `api`. Requires
+    the Mail.Read scope to have been consented to.
+
+    Returns (messages, next_link) - `next_link` is Graph's `@odata.nextLink`
+    (a full URL, already carrying every query param) if more pages exist
+    beyond this one, else None. Pass a previous call's `next_link` back in
+    to fetch the following page - `since` is ignored in that case since
+    the link already encodes the original filter.
+    """
+    oauth = get_valid_oauth_session(api)
+    if next_link:
+        response = oauth.get(next_link)
+    else:
+        params = {
+            "$select": "id,subject,from,receivedDateTime,body",
+            "$expand": "attachments",
+            "$orderby": "receivedDateTime asc",
+            "$top": 25,
+        }
+        if since:
+            params["$filter"] = (
+                f"receivedDateTime gt {since.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+            )
+        response = oauth.get(
+            f"{api.outlook_api_endpoint}/me/mailFolders/inbox/messages",
+            params=params,
+        )
+    response.raise_for_status()
+    payload = response.json()
+    return payload.get("value", []), payload.get("@odata.nextLink")
+
+
+def get_message(api: models.AzureApi, message_id: str):
+    """
+    Fetch a single message (with attachments expanded inline) by its
+    Graph message id, for re-processing a specific already-seen email.
+    """
+    oauth = get_valid_oauth_session(api)
+    response = oauth.get(
+        f"{api.outlook_api_endpoint}/me/messages/{message_id}",
+        params={"$select": "id,subject,from,receivedDateTime,body", "$expand": "attachments"},
+    )
+    response.raise_for_status()
+    return response.json()
 
 
 @login_required

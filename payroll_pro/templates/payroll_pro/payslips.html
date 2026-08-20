@@ -1,0 +1,78 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+  <div class="mb-5">
+    <h1 class="text-xl font-bold">{% trans "Payslips" %}</h1>
+    <p class="text-sm text-dark-400 mt-1">{% trans "View, release & email payslips for processed months — always rendered from the frozen snapshot" %}</p>
+  </div>
+
+  {% if not runs %}
+  <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-10 text-center">
+    <ion-icon name="file-tray-outline" class="text-4xl text-dark-100"></ion-icon>
+    <p class="font-semibold mt-2">{% trans "No payslips yet" %}</p>
+    <p class="text-xs text-dark-400 mt-1">{% trans "Finalize a payroll run from the Run Payroll menu first." %}</p>
+  </div>
+  {% else %}
+  <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-4 mb-4">
+    <div class="flex items-center gap-4 flex-wrap">
+      <form method="get" class="flex items-end gap-3 flex-wrap">
+        <div>
+          <label class="oh-label block">{% trans "Payroll month" %}</label>
+          <select name="run" class="oh-select" onchange="this.form.submit()">
+            {% for r in runs %}
+            <option value="{{ r.pk }}" {% if r.pk == run.pk %}selected{% endif %}>
+              {{ r.month|month_name }} {{ r.year }}{% if not r.payslips_released %} ({% trans "unreleased" %}){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="oh-label block">{% trans "Employee" %}</label>
+          <select name="record" class="oh-select" onchange="this.form.submit()">
+            {% for rec in records %}
+            <option value="{{ rec.pk }}" {% if record and rec.pk == record.pk %}selected{% endif %}>
+              {{ rec.employee_id.get_full_name }}{% if rec.sent_to_employee %} ✉{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </form>
+      <span class="flex-1"></span>
+      {% if run.payslips_released %}
+        <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-success-light text-success-dark">{% trans "Released to employees" %}</span>
+      {% elif perms.payroll_pro.change_payrollrun %}
+        <form method="post" action="{% url 'pp-run-release' run.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% url 'pp-payslips' %}?run={{ run.pk }}">
+          <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Release Payslips to Employees" %}</button>
+        </form>
+      {% endif %}
+      {% if record %}
+        <a class="oh-btn oh-btn--light-bkg" href="{% url 'pp-payslip-pdf' record.pk %}">
+          <ion-icon name="download-outline" class="me-1"></ion-icon>{% trans "Download PDF" %}</a>
+        <form method="post" action="{% url 'pp-payslip-email' record.pk %}">
+          {% csrf_token %}<button type="submit" class="oh-btn oh-btn--light-bkg">
+            <ion-icon name="mail-outline" class="me-1"></ion-icon>{% trans "Email This Payslip" %}</button>
+        </form>
+      {% endif %}
+      <form method="post" action="{% url 'pp-payslip-email-all' run.pk %}"
+            onsubmit="return confirm('{% trans "Email payslips to every processed employee of this run?" %}');">
+        {% csrf_token %}<button type="submit" class="oh-btn oh-btn--secondary">{% trans "Email All" %}</button>
+      </form>
+    </div>
+  </div>
+
+  {% if record and calc %}
+    {% include "payroll_pro/_payslip_doc.html" %}
+  {% else %}
+  <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-10 text-center">
+    <ion-icon name="file-tray-outline" class="text-4xl text-dark-100"></ion-icon>
+    <p class="font-semibold mt-2">{% trans "No payslip available for this selection" %}</p>
+    <p class="text-xs text-dark-400 mt-1">{% trans "The employee may be on hold / skip for this month." %}</p>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

@@ -27,7 +27,7 @@
       <div class="oh-dropdown" x-data="{open: false}">
         <button
           hx-get="{% url 'get-filter-form' %}?template_path={{filter_template_path}}"
-          hx-target="#widgetFilterContainer"
+          hx-target="#widgetFilterContainer{{self.attrs.id}}"
           hx-swap="innerHTML"
           hx-trigger="load"
           id="hxButton"
@@ -51,7 +51,7 @@
           x-show="open"
           @click.outside="open = false"
         >
-          <div id="widgetFilterContainer">
+          <div id="widgetFilterContainer{{self.attrs.id}}">
             {% comment %} {% include filter_template_path %} {% endcomment %}
           </div>
           <div class="oh-dropdown__filter-footer">

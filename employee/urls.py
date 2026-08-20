@@ -49,6 +49,21 @@ urlpatterns = [
     path("work-form/", allocations.WorkFormView.as_view(), name="work-form"),
     path("bank-form/", allocations.BankFormView.as_view(), name="bank-form"),
     path(
+        "education-form/",
+        allocations.EducationFormView.as_view(),
+        name="education-form",
+    ),
+    path(
+        "experience-form/",
+        allocations.ExperienceFormView.as_view(),
+        name="experience-form",
+    ),
+    path(
+        "emergency-form/",
+        allocations.EmergencyContactFormView.as_view(),
+        name="emergency-form",
+    ),
+    path(
         "allocation-user-group-view/",
         allocations.GroupsView.as_view(),
         name="allocation-user-group-view",

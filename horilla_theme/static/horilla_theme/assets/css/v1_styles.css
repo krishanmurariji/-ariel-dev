@@ -2732,7 +2732,7 @@ ul.errorlist ul.errorlist li {
   right: 2rem;
   position: fixed;
   z-index: 9999 !important;
-  max-width: 500px;
+  max-width: 640px;
   width: 95%;
   pointer-events: none;
 }
@@ -3133,6 +3133,7 @@ ul.errorlist ul.errorlist li {
 .oh-activity-sidebar__body {
   overflow-y: auto;
   min-height: calc(100% - 90px);
+  max-height: calc(100% - 90px);
 }
 
 .oh-activity-sidebar__qa-list {

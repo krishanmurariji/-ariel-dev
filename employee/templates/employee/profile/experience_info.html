@@ -1,0 +1,135 @@
+{% load i18n %}
+<div class="oh-general__tab-target oh-profile-section mb-4 d-none" id="experience">
+    <div class="oh-profile-section__card">
+        <form action="" method="post">
+            {% csrf_token %}
+            {{ experience_formset.management_form }}
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="oh-label mb-0">{% trans "Experience Details" %}</label>
+                <button type="button" id="addExperienceRow" class="oh-btn oh-btn--light-bkg oh-btn--sm">
+                    <ion-icon name="add-outline"></ion-icon> {% trans "Add Experience" %}
+                </button>
+            </div>
+            <div id="experienceRows">
+                {% for exp_form in experience_formset %}
+                    <div class="formset-row" style="border:1px solid #e5e5e5; border-radius:4px; padding:14px 14px 4px; margin-bottom:10px; position:relative;">
+                        {{ exp_form.id }}
+                        <div style="display:none;">{{ exp_form.DELETE }}</div>
+                        <button type="button" class="formset-remove-row" data-existing="{% if exp_form.instance.pk %}true{% else %}false{% endif %}" style="position:absolute; top:10px; right:10px; border:none; background:none; color:#dc3545;" title="{% trans 'Remove' %}">
+                            <ion-icon name="close-outline"></ion-icon>
+                        </button>
+                        <div class="row">
+                            <div class="col-12 col-sm-12 col-md-12 col-lg-6">
+                                <label class="oh-label">{% trans "Company Name" %}</label>
+                                {{ exp_form.company_name }}
+                            </div>
+                            <div class="col-12 col-sm-12 col-md-12 col-lg-6">
+                                <label class="oh-label">{% trans "Job Title" %}</label>
+                                {{ exp_form.designation }}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-12 col-sm-12 col-md-12 col-lg-6">
+                                <label class="oh-label">{% trans "Date of Joining" %}</label>
+                                {{ exp_form.start_date }}
+                            </div>
+                            <div class="col-12 col-sm-12 col-md-12 col-lg-6">
+                                <label class="oh-label">{% trans "Date of Relieving" %}</label>
+                                {{ exp_form.end_date }}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-12 col-sm-12 col-md-12 col-lg-6">
+                                <label class="oh-label">{% trans "Location" %}</label>
+                                {{ exp_form.location }}
+                            </div>
+                        </div>
+                        {{ exp_form.errors }}
+                    </div>
+                {% endfor %}
+            </div>
+            <template id="experienceRowTemplate">
+                <div class="formset-row" style="border:1px solid #e5e5e5; border-radius:4px; padding:14px 14px 4px; margin-bottom:10px; position:relative;">
+                    <button type="button" class="formset-remove-row" data-existing="false" style="position:absolute; top:10px; right:10px; border:none; background:none; color:#dc3545;" title="{% trans 'Remove' %}">
+                        <ion-icon name="close-outline"></ion-icon>
+                    </button>
+                    <div class="row">
+                        <div class="col-12 col-sm-12 col-md-12 col-lg-6">
+                            <label class="oh-label">{% trans "Company Name" %}</label>
+                            <input type="text" class="oh-input w-100 mb-2" name="experience-__PREFIX__-company_name">
+                        </div>
+                        <div class="col-12 col-sm-12 col-md-12 col-lg-6">
+                            <label class="oh-label">{% trans "Job Title" %}</label>
+                            <input type="text" class="oh-input w-100 mb-2" name="experience-__PREFIX__-designation">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12 col-sm-12 col-md-12 col-lg-6">
+                            <label class="oh-label">{% trans "Date of Joining" %}</label>
+                            <input type="date" class="oh-input w-100 mb-2" name="experience-__PREFIX__-start_date">
+                        </div>
+                        <div class="col-12 col-sm-12 col-md-12 col-lg-6">
+                            <label class="oh-label">{% trans "Date of Relieving" %}</label>
+                            <input type="date" class="oh-input w-100 mb-2" name="experience-__PREFIX__-end_date">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12 col-sm-12 col-md-12 col-lg-6">
+                            <label class="oh-label">{% trans "Location" %}</label>
+                            <input type="text" class="oh-input w-100 mb-2" name="experience-__PREFIX__-location">
+                        </div>
+                    </div>
+                </div>
+            </template>
+            <hr class="mt-5 mb-3">
+            <div class="w-100 d-flex align-items-center justify-content-end">
+                <button type="submit" class="oh-btn oh-btn--secondary oh-btn--w-100-resp">
+                    {% trans "Save" %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+    (function () {
+        function wireFormsetSection(containerId, addBtnId, templateId, totalFormsName) {
+            var container = document.getElementById(containerId);
+            var addBtn = document.getElementById(addBtnId);
+            var template = document.getElementById(templateId);
+            var totalFormsInput = document.querySelector('input[name="' + totalFormsName + '"]');
+            if (!container || !addBtn || !template || !totalFormsInput) {
+                return;
+            }
+            function wireRemove(rowEl) {
+                var removeBtn = rowEl.querySelector(".formset-remove-row");
+                if (!removeBtn) {
+                    return;
+                }
+                removeBtn.addEventListener("click", function () {
+                    if (removeBtn.dataset.existing === "true") {
+                        var deleteBox = rowEl.querySelector('input[type="checkbox"][name$="-DELETE"]');
+                        if (deleteBox) {
+                            deleteBox.checked = true;
+                        }
+                        rowEl.style.display = "none";
+                    } else {
+                        rowEl.remove();
+                    }
+                });
+            }
+            addBtn.addEventListener("click", function () {
+                var index = parseInt(totalFormsInput.value, 10) || 0;
+                var html = template.innerHTML.split("__PREFIX__").join(index);
+                var wrapper = document.createElement("div");
+                wrapper.innerHTML = html.trim();
+                var rowEl = wrapper.firstElementChild;
+                container.appendChild(rowEl);
+                totalFormsInput.value = index + 1;
+                wireRemove(rowEl);
+            });
+            container.querySelectorAll(".formset-row").forEach(wireRemove);
+        }
+
+        wireFormsetSection("experienceRows", "addExperienceRow", "experienceRowTemplate", "experience-TOTAL_FORMS");
+    })();
+</script>

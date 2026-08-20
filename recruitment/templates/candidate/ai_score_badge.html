@@ -1,0 +1,19 @@
+{% load i18n %}
+{% if instance.status == "scored" %}
+  {% if instance.score >= 75 %}
+    <span style="color:yellowgreen; font-weight:600;">{{ instance.score }}/100</span>
+  {% elif instance.score >= 50 %}
+    <span style="color:orange; font-weight:600;">{{ instance.score }}/100</span>
+  {% else %}
+    <span style="color:indianred; font-weight:600;">{{ instance.score }}/100</span>
+  {% endif %}
+  {% if instance.confidence == "low" %}
+    <ion-icon
+      name="alert-circle-outline"
+      title="{% trans 'Low confidence - flagged for manual review' %}"
+      style="color:indianred; vertical-align:middle; margin-left:2px;"
+    ></ion-icon>
+  {% endif %}
+{% else %}
+  <span style="color:indianred;">{{ instance.get_status_display }}</span>
+{% endif %}

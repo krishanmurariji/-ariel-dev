@@ -1,0 +1,62 @@
+{% load i18n payroll_pro_tags %}
+{# Add-a-revision form + append-only history for `employee` (current, revisions, form, show_picker + employees when show_picker). #}
+{% if not hide_add_form %}
+{% if show_picker or perms.payroll_pro.add_employeesalary %}
+<div class="grid grid-cols-1 {% if show_picker and employee %}lg:grid-cols-10{% endif %} gap-4 mb-4">
+<div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5 {% if show_picker and employee %}lg:col-span-7{% endif %}">
+  <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
+    <div class="flex items-center gap-2">
+      {% if show_picker and employee %}<img src="{{ employee.get_avatar }}" class="w-8 h-8 rounded-full object-cover" alt="">{% endif %}
+      <div>
+        <h3 class="text-sm font-semibold leading-tight">{% trans "Add a Pay Revision" %}{% if show_picker and employee %} — {{ employee.get_full_name }}{% endif %}</h3>
+        {% if show_picker and current %}<span class="text-xs text-dark-400">{% trans "current" %}: {{ current.salary_structure_id.name }} · {{ current.annual_ctc|pp_money0 }}/yr</span>{% endif %}
+      </div>
+    </div>
+    {% if show_picker and employees %}
+    <form method="get" class="min-w-[200px]">
+      <select name="employee" class="oh-select" onchange="this.form.submit()">
+        {% for emp in employees %}
+          <option value="{{ emp.pk }}" {% if employee and emp.pk == employee.pk %}selected{% endif %}>{{ emp.get_full_name }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% endif %}
+  </div>
+  {% if perms.payroll_pro.add_employeesalary %}
+  <form method="post" action="{% url 'pp-revision-add' employee.pk %}">
+    {% csrf_token %}
+    <input type="hidden" name="employee_id" value="{{ employee.pk }}">
+    {% if next_page %}<input type="hidden" name="next" value="{{ next_page }}">{% endif %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+      {% for field in form.visible_fields %}
+        {% if field.name != 'employee_id' %}
+        <div class="mb-2" id="{{ field.name }}Field">
+          <label class="oh-label block">{{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+          {{ field }}
+          {% if field.help_text %}<div class="text-xs text-dark-400 mt-1">{{ field.help_text }}</div>{% endif %}
+          {% for error in field.errors %}<div class="text-xs text-danger mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% if not employee.employee_bank_details.pan_number or not employee.employee_bank_details.uan_number %}
+    <div class="bg-danger-light border border-danger-light text-danger-dark rounded-md p-3 mb-3 text-xs">
+      {% trans "PAN/UAN not on file for this employee — Add Revision is disabled until both are added in their Employee profile (Bank & Statutory Details)." %}
+    </div>
+    {% endif %}
+    <div class="flex justify-end pt-4 mt-2 border-t border-[#ebebeb]">
+      <button type="submit" class="oh-btn oh-btn--secondary" {% if not employee.employee_bank_details.pan_number or not employee.employee_bank_details.uan_number %}disabled{% endif %}>{% trans "+ Add Revision" %}</button>
+    </div>
+  </form>
+  {% elif show_picker %}
+  <p class="text-xs text-dark-400">{% trans "You do not have permission to add pay revisions." %}</p>
+  {% endif %}
+</div>
+{% if show_picker and employee %}
+<div class="lg:col-span-3">{% include "payroll_pro/_bank_details_card.html" %}</div>
+{% endif %}
+</div>
+{% endif %}
+{% endif %}
+
+{% include "payroll_pro/_revision_history_card.html" %}

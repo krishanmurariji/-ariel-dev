@@ -1,0 +1,145 @@
+{% load i18n %}
+<div
+  id="aiScoreStatus"
+  hx-get="{% url 'candidate-ai-score-status' candidate_id %}"
+  {% if running %}hx-trigger="every 5s"{% endif %}
+  hx-swap="outerHTML"
+  {% if oob %}hx-swap-oob="true"{% endif %}
+>
+  <div class="d-flex align-items-center mb-3" style="gap: 0.75rem;">
+    {% if running %}
+      <ion-icon name="sync-outline" style="vertical-align:middle;"></ion-icon>
+      <span>{% trans "Scoring in progress..." %}</span>
+    {% else %}
+      <span class="text-muted">
+        {% if latest %}
+          {% trans "Last scored" %}: {{ latest.created_at }}
+        {% else %}
+          {% trans "Not scored yet." %}
+        {% endif %}
+      </span>
+    {% endif %}
+    {% if perms.recruitment.add_candidateaiscore %}
+    <button
+      type="button"
+      class="oh-btn oh-btn--secondary oh-btn--small ms-auto d-flex align-items-center"
+      style="gap:6px; {% if running %}pointer-events:none; opacity:0.6;{% endif %}"
+      {% if not running %}
+      hx-post="{% url 'candidate-ai-score-trigger' candidate_id %}"
+      hx-target="#aiScoreStatus"
+      hx-swap="outerHTML"
+      hx-disabled-elt="this"
+      hx-indicator="#aiScoreTriggerSpinner"
+      {% endif %}
+    >
+      <span id="aiScoreTriggerSpinner" class="htmx-indicator" style="display:inline-flex;">
+        <span class="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-[#e54f38]" style="display:inline-block;"></span>
+      </span>
+      <ion-icon name="sparkles-outline"></ion-icon>
+      {% if latest %}{% trans "Re-score with AI" %}{% else %}{% trans "Score with AI" %}{% endif %}
+    </button>
+    {% endif %}
+  </div>
+
+  {% if latest and latest.status == "scored" %}
+    <div class="oh-card p-3 mb-3">
+      <div class="d-flex align-items-center mb-2" style="gap:1.25rem;">
+        <div style="position:relative; width:130px; height:75px; flex-shrink:0;">
+          <canvas id="aiScoreGauge{{ candidate_id }}" width="130" height="75"></canvas>
+          <div style="position:absolute; left:0; right:0; bottom:2px; text-align:center;">
+            <span style="font-size:22px; font-weight:600; {% if latest.score >= 75 %}color:yellowgreen;{% elif latest.score >= 50 %}color:orange;{% else %}color:indianred;{% endif %}">{{ latest.score }}</span>
+            <span class="text-muted" style="font-size:11px;">/100</span>
+          </div>
+        </div>
+        <script>
+          (function () {
+            var ctx = document.getElementById("aiScoreGauge{{ candidate_id }}");
+            if (ctx && window.Chart) {
+              new Chart(ctx, {
+                type: "doughnut",
+                data: {
+                  datasets: [{
+                    data: [{{ latest.score }}, {{ latest.score_remaining }}],
+                    backgroundColor: [
+                      {% if latest.score >= 75 %}"yellowgreen"{% elif latest.score >= 50 %}"orange"{% else %}"indianred"{% endif %},
+                      "#eee"
+                    ],
+                    borderWidth: 0,
+                  }],
+                },
+                options: {
+                  rotation: -90,
+                  circumference: 180,
+                  cutout: "72%",
+                  responsive: false,
+                  plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                },
+              });
+            }
+          })();
+        </script>
+        {% if latest.scored_against %}
+          <span class="text-muted">{% trans "Scored against" %}: {{ latest.scored_against }}</span>
+        {% endif %}
+      </div>
+      {% if latest.confidence == "low" %}
+        <div class="mb-3 p-2" style="border:1px solid #f3c6c6; background:#fdf2f2; border-radius:6px;">
+          <span style="color:indianred; font-size:12.5px;">
+            <ion-icon name="alert-circle-outline" style="vertical-align:middle;"></ion-icon>
+            {% trans "Low confidence - this score was automatically flagged for manual review." %}
+            {% if "candidate_name_not_found" in latest.flags %}
+              {% trans "The candidate's name wasn't found anywhere in the resume text." %}
+            {% endif %}
+            {% if "score_inconsistent" in latest.flags %}
+              {% trans "Two independent scoring passes disagreed by more than the allowed threshold." %}
+            {% endif %}
+            {% if "hallucinated_missing_skill" in latest.flags %}
+              {% trans "The AI claimed at least one skill was missing that's actually present in the resume - that claim was removed automatically." %}
+            {% endif %}
+          </span>
+        </div>
+      {% endif %}
+      {% if latest.key_points %}
+        <ul class="oh-ai-score__points ps-3">
+          {% for point in latest.key_points %}
+            <li>{{ point }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      {% if latest.reasoning %}
+        <p class="text-muted mb-0">{{ latest.reasoning }}</p>
+      {% endif %}
+    </div>
+  {% elif latest %}
+    <div class="mb-3 p-2" style="border:1px solid #f3c6c6; background:#fdf2f2; border-radius:6px;">
+      <span style="color:indianred; font-size:12.5px;">
+        <ion-icon name="warning-outline" style="vertical-align:middle;"></ion-icon>
+        {{ latest.get_status_display }}{% if latest.error_message %}: {{ latest.error_message }}{% endif %}
+      </span>
+    </div>
+  {% endif %}
+
+  {% if history %}
+    <h5 class="mt-4">{% trans "Previous attempts" %}</h5>
+    <table class="oh-table--sortable w-100">
+      <thead>
+        <tr>
+          <th>{% trans "Date" %}</th>
+          <th>{% trans "Result" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for attempt in history %}
+        <tr>
+          <td>{{ attempt.created_at }}</td>
+          <td>{{ attempt.score_badge|safe }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+
+<div id="reloadMessages" hx-swap-oob="true">
+  {% include "generic/messages.html" %}
+</div>

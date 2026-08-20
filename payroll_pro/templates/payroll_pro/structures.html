@@ -1,0 +1,88 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+
+  <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
+    <div>
+      <h1 class="text-xl font-bold">{% trans "Salary Structures" %}</h1>
+      <p class="text-sm text-dark-400 mt-1">{% trans "Pay components, statutory rules and the linked tax regime" %}</p>
+    </div>
+    {% if perms.payroll_pro.add_salarystructure %}
+      <a class="oh-btn oh-btn--secondary" href="{% url 'pp-structure-new' %}">
+        <ion-icon name="add-outline" class="me-1"></ion-icon>{% trans "Create Structure" %}
+      </a>
+    {% endif %}
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for card in cards %}
+    {% with structure=card.structure %}
+    <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5 pp-lift relative flex flex-col">
+      <div class="absolute right-3 top-4 flex items-center gap-1.5">
+        {% if perms.payroll_pro.change_salarystructure %}
+          <a href="{% url 'pp-structure-edit' structure.pk %}" class="oh-btn oh-btn--light-bkg oh-btn--x-small" title="{% trans 'Edit' %}">
+            <i class="fa-solid fa-pen text-[11px]"></i>
+          </a>
+        {% endif %}
+        {% if perms.payroll_pro.add_salarystructure %}
+          <form method="post" action="{% url 'pp-structure-duplicate' structure.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="oh-btn oh-btn--light-bkg oh-btn--x-small" title="{% trans 'Duplicate' %}">
+              <i class="fa-solid fa-copy text-[11px]"></i>
+            </button>
+          </form>
+        {% endif %}
+        {% if perms.payroll_pro.delete_salarystructure %}
+          <a hx-get="{% url 'pp-structure-delete-confirm' structure.pk %}" hx-target="#ppMiniModalTarget" hx-swap="innerHTML"
+             data-toggle="oh-modal-toggle" data-target="#ppMiniModal"
+             class="oh-btn oh-btn--light-danger oh-btn--x-small" title="{% trans 'Delete' %}">
+            <i class="fa-solid fa-trash text-[11px]"></i>
+          </a>
+        {% endif %}
+      </div>
+
+      <a href="{% url 'pp-structure-detail' structure.pk %}" class="pr-8">
+        <h3 class="text-base font-semibold hover:text-primary-600 transition duration-200">{{ structure.name }}</h3>
+      </a>
+      {% if structure.description %}<p class="text-xs text-dark-400 mt-1 line-clamp-2">{{ structure.description }}</p>{% endif %}
+
+      <div class="flex flex-wrap gap-2 mt-3">
+        {% if structure.is_locked %}
+          <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-warning-light text-warning-dark">{% trans "Locked — in use" %}</span>
+        {% endif %}
+        {% if structure.tax_regime_id %}
+          <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-primary-200 text-primary-600">{{ structure.tax_regime_id.name }}</span>
+        {% endif %}
+        <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full {% if structure.pf_enabled %}bg-success-light text-success-dark{% else %}bg-secondary-100 text-dark-200{% endif %}">PF {% if structure.pf_enabled %}{% trans "On" %}{% else %}{% trans "Off" %}{% endif %}</span>
+        <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full {% if structure.pt_enabled %}bg-success-light text-success-dark{% else %}bg-secondary-100 text-dark-200{% endif %}">PT {% if structure.pt_enabled %}{% trans "On" %}{% else %}{% trans "Off" %}{% endif %}</span>
+        <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full {% if structure.tds_enabled %}bg-success-light text-success-dark{% else %}bg-secondary-100 text-dark-200{% endif %}">TDS {% if structure.tds_enabled %}{% trans "On" %}{% else %}{% trans "Off" %}{% endif %}</span>
+        <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full {% if structure.gratuity_enabled %}bg-success-light text-success-dark{% else %}bg-secondary-100 text-dark-200{% endif %}">{% trans "Gratuity" %} {% if structure.gratuity_enabled %}{% trans "On" %}{% else %}{% trans "Off" %}{% endif %}</span>
+      </div>
+
+      <div class="mt-4 pt-3 border-t border-[#ebebeb] flex items-center justify-between">
+        <div class="pp-avatars">
+          {% for revision in card.employees|slice:":5" %}
+            <img src="{{ revision.employee_id.get_avatar }}" title="{{ revision.employee_id.get_full_name }}" alt="">
+          {% endfor %}
+          {% if card.employees|length > 5 %}
+            <span class="pp-avatars__more">+{{ card.employees|length|add:"-5" }}</span>
+          {% endif %}
+        </div>
+        <span class="text-xs text-dark-400">
+          {% if card.employees %}{{ card.employees|length }} {% trans "employee(s)" %}{% else %}{% trans "Unused" %}{% endif %}
+        </span>
+      </div>
+    </div>
+    {% endwith %}
+    {% empty %}
+    <div class="sm:col-span-2 lg:col-span-3 bg-white rounded-md shadow-card border border-[#ebebeb] p-10 text-center">
+      <ion-icon name="file-tray-outline" class="text-4xl text-dark-100"></ion-icon>
+      <p class="font-semibold mt-2">{% trans "No salary structures yet" %}</p>
+      <p class="text-xs text-dark-400 mt-1">{% trans "Create one above — it is seeded with Basic, HRA, Conveyance, Medical and a balancing Special Allowance." %}</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -276,7 +276,11 @@ class Asset(HorillaModel):
         if self.quantity < 1:
             self.asset_status = "Not-Available"
         elif self.asset_status == "Not-Available":
-            active = self.assetassignment_set.filter(return_date__isnull=True).count()
+            active = (
+                self.assetassignment_set.filter(return_date__isnull=True).count()
+                if self.pk
+                else 0
+            )
             if active >= self.quantity:
                 self.asset_status = "In use"
             else:

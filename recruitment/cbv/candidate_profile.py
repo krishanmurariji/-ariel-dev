@@ -9,6 +9,7 @@ from django.utils.translation import gettext_lazy as _
 
 from employee.cbv.employee_profile import EmployeeProfileView
 from horilla import settings
+from horilla_theme.methods import get_active_company, get_active_company_theme
 from horilla_views.cbv_methods import login_required
 from horilla_views.generic.cbv.views import HorillaListView, HorillaProfileView
 from onboarding.filters import CandidateTaskFilter
@@ -18,6 +19,7 @@ from recruitment.cbv.candidate_mail_log import CandidateMailLogTabList
 from recruitment.cbv_decorators import all_manager_can_enter
 from recruitment.filters import CandidateFilter
 from recruitment.models import Candidate
+from recruitment.views import ai_scoring as ai_scoring_views
 from recruitment.views import views
 
 
@@ -48,6 +50,20 @@ class CandidateProfileView(HorillaProfileView):
                 redirect_url = f"{redirect_url}?{query_string}"
             return redirect(redirect_url)
         return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # So the candidate profile header's colors follow whatever theme
+        # the logged-in staff member's active company has set under
+        # Settings > Theme Manager, instead of a hardcoded color.
+        context["theme_obj"] = get_active_company_theme(self.request)
+        active_company = get_active_company(self.request)
+        context["cover_image_url"] = (
+            active_company.cover_image.url
+            if active_company and active_company.cover_image
+            else ""
+        )
+        return context
 
     actions = [
         {
@@ -132,6 +148,11 @@ CandidateProfileView.add_tab(
             "title": _("About"),
             "view": views.candidate_about_tab,
             "accessibility": "recruitment.cbv.accessibility.if_manager_accessibility",
+        },
+        {
+            "title": _("AI Insights"),
+            "view": ai_scoring_views.candidate_ai_score_tab,
+            "accessibility": "recruitment.cbv.accessibility.ai_score_accessibility",
         },
         {
             "title": _("Resume"),

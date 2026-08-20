@@ -1,14 +1,18 @@
 {% load static %}
+{% load horillafilters %}
+{% get_company as theme_obj %}
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Registration Success - OpenHRMS Dashboard</title>
-    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'favicons/apple-touch-icon.png' %}">
-    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicons/favicon-32x32.png' %}">
-    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicons/favicon-16x16.png' %}">
+    <title>Registration Success - {{ white_label_company_name }}</title>
+    {# The job's own company logo takes priority over the general #}
+    {# white-label company, which takes priority over Horilla's default. #}
+    <link rel="apple-touch-icon" sizes="180x180" href="{% if recruitment.company_id.icon %}{{ recruitment.company_id.icon.url }}{% elif white_label_company.icon %}{{ white_label_company.icon.url }}{% else %}{% static 'favicons/apple-touch-icon.png' %}{% endif %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% if recruitment.company_id.icon %}{{ recruitment.company_id.icon.url }}{% elif white_label_company.icon %}{{ white_label_company.icon.url }}{% else %}{% static 'favicons/favicon-32x32.png' %}{% endif %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% if recruitment.company_id.icon %}{{ recruitment.company_id.icon.url }}{% elif white_label_company.icon %}{{ white_label_company.icon.url }}{% else %}{% static 'favicons/favicon-16x16.png' %}{% endif %}">
 
     <link rel="stylesheet" href="{% static '/build/css/style.min.css' %}" />
   </head>
@@ -33,7 +37,7 @@
                 width="48"
                 height="48"
                 fill="none"
-                stroke="#e54f38"
+                stroke="{% if theme_obj %}{{ theme_obj.primary_600 }}{% else %}#e54f38{% endif %}"
                 stroke-linecap="round"
                 stroke-linejoin="round"
                 stroke-width="1.5"

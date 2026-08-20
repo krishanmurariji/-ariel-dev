@@ -1,0 +1,109 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+  {% include "payroll_pro/run/_strip.html" %}
+  <form id="stepform" method="post" action="{% url 'pp-run-step-save' %}">
+    {% csrf_token %}
+    <input type="hidden" name="run_id" value="{{ run.pk }}">
+    <input type="hidden" name="step" value="joinees">
+    {% include "payroll_pro/run/_stephead.html" %}
+
+    <div class="bg-white rounded-md shadow-card border border-[#ebebeb] mb-4">
+      <div class="px-5 py-3 border-b border-[#ebebeb]">
+        <h3 class="text-sm font-semibold">{% trans "New joinees this month" %} <span class="text-xs font-normal text-dark-400">({{ joinees|length }})</span></h3>
+      </div>
+      {% if joinees %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="text-left text-dark-400 uppercase text-[10px] tracking-wide border-b border-[#ebebeb]">
+              <th class="px-5 py-2">{% trans "Employee" %}</th><th class="px-2 py-2">{% trans "Date of Joining" %}</th>
+              <th class="px-2 py-2">{% trans "Monthly CTC" %}</th><th class="px-2 py-2">{% trans "Pay Action" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for record, joining in joinees %}
+            <tr class="border-b border-[#ebebeb] last:border-b-0 hover:bg-primary-100 transition duration-200">
+              <td class="px-5 py-2.5">
+                <div class="flex items-center gap-2">
+                  <img src="{{ record.employee_id.get_avatar }}" class="w-7 h-7 rounded-full object-cover" alt="">
+                  <div>
+                    <div class="font-semibold">{{ record.employee_id.get_full_name }}</div>
+                    <div class="text-dark-400 text-[11px]">{{ record.employee_id.get_job_position|default:"" }}</div>
+                  </div>
+                </div>
+              </td>
+              <td class="px-2 py-2.5">{{ joining }}</td>
+              <td class="px-2 py-2.5">{{ record.salary_revision_id.monthly_ctc|pp_money0 }}</td>
+              <td class="px-2 py-2.5">
+                <select name="r{{ record.pk }}_pay_action" class="oh-select" style="max-width:220px;" {% if run.is_locked %}disabled{% endif %}>
+                  <option value="process" {% if record.pay_action == 'process' %}selected{% endif %}>{% trans "Process salary" %}</option>
+                  <option value="hold" {% if record.pay_action == 'hold' %}selected{% endif %}>{% trans "Hold salary this month" %}</option>
+                  <option value="void" {% if record.pay_action == 'void' %}selected{% endif %}>{% trans "Skip" %}</option>
+                </select>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-8 text-center text-dark-400">
+        <ion-icon name="file-tray-outline" class="text-3xl"></ion-icon>
+        <p class="text-sm mt-1">{% trans "No new joinees in this pay cycle" %}</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="bg-white rounded-md shadow-card border border-[#ebebeb]">
+      <div class="px-5 py-3 border-b border-[#ebebeb]">
+        <h3 class="text-sm font-semibold">{% trans "Employees in exit process" %} <span class="text-xs font-normal text-dark-400">({{ exiting|length }}) — {% trans "from Offboarding" %}</span></h3>
+      </div>
+      {% if exiting %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="text-left text-dark-400 uppercase text-[10px] tracking-wide border-b border-[#ebebeb]">
+              <th class="px-5 py-2">{% trans "Employee" %}</th><th class="px-2 py-2">{% trans "Offboarding Stage" %}</th>
+              <th class="px-2 py-2">{% trans "Notice Period Ends" %}</th><th class="px-2 py-2">{% trans "Pay Action" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for record, ob in exiting %}
+            <tr class="border-b border-[#ebebeb] last:border-b-0 hover:bg-primary-100 transition duration-200">
+              <td class="px-5 py-2.5">
+                <div class="flex items-center gap-2">
+                  <img src="{{ record.employee_id.get_avatar }}" class="w-7 h-7 rounded-full object-cover" alt="">
+                  <div>
+                    <div class="font-semibold">{{ record.employee_id.get_full_name }}</div>
+                    <div class="text-dark-400 text-[11px]">{{ record.employee_id.get_job_position|default:"" }}</div>
+                  </div>
+                </div>
+              </td>
+              <td class="px-2 py-2.5"><span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-warning-light text-warning-dark">{{ ob.stage_id|default:"—" }}</span></td>
+              <td class="px-2 py-2.5">{{ ob.notice_period_ends|default:"—" }}</td>
+              <td class="px-2 py-2.5">
+                <select name="r{{ record.pk }}_pay_action" class="oh-select" style="max-width:220px;" {% if run.is_locked %}disabled{% endif %}>
+                  <option value="process" {% if record.pay_action == 'process' %}selected{% endif %}>{% trans "Process Full & Final settlement" %}</option>
+                  <option value="hold" {% if record.pay_action == 'hold' %}selected{% endif %}>{% trans "Hold salary this month" %}</option>
+                  <option value="void" {% if record.pay_action == 'void' %}selected{% endif %}>{% trans "Skip" %}</option>
+                </select>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-8 text-center text-dark-400">
+        <ion-icon name="file-tray-outline" class="text-3xl"></ion-icon>
+        <p class="text-sm mt-1">{% trans "No employees in exit process" %}</p>
+        <p class="text-xs mt-0.5">{% trans "Employees appear here automatically once HR starts their offboarding process." %}</p>
+      </div>
+      {% endif %}
+    </div>
+  </form>
+</div>
+{% endblock %}

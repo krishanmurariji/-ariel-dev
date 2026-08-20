@@ -715,6 +715,14 @@ window.confirm = function (message) {
         cancelButtonText: i18nMessages.cancel,
     }).then((result) => {
         if (result.isConfirmed) {
+            // Prevent htmx from re-showing this same confirm dialog when we
+            // manually re-issue the request below via htmx.ajax() with
+            // source: triggerEl (htmx re-checks hx-confirm on the source elt).
+            var hxConfirmAttr = triggerEl.getAttribute("hx-confirm");
+            if (hxConfirmAttr !== null) {
+                triggerEl.removeAttribute("hx-confirm");
+            }
+
             // Read HTMX data from the trigger element
             var path = triggerEl["htmx-internal-data"]?.path;
             var verb = triggerEl["htmx-internal-data"]?.verb;
@@ -750,6 +758,7 @@ window.confirm = function (message) {
                     Object.assign(values, hxVals);
 
                     htmx.ajax(verb.toUpperCase(), path, {
+                        source: triggerEl,
                         target: hxTarget,
                         swap: hxSwap,
                         values: values,
@@ -769,6 +778,7 @@ window.confirm = function (message) {
                 } else {
                     if (verb === "post") {
                         htmx.ajax("POST", path, {
+                            source: triggerEl,
                             target: hxTarget,
                             swap: hxSwap,
                             values: hxVals,
@@ -777,6 +787,7 @@ window.confirm = function (message) {
                         });
                     } else {
                         htmx.ajax("GET", path, {
+                            source: triggerEl,
                             target: hxTarget,
                             swap: hxSwap,
                             values: hxVals,
@@ -788,6 +799,7 @@ window.confirm = function (message) {
             } else if (triggerEl.tagName.toLowerCase() === "button") {
                 if (verb === "post") {
                     htmx.ajax("POST", path, {
+                        source: triggerEl,
                         target: hxTarget,
                         swap: hxSwap,
                         values: hxVals,
@@ -796,6 +808,7 @@ window.confirm = function (message) {
                     });
                 } else {
                     htmx.ajax("GET", path, {
+                        source: triggerEl,
                         target: hxTarget,
                         swap: hxSwap,
                         values: hxVals,
@@ -807,21 +820,27 @@ window.confirm = function (message) {
             } else {
                 if (verb === "post") {
                     htmx.ajax("POST", path, {
+                        source: triggerEl,
                         target: hxTarget,
                         swap: hxSwap,
                         values: hxVals,
                     }).then((response) => {
-                        ajaxWithResponseHandler(event);
+                        ajaxWithResponseHandler(triggerEl);
                     });
                 } else {
                     htmx.ajax("GET", path, {
+                        source: triggerEl,
                         target: hxTarget,
                         swap: hxSwap,
                         values: hxVals,
                     }).then((response) => {
-                        ajaxWithResponseHandler(event);
+                        ajaxWithResponseHandler(triggerEl);
                     });
                 }
+            }
+
+            if (hxConfirmAttr !== null) {
+                triggerEl.setAttribute("hx-confirm", hxConfirmAttr);
             }
         }
     });
@@ -978,19 +997,231 @@ $(document).on("click", function (event) {
     }
 });
 
+function ensureSummernoteTrailingParagraph($editable) {
+    // Summernote's insertOrderedList/insertUnorderedList crash internally
+    // (Cannot read properties of null (reading 'nextSibling')) when a
+    // list/table is the very last block in the editable area - its DOM-walk
+    // has no node to step to. Padding with an empty paragraph after such
+    // content keeps a valid "next point" available.
+    var last = $editable.children().last();
+    if (last.length && /^(UL|OL|TABLE)$/.test(last.prop("tagName"))) {
+        $editable.append("<p><br></p>");
+    }
+}
+
 $(document).on("htmx:afterSwap", function () {
     if ($("[data-summernote]").length > 0) {
         $("[data-summernote]").summernote({
             height: 300,
             codeviewFilter: false,
             codeviewIframeFilter: false,
+            dialogsInBody: true,
             callbacks: {
-                onChange: function (contents) {
+                onInit: function (layoutInfo) {
+                    ensureSummernoteTrailingParagraph(layoutInfo.editable);
+                },
+                onChange: function (contents, $editable) {
                     $('[name="body"]').val(contents);
+                    ensureSummernoteTrailingParagraph($editable);
                 },
             },
         });
     }
+});
+
+function initRecruitmentAIDescriptionButton() {
+    // Only the recruitment *create* form (not edit) gets this button - both
+    // share the same generic form.html renderer, so the create form's own
+    // hx-post URL is the only reliable way to tell them apart from here.
+    var $labelRow = $(
+        'form[hx-post*="/recruitment/recruitment-create/"] #id_description_parent_div .flex.oh-label[for="id_description"]'
+    );
+    if (!$labelRow.length || $labelRow.find("#generateDescriptionBtn").length) {
+        return;
+    }
+    $labelRow.css({ "justify-content": "space-between", "align-items": "center", width: "100%" });
+    $labelRow.append(
+        $(
+            '<button type="button" id="generateDescriptionBtn" class="oh-btn oh-btn--light-bkg" style="font-size:12px;padding:3px 10px;"></button>'
+        ).html('<ion-icon name="sparkles-outline"></ion-icon> ' + gettext("Generate with AI"))
+    );
+}
+$(document).on("htmx:afterSettle", initRecruitmentAIDescriptionButton);
+
+function applyGeneratedSkills(skills) {
+    // skills: [{id, title}, ...] - Skill rows the backend already
+    // resolved/created (reusing an existing Skill by title when one
+    // matches, so this doesn't create duplicates on re-generate).
+    if (!skills || !skills.length) {
+        return;
+    }
+    var $skills = $("#id_skills");
+    if (!$skills.length) {
+        return;
+    }
+    skills.forEach(function (skill) {
+        if (!$skills.find('option[value="' + skill.id + '"]').length) {
+            $skills.append($("<option></option>").attr("value", skill.id).text(skill.title));
+        }
+    });
+    // Keep whatever the recruiter already picked - only add the
+    // AI-suggested skills on top rather than replacing the selection.
+    // #id_skills is dynamic-create-enabled (see RecruitmentCreationView's
+    // dynamic_create_fields), whose option list includes a "" placeholder
+    // and a "dynamic_create" sentinel alongside real skill ids - either
+    // can end up in .val() and would otherwise get carried into the
+    // merged selection, failing validation as an invalid skill on save.
+    var existing = ($skills.val() || []).filter(function (id) {
+        return id && id !== "dynamic_create";
+    });
+    var generatedIds = skills.map(function (skill) {
+        return String(skill.id);
+    });
+    var merged = existing.concat(
+        generatedIds.filter(function (id) {
+            return existing.indexOf(id) === -1;
+        })
+    );
+    $skills.val(merged).trigger("change");
+}
+
+$(document).on("click", "#generateDescriptionBtn", function (e) {
+    e.preventDefault();
+    var $btn = $(this);
+    var title = $("#id_title").val().trim();
+    if (!title) {
+        Swal.fire({
+            icon: "warning",
+            title: gettext("Job title required"),
+            text: gettext("Enter a job title first, then generate a description."),
+        });
+        return;
+    }
+
+    var existingText = $("#id_description")
+        .summernote("code")
+        .replace(/<[^>]*>/g, "")
+        .trim();
+    var generate = function () {
+        var originalHtml = $btn.html();
+        $btn.prop("disabled", true).html(
+            '<ion-icon name="sync-outline"></ion-icon> ' + gettext("Generating...")
+        );
+        $.ajax({
+            type: "POST",
+            url: "/recruitment/generate-recruitment-description/",
+            data: {
+                title: title,
+                csrfmiddlewaretoken: getCookie("csrftoken"),
+            },
+            success: function (response) {
+                $("#id_description").summernote("code", response.description);
+                applyGeneratedSkills(response.skills);
+            },
+            error: function (xhr) {
+                var message =
+                    (xhr.responseJSON && xhr.responseJSON.error) ||
+                    gettext("Something went wrong while generating the description.");
+                Swal.fire({ icon: "error", title: gettext("Failed"), text: message });
+            },
+            complete: function () {
+                $btn.prop("disabled", false).html(originalHtml);
+            },
+        });
+    };
+
+    if (existingText) {
+        Swal.fire({
+            icon: "warning",
+            title: gettext("Replace description?"),
+            text: gettext("This will replace the description text you already wrote."),
+            showCancelButton: true,
+            confirmButtonText: gettext("Replace"),
+            cancelButtonText: gettext("Cancel"),
+        }).then(function (result) {
+            if (result.isConfirmed) {
+                generate();
+            }
+        });
+    } else {
+        generate();
+    }
+});
+
+function initSyncSkillsButton() {
+    // Unlike "Generate with AI" (description-only, create form only),
+    // syncing skills from whatever description already exists is useful
+    // on both create and edit - both share the same generic form.html
+    // renderer, so both hx-post URLs are matched here.
+    var $labelRow = $(
+        'form[hx-post*="/recruitment/recruitment-create/"] #id_skills_parent_div .flex.oh-label[for="id_skills"], ' +
+            'form[hx-post*="/recruitment/recruitment-update"] #id_skills_parent_div .flex.oh-label[for="id_skills"]'
+    );
+    if (!$labelRow.length || $labelRow.find("#syncSkillsBtn").length) {
+        return;
+    }
+    $labelRow.css({ "justify-content": "space-between", "align-items": "center", width: "100%" });
+    $labelRow.append(
+        $(
+            '<button type="button" id="syncSkillsBtn" class="oh-btn oh-btn--light-bkg" style="font-size:12px;padding:3px 10px;"></button>'
+        ).html('<ion-icon name="sync-outline"></ion-icon> ' + gettext("Sync Skills"))
+    );
+}
+$(document).on("htmx:afterSettle", initSyncSkillsButton);
+
+$(document).on("click", "#syncSkillsBtn", function (e) {
+    e.preventDefault();
+    var $btn = $(this);
+    var descriptionText = $("#id_description")
+        .summernote("code")
+        .replace(/<[^>]*>/g, "")
+        .trim();
+    if (!descriptionText) {
+        Swal.fire({
+            icon: "warning",
+            title: gettext("Description required"),
+            text: gettext("Write a job description first, then sync skills."),
+        });
+        return;
+    }
+
+    var originalHtml = $btn.html();
+    $btn.prop("disabled", true).html(
+        '<ion-icon name="sync-outline"></ion-icon> ' +
+            gettext("Syncing... (up to 2 min)")
+    );
+    $.ajax({
+        type: "POST",
+        url: "/recruitment/sync-recruitment-skills/",
+        data: {
+            description: descriptionText,
+            csrfmiddlewaretoken: getCookie("csrftoken"),
+        },
+        success: function (response) {
+            // Additive, same as applyGeneratedSkills always is - never
+            // removes a skill the recruiter already picked, only adds
+            // ones the AI found in the description that aren't there yet.
+            applyGeneratedSkills(response.skills);
+            if (!response.skills || !response.skills.length) {
+                Swal.fire({
+                    icon: "info",
+                    title: gettext("No skills found"),
+                    text: gettext(
+                        "The AI didn't find any clear skills in this description."
+                    ),
+                });
+            }
+        },
+        error: function (xhr) {
+            var message =
+                (xhr.responseJSON && xhr.responseJSON.error) ||
+                gettext("Something went wrong while syncing skills.");
+            Swal.fire({ icon: "error", title: gettext("Failed"), text: message });
+        },
+        complete: function () {
+            $btn.prop("disabled", false).html(originalHtml);
+        },
+    });
 });
 
 function offboardingUpdateStage($element) {

@@ -1,0 +1,8 @@
+{% load i18n %}
+{% if instance.status == "created" %}
+  <span class="oh-dot oh-dot--small me-1" style="background-color:yellowgreen"></span> {% trans "Candidate Created" %}
+{% elif instance.status == "duplicate" %}
+  <span class="oh-dot oh-dot--small me-1" style="background-color:orange"></span> {% trans "Duplicate Candidate" %}
+{% else %}
+  <span class="oh-dot oh-dot--small me-1" style="background-color:indianred"></span> {{ instance.get_status_display }}
+{% endif %}

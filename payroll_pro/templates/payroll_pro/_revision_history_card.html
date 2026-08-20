@@ -1,0 +1,26 @@
+{% load i18n payroll_pro_tags %}
+{# Revision History card for `employee` — expects `revisions` and `current` in context. #}
+<div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5">
+  <h3 class="text-sm font-semibold mb-3">{% trans "Revision History" %} <span class="text-xs font-normal text-dark-400">({% trans "append-only — old rows are never changed" %})</span></h3>
+  <div class="relative pl-5">
+    <div class="absolute left-[5px] top-1 bottom-1 w-px bg-[#ebebeb]"></div>
+    {% for revision in revisions %}
+    <div class="relative pb-4">
+      <div class="absolute -left-5 top-1 w-2.5 h-2.5 rounded-full {% if revision == current %}bg-primary-600{% else %}bg-dark-100{% endif %}"></div>
+      <div class="flex items-center gap-2 flex-wrap text-xs">
+        <b>{% trans "Effective" %} {{ revision.effective_date }}</b>
+        {% if revision == current %}<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-success-light text-success-dark">{% trans "Current" %}</span>{% endif %}
+        {% if revision.tax_regime_id %}<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-warning-light text-warning-dark">{{ revision.tax_regime_id.name }}</span>{% endif %}
+        <span class="text-dark-400">{{ revision.note|default:"" }}</span>
+      </div>
+      <div class="flex flex-wrap gap-x-5 gap-y-1 mt-1 text-[11px] text-dark-400">
+        <span>{% trans "Structure" %}: <b>{{ revision.salary_structure_id.name }}</b></span>
+        <span>{% trans "Annual CTC" %}: <b>{{ revision.annual_ctc|pp_money0 }}</b></span>
+        <span>{% trans "Per Month" %}: <b>{{ revision.monthly_ctc|pp_money0 }}</b></span>
+      </div>
+    </div>
+    {% empty %}
+    <p class="text-xs text-dark-400">{% trans "No revisions yet" %}</p>
+    {% endfor %}
+  </div>
+</div>

@@ -1,0 +1,160 @@
+{% load i18n %}
+<div
+  id="jobSuggestionStatus"
+  hx-get="{% url 'candidate-job-suggestion-status' candidate_id %}"
+  {% if running %}hx-trigger="every 5s"{% endif %}
+  hx-swap="outerHTML"
+>
+  <div class="d-flex align-items-center mb-2" style="gap: 0.75rem;">
+    {% if running %}
+      <ion-icon name="sync-outline" style="vertical-align:middle;"></ion-icon>
+      <span>{% trans "Checking for a better job match..." %}</span>
+    {% else %}
+      <span class="text-muted">
+        {% if latest %}
+          {% trans "Last checked" %}: {{ latest.created_at }}
+        {% else %}
+          {% trans "Not checked yet." %}
+        {% endif %}
+      </span>
+    {% endif %}
+    {% if perms.recruitment.add_candidatejobsuggestion %}
+    <button
+      type="button"
+      class="oh-btn oh-btn--secondary oh-btn--small ms-auto d-flex align-items-center"
+      style="gap:6px; {% if running %}pointer-events:none; opacity:0.6;{% endif %}"
+      {% if not running %}
+      hx-post="{% url 'candidate-job-suggestion-trigger' candidate_id %}"
+      hx-target="#jobSuggestionStatus"
+      hx-swap="outerHTML"
+      hx-disabled-elt="this"
+      hx-indicator="#jobSuggestionTriggerSpinner"
+      {% endif %}
+    >
+      <span id="jobSuggestionTriggerSpinner" class="htmx-indicator" style="display:inline-flex;">
+        <span class="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-[#e54f38]" style="display:inline-block;"></span>
+      </span>
+      <ion-icon name="bulb-outline"></ion-icon>
+      {% trans "Check for a better job match" %}
+    </button>
+    {% endif %}
+  </div>
+
+  {% if latest and latest.status == "suggested" and not latest.acted_on %}
+    <div class="oh-card p-3" style="border: 1px solid #ffcf7a; background: #fff9ef;">
+      <div class="d-flex align-items-center mb-2" style="gap:8px;">
+        <ion-icon name="bulb-outline" style="color:#b7791f;"></ion-icon>
+        <strong>{% trans "Stronger match found" %}</strong>
+      </div>
+      <p class="mb-2">
+        {% blocktrans with job=latest.suggested_recruitment %}
+        This resume scores higher against <strong>{{ job }}</strong>, an open role in the same company.
+        {% endblocktrans %}
+      </p>
+
+      <div class="d-flex align-items-center mb-2" style="gap:1.5rem;">
+        <div class="text-center">
+          <div style="position:relative; width:100px; height:58px;">
+            <canvas id="jobMatchCurrentGauge{{ candidate_id }}" width="100" height="58"></canvas>
+            <div style="position:absolute; left:0; right:0; bottom:2px; text-align:center;">
+              <span style="font-size:17px; font-weight:600; color:#8891A1;">{{ latest.current_score|default:"—" }}</span>
+            </div>
+          </div>
+          <p class="mb-0" style="font-size:11px; color:#565E6C; max-width:110px;">{% trans "Applied" %}: {{ latest.current_recruitment|default:"—" }}</p>
+        </div>
+        <div class="text-center">
+          <div style="position:relative; width:100px; height:58px;">
+            <canvas id="jobMatchSuggestedGauge{{ candidate_id }}" width="100" height="58"></canvas>
+            <div style="position:absolute; left:0; right:0; bottom:2px; text-align:center;">
+              <span style="font-size:17px; font-weight:600; color:#E54F38;">{{ latest.suggested_score }}</span>
+            </div>
+          </div>
+          <p class="mb-0" style="font-size:11px; color:#565E6C; max-width:110px;">{% trans "Suggested" %}: {{ latest.suggested_recruitment }}</p>
+        </div>
+      </div>
+      <script>
+        (function () {
+          if (!window.Chart) { return; }
+          var currentCtx = document.getElementById("jobMatchCurrentGauge{{ candidate_id }}");
+          if (currentCtx) {
+            new Chart(currentCtx, {
+              type: "doughnut",
+              data: {
+                datasets: [{
+                  data: [{{ latest.current_score|default:0 }}, {{ latest.current_score_remaining }}],
+                  backgroundColor: ["#B0B4BC", "#eee"],
+                  borderWidth: 0,
+                }],
+              },
+              options: {
+                rotation: -90,
+                circumference: 180,
+                cutout: "70%",
+                responsive: false,
+                plugins: { legend: { display: false }, tooltip: { enabled: false } },
+              },
+            });
+          }
+          var suggestedCtx = document.getElementById("jobMatchSuggestedGauge{{ candidate_id }}");
+          if (suggestedCtx) {
+            new Chart(suggestedCtx, {
+              type: "doughnut",
+              data: {
+                datasets: [{
+                  data: [{{ latest.suggested_score }}, {{ latest.suggested_score_remaining }}],
+                  backgroundColor: ["#E54F38", "#eee"],
+                  borderWidth: 0,
+                }],
+              },
+              options: {
+                rotation: -90,
+                circumference: 180,
+                cutout: "70%",
+                responsive: false,
+                plugins: { legend: { display: false }, tooltip: { enabled: false } },
+              },
+            });
+          }
+        })();
+      </script>
+
+      {% if latest.reasoning %}
+        <p class="text-muted mb-3">{{ latest.reasoning }}</p>
+      {% endif %}
+
+      {% if perms.recruitment.change_candidate %}
+      <button
+        type="button"
+        class="oh-btn oh-btn--secondary oh-btn--small d-flex align-items-center"
+        style="gap:6px;"
+        hx-get="{% url 'candidate-move-pipeline-form' candidate_id %}?suggested_recruitment={{ latest.suggested_recruitment_id }}"
+        hx-target="#genericModalBody"
+        data-toggle="oh-modal-toggle"
+        data-target="#genericModal"
+      >
+        {% trans "Move to suggested job" %}
+      </button>
+      {% endif %}
+    </div>
+  {% elif latest and latest.status == "suggested" and latest.acted_on %}
+    <div class="p-2" style="border:1px solid #bfe3d0; background:#f1faf5; border-radius:6px;">
+      <span style="color:seagreen; font-size:12.5px;">
+        <ion-icon name="checkmark-circle-outline" style="vertical-align:middle;"></ion-icon>
+        {% blocktrans with job=latest.suggested_recruitment %}Candidate was moved to {{ job }}.{% endblocktrans %}
+      </span>
+    </div>
+  {% elif latest and latest.status == "no_better_match" %}
+    <span class="text-muted">{% trans "No stronger match found among other open jobs." %}</span>
+  {% elif latest and latest.status != "suggested" and latest.status != "no_better_match" %}
+    <div class="p-2" style="border:1px solid #f3c6c6; background:#fdf2f2; border-radius:6px;">
+      <span style="color:indianred; font-size:12.5px;">
+        <ion-icon name="warning-outline" style="vertical-align:middle;"></ion-icon>
+        {{ latest.get_status_display }}{% if latest.error_message %}: {{ latest.error_message }}{% endif %}
+      </span>
+    </div>
+  {% endif %}
+</div>
+
+<div id="reloadMessages" hx-swap-oob="true">
+  {% include "generic/messages.html" %}
+</div>

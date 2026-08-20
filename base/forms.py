@@ -19,7 +19,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import SetPasswordForm, _unicode_ci_compare
 from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.tokens import default_token_generator
-from django.contrib.sites.shortcuts import get_current_site
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
 from django.core.validators import validate_ipv46_address
@@ -30,6 +29,7 @@ from django.urls import reverse_lazy
 from django.utils.encoding import force_bytes
 from django.utils.html import strip_tags
 from django.utils.http import urlsafe_base64_encode
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
 from base.methods import reload_queryset
@@ -78,6 +78,7 @@ from horilla.horilla_middlewares import _thread_locals
 from horilla.methods import get_horilla_model_class
 from horilla_audit.models import AuditTag
 from horilla_auth.models import HorillaUser
+from horilla_dbtemplate.utils.site import get_request_host, get_site_for_request
 from horilla_widgets.widgets.horilla_multi_select_field import HorillaMultiSelectField
 from horilla_widgets.widgets.select_widgets import HorillaMultiSelectWidget
 
@@ -562,6 +563,46 @@ class AssignPermission(Form):
         return self
 
 
+class CoverImagePreviewWidget(forms.ClearableFileInput):
+    """
+    File input widget that shows a live preview of the selected image,
+    used for the company cover image shown behind the profile photo on
+    candidate profiles.
+    """
+
+    def render(self, name, value, attrs=None, renderer=None):
+        input_html = super().render(name, value, attrs, renderer)
+        widget_id = (attrs or {}).get("id", f"id_{name}")
+        preview_url = value.url if value and hasattr(value, "url") else ""
+        preview_style = (
+            "width:100%; max-width:360px; height:100px; object-fit:cover;"
+            " border-radius:8px; margin-bottom:8px; border:1px solid #eee;"
+        )
+        if not preview_url:
+            preview_style += " display:none;"
+        preview_html = f"""
+        <img id="{widget_id}_preview" src="{preview_url}" alt=""
+            style="{preview_style}">
+        <script id="{widget_id}Script">
+            $(document).ready(function () {{
+                $("#{widget_id}").on("change", function (e) {{
+                    var file = this.files[0];
+                    if (!file) {{
+                        return;
+                    }}
+                    var reader = new FileReader();
+                    reader.addEventListener("load", function () {{
+                        $("#{widget_id}_preview").attr("src", reader.result).show();
+                    }});
+                    reader.readAsDataURL(file);
+                }});
+                $("#{widget_id}Script").remove();
+            }});
+        </script>
+        """
+        return mark_safe(str(input_html) + preview_html)
+
+
 class CompanyForm(ModelForm):
     """
     Company model's form
@@ -574,6 +615,7 @@ class CompanyForm(ModelForm):
         "state": 12,
         "city": 12,
         "zip": 12,
+        "cover_image": 12,
     }
 
     class Meta:
@@ -584,6 +626,9 @@ class CompanyForm(ModelForm):
         model = Company
         fields = "__all__"
         exclude = ["date_format", "time_format", "is_active"]
+        widgets = {
+            "cover_image": CoverImagePreviewWidget,
+        }
 
     def validate_image(self, file):
         max_size = 5 * 1024 * 1024
@@ -602,6 +647,12 @@ class CompanyForm(ModelForm):
         if icon:
             self.validate_image(icon)
         return icon
+
+    def clean_cover_image(self):
+        cover_image = self.cleaned_data.get("cover_image")
+        if cover_image:
+            self.validate_image(cover_image)
+        return cover_image
 
 
 class DepartmentForm(ModelForm):
@@ -3006,9 +3057,16 @@ class PassWordResetForm(forms.Form):
             email = work_mail
 
         if not domain_override:
-            current_site = get_current_site(request)
-            site_name = current_site.name
-            domain = current_site.domain
+            current_site = get_site_for_request(request)
+            if current_site:
+                site_name = current_site.name
+                domain = current_site.domain
+            else:
+                # No Site row matches this host (e.g. local dev, or a host not
+                # yet registered for white-label branding) - fall back to the
+                # request host instead of crashing on Site.DoesNotExist.
+                domain = get_request_host(request) or ""
+                site_name = domain
         else:
             site_name = domain = domain_override
         if email:

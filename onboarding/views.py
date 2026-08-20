@@ -71,6 +71,9 @@ from onboarding.forms import (
     OnboardingViewStageForm,
     OnboardingViewTaskForm,
     UserCreationForm,
+    build_employee_education_formset,
+    build_employee_emergency_contact_formset,
+    build_employee_experience_formset,
 )
 from onboarding.models import (
     CandidateStage,
@@ -1242,6 +1245,10 @@ def employee_creation(request, token):
         "phone": candidate.mobile,
         "address": candidate.address,
         "dob": candidate.dob,
+        "country": candidate.country,
+        "state": candidate.state,
+        "zip": candidate.zip,
+        "gender": candidate.gender,
     }
     session_key = request.session.session_key
     user = portal_user.get(session_key)
@@ -1262,7 +1269,7 @@ def employee_creation(request, token):
     user_email = getattr(user, "email", None) or candidate.email
     if Employee.objects.filter(email=user_email).exists():
         messages.success(request, _("Employee with email id already exists."))
-        return redirect("login/")
+        return redirect("login")
     employee_qs = (
         Employee.objects.filter(employee_user_id=user)
         if getattr(user, "pk", None)
@@ -1272,12 +1279,77 @@ def employee_creation(request, token):
         employee = employee_qs.first()
         if employee.employee_bank_details:
             messages.success(request, _("Employee already exists.."))
-            return redirect("login/")
+            return redirect("login")
         initial = employee.__dict__
 
     form = EmployeeCreationForm(
         initial=initial,
     )
+
+    existing_employee = employee_qs.first()
+    # Resume case: rows were already saved on a previous visit to this
+    # form - show those rather than re-seeding from the candidate's
+    # application data (which would duplicate rows the person already
+    # reviewed/edited here).
+    if existing_employee and existing_employee.emergency_contact_set.exists():
+        emergency_initial, emergency_extra = None, 0
+    else:
+        emergency_initial = [
+            {
+                "name": contact.name,
+                "phone": contact.phone,
+                "relation": contact.relation,
+            }
+            for contact in candidate.emergency_contact_set.all()
+        ]
+        emergency_extra = len(emergency_initial)
+    if existing_employee and existing_employee.education_set.exists():
+        education_initial, education_extra = None, 0
+    else:
+        education_initial = [
+            {
+                "degree": edu.degree,
+                "specialization": edu.specialization,
+                "percentage_cgpa": edu.percentage_cgpa,
+                "start_date": edu.start_date,
+                "end_date": edu.end_date,
+                "university": edu.university,
+                "location": edu.location,
+            }
+            for edu in candidate.education_set.all()
+        ]
+        education_extra = len(education_initial)
+    if existing_employee and existing_employee.experience_set.exists():
+        experience_initial, experience_extra = None, 0
+    else:
+        experience_initial = [
+            {
+                "company_name": exp.company_name,
+                "designation": exp.designation,
+                "is_current_job": exp.is_current_job,
+                "start_date": exp.start_date,
+                "end_date": exp.end_date,
+                "location": exp.location,
+            }
+            for exp in candidate.experience_set.all()
+        ]
+        experience_extra = len(experience_initial)
+
+    EmergencyContactFormSet = build_employee_emergency_contact_formset(
+        extra=emergency_extra
+    )
+    EducationFormSet = build_employee_education_formset(extra=education_extra)
+    ExperienceFormSet = build_employee_experience_formset(extra=experience_extra)
+    emergency_contact_formset = EmergencyContactFormSet(
+        instance=existing_employee, initial=emergency_initial, prefix="emergency"
+    )
+    education_formset = EducationFormSet(
+        instance=existing_employee, initial=education_initial, prefix="education"
+    )
+    experience_formset = ExperienceFormSet(
+        instance=existing_employee, initial=experience_initial, prefix="experience"
+    )
+
     # form.errors.clear()
     if request.method == "POST":
         instance = employee_qs.first() if getattr(user, "pk", None) else None
@@ -1285,7 +1357,21 @@ def employee_creation(request, token):
             request.POST,
             instance=instance,
         )
-        if form.is_valid():
+        emergency_contact_formset = EmergencyContactFormSet(
+            request.POST, instance=instance, prefix="emergency"
+        )
+        education_formset = EducationFormSet(
+            request.POST, instance=instance, prefix="education"
+        )
+        experience_formset = ExperienceFormSet(
+            request.POST, instance=instance, prefix="experience"
+        )
+        if (
+            form.is_valid()
+            and emergency_contact_formset.is_valid()
+            and education_formset.is_valid()
+            and experience_formset.is_valid()
+        ):
             if user is None:
                 messages.error(
                     request,
@@ -1310,6 +1396,23 @@ def employee_creation(request, token):
 
             employee_personal_info.is_from_onboarding = True
             employee_personal_info.save()
+
+            emergency_contact_formset.instance = employee_personal_info
+            emergency_contact_formset.save()
+
+            education_formset.instance = employee_personal_info
+            education_formset.save()
+
+            experience_formset.instance = employee_personal_info
+            experience_formset.save()
+            # is_current_job isn't on the form (see build_employee_experience_
+            # formset docstring) - a row can still arrive here already set to
+            # True if it was carried over unedited from the candidate's own
+            # application. They're being hired here now, so nothing on their
+            # experience history should still read as "currently working".
+            employee_personal_info.experience_set.filter(is_current_job=True).update(
+                is_current_job=False
+            )
 
             EmployeeWorkInformation.objects.update_or_create(
                 employee_id=employee_personal_info,
@@ -1344,7 +1447,13 @@ def employee_creation(request, token):
     return render(
         request,
         "onboarding/employee_creation.html",
-        {"form": form, "employee": candidate.recruitment_id.company_id},
+        {
+            "form": form,
+            "employee": candidate.recruitment_id.company_id,
+            "emergency_contact_formset": emergency_contact_formset,
+            "education_formset": education_formset,
+            "experience_formset": experience_formset,
+        },
     )
 
 

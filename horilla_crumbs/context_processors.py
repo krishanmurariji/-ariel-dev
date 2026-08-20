@@ -38,6 +38,16 @@ BREADCRUMB_URL_NAMES = {
     "work-schedules": "Work Schedules",
     "requests": "Work Requests",
     "work-structure": "Work Structure",
+    "candidate-intake-logs": "Email Applications",
+    "candidate-intake-mailbox-settings": "Candidate Intake Mailbox",
+    "payroll-pro": "Payroll Pro",
+    "tax-regimes": "Tax Regime",
+    "structures": "Salary Structure",
+    "salary-overview": "Salary Overview",
+    "timeline": "Salary Details",
+    "pay-revisions": "Pay Revisions",
+    "run": "Run Payroll",
+    "my-finance": "My Finance",
 }
 
 sidebar_urls = [
@@ -204,6 +214,14 @@ sidebar_urls = [
     "work-schedules",
     "requests",
     "work-structure",
+    "candidate-intake-mailbox-settings",
+    "candidate-intake-logs",
+    "tax-regimes",
+    "structures",
+    "salary-overview",
+    "pay-revisions",
+    "run",
+    "my-finance",
 ]
 remove_urls = [
     "feedback-detailed-view",
@@ -377,7 +395,10 @@ def breadcrumbs(request):
                 )
                 and not new_dict["name"].isdigit()
             ):
-                if new_dict["name"] in ["employee-view", "candidate-view"]:
+                if (
+                    new_dict["name"] in ["employee-view", "candidate-view"]
+                    and emp_query_string
+                ):
                     new_dict["url"] = f'{new_dict["url"]}?{emp_query_string}'
 
                 breadcrumbs.append(new_dict)

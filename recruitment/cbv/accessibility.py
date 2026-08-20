@@ -126,6 +126,17 @@ def rating_accessibility(
     return False
 
 
+def ai_score_accessibility(
+    request, instance: object = None, user_perms: PermWrapper = [], *args, **kwargs
+) -> bool:
+    """
+    accessibility for the AI Score tab in candidate individual view
+    """
+    candidate = Candidate.objects.get(pk=instance.pk)
+    stage_manage = stage_manages(request.user.employee_get, candidate.recruitment_id)
+    return stage_manage or request.user.has_perm("recruitment.view_candidateaiscore")
+
+
 def if_manager_accessibility(request, instance, *args, **kwargs):
     """
     If manager accessibility

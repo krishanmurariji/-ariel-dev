@@ -147,6 +147,34 @@
         {% get_current_language as LANGUAGE_CODE %}
         <div hidden id="statiUrl" data-url='{% static "" %}'></div>
         <span hidden id="whiteLabelCompany" data-company="{{ white_label_company_name }}"></span>
+
+        <!-- Toast/message container: must be a direct child of <body>, not
+             nested inside .oh-main-header (position:fixed; z-index:40) —
+             that would trap .oh-alert-container's z-index:9999 inside the
+             header's own (much lower) stacking context, making toasts
+             render behind any modal/overlay with a higher z-index than 40,
+             regardless of the toast's own z-index. -->
+        <div id="reloadMessages">
+            {% include "generic/messages.html" %}
+        </div>
+        <button
+            id="reloadMessagesButton"
+            hx-get="{% url 'reload-messages' %}"
+            hx-swap="afterend"
+            hidden
+            hx-target="#reloadMessages"
+        >
+        </button>
+        {% if messages %}
+            <div class="oh-alert-container">
+                {% for message in messages %}
+                    <div class="oh-alert oh-alert--animated {{message.tags}}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
         <!-- Include Sidebar (sidebar.html owns id="sidebar" itself) -->
         {% include "horilla_theme/components/sidebar.html" %}
 

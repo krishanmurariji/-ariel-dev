@@ -60,6 +60,16 @@ phone_validator = RegexValidator(
     message=_("Enter a valid phone number (7-20 characters, optional +)."),
 )
 
+pan_validator = RegexValidator(
+    regex=r"^[A-Z]{5}[0-9]{4}[A-Z]$",
+    message=_("Enter a valid PAN number (format: ABCDE1234F)."),
+)
+
+uan_validator = RegexValidator(
+    regex=r"^\d{12}$",
+    message=_("Enter a valid 12-digit UAN number."),
+)
+
 
 class Employee(models.Model):
     """
@@ -76,7 +86,9 @@ class Employee(models.Model):
         ("married", _("Married")),
         ("divorced", _("Divorced")),
     )
-    badge_id = models.CharField(max_length=50, null=True, blank=True)
+    badge_id = models.CharField(
+        max_length=50, null=True, blank=True, verbose_name=_("Employee Id")
+    )
     employee_user_id = models.OneToOneField(
         HorillaUser,
         on_delete=models.CASCADE,
@@ -753,6 +765,130 @@ class Employee(models.Model):
         return self
 
 
+class EmployeeEmergencyContact(HorillaModel):
+    """
+    One emergency contact for an employee. An employee can have multiple -
+    the original Employee.emergency_contact/emergency_contact_name/
+    emergency_contact_relation fields only ever held one and are kept
+    as-is (existing reports/exports/API still read them; migration 0009
+    backfills whatever was in them into a first row here), but this model
+    is the one collected/edited going forward.
+    """
+
+    employee_id = models.ForeignKey(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name="emergency_contact_set",
+        verbose_name=_("Employee"),
+    )
+    name = models.CharField(max_length=100, verbose_name=_("Name"))
+    phone = models.CharField(
+        max_length=25,
+        validators=[phone_validator],
+        verbose_name=_("Phone"),
+    )
+    relation = models.CharField(
+        max_length=50, null=True, blank=True, verbose_name=_("Relation")
+    )
+
+    def __str__(self):
+        return f"{self.name} ({self.relation or _('Emergency Contact')})"
+
+    class Meta:
+        verbose_name = _("Emergency Contact")
+        verbose_name_plural = _("Emergency Contacts")
+
+
+class EmployeeEducation(HorillaModel):
+    """
+    One education entry (degree) for an employee. Mirrors
+    recruitment.models.CandidateEducation - onboarding prefills these rows
+    from the candidate's application instead of asking again, and this
+    structured section replaces the old single Employee.qualification
+    field on the onboarding form (that field is left as-is for any other
+    code still reading it, just no longer collected here).
+    """
+
+    employee_id = models.ForeignKey(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name="education_set",
+        verbose_name=_("Employee"),
+    )
+    degree = models.CharField(max_length=100, verbose_name=_("Course"))
+    specialization = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        verbose_name=_("Branch/Specialization"),
+    )
+    percentage_cgpa = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        verbose_name=_("CGPA/Percentage"),
+    )
+    start_date = models.DateField(
+        null=True, blank=True, verbose_name=_("Start of Course")
+    )
+    end_date = models.DateField(null=True, blank=True, verbose_name=_("End of Course"))
+    university = models.CharField(
+        max_length=150,
+        null=True,
+        blank=True,
+        verbose_name=_("University/College"),
+    )
+    location = models.CharField(
+        max_length=100, null=True, blank=True, verbose_name=_("Location")
+    )
+
+    def __str__(self):
+        return f"{self.degree} - {self.university or ''}".strip(" -")
+
+    class Meta:
+        verbose_name = _("Employee Education")
+        verbose_name_plural = _("Employee Education")
+        ordering = ["-end_date"]
+
+
+class EmployeeExperience(HorillaModel):
+    """
+    One work-experience entry for an employee. Mirrors
+    recruitment.models.CandidateExperience - see EmployeeEducation
+    docstring for why this exists alongside the old flat
+    Employee.experience field.
+    """
+
+    employee_id = models.ForeignKey(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name="experience_set",
+        verbose_name=_("Employee"),
+    )
+    company_name = models.CharField(max_length=150, verbose_name=_("Company Name"))
+    designation = models.CharField(max_length=100, verbose_name=_("Job Title"))
+    is_current_job = models.BooleanField(
+        default=False, verbose_name=_("Currently working here")
+    )
+    start_date = models.DateField(
+        null=True, blank=True, verbose_name=_("Date of Joining")
+    )
+    end_date = models.DateField(
+        null=True, blank=True, verbose_name=_("Date of Relieving")
+    )
+    location = models.CharField(
+        max_length=100, null=True, blank=True, verbose_name=_("Location")
+    )
+
+    def __str__(self):
+        return f"{self.designation} - {self.company_name}".strip(" -")
+
+    class Meta:
+        verbose_name = _("Employee Experience")
+        verbose_name_plural = _("Employee Experience")
+        ordering = ["-end_date"]
+
+
 class EmployeeTag(HorillaModel):
     """
     EmployeeTag Model
@@ -1010,10 +1146,26 @@ class EmployeeBankDetails(HorillaModel):
     state = models.CharField(max_length=50, null=True, blank=True)
     city = models.CharField(max_length=50, null=True, blank=True)
     any_other_code1 = models.CharField(
-        max_length=50, verbose_name="Bank Code #1", null=True
+        max_length=50, verbose_name="IFSC Code", null=True
     )
     any_other_code2 = models.CharField(
         max_length=50, null=True, blank=True, verbose_name="Bank Code #2"
+    )
+    pan_number = models.CharField(
+        max_length=10,
+        null=True,
+        blank=True,
+        unique=True,
+        validators=[pan_validator],
+        verbose_name=_("PAN Number"),
+    )
+    uan_number = models.CharField(
+        max_length=12,
+        null=True,
+        blank=True,
+        unique=True,
+        validators=[uan_validator],
+        verbose_name=_("PF/UAN Number"),
     )
     additional_info = models.JSONField(null=True, blank=True)
     objects = HorillaCompanyManager(
@@ -1040,6 +1192,14 @@ class EmployeeBankDetails(HorillaModel):
                         )
                     }
                 )
+
+    def save(self, *args, **kwargs):
+        # Normalize blank -> None (not "") so multiple employees without a
+        # PAN/UAN don't collide on the unique constraints, and PAN is
+        # always stored uppercase regardless of how it was typed.
+        self.pan_number = self.pan_number.upper() if self.pan_number else None
+        self.uan_number = self.uan_number or None
+        super().save(*args, **kwargs)
 
 
 class NoteFiles(HorillaModel):

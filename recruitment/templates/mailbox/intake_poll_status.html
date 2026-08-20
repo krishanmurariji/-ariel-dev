@@ -1,0 +1,49 @@
+{% load i18n %}
+{% if running %}
+  <ion-icon name="sync-outline" style="vertical-align:middle;"></ion-icon>
+  {% trans "Poll running..." %}
+{% else %}
+  <ion-icon name="checkmark-circle-outline" style="vertical-align:middle; color:yellowgreen;"></ion-icon>
+  {% trans "Idle" %}
+  {% if last_result %}
+    ({% trans "last run" %} {{ last_result.finished_at }}, {{ last_result.duration_seconds }}s{% if last_result.error %}, {% trans "error" %}: {{ last_result.error }}{% endif %})
+  {% endif %}
+  {% if next_scheduled_run %}
+    &middot; {% trans "next scheduled run" %} {{ next_scheduled_run }}
+  {% endif %}
+{% endif %}
+{% if perms.recruitment.change_candidateintakemailbox %}
+  <a
+    role="button"
+    class="oh-btn oh-btn--secondary oh-btn--small ms-2"
+    style="{% if running %}pointer-events:none; opacity:0.6;{% endif %}"
+    {% if not running %}
+    hx-post="{% url 'candidate-intake-poll-now' %}"
+    hx-target="#pollStatusInline"
+    hx-swap="innerHTML"
+    {% endif %}
+  >
+    <ion-icon name="refresh-outline" class="me-1"></ion-icon>
+    {% if running %}{% trans "Running..." %}{% else %}{% trans "Run Poll Now" %}{% endif %}
+  </a>
+{% endif %}
+{% if mailbox_errors %}
+  <span style="color:indianred; margin-left:0.5rem;" title="{% for name, error in mailbox_errors %}{{ name }}: {{ error }}&#10;{% endfor %}">
+    <ion-icon name="warning-outline" style="vertical-align:middle;"></ion-icon>
+    {% blocktrans count counter=mailbox_errors|length %}{{ counter }} mailbox couldn't be reached{% plural %}{{ counter }} mailboxes couldn't be reached{% endblocktrans %}
+  </span>
+{% endif %}
+<script>
+  (function () {
+    var el = document.getElementById("pollStatusInline");
+    if (!el) return;
+    var finishedAt = "{{ last_result.finished_at|date:'U'|default:'' }}";
+    if (finishedAt && el.dataset.lastFinished !== finishedAt) {
+      if (el.dataset.initialized === "true") {
+        htmx.trigger(document.body, "refreshIntakeLog");
+      }
+      el.dataset.lastFinished = finishedAt;
+    }
+    el.dataset.initialized = "true";
+  })();
+</script>

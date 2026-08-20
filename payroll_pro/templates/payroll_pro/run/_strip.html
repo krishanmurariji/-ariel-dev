@@ -1,0 +1,25 @@
+{% load i18n %}
+<div class="bg-white rounded-md shadow-card border border-[#ebebeb] mb-4">
+  <div class="px-5 py-3 border-b border-[#ebebeb] flex items-center justify-between flex-wrap gap-2">
+    <h3 class="text-sm font-semibold">{% trans "Financial Year" %} {{ strip.fy }} – {{ strip.fy|add:1 }}</h3>
+    <div class="flex items-center gap-2">
+      <a class="oh-btn oh-btn--light-bkg oh-btn--x-small" href="{% url 'pp-run-payroll' %}?year={{ year|add:-1 }}&month={{ month }}">
+        <ion-icon name="chevron-back-outline"></ion-icon>{% trans "Prev Year" %}
+      </a>
+      <a class="oh-btn oh-btn--light-bkg oh-btn--x-small" href="{% url 'pp-run-payroll' %}?year={{ year|add:1 }}&month={{ month }}">
+        {% trans "Next FY" %}<ion-icon name="chevron-forward-outline"></ion-icon>
+      </a>
+    </div>
+  </div>
+  <div class="px-4 py-3">
+    <div class="pp-month-strip">
+      {% for chip in strip.chips %}
+      <a class="pp-month-chip {{ chip.cls }} {% if chip.selected %}!bg-primary-600 !border-primary-600{% endif %}"
+         href="{% url 'pp-run-payroll' %}?year={{ chip.year }}&month={{ chip.month }}">
+        <span class="m {% if chip.selected %}!text-white{% endif %}">{{ chip.label }}</span>
+        <span class="st {% if chip.selected %}!text-white{% endif %}">{{ chip.status }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>

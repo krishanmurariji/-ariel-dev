@@ -13,7 +13,237 @@
         <!-- Left Column: 6/12 -->
         <!-- Right Column: 6/12 -->
         <div class="col-span-12 lg:col-span-9">
+            {% if request.resolver_match.url_name == "candidate-view" or request.resolver_match.url_name == "candidate-view-individual" %}
+            <div class="bg-white rounded-md shadow-card mb-5">
+            {% else %}
             <div class="bg-white rounded-md shadow-card p-3 mb-5">
+            {% endif %}
+                {% if request.resolver_match.url_name == "candidate-view" or request.resolver_match.url_name == "candidate-view-individual" %}
+                {% with theme_primary_500=theme_obj.primary_500|default:"#F7C8C1" theme_primary_600=theme_obj.primary_600|default:"#E54F38" theme_primary_700=theme_obj.primary_700|default:"#ce4732" theme_primary_800=theme_obj.primary_800|default:"#AC3B2A" theme_primary_900=theme_obj.primary_900|default:"#672419" theme_primary_100=theme_obj.primary_100|default:"#FFF5F1" %}
+                <style>
+                    .kk-cover {
+                        background:
+                            radial-gradient(circle at 15% 20%, {{ theme_primary_500 }}55 0%, transparent 45%),
+                            radial-gradient(circle at 88% 85%, {{ theme_primary_900 }}77 0%, transparent 55%),
+                            linear-gradient(120deg, {{ theme_primary_900 }} 0%, {{ theme_primary_800 }} 30%, {{ theme_primary_600 }} 65%, {{ theme_primary_700 }} 100%);
+                    }
+                    .kk-usertablist {
+                        border-bottom: 1px solid #E6E6E6;
+                        gap: 4px !important;
+                    }
+                    .kk-usertablist li button {
+                        border: none !important;
+                        border-radius: 0 !important;
+                        background: transparent !important;
+                        color: #565E6C !important;
+                        padding: 10px 4px !important;
+                        margin: 0 16px 0 0 !important;
+                        font-weight: 500;
+                        border-bottom: 2px solid transparent !important;
+                    }
+                    .kk-usertablist li button.active,
+                    .kk-usertablist li button:hover {
+                        background: transparent !important;
+                        color: {{ theme_primary_600 }} !important;
+                        border-bottom: 2px solid {{ theme_primary_600 }} !important;
+                    }
+                    .kk-gear-btn:hover i {
+                        color: {{ theme_primary_600 }} !important;
+                    }
+                    .kk-action-link:hover {
+                        color: {{ theme_primary_600 }} !important;
+                    }
+                </style>
+                <div class="kk-cover relative rounded-t-md h-40 md:h-56"
+                    {% if cover_image_url %}
+                    style="background-image:url('{{ cover_image_url }}'); background-size:cover; background-position:center;"
+                    {% endif %}
+                >
+                    {% if cover_image_url %}
+                    <div class="absolute inset-0 rounded-t-md" style="background:linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.35) 100%);"></div>
+                    {% endif %}
+                    <div class="absolute top-3 right-3 flex items-center gap-2">
+                        <button
+                            id="candidateBackButton"
+                            type="button"
+                            title="{% trans 'Back' %}"
+                            class="px-3 py-1 text-xs bg-white/20 backdrop-blur text-white rounded-full hover:bg-white/30 transition duration-300 flex items-center gap-2"
+                            onclick="candidateProfileGoBack()"
+                            style="display: none"
+                        >
+                            <i class="fa-solid fa-arrow-left"></i>
+                            {% trans "Back" %}
+                        </button>
+                        <script>
+                            (function () {
+                            	function normalizeSameOriginPath(rawUrl) {
+                            		if (!rawUrl) return "";
+                            		try {
+                            			var u = new URL(rawUrl, window.location.origin);
+                            			if (u.origin !== window.location.origin) return "";
+                            			return u.pathname + u.search;
+                            		} catch (e) {
+                            			if (String(rawUrl).startsWith("/")) return String(rawUrl);
+                            			return "";
+                            		}
+                            	}
+
+                            	function resolveCandidateBackUrl() {
+                            		var params = new URLSearchParams(window.location.search);
+                            		var fromQuery = normalizeSameOriginPath(params.get("next"));
+                            		if (fromQuery) return fromQuery;
+
+                            		var saved = normalizeSameOriginPath(
+                            			sessionStorage.getItem("candidateProfileBackUrl")
+                            		);
+                            		if (saved) return saved;
+
+                            		var ref = normalizeSameOriginPath(document.referrer || "");
+                            		if (
+                            			ref &&
+                            			(ref.indexOf("/recruitment/cbv-pipeline/") !== -1 ||
+                            				ref.indexOf("/onboarding/candidates-view") !== -1)
+                            		) {
+                            			return ref;
+                            		}
+                            		return "";
+                            	}
+
+                            	window.candidateProfileGoBack = function () {
+                            		var backUrl = resolveCandidateBackUrl();
+                            		if (backUrl) {
+                            			try {
+                            				sessionStorage.removeItem("candidateProfileBackUrl");
+                            			} catch (e) {}
+                            			window.location.href = backUrl;
+                            		}
+                            	};
+
+                            	var backBtn = document.getElementById("candidateBackButton");
+                            	if (backBtn && resolveCandidateBackUrl()) {
+                            		backBtn.style.display = "";
+                            	}
+                            })();
+                        </script>
+
+                        {% if actions %}
+                            <div class="relative inline-block" x-data="{open: false}">
+                                <button
+                                    class="kk-gear-btn p-2 group text-white w-8 h-8 text-sm bg-white/20 backdrop-blur hover:bg-white rounded-full transition duration-300 flex items-center justify-center"
+                                    title="{% trans 'Actions' %}"
+                                    @click="open = !open"
+                                    @click.outside="open = false"
+                                >
+                                    <i class="fas fa-cog transition duration-300"></i>
+                                </button>
+                                <div
+                                    class="absolute right-0 min-w-[100px] bg-white rounded-lg shadow-card py-2 z-50 transition-all duration-200"
+                                    x-show="open"
+                                >
+                                    <ul class="text-xs">
+                                        {% for action in actions %}
+                                            {% if action.accessibility|accessibility:instance %}
+                                                <li role="button">
+                                                    <p class="kk-action-link w-[200px] text-dark-600 font-bold text-left text-xs px-3 py-1 transition duration-300">
+                                                        <a {{action.attrs|format:instance|safe}}>
+                                                            {{ action.title }}
+                                                        </a>
+                                                    </p>
+                                                </li>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        {% if instance_ids and previous_url and next_url %}
+                            <div class="flex gap-1">
+                                <button
+                                    data-action="previous"
+                                    hx-get="{{previous_url}}?instance_ids={{instance_ids}}"
+                                    {% if push_url %}hx-push-url="{{push_url_prev}}"{% endif %}
+                                    hx-target="#{{view_id|safe}}"
+                                    hx-swap="outerHTML"
+                                    title="Previous"
+                                    class="p-2 w-8 h-8 justify-center bg-white/20 backdrop-blur text-white rounded-full text-xs flex items-center gap-2 hover:bg-white/30 transition duration-300"
+                                >
+                                    <i class="fa-solid fa-angle-left"></i>
+                                </button>
+                                <button
+                                    data-action="next"
+                                    hx-get="{{next_url}}?instance_ids={{instance_ids}}"
+                                    {% if push_url %}hx-push-url="{{push_url_next}}"{% endif %}
+                                    hx-target="#{{view_id|safe}}"
+                                    hx-swap="outerHTML"
+                                    title="Next"
+                                    class="p-2 w-8 h-8 justify-center bg-white/20 backdrop-blur text-white rounded-full text-xs flex items-center gap-2 hover:bg-white/30 transition duration-300"
+                                >
+                                    <i class="fa-solid fa-angle-right"></i>
+                                </button>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="px-5 pb-4">
+                    <div class="flex items-end gap-4" style="margin-top: -56px; position: relative; z-index: 1;">
+                        <img
+                            src="{{ object.get_avatar }}"
+                            alt=""
+                            data-src="{{ object.get_avatar }}"
+                            class="avatar-thumb shrink-0"
+                            style="width: 112px; height: 112px; min-width: 112px; border-radius: 9999px; object-fit: cover; object-position: center; border: 5px solid #fff; box-shadow: 0px 4px 14px rgba(0,0,0,0.15); display: block;"
+                        >
+                        <div class="min-w-0 pb-2">
+                            <h4 class="font-semibold text-lg truncate">{{ object }}</h4>
+                            <p class="text-xs text-[#565E6C] truncate">
+                                {% if object.job_position_id %}{{ object.job_position_id }}{% else %}{% trans "Candidate" %}{% endif %}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-x-6 gap-y-2 mt-4 text-xs text-[#565E6C]">
+                        <span class="flex items-center gap-1.5">
+                            <i class="fa-solid fa-envelope" style="color: {{ theme_primary_600 }};"></i>
+                            {{ object.get_email|default:"—" }}
+                        </span>
+                        <span class="flex items-center gap-1.5">
+                            <i class="fa-solid fa-phone" style="color: {{ theme_primary_600 }};"></i>
+                            {{ object.phone|default:"—" }}
+                        </span>
+                        <span class="flex items-center gap-1.5">
+                            <i class="fa-solid fa-location-dot" style="color: {{ theme_primary_600 }};"></i>
+                            {% if object.city or object.state or object.country %}{{ object.city|default:'' }}{% if object.city and object.state %}, {% endif %}{{ object.state|default:'' }}{% else %}—{% endif %}
+                        </span>
+                        <span class="flex items-center gap-1.5">
+                            <i class="fa-solid {% if object.gender == 'male' %}fa-mars{% elif object.gender == 'female' %}fa-venus{% else %}fa-genderless{% endif %}" style="color: {{ theme_primary_600 }};"></i>
+                            {{ object.get_gender_display|default:"—" }}
+                        </span>
+                        {% if object.stage_id %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium" style="background: {{ theme_primary_100 }}; color: {{ theme_primary_700 }};">
+                            {{ object.stage_id }}
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <div class="flex flex-wrap gap-x-10 gap-y-3 mt-4 pt-4 border-t border-dark-50">
+                        <div>
+                            <p class="text-[10px] uppercase tracking-wide text-[#8891A1] mb-0.5">{% trans "Recruitment" %}</p>
+                            <p class="text-xs font-semibold">{{ object.stage_id.recruitment_id|default:"—" }}</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] uppercase tracking-wide text-[#8891A1] mb-0.5">{% trans "Department" %}</p>
+                            <p class="text-xs font-semibold">{{ object.job_position_id.department_id|default:"—" }}</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] uppercase tracking-wide text-[#8891A1] mb-0.5">{% trans "Applied Position" %}</p>
+                            <p class="text-xs font-semibold">{{ object.job_position_id|default:"—" }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endwith %}
+                {% else %}
                 <div class="block lg:flex lg:items-center gap-3 mb-5 bg-[#f4f7fe] rounded-md p-3 lg:sticky top-0 z-10">
                     <div class="rounded-md overflow-hidden mb-3 lg:mb-0">
                         <img
@@ -243,6 +473,7 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
                 {% if request.resolver_match.url_name != "candidate-view" and request.resolver_match.url_name != "candidate-view-individual" %}
                     <div class="relative">
                         <div class="oh-sticky-dropdown--header absolute right-[15px] top-[5px]" style="z-index: 13">
@@ -269,7 +500,7 @@
                         </div>
                     </div>
                 {% endif %}
-                <ul class="usertablist">
+                <ul class="usertablist{% if request.resolver_match.url_name == "candidate-view" or request.resolver_match.url_name == "candidate-view-individual" %} kk-usertablist px-5{% endif %}">
                     {% for tab in visible_tabs %}
                         {% if not tab.accessibility or tab.accessibility|accessibility:instance %}
                             <li>
@@ -296,7 +527,7 @@
 
             <div class="bg-white rounded-md shadow-card p-3 mb-5 lg:mb-0">
                 <div
-                    class="h-[calc(100vh_-_450px)] overflow-hidden overflow-y-auto"
+                    class="min-h-[calc(100vh_-_450px)]"
                     id="{{view_id}}profileTab"
                 >
                 </div>

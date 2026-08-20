@@ -1,0 +1,12 @@
+{% load i18n %}
+{% if instance.last_error %}
+  <span style="color:indianred;" title="{{ instance.last_error }}">
+    <ion-icon name="warning-outline" style="vertical-align:middle;"></ion-icon>
+    {% trans "Error" %}
+  </span>
+{% else %}
+  <span style="color:yellowgreen;">
+    <ion-icon name="checkmark-circle-outline" style="vertical-align:middle;"></ion-icon>
+    {% trans "OK" %}
+  </span>
+{% endif %}

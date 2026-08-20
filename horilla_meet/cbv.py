@@ -111,6 +111,14 @@ class GmeetCredentialListView(views.HorillaListView):
 
     actions = [
         {
+            "action": _trans("Authenticate"),
+            "icon": "log-in-outline",
+            "attrs": """
+                class="oh-btn oh-btn--light-bkg w-50"
+                href="{get_authenticate_url}"
+                """,
+        },
+        {
             "action": _trans("Edit"),
             "icon": "create-outline",
             "attrs": """

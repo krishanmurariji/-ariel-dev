@@ -1,0 +1,66 @@
+{% load i18n %}
+<div
+  id="historyAiSummaryStatus"
+  hx-get="{% url 'candidate-history-summary-status' candidate_id %}"
+  hx-trigger="every 5s"
+  hx-swap="outerHTML"
+>
+  <div class="border border-dark-50 rounded-md p-4 bg-white">
+    <div class="flex items-center justify-between gap-2 mb-2">
+      <h5 class="font-medium text-sm flex items-center gap-1.5">
+        <ion-icon name="sparkles-outline" class="text-primary-600"></ion-icon>
+        {% trans "AI Analysis" %}
+      </h5>
+      <button
+        type="button"
+        class="oh-btn oh-btn--secondary oh-btn--small"
+        style="{% if running %}pointer-events:none; opacity:0.6;{% endif %}"
+        {% if not running %}
+        hx-post="{% url 'candidate-history-summary-trigger' candidate_id %}"
+        hx-target="#historyAiSummaryStatus"
+        hx-swap="outerHTML"
+        {% endif %}
+      >
+        {% if latest %}{% trans "Re-analyze" %}{% else %}{% trans "Analyze" %}{% endif %}
+      </button>
+    </div>
+
+    <div class="flex items-center gap-1.5 mb-3 text-[11px] text-[#565E6C]">
+      {% if running %}
+        <ion-icon name="sync-outline"></ion-icon>
+        <span>{% trans "Analyzing history..." %}</span>
+      {% elif latest %}
+        <span>{% trans "Last analyzed" %}: {{ latest.created_at }}</span>
+      {% else %}
+        <span>{% trans "No analysis generated yet." %}</span>
+      {% endif %}
+    </div>
+
+    {% if latest and latest.status == "summarized" %}
+      <p class="text-[11px] font-semibold text-[#565E6C] mb-2">
+        {% trans "What happened, step by step" %}
+      </p>
+      <div class="relative pl-5">
+        <div class="absolute left-[5px] top-1 bottom-1 w-px bg-[#dbdbdb]"></div>
+        <ol class="space-y-3">
+          {% for step in latest.milestones %}
+            <li class="relative text-xs leading-relaxed">
+              <span class="absolute -left-5 top-1 w-2.5 h-2.5 rounded-full bg-primary-600 border-2 border-white"></span>
+              {{ step }}
+            </li>
+          {% endfor %}
+        </ol>
+      </div>
+    {% elif latest and latest.status == "no_history" %}
+      <p class="text-xs text-[#565E6C] flex items-start gap-1.5">
+        <ion-icon name="information-circle-outline"></ion-icon>
+        {% trans "Not enough recorded history to analyze yet." %}
+      </p>
+    {% elif latest %}
+      <p class="text-xs flex items-start gap-1.5" style="color:indianred;">
+        <ion-icon name="warning-outline"></ion-icon>
+        {{ latest.get_status_display }}{% if latest.error_message %}: {{ latest.error_message }}{% endif %}
+      </p>
+    {% endif %}
+  </div>
+</div>

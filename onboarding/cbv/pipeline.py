@@ -221,11 +221,23 @@ def allocation_path(self):
     return f'{reverse("allocation-view",kwargs={"pk":self.candidate_id.pk})}?model=recruitment.models.Candidate'
 
 
+def add_task_path(self):
+    """
+    Add task path - stage-level, so it's reachable from a stage's own
+    tab/column actions (List view's stage tab, Kanban's column header)
+    even when the stage currently has no candidates in it. Candidate
+    cards/rows have no task-creation action of their own; this was the
+    only way to add a task, so an empty stage had no path to add one.
+    """
+    return reverse("task-creation", kwargs={"obj_id": self.pk})
+
+
 onboarding_models.CandidateStage.allocation_path = allocation_path
 
 onboarding_models.OnboardingStage.edit_stage_path = edit_stage_path
 onboarding_models.OnboardingStage.generic_delete_path = generic_delete_path
 onboarding_models.OnboardingStage.bulk_send_mail_path = bulk_send_mail_path
+onboarding_models.OnboardingStage.add_task_path = add_task_path
 
 
 @method_decorator(login_required, name="dispatch")
@@ -270,6 +282,16 @@ class CandidatePipeline(Pipeline):
                     hx-get="{bulk_send_mail_path}"
                     data-toggle="oh-modal-toggle"
                     data-target="#objectCreateModal"
+                """,
+                },
+                {
+                    "action": _("Add Task"),
+                    "accessibility": "onboarding.cbv.accessibility.add_task_accessibility",
+                    "attrs": """
+                    hx-target="#genericModalBody"
+                    hx-get="{add_task_path}"
+                    data-toggle="oh-modal-toggle"
+                    data-target="#genericModal"
                 """,
                 },
                 {
@@ -736,6 +758,16 @@ class CandidateKanbanView(HorillaKanbanView):
                 hx-get="{bulk_send_mail_path}"
                 data-toggle="oh-modal-toggle"
                 data-target="#objectCreateModal"
+            """,
+        },
+        {
+            "action": "Add Task",
+            "accessibility": "onboarding.cbv.accessibility.add_task_accessibility",
+            "attrs": """
+                hx-target="#genericModalBody"
+                hx-get="{add_task_path}"
+                data-toggle="oh-modal-toggle"
+                data-target="#genericModal"
             """,
         },
         {

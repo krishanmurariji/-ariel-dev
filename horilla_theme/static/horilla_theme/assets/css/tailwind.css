@@ -194,6 +194,26 @@ ul {
     padding: 0
 }
 
+/* Restore native list rendering inside Summernote-edited/rendered rich text.
+   The reset above (Tailwind Preflight) otherwise strips bullets/numbers and
+   indentation from every ol/ul on the page, including WYSIWYG content, making
+   the editor's list/indent/outdent toolbar buttons appear to do nothing. */
+.note-editable ol,
+.note-editable ul,
+.oh-job__post_description ol,
+.oh-job__post_description ul {
+    list-style: revert;
+    margin: revert;
+    padding: revert
+}
+
+/* Same Preflight-strips-bullets issue as above, for the AI score's
+   "key points" list (recruitment/templates/candidate/ai_score_status.html). */
+.oh-ai-score__points {
+    list-style: disc;
+    padding-left: 1.25rem;
+}
+
 dialog {
     padding: 0
 }

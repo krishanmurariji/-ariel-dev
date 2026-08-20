@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "asset",
     "attendance",
     "payroll",
+    "payroll_pro",
     "accessibility",
     "horilla_audit",
     "horilla_widgets",
@@ -88,6 +89,8 @@ INSTALLED_APPS = [
     "whatsapp",
     "horilla_ldap",
     "horilla_dbtemplate",
+    "outlook_auth",
+    "gmail_auth",
 ]
 
 # ========================================
@@ -164,11 +167,18 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": env("DB_ENGINE", default="django.db.backends.sqlite3"),
-            "NAME": env("DB_NAME", default=os.path.join(BASE_DIR, "TestDB.sqlite3")),
+            "NAME": env("DB_NAME", default=os.path.join(BASE_DIR, "ArielDb.sqlite3")),
             "USER": env("DB_USER", default=""),
             "PASSWORD": env("DB_PASSWORD", default=""),
             "HOST": env("DB_HOST", default=""),
             "PORT": env("DB_PORT", default=""),
+            # Only affects `manage.py test` - Django's default sqlite test DB
+            # is ":memory:", which is private per-connection, so a
+            # background thread opening its own connection (as the
+            # automatic AI-scoring signal does) would see an empty database
+            # instead of the just-created candidate row. A file-backed test
+            # DB is shared across threads/connections like a real DB is.
+            "TEST": {"NAME": os.path.join(BASE_DIR, "TestDB_threaded_test.sqlite3")},
         }
     }
 
@@ -223,6 +233,9 @@ TEMPLATES = [
                 "base.context_processors.intial_notice_period",
                 "base.context_processors.check_candidate_self_tracking",
                 "base.context_processors.check_candidate_self_tracking_rating",
+                "base.context_processors.check_candidate_portal_mail",
+                "base.context_processors.check_platform_conversion_widget",
+                "base.context_processors.check_default_meeting_provider",
                 "base.context_processors.get_initial_prefix",
                 "base.context_processors.biometric_app_exists",
                 "base.context_processors.enable_late_come_early_out_tracking",
@@ -304,6 +317,7 @@ SIDEBARS = [
     "attendance",
     "leave",
     "payroll",
+    "payroll_pro",
     "recruitment",
     "onboarding",
     "offboarding",
@@ -324,6 +338,47 @@ AUDITLOG_EXCLUDE_TRACKING_MODELS = (
 )
 
 EMAIL_BACKEND = "base.backends.ConfiguredEmailBackend"
+
+# ========================================
+# CANDIDATE EMAIL INTAKE (local LLM)
+# ========================================
+# Base URL of a locally-hosted Ollama server used to parse resumes/emails
+# and match candidates to open job positions, without sending candidate
+# PII to a third-party API. See recruitment/intake.py.
+OLLAMA_BASE_URL = env("OLLAMA_BASE_URL", default="http://localhost:11434")
+OLLAMA_INTAKE_MODEL = env("OLLAMA_INTAKE_MODEL", default="llama3.2:3b")
+# CPU-only inference of a real resume + prompt can take well over a minute.
+OLLAMA_TIMEOUT = env.int("OLLAMA_TIMEOUT", default=300)
+
+# Reject-before-decode cap on a single email attachment, applied by both
+# providers (recruitment/intake_providers/) before any base64 decode or
+# PDF parsing - guards against a mislabeled/oversized attachment spiking
+# memory/CPU.
+INTAKE_MAX_ATTACHMENT_BYTES = env.int(
+    "INTAKE_MAX_ATTACHMENT_BYTES", default=15 * 1024 * 1024
+)
+# Hard ceiling on how many messages one poll of one mailbox will process,
+# regardless of how many arrived - bounds a single poll run under burst
+# volume. Anything beyond this is picked up on a later poll (see
+# recruitment/intake.py's cursor-advancement logic), never silently lost.
+INTAKE_MAX_MESSAGES_PER_POLL = env.int("INTAKE_MAX_MESSAGES_PER_POLL", default=200)
+# Wall-clock budget for one poll run, in addition to the message-count
+# ceiling above - needed because OLLAMA_TIMEOUT (plus one retry) can make
+# a single message take up to 2x OLLAMA_TIMEOUT, so a count ceiling alone
+# could still let a poll run for hours under LLM slowness.
+INTAKE_POLL_MAX_DURATION_SECONDS = env.int(
+    "INTAKE_POLL_MAX_DURATION_SECONDS", default=1200
+)
+# Must comfortably exceed INTAKE_POLL_MAX_DURATION_SECONDS so IntakePollLock
+# staleness recovery never preempts a legitimately still-running poll, but
+# reliably reclaims a lock abandoned by a crashed worker.
+INTAKE_POLL_LOCK_STALE_SECONDS = env.int(
+    "INTAKE_POLL_LOCK_STALE_SECONDS", default=3600
+)
+# Default per-mailbox daily cap on auto-created candidates (overridable
+# per CandidateIntakeMailbox via its daily_candidate_cap field) - simple
+# abuse brake against a mailbox being flooded with plausible-looking PDFs.
+INTAKE_DAILY_CANDIDATE_CAP = env.int("INTAKE_DAILY_CANDIDATE_CAP", default=50)
 
 """
 DB_INIT_PASSWORD: str

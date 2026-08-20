@@ -63,7 +63,7 @@
                                 <a {{type.attrs|safe}}> <ion-icon name="{{type.icon}}"></ion-icon></a>
                                 {% if active_view.type == type.type %}
                                     <script>
-                                        $(".navFilterForm").attr('hx-get', '{{type.url}}');
+                                        $(".navFilterForm").attr('hx-get', '{{type.url|safe}}');
                                         $(".nav-view-btn[data-type={{type.type}}]").addClass("oh-view-btn--active")
                                     </script>
                                 {% endif %}
@@ -205,14 +205,6 @@
             }
         });
 
-        setTimeout(() => {
-            $(".oh-view-btn--active").click();
-            {% if apply_first_filter %}
-            if (!$(".oh-view-btn--active").length) {
-                $("#applyFilter").click()
-            }
-            {% endif %}
-        }, 100);
         $(document).ready(function () {
 
         let debounceTimer;

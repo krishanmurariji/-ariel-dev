@@ -1,8 +1,19 @@
 {% load i18n %}
 <div class="oh-btn-group" onclick="event.stopPropagation()">
-    <a href="#" class="oh-btn oh-btn--light-bkg w-100" onclick="copyLink(window.location.origin+'/recruitment/application-form?recruitmentId={{instance.id}}')" title="{% trans "Share Link" %}">
-      <ion-icon name="share-social-outline"></ion-icon>
+    {% if perms.recruitment.change_recruitment %}
+    <a
+      href="#"
+      class="oh-btn oh-btn--light-bkg w-100"
+      hx-get="{% url 'recruitment-dynamic-link' instance.id %}"
+      hx-target="#genericModalBody"
+      hx-swap="innerHTML"
+      data-toggle="oh-modal-toggle"
+      data-target="#genericModal"
+      title="{% trans "Create Dynamic Link" %}"
+    >
+      <ion-icon name="link-outline"></ion-icon>
     </a>
+    {% endif %}
     {% if perms.recruitment.change_recruitment %}
     <a  hx-get="{% url 'recruitment-update' instance.id %}?instance_ids={{instance.ordered_ids}}" hx-target='#genericModalBody' hx-swap='innerHTML' data-toggle='oh-modal-toggle' data-target='#genericModal'  class="oh-btn oh-btn--light-bkg w-100" title="{% trans 'Edit' %}"><ion-icon name="create-outline"></ion-icon></a>
     {% endif %}

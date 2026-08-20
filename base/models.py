@@ -105,6 +105,15 @@ class Company(HorillaModel):
         upload_to=upload_path,
         null=True,
     )
+    cover_image = models.FileField(
+        upload_to=upload_path,
+        null=True,
+        blank=True,
+        verbose_name=_("Cover Image"),
+        help_text=_(
+            "Shown as the banner behind the profile photo on candidate profiles."
+        ),
+    )
     objects = models.Manager()
     date_format = models.CharField(max_length=30, blank=True, null=True)
     time_format = models.CharField(max_length=20, blank=True, null=True)

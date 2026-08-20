@@ -1,0 +1,52 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+  <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
+    <div>
+      <h1 class="text-xl font-bold">{% trans "Payroll Auto Run" %}</h1>
+      <p class="text-sm text-dark-400 mt-1">{% trans "Schedule automatic monthly payroll runs — attendance & LOP are prefilled from the attendance and leave modules" %}</p>
+    </div>
+    <a class="oh-btn oh-btn--secondary" href="{% url 'pp-auto-settings-new' %}">
+      <ion-icon name="add-outline" class="me-1"></ion-icon>{% trans "Add Setting" %}
+    </a>
+  </div>
+
+  <div class="bg-white rounded-md shadow-card border border-[#ebebeb]">
+    <div class="px-5 py-3 border-b border-[#ebebeb]"><h3 class="text-sm font-semibold">{% trans "Configured Schedules" %}</h3></div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="text-left text-dark-400 uppercase text-[10px] tracking-wide border-b border-[#ebebeb]">
+            <th class="px-5 py-2">{% trans "Company" %}</th><th class="px-2 py-2">{% trans "Run Day" %}</th><th class="px-2 py-2">{% trans "Auto Run" %}</th>
+            <th class="px-2 py-2">{% trans "Auto Finalize" %}</th><th class="px-2 py-2">{% trans "Auto Email Payslips" %}</th><th class="px-5 py-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for setting in settings_list %}
+          <tr class="border-b border-[#ebebeb] last:border-b-0 hover:bg-primary-100 transition duration-200">
+            <td class="px-5 py-2.5">{{ setting.company_id|default:_("All companies") }}</td>
+            <td class="px-2 py-2.5">{{ setting.get_run_day_display }}</td>
+            <td class="px-2 py-2.5">{% if setting.auto_run %}<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-success-light text-success-dark">{% trans "On" %}</span>{% else %}<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-secondary-100 text-dark-200">{% trans "Off" %}</span>{% endif %}</td>
+            <td class="px-2 py-2.5">{% if setting.auto_finalize %}<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-success-light text-success-dark">{% trans "On" %}</span>{% else %}<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-secondary-100 text-dark-200">{% trans "Off" %}</span>{% endif %}</td>
+            <td class="px-2 py-2.5">{% if setting.auto_email_payslips %}<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-success-light text-success-dark">{% trans "On" %}</span>{% else %}<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-secondary-100 text-dark-200">{% trans "Off" %}</span>{% endif %}</td>
+            <td class="px-5 py-2.5 text-right whitespace-nowrap">
+              <a class="oh-btn oh-btn--light-bkg oh-btn--x-small" href="{% url 'pp-auto-settings-edit' setting.pk %}">{% trans "Edit" %}</a>
+              <form method="post" action="{% url 'pp-auto-settings-delete' setting.pk %}" class="inline" onsubmit="return confirm('{% trans "Remove this schedule?" %}');">
+                {% csrf_token %}<button type="submit" class="oh-btn oh-btn--light-danger oh-btn--x-small">{% trans "Delete" %}</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="px-5 py-6 text-center text-dark-400">{% trans "No schedules configured — payroll runs stay manual." %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="bg-primary-100 border border-primary-300 rounded-md p-3.5 text-xs mt-4">
+    {% trans "On the configured day the scheduler generates the previous month's run with attendance/LOP prefilled. With Auto Finalize it locks the run and freezes every payslip snapshot; with Auto Email Payslips it also releases and emails the payslips (PDF attached)." %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,8 @@
+{% extends "settings.html" %}
+{% block settings %}
+{% load i18n %}
+{% include "generic/components.html" %}
+<div style="display: none;" data-ids="[]" id="selectedRecords"></div>
+<div hx-get="{% url "gmail_server_nav" %}" hx-trigger="load"></div>
+<div class="oh-wrapper" hx-get="{% url "gmail_server_list" %}" hx-trigger="load"></div>
+{% endblock settings %}

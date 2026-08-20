@@ -1,0 +1,14 @@
+{% load i18n %}
+{% if instance.resume %}
+  <a
+    href="{{ instance.resume.url }}"
+    target="_blank"
+    title="{% trans 'Download resume' %}"
+    onclick="event.stopPropagation();"
+  >
+    <ion-icon name="document-attach-outline" style="vertical-align:middle;"></ion-icon>
+    {% trans "Resume" %}
+  </a>
+{% else %}
+  -
+{% endif %}

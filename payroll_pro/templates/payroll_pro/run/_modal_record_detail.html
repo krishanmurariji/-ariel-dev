@@ -1,0 +1,103 @@
+{% load i18n payroll_pro_tags %}
+<div class="oh-modal__dialog-header">
+  <div class="flex items-center gap-2">
+    <img src="{{ record.employee_id.get_avatar }}" class="w-8 h-8 rounded-full object-cover flex-shrink-0" alt="">
+    <div>
+      <span class="oh-modal__dialog-title block">{{ record.employee_id.get_full_name }}</span>
+      <div class="text-dark-400 text-[11px]">{{ calc.structure.name }} · {{ calc.regime_name|default:"—" }}</div>
+    </div>
+  </div>
+  <button class="oh-modal__close" onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')" aria-label="{% trans 'Close' %}">
+    <ion-icon name="close-outline"></ion-icon>
+  </button>
+</div>
+<div class="oh-modal__dialog-body" style="max-height:70vh; overflow-y:auto;">
+
+  <div class="bg-white border border-[#ebebeb] rounded-md mb-3 overflow-hidden">
+    <div class="flex items-center gap-2 px-3.5 py-2.5 border-b border-[#ebebeb] font-semibold text-xs">
+      <span class="w-6 h-6 rounded-full bg-primary-200 text-primary-600 flex items-center justify-center text-[11px] font-bold flex-shrink-0">1</span>
+      {% trans "CTC → Monthly Gross" %} <span class="text-dark-400 font-normal">({% trans "structure" %}: {{ calc.structure.name }})</span>
+    </div>
+    <div class="p-3.5 flex flex-col gap-1.5 text-xs">
+      <div class="flex gap-3.5"><span class="text-dark-400 min-w-[160px]">{% trans "Annual CTC" %}</span>{{ calc.annual_ctc|pp_money }}</div>
+      <div class="flex gap-3.5"><span class="text-dark-400 min-w-[160px]">{% trans "Monthly CTC" %}</span><span class="text-primary-600 bg-primary-100 rounded px-1.5 py-0.5 font-mono text-[10.5px]">{{ calc.annual_ctc|pp_money0 }} ÷ 12</span> = {{ calc.monthly_ctc|pp_money }}</div>
+      <div class="flex gap-3.5"><span class="text-dark-400 min-w-[160px]">{% trans "Monthly Gross" %}</span>{{ calc.gross_monthly|pp_money }}</div>
+    </div>
+  </div>
+
+  <div class="bg-white border border-[#ebebeb] rounded-md mb-3 overflow-hidden">
+    <div class="flex items-center gap-2 px-3.5 py-2.5 border-b border-[#ebebeb] font-semibold text-xs">
+      <span class="w-6 h-6 rounded-full bg-primary-200 text-primary-600 flex items-center justify-center text-[11px] font-bold flex-shrink-0">2</span>
+      {% trans "Attendance & LOP" %}
+    </div>
+    <div class="p-3.5 flex flex-col gap-1.5 text-xs">
+      <div class="flex gap-3.5"><span class="text-dark-400 min-w-[160px]">{% trans "Calendar Days" %}</span>{{ calc.calendar_days|floatformat:"-2" }}</div>
+      <div class="flex gap-3.5"><span class="text-dark-400 min-w-[160px]">{% trans "Actual Working Days" %}</span>{{ calc.total_days|floatformat:"-2" }}</div>
+      <div class="flex gap-3.5"><span class="text-dark-400 min-w-[160px]">{% trans "LOP Days" %}</span>{{ calc.lop_days|floatformat:"-2" }}</div>
+      <div class="flex gap-3.5"><span class="text-dark-400 min-w-[160px]">{% trans "Payable Days" %}</span><span class="text-primary-600 bg-primary-100 rounded px-1.5 py-0.5 font-mono text-[10.5px]">{{ calc.total_days|floatformat:"-2" }} − {{ calc.lop_days|floatformat:"-2" }}</span> = <b>{{ calc.payable_days|floatformat:"-2" }}</b></div>
+      <div class="flex gap-3.5"><span class="text-dark-400 min-w-[160px]">{% trans "Per Day Wage" %}</span><span class="text-primary-600 bg-primary-100 rounded px-1.5 py-0.5 font-mono text-[10.5px]">{{ calc.gross_monthly|pp_money0 }} ÷ {{ calc.calendar_days|floatformat:"-2" }}</span> = {{ calc.per_day_wage|pp_money }}</div>
+      <div class="flex gap-3.5"><span class="text-dark-400 min-w-[160px]">{% trans "LOP Ratio" %}</span><span class="text-primary-600 bg-primary-100 rounded px-1.5 py-0.5 font-mono text-[10.5px]">{{ calc.calendar_days|floatformat:"-2" }} ÷ {{ calc.total_days|floatformat:"-2" }}</span> = {{ calc.lop_ratio|floatformat:4 }}</div>
+      <div class="flex gap-3.5"><span class="text-dark-400 min-w-[160px]">{% trans "LOP Deduction" %}</span><span class="text-primary-600 bg-primary-100 rounded px-1.5 py-0.5 font-mono text-[10.5px]">{{ calc.lop_ratio|floatformat:4 }} × {{ calc.lop_days|floatformat:"-2" }} × {{ calc.per_day_wage|pp_money0 }}</span> = <b>{{ calc.lop_deduction_amount|pp_money }}</b></div>
+    </div>
+  </div>
+
+  <div class="bg-white border border-[#ebebeb] rounded-md mb-3 overflow-hidden">
+    <div class="flex items-center gap-2 px-3.5 py-2.5 border-b border-[#ebebeb] font-semibold text-xs">
+      <span class="w-6 h-6 rounded-full bg-primary-200 text-primary-600 flex items-center justify-center text-[11px] font-bold flex-shrink-0">3</span>
+      {% trans "Earnings" %}
+    </div>
+    <table class="w-full text-xs">
+      <thead><tr class="text-left text-dark-400 uppercase text-[10px] border-b border-[#ebebeb]">
+        <th class="px-3.5 py-1.5">{% trans "Component" %}</th><th class="px-3.5 py-1.5 text-right">{% trans "Full Month" %}</th><th class="px-3.5 py-1.5 text-right">{% trans "Payable" %}</th>
+      </tr></thead>
+      <tbody>
+        {% for comp in calc.components %}
+        <tr class="border-b border-[#ebebeb]"><td class="px-3.5 py-1.5">{{ comp.name }}</td><td class="px-3.5 py-1.5 text-right">{{ comp.full|pp_money }}</td><td class="px-3.5 py-1.5 text-right"><b>{{ comp.prorated|pp_money }}</b></td></tr>
+        {% endfor %}
+        <tr class="border-b border-[#ebebeb] bg-primary-50 font-semibold"><td class="px-3.5 py-1.5">{% trans "Prorated Gross" %}</td><td class="px-3.5 py-1.5 text-right">{{ calc.gross_monthly|pp_money }}</td><td class="px-3.5 py-1.5 text-right">{{ calc.prorated_gross|pp_money }}</td></tr>
+        {% if calc.bonus %}<tr class="border-b border-[#ebebeb]"><td class="px-3.5 py-1.5">{% trans "Bonus" %}</td><td class="px-3.5 py-1.5 text-right">—</td><td class="px-3.5 py-1.5 text-right"><b>{{ calc.bonus|pp_money }}</b></td></tr>{% endif %}
+        {% if calc.overtime %}<tr class="border-b border-[#ebebeb]"><td class="px-3.5 py-1.5">{% trans "Overtime" %}</td><td class="px-3.5 py-1.5 text-right">—</td><td class="px-3.5 py-1.5 text-right"><b>{{ calc.overtime|pp_money }}</b></td></tr>{% endif %}
+        {% if calc.reimbursement %}<tr class="border-b border-[#ebebeb]"><td class="px-3.5 py-1.5">{% trans "Reimbursement" %}</td><td class="px-3.5 py-1.5 text-right">—</td><td class="px-3.5 py-1.5 text-right"><b>{{ calc.reimbursement|pp_money }}</b></td></tr>{% endif %}
+        {% if calc.adhoc_pay %}<tr class="border-b border-[#ebebeb]"><td class="px-3.5 py-1.5">{% trans "Adhoc Payment" %}</td><td class="px-3.5 py-1.5 text-right">—</td><td class="px-3.5 py-1.5 text-right"><b>{{ calc.adhoc_pay|pp_money }}</b></td></tr>{% endif %}
+        <tr class="font-semibold"><td class="px-3.5 py-1.5">{% trans "Gross Earnings" %}</td><td class="px-3.5 py-1.5 text-right"></td><td class="px-3.5 py-1.5 text-right">{{ calc.gross_earnings|pp_money }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bg-white border border-[#ebebeb] rounded-md mb-3 overflow-hidden">
+    <div class="flex items-center gap-2 px-3.5 py-2.5 border-b border-[#ebebeb] font-semibold text-xs">
+      <span class="w-6 h-6 rounded-full bg-primary-200 text-primary-600 flex items-center justify-center text-[11px] font-bold flex-shrink-0">4</span>
+      {% trans "Employee Deductions" %}
+    </div>
+    <table class="w-full text-xs">
+      <tbody>
+        <tr class="border-b border-[#ebebeb]"><td class="px-3.5 py-1.5">{% trans "Provident Fund (Employee)" %}</td><td class="px-3.5 py-1.5 text-right"><b>{{ calc.employee_pf|pp_money }}</b></td></tr>
+        <tr class="border-b border-[#ebebeb]"><td class="px-3.5 py-1.5">{% trans "Professional Tax" %}{% if calc.pt_overridden %} <span class="text-primary-600 text-[10px] font-bold uppercase">{% trans "Overridden" %}</span>{% endif %}</td><td class="px-3.5 py-1.5 text-right"><b>{{ calc.pt|pp_money }}</b></td></tr>
+        <tr class="border-b border-[#ebebeb]"><td class="px-3.5 py-1.5">{% trans "TDS (Income Tax)" %}{% if calc.tds_overridden %} <span class="text-primary-600 text-[10px] font-bold uppercase">{% trans "Overridden" %}</span>{% endif %}</td><td class="px-3.5 py-1.5 text-right"><b>{{ calc.tds|pp_money }}</b></td></tr>
+        {% if calc.adhoc_deduction %}<tr class="border-b border-[#ebebeb]"><td class="px-3.5 py-1.5">{% trans "Adhoc Deduction" %}</td><td class="px-3.5 py-1.5 text-right"><b>{{ calc.adhoc_deduction|pp_money }}</b></td></tr>{% endif %}
+        <tr class="font-semibold"><td class="px-3.5 py-1.5">{% trans "Total Deductions" %}</td><td class="px-3.5 py-1.5 text-right">{{ calc.total_deductions|pp_money }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bg-white border border-[#ebebeb] rounded-md mb-3 overflow-hidden">
+    <div class="flex items-center gap-2 px-3.5 py-2.5 border-b border-[#ebebeb] font-semibold text-xs">
+      <span class="w-6 h-6 rounded-full bg-primary-200 text-primary-600 flex items-center justify-center text-[11px] font-bold flex-shrink-0">5</span>
+      {% trans "Employer Contributions" %} <span class="text-dark-400 font-normal">({% trans "cost to company, not deducted from pay" %})</span>
+    </div>
+    <table class="w-full text-xs">
+      <tbody>
+        <tr class="border-b border-[#ebebeb]"><td class="px-3.5 py-1.5">{% trans "Provident Fund (Employer)" %}</td><td class="px-3.5 py-1.5 text-right"><b>{{ calc.employer_pf|pp_money }}</b></td></tr>
+        {% if calc.structure.gratuity.enabled %}
+        <tr class="border-b border-[#ebebeb]"><td class="px-3.5 py-1.5">{% trans "Gratuity (Employer Accrual)" %}</td><td class="px-3.5 py-1.5 text-right"><b>{{ calc.employer_gratuity|pp_money }}</b></td></tr>
+        {% endif %}
+        <tr class="font-semibold"><td class="px-3.5 py-1.5">{% trans "Total Employer Cost" %}</td><td class="px-3.5 py-1.5 text-right">{{ calc.total_employer_cost|pp_money }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="flex justify-between items-center bg-primary-200 border border-primary-300 rounded-md px-4 py-3 font-semibold">
+    <div><span class="w-6 h-6 rounded-full bg-white text-primary-600 inline-flex items-center justify-center text-[11px] font-bold mr-2">6</span>{% trans "Net Pay" %} = {{ calc.gross_earnings|pp_money }} − {{ calc.total_deductions|pp_money }}</div>
+    <div class="text-lg text-primary-600">{{ calc.net_pay|pp_money }}</div>
+  </div>
+</div>

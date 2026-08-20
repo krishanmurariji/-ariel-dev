@@ -66,7 +66,7 @@
                       <div class="oh-sticky-table__thead">
                         <div class="oh-sticky-table__tr">
                           <div class="oh-sticky-table__th {% if request.sort_option.order == '-title' %}arrow-up {% elif request.sort_option.order == 'title' %}arrow-down {% else %} arrow-up-down {% endif %}" hx-get="{% url 'recruitment-search' %}?{{pd}}&orderby=title" hx-target="#recruitment-container">{% trans "Recruitment" %}</div>
-                          <div data-cell-index="1" data-cell-title='{% trans "Managers" %}' class="oh-sticky-table__th" >{% trans "Managers" %}</div>
+                          <div data-cell-index="1" data-cell-title='{% trans "Interviewers" %}' class="oh-sticky-table__th" >{% trans "Interviewers" %}</div>
                           <div data-cell-index="2" data-cell-title='{% trans "Open Jobs" %}' class="oh-sticky-table__th" >{% trans "Open Jobs" %}</div>
                           <div data-cell-index="3" data-cell-title='{% trans "Vacancy" %}'
                             class="oh-sticky-table__th {% if request.sort_option.order == '-vacancy' %}arrow-up {% elif request.sort_option.order == 'vacancy' %}arrow-down {% else %} arrow-up-down {% endif %}"
@@ -138,7 +138,7 @@
                               {% endif %}
                             </span>
                             {% endfor %}
-                            <span class="count-span">{{rec.recruitment_managers.all|length}} {% trans "Managers" %}</span>
+                            <span class="count-span">{{rec.recruitment_managers.all|length}} {% trans "Interviewers" %}</span>
 
                           </div>
                           <div data-cell-index="2" class="oh-sticky-table__td">

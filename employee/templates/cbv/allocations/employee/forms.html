@@ -30,12 +30,42 @@
           "
           data-action="general-tab" data-target="#bankInfo">{% trans "Bank Info" %}</span>
       </li>
+      <li class="oh-general__tab">
+        <span hx-get="{% url 'education-form' %}?{{request.GET.urlencode}}" hx-target="#educationInfo" data-url="{% url 'education-form' %}" class="oh-general__tab-link"
+          onclick="$(this).closest('.oh-general__tabs').find('.oh-general__tab-link--active').removeClass('oh-general__tab-link--active');$(this).addClass('oh-general__tab-link--active');
+          target = $(this).attr('data-target');
+          $(this).closest('.oh-inner-sidebar-content').find('.oh-general__tab-target').addClass('d-none');
+          $(target).removeClass('d-none');
+          "
+          data-action="general-tab" data-target="#educationInfo">{% trans "Education" %}</span>
+      </li>
+      <li class="oh-general__tab">
+        <span hx-get="{% url 'experience-form' %}?{{request.GET.urlencode}}" hx-target="#experienceInfo" data-url="{% url 'experience-form' %}" class="oh-general__tab-link"
+          onclick="$(this).closest('.oh-general__tabs').find('.oh-general__tab-link--active').removeClass('oh-general__tab-link--active');$(this).addClass('oh-general__tab-link--active');
+          target = $(this).attr('data-target');
+          $(this).closest('.oh-inner-sidebar-content').find('.oh-general__tab-target').addClass('d-none');
+          $(target).removeClass('d-none');
+          "
+          data-action="general-tab" data-target="#experienceInfo">{% trans "Experience" %}</span>
+      </li>
+      <li class="oh-general__tab">
+        <span hx-get="{% url 'emergency-form' %}?{{request.GET.urlencode}}" hx-target="#emergencyInfo" data-url="{% url 'emergency-form' %}" class="oh-general__tab-link"
+          onclick="$(this).closest('.oh-general__tabs').find('.oh-general__tab-link--active').removeClass('oh-general__tab-link--active');$(this).addClass('oh-general__tab-link--active');
+          target = $(this).attr('data-target');
+          $(this).closest('.oh-inner-sidebar-content').find('.oh-general__tab-target').addClass('d-none');
+          $(target).removeClass('d-none');
+          "
+          data-action="general-tab" data-target="#emergencyInfo">{% trans "Emergency Contact" %}</span>
+      </li>
     </ul>
   </div>
   <div class="oh-inner-sidebar-content__body">
     <div class="oh-general__tab-target oh-profile-section mb-4 d-none" id="personalInfo"></div>
     <div class="oh-general__tab-target oh-profile-section mb-4 d-none" id="workInfo"></div>
     <div class="oh-general__tab-target oh-profile-section mb-4 d-none" id="bankInfo"></div>
+    <div class="oh-general__tab-target oh-profile-section mb-4 d-none" id="educationInfo"></div>
+    <div class="oh-general__tab-target oh-profile-section mb-4 d-none" id="experienceInfo"></div>
+    <div class="oh-general__tab-target oh-profile-section mb-4 d-none" id="emergencyInfo"></div>
     <div class="oh-modal__dialog-footer p-0">
       <button type="submit" class="oh-btn oh-btn--secondary oh-btn--shadow" onclick="$('.oh-general__tab-target.oh-profile-section').not('.d-none').find('form').find('input[type=submit]').click()">{% trans "Save" %}</button>
     </div>

@@ -1,31 +1,63 @@
 {% comment %} {% extends 'candidate/application_form_component.html' %}  {% endcomment %}
 {% block content %}
-{% load static %} {% load i18n horillafilters %} {{form.load}}
-{% get_company as theme_obj %}
+{% load static %} {% load i18n horillafilters %}
+{% comment %}
+Not rendering {{form.load}} (RecruitmentAjaxWidget) here: it injects a
+<script src="recruitmentAjax.js"> and an inline $(document).ready(...)
+call at the very top of the document - before the page's own jQuery
+<script> tag further down - which threw "$ is not defined" on every
+load. It's also functionally dead weight on this specific template:
+that script only wires up #id_recruitment_id/#id_job_position_id
+(Django's default auto-generated field ids), but this form renders
+recruitment_id as a hidden input and job_position_id's options
+server-side directly, neither with those ids, so nothing it does ever
+matched anything here anyway.
+{% endcomment %}
+{% comment %}
+theme_obj comes from the view (recruitment.views.surveys.application_form) -
+the recruitment's own company's theme, not the session-based get_company
+tag used on the internal admin pages (see that view for why session-based
+theming doesn't work for an anonymous candidate).
+{% endcomment %}
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link href="{% static 'horilla_theme/assets/css/tailwind.css' %}" rel="stylesheet">
+    {% comment %}
+    Same stylesheet the main app layout (horilla_theme/templates/index.html)
+    links for every select2-initialized field - this page doesn't extend that
+    layout (it's a standalone public document), so it never picked this up on
+    its own. Without it, select2() still runs and builds its dropdown markup,
+    but with nothing to size/position it - invisible on a single-select,
+    catastrophic on the multi-select Skills field (all options render as an
+    unstyled, unconstrained list on top of everything else).
+    {% endcomment %}
+    <link href="{% static 'cdn/select2/css/select2.min.css' %}" rel="stylesheet">
+    {# The job's own company logo takes priority over the general #}
+    {# white-label company, which takes priority over Horilla's default. #}
     <link
         rel="apple-touch-icon"
         sizes="180x180"
-        href="{% if white_label_company.icon %}{{white_label_company.icon.url}} {% else %}{% static 'favicons/apple-touch-icon.png' %}{% endif %}"
+        href="{% if recruitment.company_id.icon %}{{ recruitment.company_id.icon.url }}{% elif white_label_company.icon %}{{ white_label_company.icon.url }}{% else %}{% static 'favicons/apple-touch-icon.png' %}{% endif %}"
     />
     <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link
         rel="icon"
         type="image/png"
         sizes="32x32"
-        href="{% if white_label_company.icon %}{{white_label_company.icon.url}} {% else %}{% static 'favicons/favicon-32x32.png' %}{% endif %}"
+        href="{% if recruitment.company_id.icon %}{{ recruitment.company_id.icon.url }}{% elif white_label_company.icon %}{{ white_label_company.icon.url }}{% else %}{% static 'favicons/favicon-32x32.png' %}{% endif %}"
     />
     <link
         rel="icon"
         type="image/png"
         sizes="16x16"
-        href="{% if white_label_company.icon %}{{white_label_company.icon.url}} {% else %}{% static 'favicons/favicon-16x16.png' %}{% endif %}"
+        href="{% if recruitment.company_id.icon %}{{ recruitment.company_id.icon.url }}{% elif white_label_company.icon %}{{ white_label_company.icon.url }}{% else %}{% static 'favicons/favicon-16x16.png' %}{% endif %}"
     />
     <link
         rel="stylesheet"
@@ -36,250 +68,1159 @@
         href="/static/horilla_theme/assets/css/v1_styles.css"
     />
     <script src="{% static "horilla_theme/assets/js/tailwindcdn.js" %}"></script>
+    <title>{% trans "Apply" %}{% if recruitment.title %} - {{ recruitment.title }}{% endif %}</title>
     <style>
-        .overflow-y-auto {
-            overflow-y: auto !important;
+        :root {
+            --brand-50: {{ theme_obj.primary_50|default:"#eff6ff" }};
+            --brand-600: {{ theme_obj.primary_600|default:"#2563eb" }};
+            --brand-700: {{ theme_obj.primary_700|default:"#1d4ed8" }};
+            --brand-800: {{ theme_obj.primary_800|default:"#1e40af" }};
+            /* One shared field height, used by every text input, select,
+               the phone group, and select2's boxes alike, so no two
+               fields on the form can ever drift out of alignment with
+               each other regardless of what's rendering their content. */
+            --field-h: 2.9rem;
         }
-        .oh-select-2 {
-            padding-left: 30px !important;
-          }
+        * { font-family: 'Inter', ui-sans-serif, sans-serif; }
+        body { background: #f3f5f9; }
+
+        /* Pure-CSS entrance animation - deliberately NOT gated behind an
+           IntersectionObserver + JS-added class. That pattern (opacity:0
+           until JS proves the element is visible) can leave content
+           permanently invisible if the observer never fires - e.g. in
+           background/non-composited tabs, some embedded webviews, or if
+           the script errors before it attaches. A public application
+           form must never render blank, so this animates unconditionally
+           on paint; worst case with no JS at all, it still ends at
+           opacity:1 through the animation's own fill-mode. */
+        @keyframes fade-up-in {
+            from { opacity: 0; transform: translateY(18px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @media (prefers-reduced-motion: no-preference) {
+            .reveal {
+                animation: fade-up-in .6s cubic-bezier(.16,.84,.44,1) both;
+            }
+        }
+
+        @keyframes blob-float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(20px, -25px) scale(1.06); }
+            66% { transform: translate(-15px, 15px) scale(0.96); }
+        }
+        .blob {
+            position: absolute;
+            border-radius: 9999px;
+            filter: blur(50px);
+            opacity: 0.35;
+            animation: blob-float 14s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translateX(-1px); }
+            20%, 80% { transform: translateX(2px); }
+            30%, 50%, 70% { transform: translateX(-4px); }
+            40%, 60% { transform: translateX(4px); }
+        }
+        .shake-once { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spin { animation: spin 0.8s linear infinite; }
+
+        @keyframes pop-in {
+            0% { opacity: 0; transform: scale(0.6); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .pop-in { animation: pop-in .25s ease-out both; }
+
+        /* Brief highlight sweep on a field the AI autofill just populated,
+           so it's obvious *which* fields changed without reading every one. */
+        @keyframes ai-flash {
+            0% { background-color: #dcfce7; box-shadow: 0 0 0 4px rgba(34,197,94,.25); }
+            100% { background-color: transparent; box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+        }
+        .ai-flash { animation: ai-flash 1.4s ease-out both; }
+
+        @keyframes shimmer {
+            0% { background-position: -300px 0; }
+            100% { background-position: 300px 0; }
+        }
+        .shimmer-bar {
+            position: relative;
+            overflow: hidden;
+            background: #e9edf3;
+        }
+        .shimmer-bar::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.85), transparent);
+            background-size: 300px 100%;
+            animation: shimmer 1.3s ease-in-out infinite;
+        }
+        .shimmer-fill {
+            position: absolute;
+            inset: 0;
+            width: 45%;
+            border-radius: 9999px;
+            background: linear-gradient(90deg, var(--brand-600), var(--brand-700));
+            animation: convert-slide 1.4s ease-in-out infinite;
+        }
+        @keyframes convert-slide {
+            0% { left: -45%; }
+            100% { left: 100%; }
+        }
+
+        .hero-card {
+            background: linear-gradient(135deg, var(--brand-700) 0%, var(--brand-600) 55%, var(--brand-800) 100%);
+        }
+
+        /* One shared, symmetric padding for every field on the form -
+           text input, textarea, select, or the custom-select trigger
+           button - so nothing needs its own special-cased vertical
+           spacing and every row lines up the same way. */
+        .field-input {
+            width: 100%;
+            min-height: var(--field-h);
+            box-sizing: border-box;
+            border: 1.5px solid #e2e5ec;
+            background: #fff;
+            border-radius: 0.75rem;
+            padding: 0.7rem 0.9rem;
+            font-size: 0.9rem;
+            transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
+        }
+        textarea.field-input { padding-top: 0.7rem; min-height: 4.6rem; }
+        .field-input:focus {
+            outline: none;
+            border-color: var(--brand-600);
+            box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-600) 16%, transparent);
+        }
+        .field-input.is-valid {
+            border-color: #22c55e;
+            background-color: #f7fdf9;
+        }
+        .field-input.is-invalid {
+            border-color: #ef4444 !important;
+            background-color: #fef2f2;
+        }
+        .field-status-icon {
+            position: absolute;
+            right: 12px;
+            top: 0;
+            bottom: 0;
+            display: none;
+            align-items: center;
+            pointer-events: none;
+        }
+        .field-status-icon.show-valid,
+        .field-status-icon.show-invalid { display: flex; }
+        .field-status-icon.show-valid i { color: #22c55e; }
+        .field-status-icon.show-invalid i { color: #ef4444; }
+
+        /* Neutralizes the global .oh-input/.oh-select margin-bottom (12px)
+           inside any `.relative` icon/affix wrapper. That margin sits below
+           the <input> but inside the wrapper's own auto height, so the
+           wrapper ends up taller than the visible input box - absolutely
+           positioned icons/labels using top-0/bottom-0/items-center then
+           center against that *taller* box instead of the input itself,
+           landing visibly low. Spacing between fields still comes from the
+           parent grid's own `gap`, so dropping it here is safe. */
+        .field-affix input,
+        .field-affix select {
+            margin-bottom: 0 !important;
+        }
+
+        /* ---- Floating labels ----
+           "Outlined" Material style: the label sits fully *inside* the
+           field at rest, and floats up to straddle the top border on
+           focus/fill, with a white background behind it so it reads as
+           a notch cut into the border - not just nudged a few pixels
+           higher while still inside the box (which is what made the
+           earlier version look like a barely-there shift).
+           Driven entirely by JS-toggled .fl-filled/.fl-focused on the
+           wrapper (see initFloatingLabel below), not CSS's
+           :placeholder-shown - that pseudo-class doesn't exist for
+           <select> at all, and its reactivity to *programmatic* value
+           changes (AI autofill, pre-filled server values) isn't
+           consistent enough across engines to trust as the only cue.
+           Every .fl-input (text input, textarea, or the custom-select
+           trigger button below) shares one plain, symmetric padding -
+           the label floats *outside* the box instead of eating into it,
+           so there's no risk of it ever overlapping real field content
+           (which is what happened when <select>'s own text didn't
+           reliably respect an asymmetric padding-top the way <input>
+           does). */
+        .fl-wrap { position: relative; }
+        .fl-label {
+            position: absolute;
+            left: 0.75rem;
+            top: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            padding: 0 0.3rem;
+            font-size: 0.85rem;
+            color: #8891a1;
+            background: transparent;
+            pointer-events: none;
+            transition: top .15s ease, font-size .15s ease, color .15s ease, background-color .15s ease;
+        }
+        .fl-wrap.has-icon .fl-label { left: 2.2rem; }
+        .fl-wrap.fl-filled .fl-label,
+        .fl-wrap.fl-focused .fl-label {
+            top: -0.55rem;
+            bottom: auto;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--brand-700);
+            background: #fff;
+            border-radius: 3px;
+        }
+        .fl-required::after { content: "*"; color: #ef4444; margin-left: 2px; }
+
+        /* ---- Custom select (Gender / Job Position / Source / Experience
+           Months) ----
+           A native <select> replaces its own trigger box with
+           OS/engine-drawn chrome that a floating label can't reliably
+           coexist with (confirmed: the selected option's text ignored a
+           padding-top meant to make room for the label, so the two
+           visually collided). This swaps the *trigger* for a plain
+           styled button, keeping the real <select> in the DOM (name=...
+           and all) purely to hold the submitted value and its
+           <option>s - it's visually hidden but still what the form
+           actually posts. */
+        .cs-trigger {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            background: #fff;
+        }
+        .cs-trigger:focus { outline: none; }
+        .cs-value { color: #111827; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .cs-value:empty::before { content: "\00a0"; }
+        .cs-caret { font-size: .7rem; color: #8891a1; flex: none; margin-left: .6rem; transition: transform .15s ease; }
+        .cs-trigger[aria-expanded="true"] .cs-caret { transform: rotate(180deg); }
+        .cs-native { position: absolute; opacity: 0; height: 0; width: 0; pointer-events: none; }
+        .cs-panel {
+            position: absolute;
+            z-index: 1000;
+            top: calc(100% + 6px);
+            left: 0;
+            right: 0;
+            max-height: 260px;
+            overflow-y: auto;
+            background: #fff;
+            border: 1px solid #e2e5ec;
+            border-radius: 0.85rem;
+            box-shadow: 0 16px 32px rgba(16,24,40,.14);
+            padding: 0.3rem;
+        }
+        /* Reparented straight into <body> on first open (see
+           initCustomSelect) - position/left/width then come from inline
+           styles computed fresh from the trigger's live coordinates each
+           time it opens, not from this rule. Only the *type* of
+           positioning (fixed, so it tracks the viewport rather than any
+           ancestor) and stacking (an explicit z-index high enough to
+           clear every card on the page) matter here. */
+        .cs-panel-detached {
+            position: fixed;
+            right: auto;
+            z-index: 1000;
+        }
+        .cs-panel.hidden { display: none; }
+        .cs-option {
+            padding: 0.55rem 0.7rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: .88rem;
+            color: #374151;
+        }
+        .cs-option:hover,
+        .cs-option.is-active { background: var(--brand-50); }
+
+        /* Native <select> styled to match text inputs exactly (same
+           class, same padding) instead of select2 - select2 has its own
+           internal height/line-height defaults that don't reliably pick
+           up an inline `height:` override on the source <select> it
+           replaces, which is what made "Choose Job Position" and
+           "Source" render at visibly different heights side by side.
+           Plain <select> fully respects box-model CSS from a shared
+           class, so every field in a row ends up the same height. */
+        select.field-input {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 1.05rem;
+            padding-right: 2.4rem;
+            cursor: pointer;
+        }
+
+        .section-card {
+            background: #fff;
+            border: 1px solid #eef0f4;
+            border-radius: 1rem;
+            box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.04);
+            transition: box-shadow .25s ease, transform .25s ease;
+        }
+        .section-card:hover { box-shadow: 0 8px 24px rgba(16,24,40,.07); }
+
+        .section-icon-badge {
+            width: 2.25rem;
+            height: 2.25rem;
+            border-radius: 0.65rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--brand-50);
+            color: var(--brand-700);
+            flex: none;
+        }
+
+        .dropzone {
+            border: 2px dashed #d7dbe3;
+            border-radius: 1rem;
+            transition: border-color .2s ease, background-color .2s ease, transform .15s ease;
+            background: #fafbfc;
+        }
+        .dropzone:hover { border-color: var(--brand-600); background: var(--brand-50); }
+        .dropzone.drag-over {
+            border-color: var(--brand-600);
+            background: var(--brand-50);
+            transform: scale(1.01);
+        }
+        .dropzone.is-invalid { border-color: #ef4444; background: #fef2f2; }
+
+        .required-star::after {
+            content: "*";
+            color: #ef4444;
+            margin-left: 3px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: .8rem;
+            font-weight: 600;
+            color: #384152;
+            margin-bottom: .35rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--brand-600), var(--brand-700));
+            transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+            box-shadow: 0 6px 16px color-mix(in srgb, var(--brand-600) 40%, transparent);
+        }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 22px color-mix(in srgb, var(--brand-600) 45%, transparent); }
+        .btn-primary:active:not(:disabled) { transform: translateY(0); }
+        .btn-primary:disabled { opacity: .6; cursor: not-allowed; box-shadow: none; }
+        .btn-primary.is-thinking { background-size: 200% 100%; animation: shimmer-btn 1.4s linear infinite; }
+        @keyframes shimmer-btn {
+            0% { background-image: linear-gradient(90deg, var(--brand-600), var(--brand-700), var(--brand-600)); background-position: 0% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .progress-track { position: relative; }
+        .progress-dot {
+            width: 1rem;
+            height: 1rem;
+            border-radius: 9999px;
+            background: rgba(255,255,255,.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color .25s ease, transform .25s ease;
+        }
+        .progress-dot::before {
+            content: "";
+            width: .4rem;
+            height: .4rem;
+            border-radius: 9999px;
+            background: #cbd3e0;
+            transition: background-color .25s ease;
+        }
+        .progress-step.active .progress-dot { transform: scale(1.15); }
+        .progress-step.active .progress-dot::before { background: #fff; }
+        .progress-step .progress-label { color: rgba(255,255,255,.6); transition: color .3s ease; }
+        .progress-step.active .progress-label { color: #fff; }
+        /* Real per-section completion (required fields actually valid),
+           not just "scrolled past" - a checkmark once a section is
+           genuinely done, independent of whether it's the one currently
+           in view. */
+        .step-check {
+            display: none;
+            font-size: .55rem;
+            color: #fff;
+        }
+        .progress-step.step-complete .progress-dot {
+            background: #22c55e;
+        }
+        .progress-step.step-complete .progress-dot::before { display: none; }
+        .progress-step.step-complete .step-check { display: block; }
+
+        .skill-hint { animation: pop-in .2s ease-out both; }
+
+        .formset-row { transition: box-shadow .2s ease, transform .2s ease; }
+        .formset-row:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); }
+        .formset-remove-row { transition: transform .15s ease, background-color .15s ease; }
+        .formset-remove-row:hover { transform: scale(1.15); background-color: #fee2e2; }
+
+        /* "Currently working here" toggle switch, standing in for a
+           plain checkbox. Namespaced as "cf-toggle" (candidate form) -
+           global.css (loaded above) already defines an unrelated,
+           differently-shaped .toggle-switch/.toggle-input used
+           elsewhere in the app; reusing that name here collided with
+           it (its ::after knob rendering on top of this one's thumb -
+           looked like two overlapping circles). */
+        .cf-toggle { position: relative; display: inline-flex; flex: none; cursor: pointer; width: 2.6rem; height: 1.5rem; }
+        .cf-toggle input[type="checkbox"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            margin: 0;
+            cursor: pointer;
+        }
+        .cf-toggle-track {
+            position: absolute;
+            inset: 0;
+            border-radius: 9999px;
+            background: #d1d5db;
+            transition: background-color .2s ease;
+            pointer-events: none;
+        }
+        .cf-toggle-thumb {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 1.2rem;
+            height: 1.2rem;
+            border-radius: 9999px;
+            background: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,.25);
+            transition: transform .2s ease;
+        }
+        .cf-toggle input:checked ~ .cf-toggle-track { background: var(--brand-600); }
+        .cf-toggle input:checked ~ .cf-toggle-track .cf-toggle-thumb { transform: translateX(1.1rem); }
+        .cf-toggle input:focus-visible ~ .cf-toggle-track {
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-600) 30%, transparent);
+        }
+
+        /* ---- Left panel tabs (Job Description / Resume Preview) ---- */
+        .info-tab {
+            font-size: .82rem;
+            font-weight: 600;
+            color: #6b7280;
+            padding: .6rem .5rem;
+            border-bottom: 2.5px solid transparent;
+            transition: color .2s ease, border-color .2s ease;
+        }
+        .info-tab.active { color: var(--brand-700); border-color: var(--brand-600); }
+        .info-tab:disabled { color: #c6cbd4; cursor: not-allowed; }
+        .info-panel { display: none; }
+        .info-panel.active { display: block; animation: pop-in .25s ease-out both; }
+
+        /* ---- Phone: country flag dropdown + number input group ----
+           A native <select> can't render an <img> per-option, so the
+           country picker showing an actual flag *image* (not a flag
+           emoji, which many Windows font configs fall back to rendering
+           as plain "IN"/"US" text) has to be a custom button + panel
+           instead of a <select>. Flags come from flagcdn.com (small
+           static PNGs, no JS/canvas needed). */
+        .phone-group {
+            display: flex;
+            min-height: var(--field-h);
+            box-sizing: border-box;
+            border: 1.5px solid #e2e5ec;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            background: #fff;
+            transition: border-color .2s ease, box-shadow .2s ease;
+        }
+        .phone-group:focus-within {
+            border-color: var(--brand-600);
+            box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-600) 16%, transparent);
+        }
+        .phone-group.is-invalid { border-color: #ef4444 !important; background-color: #fef2f2; }
+        .phone-group.is-valid { border-color: #22c55e; background-color: #f7fdf9; }
+        .phone-country-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: none;
+            background: #f7f8fa;
+            border-right: 1.5px solid #e2e5ec;
+            padding: 0 0.65rem;
+            font-size: .85rem;
+            font-weight: 600;
+            color: #374151;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .phone-country-btn:focus { outline: none; }
+        .phone-flag-img {
+            width: 20px;
+            height: 14px;
+            object-fit: cover;
+            border-radius: 2px;
+            box-shadow: 0 0 0 1px rgba(0,0,0,.08);
+            display: block;
+            background: #eef0f4;
+        }
+        .phone-country-caret { font-size: .6rem; color: #8891a1; transition: transform .15s ease; }
+        .phone-country-btn[aria-expanded="true"] .phone-country-caret { transform: rotate(180deg); }
+        .phone-group input {
+            border: none;
+            flex: 1;
+            min-width: 0;
+            align-self: center;
+            padding: 0.5rem 0.9rem;
+        }
+        .phone-group input:focus { outline: none; box-shadow: none; }
+
+        .phone-country-panel {
+            /* Reparented into <body> on first open, same as .cs-panel -
+               position/left/top then come from inline styles computed
+               from the button's live coordinates each time it opens. */
+            position: fixed;
+            z-index: 1000;
+            width: 290px;
+            max-height: 300px;
+            background: #fff;
+            border: 1px solid #e2e5ec;
+            border-radius: 0.85rem;
+            box-shadow: 0 16px 32px rgba(16,24,40,.14);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .phone-country-panel.hidden { display: none; }
+        .phone-country-search {
+            border: none;
+            border-bottom: 1px solid #eef0f4;
+            padding: 0.65rem 0.9rem;
+            font-size: .85rem;
+            outline: none;
+        }
+        .phone-country-list { overflow-y: auto; padding: .3rem; }
+        .phone-country-option {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.5rem 0.6rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: .85rem;
+        }
+        .phone-country-option:hover,
+        .phone-country-option.is-active { background: var(--brand-50); }
+        .phone-country-option img {
+            width: 20px;
+            height: 14px;
+            object-fit: cover;
+            border-radius: 2px;
+            box-shadow: 0 0 0 1px rgba(0,0,0,.08);
+            flex: none;
+        }
+        .phone-country-option .pco-name { flex: 1; color: #374151; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .phone-country-option .pco-dial { color: #8891a1; font-variant-numeric: tabular-nums; }
+        .phone-country-empty { padding: .9rem; text-align: center; color: #9aa1ae; font-size: .82rem; }
+
+        .overflow-y-auto { overflow-y: auto !important; }
+        .oh-select-2 { padding-left: 30px !important; }
+        /* Select2's multi-select search box is a raw <textarea> - without
+           this it shows a draggable resize handle in the corner, letting
+           it be dragged/distorted out of its row. It also inherits the
+           browser's 16px default textarea font-size instead of matching
+           every other field on this form (12px). */
+        .select2-search__field {
+            resize: none !important;
+            font-size: 12px !important;
+        }
+        /* Selected skill chips default to light-grey-fill/white-text -
+           unreadable (white on light grey). Filled with the theme color
+           instead, which also has proper contrast against white text. */
+        .select2-selection__choice {
+            background-color: {{ theme_obj.primary_600 }} !important;
+            border-color: {{ theme_obj.primary_600 }} !important;
+            color: #fff !important;
+            border-radius: 9999px !important;
+            padding: 2px 10px !important;
+        }
+        .select2-selection__choice__remove,
+        .select2-selection__choice__display {
+            color: #fff !important;
+        }
+        .select2-container--default .select2-selection--multiple {
+            border-radius: .75rem !important;
+            border: 1.5px solid #e2e5ec !important;
+        }
+        .select2-container--default.select2-container--focus .select2-selection--multiple {
+            border-color: var(--brand-600) !important;
+            box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-600) 16%, transparent);
+        }
+        /* Matches Skills' box weight/min-height to every other .field-input
+           on the form - select2's own default sizing made it read as a
+           visually different (more "pill-like") shape next to plain
+           inputs even with the same border-radius value. Skills is the
+           only field left using select2 - Gender/Job Position/Source/
+           Experience Months/Country/State all moved to the custom-select
+           component below (a native <select>'s own trigger box turned
+           out not to reliably share space with a floating label; a
+           plain styled button does). */
+        .select2-container--default .select2-selection--multiple {
+            min-height: var(--field-h);
+        }
+        .select2-selection--multiple .select2-selection__rendered {
+            padding: 0.3rem 0.5rem !important;
+        }
+        /* A global input-width rule (meant for text inputs) was also
+           stretching plain checkboxes to full field width, shoving their
+           label far away in a flex row like "Currently working here". */
+        .formset-row input[type="checkbox"] {
+            width: auto !important;
+            flex: 0 0 auto !important;
+        }
     </style>
 </head>
 
-<body class="bg-secondary-50 font-[Inter,_sans-serif]">
+<body class="bg-secondary-50">
     <!-- Main Content -->
-        <div class="bg-[{{theme_obj.primary_50}}]">
-            <div class="pb-10 pt-3 pl-20 pr-20">
-                <h3 class="pb-4 pt-2 font-bold text-center text-2xl">{% trans "Application Form" %}</h3>
-                <div class="grid grid-cols-12 gap-4">
-                    <div class="col-span-12 lg:col-span-4 bg-[{{theme_obj.primary_50}}] rounded-md shadow-card p-5">
-                        <div class="lg:h-[calc(100vh_-_160px)] overflow-hidden overflow-y-auto">
-                            {% if resume %}
-                                <div class="sticky">
-                                    <iframe style="width: 100%;height:90vh" height="100" src="{{ resume.file.url }}" frameborder="0"></iframe>
-                                </div>
-                            {% else %}
-                                <div class="font-semibold text-xl border-b-2 border-black">
-                                    <h3> {% trans "Job Description" %} </h3>
-                                </div>
-                                <div class="p-3 leading-relaxed">
-                                    <p class="text-sm mb-2">{{recruitment.description|safe}}</p>
-                                </div>
-                            {% endif %}
-                        </div>
-                    </div>
+    <div class="min-h-screen">
 
-                    {% comment %} <form action="" method="post" enctype="multipart/form-data">  {% endcomment %}
-                        {% if messages %}
-                            <div class="oh-alert-container">
-                                {% for message in messages %}
-                                    <div class="oh-alert oh-alert--animated {{message.tags}}">
-                                        {{ message }}
-                                    </div>
+        <!-- Hero -->
+        <div class="hero-card relative overflow-hidden">
+            <div class="blob w-72 h-72 bg-white" style="top: -60px; left: -40px;"></div>
+            <div class="blob w-96 h-96 bg-white" style="bottom: -120px; right: -60px; animation-delay: -6s;"></div>
+            <div class="relative px-5 md:px-16 pt-10 pb-6 text-white">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div class="flex items-center gap-4">
+                        {% if recruitment.company_id.icon %}
+                        <img src="{{ recruitment.company_id.icon.url }}" alt="{{ recruitment.company_id }}" class="w-14 h-14 rounded-xl bg-white object-contain p-1 shadow-lg">
+                        {% endif %}
+                        <div>
+                            <p class="text-xs uppercase tracking-wider text-white/70 font-semibold mb-1">{% trans "You're applying for" %}</p>
+                            <h1 class="text-2xl md:text-3xl font-extrabold leading-tight">{{ recruitment.title|default:_("this role") }}</h1>
+                            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-white/85">
+                                {% if recruitment.company_id %}
+                                <span><i class="fa-solid fa-building mr-1"></i>{{ recruitment.company_id }}</span>
+                                {% endif %}
+                                {% if recruitment.vacancy %}
+                                <span><i class="fa-solid fa-users mr-1"></i>{{ recruitment.vacancy }} {% trans "opening(s)" %}</span>
+                                {% endif %}
+                                {% for job in recruitment.open_positions.all %}
+                                <span class="bg-white/15 rounded-full px-2.5 py-0.5 text-xs">{{ job.job_position }}</span>
                                 {% endfor %}
                             </div>
+                        </div>
+                    </div>
+                   
+                </div>
+            </div>
+        </div>
+
+        {% if messages %}
+        <div class="px-5 md:px-16 mt-5 space-y-2">
+            {% for message in messages %}
+            <div class="pop-in flex items-start gap-2 rounded-xl px-4 py-3 text-sm shadow-sm border {% if 'error' in message.tags %}bg-red-50 border-red-200 text-red-700{% elif 'success' in message.tags %}bg-green-50 border-green-200 text-green-700{% else %}bg-blue-50 border-blue-200 text-blue-700{% endif %}">
+                <i class="fa-solid {% if 'error' in message.tags %}fa-circle-exclamation{% elif 'success' in message.tags %}fa-circle-check{% else %}fa-circle-info{% endif %} mt-0.5"></i>
+                <span>{{ message }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="px-3 md:px-16 py-6 md:py-8">
+            <div class="grid grid-cols-12 gap-5">
+
+                <!-- Job info / resume preview -->
+                <div class="col-span-12 lg:col-span-4 reveal">
+                    <div class="section-card p-0 overflow-hidden lg:sticky lg:top-6">
+                        <div class="flex items-center border-b border-gray-100 px-2 bg-white sticky top-0 z-10">
+                            <button type="button" class="info-tab active" data-panel="panel-jobdesc" id="tabJobDesc">
+                                <i class="fa-solid fa-file-lines mr-1.5"></i>{% trans "Job Description" %}
+                            </button>
+                            <button type="button" class="info-tab" data-panel="panel-resume" id="tabResume" {% if not resume %}disabled{% endif %}>
+                                <i class="fa-solid fa-file-pdf mr-1.5"></i>{% trans "Resume Preview" %}
+                            </button>
+                        </div>
+                        <div class="lg:h-[calc(100vh_-_160px)] overflow-hidden overflow-y-auto">
+                            <div class="info-panel active" id="panel-jobdesc">
+                                <div class="p-5 leading-relaxed">
+                                    <div class="text-sm text-gray-600 oh-job__post_description prose prose-sm max-w-none">{{ recruitment.description|safe }}</div>
+                                </div>
+                            </div>
+                            <div class="info-panel" id="panel-resume">
+                                <iframe id="resumePreviewFrame" style="width: 100%; height: 90vh" src="{% if resume %}{{ resume.file.url }}{% endif %}" frameborder="0"></iframe>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="applicationForm" class="col-span-12 lg:col-span-8" method="post" enctype="multipart/form-data" novalidate>
+                    {% csrf_token %}
+                    {% if request.GET.utm_source %}
+                    <input type="hidden" name="utm_source" value="{{ request.GET.utm_source }}">
+                    {% endif %}
+                    <input type="text" name="recruitment_id" hidden value="{{ recruitment.id }}" />
+
+                    <div class="space-y-5">
+
+                        <!-- Resume Upload -->
+                        <div class="section-card p-5 reveal" id="sec-resume">
+                            <div class="flex items-center gap-2.5 mb-4">
+                                <div class="section-icon-badge"><i class="fa-solid fa-file-arrow-up"></i></div>
+                                <h3 class="font-bold text-gray-900">{% trans "Resume" %}</h3>
+                            </div>
+
+                            <label class="form-label {% if not recruitment.optional_resume %}required-star{% endif %}">{% trans "Upload your resume" %}</label>
+                            <label for="resumeUpload" id="resumeDropzone"
+                                class="dropzone flex flex-col items-center justify-center w-full py-8 px-4 cursor-pointer text-center">
+                                <div class="flex flex-col items-center justify-center gap-1" id="dropzoneIdle">
+                                    <div class="w-11 h-11 rounded-full bg-white shadow-sm flex items-center justify-center mb-1">
+                                        <i class="fa-solid fa-cloud-arrow-up text-lg text-[var(--brand-700)]"></i>
+                                    </div>
+                                    <p class="text-sm font-semibold text-gray-700">{% trans "Drag & drop your resume, or click to browse" %}</p>
+                                    <p class="text-xs text-gray-400">{% trans "Up to 5MB - DOCX/JPEG converts to PDF automatically" %}</p>
+                                </div>
+                                <input id="resumeUpload" name="resume" type="file"
+                                    accept=".pdf,.docx,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg"
+                                    class="hidden" {% if not recruitment.optional_resume %}required{% endif %}/>
+                            </label>
+                            {{ form.resume.errors }}
+                            <div id="err-resume" class="mt-2 text-sm flex items-center gap-1.5" style="display:none;color:#dc3545;"><i class="fa-solid fa-circle-exclamation"></i><span></span></div>
+
+                            <!-- Animated conversion progress -->
+                            <div id="resumeConvertingMsg" class="mt-3 hidden">
+                                <div class="flex items-center gap-2 text-sm text-gray-600 mb-1.5">
+                                    <i class="fa-solid fa-file-circle-plus text-[var(--brand-700)]"></i>
+                                    <span id="resumeConvertingLabel">{% trans "Converting to PDF..." %}</span>
+                                </div>
+                                <div class="shimmer-bar h-1.5 rounded-full relative">
+                                    <div class="shimmer-fill"></div>
+                                </div>
+                            </div>
+
+                            <!-- PDF file name preview -->
+                            <div id="pdfPreview" class="mt-3 pop-in flex items-center gap-2.5 bg-green-50 border border-green-200 rounded-xl px-3.5 py-2.5 text-sm hidden">
+                                <i class="fa-solid fa-file-pdf text-red-500"></i>
+                                <span id="pdfFileName" class="font-medium text-gray-700 truncate"></span>
+                                <i class="fa-solid fa-circle-check text-green-500 ml-auto"></i>
+                            </div>
+
+                            <button type="button" id="aiAutofillBtn"
+                                class="btn-primary mt-4 w-full px-4 py-2.5 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+                                disabled>
+                                <i class="fa-solid fa-wand-magic-sparkles" id="aiAutofillBtnIcon"></i>
+                                <span id="aiAutofillBtnLabel">{% trans "Autofill with AI" %}</span>
+                            </button>
+                            <div id="aiAutofillMessage" class="text-sm mt-2 flex items-center gap-1.5" style="display:none;"></div>
+                        </div>
+
+                        {% if recruitment.optional_profile_image %}
+                        <!-- Profile Image -->
+                        <div class="section-card p-5 reveal">
+                            <div class="flex items-center gap-2.5 mb-4">
+                                <div class="section-icon-badge"><i class="fa-solid fa-image"></i></div>
+                                <h3 class="font-bold text-gray-900">{% trans "Profile Image" %}</h3>
+                            </div>
+                            <label class="form-label required-star">{% trans "Photo" %}</label>
+                            <label for="profileImageUpload"
+                                class="dropzone flex flex-col items-center justify-center w-full py-6 px-4 cursor-pointer text-center">
+                                <div class="flex flex-col items-center justify-center gap-1">
+                                    <i class="fa-solid fa-arrow-up-from-bracket text-lg mb-1 text-[var(--brand-700)]"></i>
+                                    <p class="text-sm font-semibold text-gray-700">{% trans "Upload photo" %}</p>
+                                    <p class="text-xs text-gray-400">{% trans "JPG, PNG up to 5MB" %}</p>
+                                </div>
+                                <input id="profileImageUpload" type="file" name="profile"
+                                    class="hidden" accept=".jpg, .jpeg, .png" required/>
+                            </label>
+                            {{ form.profile.errors }}
+                            <div id="err-profile" class="mt-2 text-sm flex items-center gap-1.5" style="display:none;color:#dc3545;"><i class="fa-solid fa-circle-exclamation"></i><span></span></div>
+
+                            <!-- Preview image -->
+                            <div id="imagePreview" class="mt-4 hidden pop-in">
+                                <img src="" alt="Image Preview"
+                                    class="w-24 h-24 object-cover rounded-xl border-2 border-white shadow-md" />
+                            </div>
+                        </div>
                         {% endif %}
-                        <form class="col-span-12 lg:col-span-8 bg-[{{theme_obj.primary_50}}] rounded-md shadow-card p-5 myform" method="post" enctype="multipart/form-data">
-                            {% csrf_token %}
-                            <div class= "lg:h-[calc(100vh_-_160px)] overflow-hidden overflow-y-auto">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 ">
-                                    <div>
-                                        <label class="required-star" for="name">{% trans "Name" %}</label>
-                                        <div class="relative">
-                                            <input type="text" id="name" name="name" placeholder="Enter your name" required style="padding-left: 35px;" value="{{ form.name.value|default:'' }}">
-                                            <span class="absolute left-1 top-0 bottom-0 m-auto flex items-center ps-2 text-sm text-[{{theme_obj.primary_700}}]">
 
-                                                <i class="fa-solid fa-user"></i></span>
-                                            </div>
-                                            {{form.name.errors}}
+                        <!-- Personal Info -->
+                        <div class="section-card p-5 reveal" id="sec-personal">
+                            <div class="flex items-center gap-2.5 mb-4">
+                                <div class="section-icon-badge"><i class="fa-solid fa-user"></i></div>
+                                <h3 class="font-bold text-gray-900">{% trans "Personal Information" %}</h3>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="field-affix">
+                                    <div class="fl-wrap has-icon relative">
+                                        <input type="text" id="name" name="name" required maxlength="100"
+                                            class="field-input fl-input" style="padding-left: 38px; padding-right: 34px;" value="{{ form.name.value|default:'' }}" autocomplete="name">
+                                        <label for="name" class="fl-label fl-required">{% trans "Name" %}</label>
+                                        <span class="absolute left-0 top-0 bottom-0 flex items-center pl-3 text-sm text-[var(--brand-700)] pointer-events-none">
+                                            <i class="fa-solid fa-user"></i></span>
+                                        <span class="field-status-icon" id="status-name"><i class="fa-solid fa-circle-check"></i></span>
                                     </div>
-                                    <div>
-                                        <label class="required-star" for="email">{% trans "Email" %}</label>
-                                        <div class="relative">
-                                            <input type="email" id="email" name="email" placeholder="e.g. janedoe@example.com" required style="padding-left: 35px;" value="{{ form.email.value|default:'' }}">
-                                            <span
-                                            class="absolute left-1 top-0 bottom-0 m-auto flex items-center ps-2 text-sm text-[{{theme_obj.primary_700}}]"><i
-                                            class="fa-solid fa-envelope"></i></span>
-                                        </div>
-                                        {{form.email.errors}}
-                                    </div>
-                                    <div>
-                                        <label class="required-star" for="phone">{% trans "Phone" %}</label>
-                                        <div class="relative">
-                                            <input type="text" placeholder="e.g. +1 245 999 999" name="mobile" style="padding-left: 35px;" value="{{ form.mobile.value|default:'' }}">
-                                            <span
-                                            class="absolute left-1 top-0 bottom-0 m-auto flex items-center ps-2 text-sm text-[{{theme_obj.primary_700}}]"><i
-                                            class="fa-solid fa-phone"></i></span>
-                                        </div>
-                                        {{form.mobile.errors}}
-                                    </div>
-                                    <div>
-                                        <input
-                                            type="text"
-                                            name="recruitment_id"
-                                            hidden
-                                            value="{{recruitment.id}}"
-                                            />
-                                        <label for="recuitment" >{% trans "Choose Job Position" %}</label>
-                                        <div class="relative">
-                                            <select name="job_position_id" class="oh-select oh-select2 w-100" style="height: 35px">
-                                                 {% for job in recruitment.open_positions.all %}
-                                                    <option value="{{job.id}}">&nbsp;&nbsp;&nbsp;&nbsp;{{job.job_position}}</option>
-                                                {% endfor %}
-                                            </select>
-                                            <span class="absolute left-2 top-3 text-sm text-[{{theme_obj.primary_700}}] pointer-events-none">
-                                                <i class="fa-solid fa-briefcase"></i>
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label for="portfolio">{% trans "Portfolio" %}</label>
-                                        <div class="relative">
-                                            <input type="text" id="portfolio" name="portfolio" placeholder="e.g. https://www.linktoportfolio.com/" style="padding-left: 35px;" value="{{ form.portfolio.value|default:'' }}">
-                                            <span
-                                            class="absolute left-1 top-0 bottom-0 m-auto flex items-center ps-2 text-sm text-[{{theme_obj.primary_700}}]"><i
-                                            class="fa-solid fa-folder-open"></i></span>
-                                        </div>
-                                        {{form.portfolio.errors}}
-                                    </div>
-
-                                    <div>
-                                        <label class="required-star" for="gender">{% trans "Gender" %}</label>
-                                        <div class="relative">
-                                            {{form.gender}}
-                                            <span class="absolute left-1 top-0 bottom-0 m-auto flex items-center ps-2 text-sm text-[{{theme_obj.primary_700}}]">
-                                                <i class="fa-solid fa-circle-dot"></i></span>
-                                            </div>
-                                            {{form.gender.errors}}
-                                    </div>
-
+                                    {{ form.name.errors }}
+                                    <small id="ai-warn-name" class="text-warning" style="display:none;"></small>
+                                    <div id="err-name" class="mt-1 text-sm flex items-center gap-1.5" style="display:none;color:#dc3545;"><i class="fa-solid fa-circle-exclamation"></i><span></span></div>
+                                    
                                 </div>
-
-                                <div class="mb-3">
-                                    <label class="required-star" for="address">{% trans "Address" %}</label>
-                                    <div class="relative">
-                                        <textarea type="text" id="address" name="address" required rows="3" placeholder="Enter your address"
-                                            style="padding-left: 35px;">{{ form.address.value|default:'' }}</textarea>
-                                            <span
-                                            class="absolute left-1 top-2.5 m-auto flex items-center ps-2 text-sm text-[{{theme_obj.primary_700}}]"><i
-                                            class="fa-solid fa-location-dot"></i></span>
-                                        </div>
-                                        {{form.address.errors}}
-                                </div>
-
-
-                                <div class="p-5 rounded-md bg-[#f5f5f5] mb-4">
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <!-- Profile Image Upload -->
-                                        <div>
-                                            <label class="{% if not recruitment.optional_profile_image %}required-star{% endif %}">{% trans "Profile Image" %}</label>
-                                            <label for="profileImageUpload"
-                                                class="bg-white flex flex-col items-center justify-center w-full h-[6rem] border-2 border-dashed border-[#d5d5d5] rounded-lg cursor-pointer hover:border-gray-400 transition">
-                                                <div class="flex flex-col items-center justify-center">
-                                                    <i
-                                                        class="fa-solid fa-arrow-up-from-bracket text-xl mb-2 text-gray-500"></i>
-                                                    <p class="text-sm font-semibold text-gray-700">Upload photo</p>
-                                                    <p class="text-xs text-[#9e9e9e]">JPG, PNG up to 5MB</p>
-                                                </div>
-                                                <input id="profileImageUpload" type="file" name="profile"
-                                                    class="hidden" accept=".jpg, .jpeg, .png"
-                                                    {% if not recruitment.optional_profile_image %}required{% endif %}/>
-                                            </label>
-                                            {{form.profile.errors}}
-
-                                            <!-- Preview image -->
-                                            <div id="imagePreview" class="mt-4 hidden">
-                                                <img src="" alt="Image Preview"
-                                                    class="w-32 h-32 object-cover rounded border" />
-                                            </div>
-                                        </div>
-
-                                        <!-- Resume Upload -->
-                                        <div>
-                                            <label class="{% if not recruitment.optional_resume %}required-star{% endif %}">{% trans "Resume" %}</label>
-                                                <label for="resumeUpload"
-                                                class="bg-white flex flex-col items-center justify-center w-full h-[6rem] border-2 border-dashed border-[#d5d5d5] rounded-lg cursor-pointer hover:border-gray-400 transition">
-                                                <div class="flex flex-col items-center justify-center">
-                                                    <i class="fa-solid fa-file-pdf text-xl mb-2 text-gray-500"></i>
-                                                    <p class="text-sm font-semibold text-gray-700">Upload PDF</p>
-                                                    <p class="text-xs text-[#9e9e9e]">Up to 5MB</p>
-                                                </div>
-                                                <input id="resumeUpload" name="resume" type="file" accept="application/pdf"
-                                                    class="hidden" {% if not recruitment.optional_resume %}required{% endif %}/>
-                                            </label>
-                                            {{form.resume.errors}}
-
-                                            <!-- PDF file name preview -->
-                                            <div id="pdfPreview" class="mt-4 text-sm text-gray-600 hidden">
-                                                <i class="fa-solid fa-file-pdf text-red-500 mr-2"></i>
-                                                <span id="pdfFileName"></span>
-                                            </div>
-                                        </div>
-
+                                <div class="field-affix">
+                                    <div class="fl-wrap has-icon relative">
+                                        <input type="email" id="email" name="email" required maxlength="254"
+                                            class="field-input fl-input" style="padding-left: 38px; padding-right: 34px;" value="{{ form.email.value|default:'' }}" autocomplete="email">
+                                        <label for="email" class="fl-label fl-required">{% trans "Email" %}</label>
+                                        <span class="absolute left-0 top-0 bottom-0 flex items-center pl-3 text-sm text-[var(--brand-700)] pointer-events-none">
+                                            <i class="fa-solid fa-envelope"></i></span>
+                                        <span class="field-status-icon" id="status-email"><i class="fa-solid fa-circle-check"></i></span>
                                     </div>
+                                    {{ form.email.errors }}
+                                    <small id="ai-warn-email" class="text-warning" style="display:none;"></small>
+                                    <div id="err-email" class="mt-1 text-sm flex items-center gap-1.5" style="display:none;color:#dc3545;"><i class="fa-solid fa-circle-exclamation"></i><span></span></div>
                                 </div>
+                                <div class="relative">
+                                    <label class="form-label fl-required" for="phoneNumber">{% trans "Phone" %}</label>
+                                    <div class="phone-group" id="phoneGroup">
+                                        <button type="button" id="phoneCountryBtn" class="phone-country-btn" aria-haspopup="listbox" aria-expanded="false">
+                                            <img id="phoneCountryFlag" src="" alt="" class="phone-flag-img">
+                                            <span id="phoneCountryDial">+91</span>
+                                            <i class="fa-solid fa-chevron-down phone-country-caret"></i>
+                                        </button>
+                                        <input type="text" id="phoneNumber" inputmode="numeric" autocomplete="tel-national">
+                                    </div>
+                                    <div class="phone-country-panel hidden" id="phoneCountryPanel">
+                                        <input type="text" id="phoneCountrySearch" class="phone-country-search" placeholder="{% trans 'Search country or code' %}" autocomplete="off">
+                                        <div class="phone-country-list" id="phoneCountryList"></div>
+                                    </div>
+                                    <input type="hidden" id="phone" name="mobile" value="{{ form.mobile.value|default:'' }}">
+                                    {{ form.mobile.errors }}
+                                    <small id="ai-warn-mobile" class="text-warning" style="display:none;"></small>
+                                    <div id="err-phone" class="mt-1 text-sm flex items-center gap-1.5" style="display:none;color:#dc3545;"><i class="fa-solid fa-circle-exclamation"></i><span></span></div>
+                                </div>
+                                <!-- Paired with Date of Birth, not Gender - both use a plain
+                                     label-above-the-box layout (Phone's custom flag+number
+                                     group can't cleanly host a floating label the way a plain
+                                     input can), so their boxes start at the same height. Gender
+                                     (floating label, box starts right at the row top) sits
+                                     alone below instead of next to a field with a different
+                                     vertical rhythm. -->
+                                <div>
+                                    <label class="form-label" for="dob">{% trans "Date of Birth" %}</label>
+                                    <input type="date" id="dob" name="dob" class="oh-input field-input w-100" value="{{ form.dob.value|default:'' }}">
+                                    {{ form.dob.errors }}
+                                    <small id="ai-warn-dob" class="text-warning" style="display:none;"></small>
+                                    <div id="err-dob" class="mt-1 text-sm flex items-center gap-1.5" style="display:none;color:#dc3545;"><i class="fa-solid fa-circle-exclamation"></i><span></span></div>
+                                </div>
+                                <div class="fl-wrap cs-wrap relative">
+                                    <button type="button" class="field-input fl-input cs-trigger" id="genderTrigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="cs-value"></span>
+                                        <i class="fa-solid fa-chevron-down cs-caret"></i>
+                                    </button>
+                                    <label for="genderTrigger" class="fl-label">{% trans "Gender" %}</label>
+                                    <select id="gender" name="gender" class="cs-native" tabindex="-1" aria-hidden="true">
+                                        <option value=""></option>
+                                        <option value="male" {% if form.gender.value == "male" %}selected{% endif %}>{% trans "Male" %}</option>
+                                        <option value="female" {% if form.gender.value == "female" %}selected{% endif %}>{% trans "Female" %}</option>
+                                        <option value="other" {% if form.gender.value == "other" %}selected{% endif %}>{% trans "Other" %}</option>
+                                    </select>
+                                    <div class="cs-panel hidden"><div class="cs-list"></div></div>
+                                    {{ form.gender.errors }}
+                                    <small id="ai-warn-gender" class="text-warning" style="display:none;"></small>
+                                </div>
+                            </div>
+                        </div>
 
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 ">
-                                    <div>
-                                        <label class="required-star" for="id_country">{% trans "Country" %}</label>
-                                        <div class="relative">
-                                            <select name="country" id="id_country" required class="oh-select oh-select-2" style="padding-left:30px;" data-selected="{{ form.country.value|default:'' }}">
+                        <!-- Job Details -->
+                        <div class="section-card p-5 reveal" id="sec-job">
+                            <div class="flex items-center gap-2.5 mb-4">
+                                <div class="section-icon-badge"><i class="fa-solid fa-briefcase"></i></div>
+                                <h3 class="font-bold text-gray-900">{% trans "Job Details" %}</h3>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Not shown to the candidate: recruitments on this form only
+                                     ever have a single open position in practice, and the
+                                     picker for it kept rendering with a visibly off-center
+                                     icon that wasn't worth chasing further. Submits the same
+                                     default a candidate would've gotten by leaving the old
+                                     dropdown untouched - its first open position. -->
+                                <input type="hidden" name="job_position_id" value="{{ recruitment.open_positions.all.0.id|default:'' }}">
+
+                                {% if not request.GET.utm_source %}
+                                <div>
+                                    <div class="fl-wrap cs-wrap relative">
+                                        <button type="button" class="field-input fl-input cs-trigger" id="sourceTrigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="cs-value"></span>
+                                            <i class="fa-solid fa-chevron-down cs-caret"></i>
+                                        </button>
+                                        <label for="sourceTrigger" class="fl-label fl-required">{% trans "Source" %}</label>
+                                        <select id="sourcePlatformSelect" name="utm_source" class="cs-native" required tabindex="-1" aria-hidden="true">
+                                            <option value=""></option>
+                                            {% for platform in platforms %}
+                                            <option value="{{ platform.title }}">{{ platform.title }}</option>
+                                            {% endfor %}
+                                            <option value="__create_new__">{% trans "+ Create New Source" %}</option>
                                         </select>
-                                            {{form.country.errors}}
-                                            <span class="absolute left-1 top-2.5 m-auto flex items-center ps-2 text-sm text-[{{theme_obj.primary_700}}]">
-                                                <i class="fa-solid fa-globe"></i></span>
-                                        </div>
+                                        <div class="cs-panel hidden"><div class="cs-list"></div></div>
                                     </div>
-                                    <div>
-                                        <label class="required-star" for="id_state">{% trans "State" %}</label>
-                                        <div class="relative">
-                                            <select name="state" id="id_state" required class="oh-select oh-select-2" style="padding-left:30px;" data-selected="{{ form.state.value|default:'' }}">
-                                            </select>
-                                                {{form.state.errors}}
-                                            <span class="absolute left-1 top-2.5 m-auto flex items-center ps-2 text-sm text-[{{theme_obj.primary_700}}]">
-                                                <i class="fa-solid fa-map"></i>
-                                            </span>
-                                        </div>
+                                    <div class="mt-2" id="newSourceGroup" style="display:none;">
+                                        <input type="text" id="newSourceInput" class="oh-input field-input w-100" placeholder="{% trans 'e.g. LinkedIn, Indeed' %}" maxlength="100">
                                     </div>
-                                    <div>
-                                        <label class="required-star" for="city">{% trans "City" %}</label>
-                                        <div class="relative">
-                                            <input type="text" id="city" required name="city" placeholder="e.g. Kerala" style="padding-left: 35px;" value="{{ form.city.value|default:'' }}">
-                                            {{form.city.errors}}
-                                            <span
-                                            class="absolute left-1 top-0 bottom-0 m-auto flex items-center ps-2 text-sm text-[{{theme_obj.primary_700}}]"><i
-                                            class="fa-solid fa-city"></i></span>
-                                        </div>
+                                    <div id="err-source" class="mt-1 text-sm flex items-center gap-1.5" style="display:none;color:#dc3545;"><i class="fa-solid fa-circle-exclamation"></i><span></span></div>
+                                </div>
+                                {% endif %}
+
+                              
+                                <div class="field-affix">
+                                    <div class="fl-wrap relative">
+                                        <input type="number" id="available_to_join_days" name="available_to_join_days" class="field-input fl-input w-100" min="0" max="365" value="{{ form.available_to_join_days.value|default:'' }}">
+                                        <label for="available_to_join_days" class="fl-label">{% trans "Available To Join (in days)" %}</label>
                                     </div>
-                                    <div>
-                                        <label class="required-star" for="zip">{% trans "Zip Code" %}</label>
-                                        <div class="relative">
-                                            <input type="text" id="zip" required name="zip" placeholder="e.g. 611 293" style="padding-left: 35px;" value="{{ form.zip.value|default:'' }}">
-                                            {{form.zip.errors}}
-                                            <span
-                                            class="absolute left-1 top-0 bottom-0 m-auto flex items-center ps-2 text-sm text-[{{theme_obj.primary_700}}]"><i
-                                            class="fa-solid fa-location-dot"></i></span>
-                                        </div>
+                                    <div id="err-available_to_join_days" class="mt-1 text-sm flex items-center gap-1.5" style="display:none;color:#dc3545;"><i class="fa-solid fa-circle-exclamation"></i><span></span></div>
+                                </div>
+                                <div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <input type="number" id="experience_years" name="experience_years" class="field-input w-100" min="0" max="60" placeholder="{% trans 'Experience in Years' %}" value="{{ form.experience_years.value|default:'' }}">
+                                        <input type="number" id="experience_months" name="experience_months" class="field-input w-100" min="0" max="11" placeholder="{% trans 'Experience in Months' %}" value="{{ form.experience_months.value|default:'' }}">
+                                    </div>
+                                    <div id="err-experience_years" class="mt-1 text-sm flex items-center gap-1.5" style="display:none;color:#dc3545;"><i class="fa-solid fa-circle-exclamation"></i><span></span></div>
+                                </div>
+                                <div class="field-affix">
+                                    <div class="fl-wrap relative">
+                                        <span class="absolute left-3 top-0 bottom-0 flex items-center text-sm text-[var(--brand-700)] font-semibold z-10">{{ currency_symbol }}</span>
+                                        <input type="number" id="current_salary" name="current_salary" class="field-input fl-input w-100" min="0" step="0.01" style="padding-left: 42px; padding-right: 64px;" value="{{ form.current_salary.value|default:'' }}">
+                                        <label for="current_salary" class="fl-label" style="left: 2.6rem;">{% trans "Current Salary" %}</label>
+                                        <span class="absolute right-3 top-0 bottom-0 flex items-center text-xs text-gray-400">{% trans "Monthly" %}</span>
+                                    </div>
+                                    <div id="err-current_salary" class="mt-1 text-sm flex items-center gap-1.5" style="display:none;color:#dc3545;"><i class="fa-solid fa-circle-exclamation"></i><span></span></div>
+                                </div>
+                                <div class="field-affix">
+                                    <div class="fl-wrap relative">
+                                        <span class="absolute left-3 top-0 bottom-0 flex items-center text-sm text-[var(--brand-700)] font-semibold z-10">{{ currency_symbol }}</span>
+                                        <input type="number" id="expected_salary" name="expected_salary" class="field-input fl-input w-100" min="0" step="0.01" style="padding-left: 42px; padding-right: 64px;" value="{{ form.expected_salary.value|default:'' }}">
+                                        <label for="expected_salary" class="fl-label" style="left: 2.6rem;">{% trans "Expected Salary" %}</label>
+                                        <span class="absolute right-3 top-0 bottom-0 flex items-center text-xs text-gray-400">{% trans "Monthly" %}</span>
+                                    </div>
+                                    <div id="err-expected_salary" class="mt-1 text-sm flex items-center gap-1.5" style="display:none;color:#dc3545;"><i class="fa-solid fa-circle-exclamation"></i><span></span></div>
+                                </div>
+                                <div class="md:col-span-2 flex items-center gap-3">
+                                    <label class="cf-toggle">
+                                        <input type="checkbox" name="is_salary_negotiable" id="is_salary_negotiable" {% if form.is_salary_negotiable.value %}checked{% endif %}>
+                                        <span class="cf-toggle-track"><span class="cf-toggle-thumb"></span></span>
+                                    </label>
+                                    <label class="oh-label form-label mb-0" for="is_salary_negotiable">{% trans "Open to salary negotiation" %}</label>
+                                </div>
+                                <div class="md:col-span-2">
+                                    <div class="fl-wrap relative" id="skillsFlWrap">
+                                        <label for="skillsSelect" class="fl-label" style="z-index: 5;">{% trans "Skills" %}</label>
+                                        <select id="skillsSelect" name="skills_input" class="oh-select oh-select2 w-100" multiple="multiple">
+                                            {% for skill in all_skills %}
+                                            <option value="{{ skill.id }}">{{ skill.title }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="md:col-span-2 field-affix">
+                                    <div class="fl-wrap relative">
+                                        <textarea id="reason_to_leave" name="reason_to_leave" class="field-input fl-input w-100" rows="2" maxlength="500">{{ form.reason_to_leave.value|default:'' }}</textarea>
+                                        <label for="reason_to_leave" class="fl-label">{% trans "Reason to Leave" %}</label>
+                                    </div>
+                                    <div class="flex items-center justify-between mt-1">
+                                        <div id="err-reason_to_leave" class="text-sm flex items-center gap-1.5" style="display:none;color:#dc3545;"><i class="fa-solid fa-circle-exclamation"></i><span></span></div>
+                                        <span id="reasonCounter" class="text-xs text-gray-400 ml-auto">0/500</span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="flex justify-end">
-                                <button type="submit" onclick="validateForm(event)"
-                                  class="px-4 py-2 bg-[{{theme_obj.primary_600}}] text-white rounded-md text-sm flex items-center gap-2 hover:bg-[{{theme_obj.primary_800}}] transition duration-300">
-                                  <i class="fa-solid fa-check"></i>
-                                  {% trans "Submit Application" %}
-                                </button>
-                              </div>
-                        </form>
-                </div>
+                        </div>
 
+                        <!-- Current Location -->
+                        <div class="section-card p-5 reveal" id="sec-location">
+                            <div class="flex items-center gap-2.5 mb-4">
+                                <div class="section-icon-badge"><i class="fa-solid fa-location-dot"></i></div>
+                                <h3 class="font-bold text-gray-900">{% trans "Current Location" %}</h3>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="md:col-span-2 field-affix">
+                                    <div class="fl-wrap relative">
+                                        <textarea id="address" name="address" class="field-input fl-input w-100" rows="2" maxlength="255">{{ form.address.value|default:'' }}</textarea>
+                                        <label for="address" class="fl-label">{% trans "Address" %}</label>
+                                    </div>
+                                    {{ form.address.errors }}
+                                    <small id="ai-warn-address" class="text-warning" style="display:none;"></small>
+                                </div>
+                                <div class="fl-wrap cs-wrap relative">
+                                    <button type="button" class="field-input fl-input cs-trigger" id="countryTrigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="cs-value"></span>
+                                        <i class="fa-solid fa-chevron-down cs-caret"></i>
+                                    </button>
+                                    <label for="countryTrigger" class="fl-label">{% trans "Country" %}</label>
+                                    <select name="country" id="id_country" class="cs-native" tabindex="-1" aria-hidden="true"
+                                        data-selected="{{ form.country.value|default:'' }}"></select>
+                                    <div class="cs-panel hidden"><div class="cs-list"></div></div>
+                                    {{ form.country.errors }}
+                                    <small id="ai-warn-country" class="text-warning" style="display:none;"></small>
+                                </div>
+                                <div class="fl-wrap cs-wrap relative">
+                                    <button type="button" class="field-input fl-input cs-trigger" id="stateTrigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="cs-value"></span>
+                                        <i class="fa-solid fa-chevron-down cs-caret"></i>
+                                    </button>
+                                    <label for="stateTrigger" class="fl-label">{% trans "State" %}</label>
+                                    <select name="state" id="id_state" class="cs-native" tabindex="-1" aria-hidden="true"
+                                        data-selected="{{ form.state.value|default:'' }}"></select>
+                                    <div class="cs-panel hidden"><div class="cs-list"></div></div>
+                                    {{ form.state.errors }}
+                                    <small id="ai-warn-state" class="text-warning" style="display:none;"></small>
+                                </div>
+                                <div class="field-affix">
+                                    <div class="fl-wrap relative">
+                                        <input type="text" id="zip" name="zip" class="field-input fl-input w-100" maxlength="30" value="{{ form.zip.value|default:'' }}">
+                                        <label for="zip" class="fl-label">{% trans "Zip Code" %}</label>
+                                    </div>
+                                    {{ form.zip.errors }}
+                                    <small id="ai-warn-zip" class="text-warning" style="display:none;"></small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Education Details -->
+                        <div class="section-card p-5 reveal" id="sec-education">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="section-icon-badge"><i class="fa-solid fa-graduation-cap"></i></div>
+                                    <h3 class="font-bold text-gray-900">{% trans "Education Details" %}</h3>
+                                </div>
+                                <button type="button" id="addEducationRow"
+                                    class="text-sm text-[var(--brand-700)] font-semibold flex items-center gap-1.5 bg-[var(--brand-50)] px-3 py-1.5 rounded-lg hover:opacity-80 transition">
+                                    <i class="fa-solid fa-plus"></i> {% trans "Add Education" %}
+                                </button>
+                            </div>
+                            {{ education_formset.management_form }}
+                            <div id="educationRows" class="space-y-2.5"></div>
+                            <template id="educationRowTemplate">
+                                <div class="formset-row pop-in grid grid-cols-1 md:grid-cols-2 gap-3 bg-gray-50 border border-gray-100 p-4 rounded-xl relative">
+                                    <button type="button" class="formset-remove-row absolute top-2.5 right-2.5 w-7 h-7 rounded-full flex items-center justify-center text-red-500" title="{% trans 'Remove' %}">
+                                        <i class="fa-solid fa-xmark"></i>
+                                    </button>
+                                    <div>
+                                        <label class="oh-label form-label">{% trans "Course" %}</label>
+                                        <input type="text" class="oh-input field-input w-100 py-2" name="education-__PREFIX__-degree" placeholder="{% trans 'e.g. B.Tech' %}" maxlength="100">
+                                    </div>
+                                    <div>
+                                        <label class="oh-label form-label">{% trans "Branch/ Specialization" %}</label>
+                                        <input type="text" class="oh-input field-input w-100 py-2" name="education-__PREFIX__-specialization" placeholder="{% trans 'e.g. Computer Science' %}" maxlength="100">
+                                    </div>
+                                    <div>
+                                        <label class="oh-label form-label">{% trans "CGPA/Percentage" %}</label>
+                                        <input type="text" class="oh-input field-input w-100 py-2" name="education-__PREFIX__-percentage_cgpa" placeholder="{% trans 'e.g. 8.5' %}" maxlength="10" inputmode="decimal">
+                                    </div>
+                                    <div>
+                                        <label class="oh-label form-label">{% trans "Start of Course" %}</label>
+                                        <input type="date" class="oh-input field-input w-100 py-2" name="education-__PREFIX__-start_date" min="1950-01-01" max="{% now 'Y-m-d' %}">
+                                    </div>
+                                    <div>
+                                        <label class="oh-label form-label">{% trans "End of Course" %}</label>
+                                        <input type="date" class="oh-input field-input w-100 py-2" name="education-__PREFIX__-end_date" min="1950-01-01">
+                                    </div>
+                                    <div>
+                                        <label class="oh-label form-label">{% trans "University/ College" %}</label>
+                                        <input type="text" class="oh-input field-input w-100 py-2" name="education-__PREFIX__-university" placeholder="{% trans 'e.g. Punjab University' %}" maxlength="150">
+                                    </div>
+                                    <div>
+                                        <label class="oh-label form-label">{% trans "Location" %}</label>
+                                        <input type="text" class="oh-input field-input w-100 py-2" name="education-__PREFIX__-location" placeholder="{% trans 'e.g. Punjab' %}" maxlength="100">
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Experience Details -->
+                        <div class="section-card p-5 reveal">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="section-icon-badge"><i class="fa-solid fa-briefcase"></i></div>
+                                    <h3 class="font-bold text-gray-900">{% trans "Experience Details" %}</h3>
+                                </div>
+                                <button type="button" id="addExperienceRow"
+                                    class="text-sm text-[var(--brand-700)] font-semibold flex items-center gap-1.5 bg-[var(--brand-50)] px-3 py-1.5 rounded-lg hover:opacity-80 transition">
+                                    <i class="fa-solid fa-plus"></i> {% trans "Add Experience" %}
+                                </button>
+                            </div>
+                            {{ experience_formset.management_form }}
+                            <div id="experienceRows" class="space-y-2.5"></div>
+                            <template id="experienceRowTemplate">
+                                <div class="formset-row pop-in grid grid-cols-1 md:grid-cols-2 gap-3 bg-gray-50 border border-gray-100 p-4 rounded-xl relative">
+                                    <button type="button" class="formset-remove-row absolute top-2.5 right-2.5 w-7 h-7 rounded-full flex items-center justify-center text-red-500" title="{% trans 'Remove' %}">
+                                        <i class="fa-solid fa-xmark"></i>
+                                    </button>
+                                    <div>
+                                        <label class="oh-label form-label">{% trans "Company Name" %}</label>
+                                        <input type="text" class="oh-input field-input w-100 py-2" name="experience-__PREFIX__-company_name" placeholder="{% trans 'e.g. Ariel' %}" maxlength="150">
+                                    </div>
+                                    <div>
+                                        <label class="oh-label form-label">{% trans "Job Title" %}</label>
+                                        <input type="text" class="oh-input field-input w-100 py-2" name="experience-__PREFIX__-designation" placeholder="{% trans 'e.g. Software Engineer' %}" maxlength="100">
+                                    </div>
+                                    <div class="md:col-span-2 flex items-center gap-3">
+                                        <label class="cf-toggle">
+                                            <input type="checkbox" class="formset-current-job-toggle" name="experience-__PREFIX__-is_current_job" id="experience-__PREFIX__-is_current_job">
+                                            <span class="cf-toggle-track"><span class="cf-toggle-thumb"></span></span>
+                                        </label>
+                                        <label class="oh-label form-label mb-0" for="experience-__PREFIX__-is_current_job">{% trans "Currently working here" %}</label>
+                                    </div>
+                                    <div>
+                                        <label class="oh-label form-label">{% trans "Date of Joining" %}</label>
+                                        <input type="date" class="oh-input field-input w-100 py-2" name="experience-__PREFIX__-start_date" min="1950-01-01" max="{% now 'Y-m-d' %}">
+                                    </div>
+                                    <div class="formset-end-date-group">
+                                        <label class="oh-label form-label">{% trans "Date of Relieving" %}</label>
+                                        <input type="date" class="oh-input field-input w-100 py-2" name="experience-__PREFIX__-end_date" min="1950-01-01" max="{% now 'Y-m-d' %}">
+                                    </div>
+                                    <div>
+                                        <label class="oh-label form-label">{% trans "Location" %}</label>
+                                        <input type="text" class="oh-input field-input w-100 py-2" name="experience-__PREFIX__-location" placeholder="{% trans 'e.g. Punjab' %}" maxlength="100">
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                    </div>
+
+                    <div class="flex justify-end mt-6">
+                        <button type="submit" id="submitApplicationBtn"
+                            class="btn-primary px-6 py-3 text-white rounded-xl text-sm font-bold flex items-center gap-2">
+                            <i class="fa-solid fa-check" id="submitBtnIcon"></i>
+                            <span id="submitBtnLabel">{% trans "Submit Application" %}</span>
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 
+    {% comment %}
+    Consumed by the "restore previously submitted state" script near the
+    end of the script block below, after a validation error elsewhere on
+    the form redisplays this page - see education_initial/
+    experience_initial/submitted_skill_names in
+    recruitment/views/surveys.py:application_form.
+    {% endcomment %}
+    {{ education_initial|json_script:"educationInitialData" }}
+    {{ experience_initial|json_script:"experienceInitialData" }}
+    {{ submitted_skill_names|json_script:"submittedSkillsData" }}
 
+    <script src="{% static '/jquery/jquery.min.js' %}"></script>
     <script src="{% static '/index/country.js' %}"></script>
+    <script src="{% static 'vendor/mammoth/mammoth.browser.min.js' %}"></script>
+    <script src="{% static 'vendor/dompurify/purify.min.js' %}"></script>
+    <script src="{% static 'vendor/html2canvas/html2canvas.min.js' %}"></script>
+    <script src="{% static 'vendor/jspdf/jspdf.umd.min.js' %}"></script>
     <script>
         {% include 'select2.js' %}
         var resume = "{{resume.file.url}}"
@@ -293,19 +1234,1156 @@
               $(this).html('<strong>' + text + '</strong>');
             }
         });
-        function validateForm(event) {
-          var fileInput = document.getElementById("photo");
-          var errorList = document.getElementById("error-list");
-          {% if not perms.recruitment.add_candidate %}
-            if (!fileInput.value) {
-              errorList.scrollIntoView({ behavior: "smooth", block: "center" });
-              errorList.style.display = "block"; // Show error message
-            } else {
-              errorList.style.display = "none"; // Hide error message
-            }
-          {% endif %}
-        }
         $(document).ready(function(){
+          // Caps the native date picker at 18 years ago so a candidate
+          // can't even pick an under-18 date, mirroring the age >= 18
+          // check further down in the submit handler.
+          (function () {
+            var dobInputEl = document.getElementById("dob");
+            var eighteenYearsAgo = new Date();
+            eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
+            var yyyy = eighteenYearsAgo.getFullYear();
+            var mm = String(eighteenYearsAgo.getMonth() + 1).padStart(2, "0");
+            var dd = String(eighteenYearsAgo.getDate()).padStart(2, "0");
+            dobInputEl.max = yyyy + "-" + mm + "-" + dd;
+          })();
+
+          // ---- Floating labels (input/textarea/select alike) ----
+          // Driven by JS-toggled classes rather than CSS's
+          // :placeholder-shown, since that pseudo-class doesn't exist at
+          // all for <select>, and its *reactivity* to programmatic value
+          // changes (pre-filled server values, AI autofill) isn't
+          // consistent enough across engines to trust for the only cue
+          // this label has. window.syncFloatingLabel is exposed so code
+          // that sets a field's value directly (skills chips, formset
+          // rows) can re-sync it without waiting for a native event.
+          function initFloatingLabel(wrapEl) {
+            var field = wrapEl.querySelector(".fl-input");
+            if (!field) return;
+            function sync() {
+              var filled = field.value !== null && field.value !== undefined && String(field.value).trim() !== "";
+              wrapEl.classList.toggle("fl-filled", filled);
+            }
+            field.addEventListener("input", sync);
+            field.addEventListener("change", sync);
+            field.addEventListener("focus", function () { wrapEl.classList.add("fl-focused"); });
+            field.addEventListener("blur", function () { wrapEl.classList.remove("fl-focused"); sync(); });
+            sync();
+          }
+          // .cs-wrap fields (custom-select) are wired separately below -
+          // their visible trigger is a <button>, which has no .value to
+          // read, so they'd always read as "empty" through this path.
+          document.querySelectorAll(".fl-wrap:not(.cs-wrap)").forEach(initFloatingLabel);
+          window.syncFloatingLabel = function (fieldEl) {
+            if (!fieldEl) return;
+            var wrapEl = fieldEl.closest(".fl-wrap");
+            if (!wrapEl) return;
+            var filled = fieldEl.value !== null && fieldEl.value !== undefined && String(fieldEl.value).trim() !== "";
+            wrapEl.classList.toggle("fl-filled", filled);
+          };
+
+          // ---- Custom select (Gender / Job Position / Source / Experience
+          // Months) ----
+          // Keeps the real <select class="cs-native"> in the DOM (still
+          // has name=... and its <option>s, so it's what actually gets
+          // submitted and what the rest of the form's existing code -
+          // AI autofill's aiFillField, the source create-new toggle,
+          // formset prefill - already reads/writes via
+          // [name='gender']/#sourcePlatformSelect/etc, all unchanged).
+          // This only replaces how it's *displayed*: a styled button
+          // standing in for the native select's own box, whose selected
+          // text a floating label couldn't reliably share space with.
+          function initCustomSelect(wrapEl) {
+            var trigger = wrapEl.querySelector(".cs-trigger");
+            var nativeSelect = wrapEl.querySelector(".cs-native");
+            var panel = wrapEl.querySelector(".cs-panel");
+            var list = wrapEl.querySelector(".cs-list");
+            var valueSpan = trigger.querySelector(".cs-value");
+            if (!trigger || !nativeSelect || !panel || !list) return;
+
+            function renderOptions() {
+              list.innerHTML = "";
+              Array.prototype.forEach.call(nativeSelect.options, function (opt) {
+                var row = document.createElement("div");
+                row.className = "cs-option" + (opt.value === nativeSelect.value ? " is-active" : "");
+                row.setAttribute("role", "option");
+                row.textContent = opt.textContent;
+                row.addEventListener("click", function () {
+                  nativeSelect.value = opt.value;
+                  nativeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+                  closePanel();
+                });
+                list.appendChild(row);
+              });
+            }
+            function syncValueDisplay() {
+              // Blank whenever nothing is actually selected - not the
+              // selected <option>'s own text, since the placeholder-ish
+              // first option in some of these (country.js's own "Select
+              // Country"/"Select State" wording in particular) is meant
+              // to show only *inside* the open dropdown list, not sit in
+              // the closed trigger doubling as unwanted placeholder text.
+              var text = nativeSelect.value ? nativeSelect.options[nativeSelect.selectedIndex].textContent : "";
+              valueSpan.textContent = text;
+              wrapEl.classList.toggle("fl-filled", !!nativeSelect.value);
+            }
+            // Moved to a fixed-position child of <body> instead of an
+            // absolutely-positioned child of the field's own wrapper.
+            // Nesting it inside the wrapper made the panel's stacking
+            // depend entirely on every ancestor between it and the page
+            // root - a card, a grid cell, anything with its own stacking
+            // context could end up painting *over* the panel even with a
+            // high z-index, which is exactly what kept happening (Gender,
+            // then Country/State, all inside different card/grid
+            // ancestors). A fixed-position element parented to <body>
+            // has no such ancestor to interfere - it's positioned purely
+            // from the trigger's live on-screen coordinates, computed
+            // fresh every time it opens.
+            panel.classList.add("cs-panel-detached");
+            document.body.appendChild(panel);
+            function positionPanel() {
+              var triggerRect = trigger.getBoundingClientRect();
+              var panelHeight = panel.getBoundingClientRect().height;
+              var spaceBelow = window.innerHeight - triggerRect.bottom;
+              var openUpward = spaceBelow < panelHeight + 8 && triggerRect.top > panelHeight + 8;
+              panel.style.left = triggerRect.left + "px";
+              panel.style.width = triggerRect.width + "px";
+              panel.style.top = openUpward
+                ? (triggerRect.top - panelHeight - 6) + "px"
+                : (triggerRect.bottom + 6) + "px";
+            }
+            function openPanel() {
+              // Close any other open custom-select panel first - two
+              // panels open at once, both now living directly in <body>,
+              // would otherwise just stack on top of each other.
+              document.querySelectorAll(".cs-panel-detached:not(.hidden)").forEach(function (p) {
+                p.classList.add("hidden");
+              });
+              document.querySelectorAll(".cs-trigger[aria-expanded='true']").forEach(function (t) {
+                t.setAttribute("aria-expanded", "false");
+              });
+              renderOptions();
+              panel.classList.remove("hidden");
+              trigger.setAttribute("aria-expanded", "true");
+              positionPanel();
+            }
+            function closePanel() {
+              panel.classList.add("hidden");
+              trigger.setAttribute("aria-expanded", "false");
+            }
+            trigger.addEventListener("click", function (e) {
+              e.stopPropagation();
+              if (panel.classList.contains("hidden")) openPanel(); else closePanel();
+            });
+            trigger.addEventListener("focus", function () { wrapEl.classList.add("fl-focused"); });
+            trigger.addEventListener("blur", function () { wrapEl.classList.remove("fl-focused"); });
+            document.addEventListener("click", function (e) {
+              // The panel no longer lives inside wrapEl (it's a direct
+              // child of <body> now), so "outside" has to check both.
+              if (!wrapEl.contains(e.target) && !panel.contains(e.target)) closePanel();
+            });
+            document.addEventListener("keydown", function (e) {
+              if (e.key === "Escape") closePanel();
+            });
+            // The panel's fixed coordinates are a snapshot from the
+            // moment it opened - if the *page* scrolls while it's open,
+            // close it rather than trying to track the trigger's new
+            // position. Capture phase is needed to catch scrolling on
+            // any ancestor container, but that also means it sees the
+            // panel's *own* option list being scrolled (a 'scroll' event
+            // there gets intercepted here on its way down to the list,
+            // regardless of bubbling) - excluding e.target whenever it's
+            // the panel itself or something inside it is what keeps
+            // scrolling through a long list (Country's 253 options, for
+            // instance) from closing the panel on the first attempt.
+            window.addEventListener("scroll", function (e) {
+              if (!panel.classList.contains("hidden") && !panel.contains(e.target)) closePanel();
+            }, true);
+            window.addEventListener("resize", function () {
+              if (!panel.classList.contains("hidden")) closePanel();
+            });
+            nativeSelect.addEventListener("change", syncValueDisplay);
+            if (!wrapEl.classList.contains("fl-wrap")) {
+              valueSpan.setAttribute("data-placeholder", valueSpan.textContent);
+            }
+            // Exposed so code outside this closure (the Country->State
+            // cascade bridge just below) can force a redraw when the
+            // native <select>'s options/value changed without it firing
+            // its own 'change' event.
+            nativeSelect._csSync = syncValueDisplay;
+            syncValueDisplay();
+          }
+          document.querySelectorAll(".cs-wrap").forEach(initCustomSelect);
+
+          // country.js (a shared file used across the whole app, out of
+          // scope to edit here) rewrites #id_state's <option> list and
+          // selected value directly via its own onchange handler on
+          // #id_country - a plain DOM mutation, not a '.value =' change,
+          // so it never fires State's own 'change' event and its
+          // custom-select trigger button would otherwise keep showing
+          // whatever state was picked for the *previous* country.
+          // setTimeout(...,0) runs this after country.js's own onchange
+          // handler (which does the actual rewrite) has finished.
+          (function () {
+            var countrySelect = document.getElementById("id_country");
+            var stateSelect = document.getElementById("id_state");
+            if (!countrySelect || !stateSelect) return;
+            countrySelect.addEventListener("change", function () {
+              setTimeout(function () {
+                if (stateSelect._csSync) stateSelect._csSync();
+              }, 0);
+            });
+          })();
+
+          // ---- Scroll-spy progress dots ----
+          (function () {
+            var steps = document.querySelectorAll(".progress-step");
+            if (!steps.length || !("IntersectionObserver" in window)) return;
+            var targets = {};
+            steps.forEach(function (step) {
+              var id = step.getAttribute("data-target");
+              var el = document.getElementById(id);
+              if (el) targets[id] = step;
+            });
+            var spy = new IntersectionObserver(function (entries) {
+              entries.forEach(function (entry) {
+                var step = targets[entry.target.id];
+                if (!step) return;
+                if (entry.isIntersecting) {
+                  steps.forEach(function (s) { s.classList.remove("active"); });
+                  step.classList.add("active");
+                }
+              });
+            }, { rootMargin: "-40% 0px -50% 0px" });
+            Object.keys(targets).forEach(function (id) {
+              spy.observe(document.getElementById(id));
+            });
+          })();
+
+          // ---- Real per-section completion for the stepper ----
+          // ".active" (above) just tracks which section is currently
+          // scrolled into view - it says nothing about whether that
+          // section is actually filled in correctly. This drives a
+          // separate checkmark from each section's *own* required-field
+          // state, independent of scroll position, so the stepper means
+          // something: Resume needs a file attached (when required),
+          // Personal needs a valid name/email/phone, Job Details needs a
+          // source chosen. Location/Background have no required fields
+          // on this form, so they never gate on anything and stay
+          // uncompleted-but-not-blocking. Lightweight, read-only checks -
+          // deliberately not reusing the validate* functions, since those
+          // also *display* error state on every call and this needs to
+          // run silently on every keystroke across the whole form.
+          function updateStepperProgress() {
+            var resumeInput = document.getElementById("resumeUpload");
+            var resumeDone = !resumeInput.hasAttribute("required") || (resumeInput.files && resumeInput.files.length > 0);
+
+            var nameVal = document.getElementById("name").value.trim().replace(/\s+/g, " ");
+            var nameDone = nameVal.length >= 2 && nameVal.length <= 100 && /^[A-Za-z ]+$/.test(nameVal);
+            var emailDone = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(document.getElementById("email").value.trim());
+            var phoneDone = /^\d{7,15}$/.test(document.getElementById("phone").value);
+            var personalDone = nameDone && emailDone && phoneDone;
+
+            var sourceSelectEl = document.getElementById("sourcePlatformSelect");
+            var sourceDone = true;
+            if (sourceSelectEl) {
+              if (sourceSelectEl.value === "__create_new__") {
+                var newSourceInputEl = document.getElementById("newSourceInput");
+                sourceDone = !!(newSourceInputEl && newSourceInputEl.value.trim());
+              } else {
+                sourceDone = !!sourceSelectEl.value;
+              }
+            }
+            // Source is the only field this section actually *requires*,
+            // but "done" should still mean nothing in the section is
+            // sitting on an out-of-range value - Source alone used to
+            // mark the whole section complete even with, say, "70" left
+            // in Experience Years.
+            function inRangeOrEmpty(id, min, max) {
+              var v = document.getElementById(id).value;
+              if (v === "") return true;
+              var n = parseFloat(v);
+              return !isNaN(n) && n >= min && n <= max;
+            }
+            var numbersOk =
+              inRangeOrEmpty("experience_years", 0, 60) &&
+              inRangeOrEmpty("experience_months", 0, 11) &&
+              inRangeOrEmpty("available_to_join_days", 0, 365) &&
+              inRangeOrEmpty("current_salary", 0, 9999999999.99) &&
+              inRangeOrEmpty("expected_salary", 0, 9999999999.99);
+
+            var completion = {
+              "sec-resume": resumeDone,
+              "sec-personal": personalDone,
+              "sec-job": sourceDone && numbersOk,
+            };
+            document.querySelectorAll(".progress-step").forEach(function (step) {
+              var done = completion[step.getAttribute("data-target")];
+              if (done === undefined) return;
+              step.classList.toggle("step-complete", !!done);
+            });
+          }
+          // 'input'/'change' bubble up from every field in the form, so
+          // one listener here covers manual typing, AI autofill, and the
+          // resume dropzone alike without wiring each field separately.
+          document.getElementById("applicationForm").addEventListener("input", updateStepperProgress);
+          document.getElementById("applicationForm").addEventListener("change", updateStepperProgress);
+          updateStepperProgress();
+
+          // ---- Job Description / Resume Preview tabs ----
+          (function () {
+            var tabs = document.querySelectorAll(".info-tab");
+            tabs.forEach(function (tab) {
+              tab.addEventListener("click", function () {
+                if (tab.disabled) return;
+                tabs.forEach(function (t) { t.classList.remove("active"); });
+                tab.classList.add("active");
+                document.querySelectorAll(".info-panel").forEach(function (p) { p.classList.remove("active"); });
+                document.getElementById(tab.getAttribute("data-panel")).classList.add("active");
+              });
+            });
+          })();
+          var resumeObjectUrl = null;
+          function showResumePreview(pdfFile) {
+            var frame = document.getElementById("resumePreviewFrame");
+            var tab = document.getElementById("tabResume");
+            if (resumeObjectUrl) {
+              URL.revokeObjectURL(resumeObjectUrl);
+            }
+            resumeObjectUrl = URL.createObjectURL(pdfFile);
+            frame.src = resumeObjectUrl;
+            tab.disabled = false;
+            tab.click();
+          }
+
+          // Required fields (resume in particular) are wrapped in styled
+          // labels with the real <input> hidden via `class="hidden"`.
+          // Hidden required inputs still block native HTML5 validation,
+          // but the browser has nowhere visible to anchor the "Please
+          // fill this field" bubble, so it fails completely silently.
+          // `novalidate` on the form hands all of this to explicit JS
+          // checks with inline messages instead.
+          function showFieldError(id, message) {
+            var el = document.getElementById(id);
+            if (el) {
+              var span = el.querySelector("span");
+              if (span) { span.textContent = message; } else { el.textContent = message; }
+              el.style.display = "flex";
+            }
+          }
+          function clearFieldError(id) {
+            var el = document.getElementById(id);
+            if (el) {
+              el.style.display = "none";
+              var span = el.querySelector("span");
+              if (span) { span.textContent = ""; }
+            }
+          }
+          function markValid(fieldEl) {
+            if (!fieldEl) return;
+            fieldEl.classList.remove("is-invalid");
+            fieldEl.classList.add("is-valid");
+            var status = document.getElementById("status-" + fieldEl.id);
+            if (status) { status.classList.remove("show-invalid"); status.classList.add("show-valid"); }
+          }
+          function markInvalid(fieldEl) {
+            if (!fieldEl) return;
+            fieldEl.classList.remove("is-valid");
+            fieldEl.classList.add("is-invalid");
+            var status = document.getElementById("status-" + fieldEl.id);
+            if (status) { status.classList.remove("show-valid"); status.classList.add("show-invalid"); }
+          }
+          function clearMark(fieldEl) {
+            if (!fieldEl) return;
+            fieldEl.classList.remove("is-valid", "is-invalid");
+            var status = document.getElementById("status-" + fieldEl.id);
+            if (status) { status.classList.remove("show-valid", "show-invalid"); }
+          }
+          // Briefly flashes a field green so it's obvious the AI autofill
+          // just touched it, without needing to read every field to spot
+          // what changed.
+          function flashField(el) {
+            if (!el) return;
+            el.classList.remove("ai-flash");
+            void el.offsetWidth; // restart the animation if triggered twice
+            el.classList.add("ai-flash");
+          }
+
+          // ---- Per-field validators (reused on blur/input AND on submit) ----
+          // Name: mirrors ApplicationForm.clean_name exactly - trims,
+          // collapses internal whitespace to single spaces, then only
+          // letters/spaces survive (backend re-validates this too, this
+          // is purely to catch it before a round-trip). 2-100 chars is a
+          // client-side-only floor/ceiling (100 = Candidate.name max_length,
+          // 2 = a light sanity floor the backend doesn't itself enforce).
+          var NAME_PATTERN = /^[A-Za-z ]+$/;
+          function validateName(showMark) {
+            var el = document.getElementById("name");
+            clearFieldError("err-name");
+            var normalized = el.value.trim().replace(/\s+/g, " ");
+            if (el.value !== normalized && document.activeElement !== el) {
+              el.value = normalized;
+            }
+            if (!normalized) {
+              if (showMark) markInvalid(el); else clearMark(el);
+              showFieldError("err-name", "{% trans 'Name is required.' %}");
+              return false;
+            }
+            if (normalized.length < 2) {
+              if (showMark) markInvalid(el); else clearMark(el);
+              showFieldError("err-name", "{% trans 'Name must be at least 2 characters.' %}");
+              return false;
+            }
+            if (normalized.length > 100) {
+              if (showMark) markInvalid(el); else clearMark(el);
+              showFieldError("err-name", "{% trans 'Name must be under 100 characters.' %}");
+              return false;
+            }
+            if (!NAME_PATTERN.test(normalized)) {
+              if (showMark) markInvalid(el); else clearMark(el);
+              showFieldError("err-name", "{% trans 'Name can only contain letters and spaces.' %}");
+              return false;
+            }
+            if (showMark) markValid(el); else clearMark(el);
+            return true;
+          }
+
+          function validateEmail(showMark) {
+            var el = document.getElementById("email");
+            clearFieldError("err-email");
+            var value = el.value.trim();
+            if (!value) {
+              if (showMark) markInvalid(el); else clearMark(el);
+              showFieldError("err-email", "{% trans 'Email is required.' %}");
+              return false;
+            }
+            if (value.length > 254) {
+              if (showMark) markInvalid(el); else clearMark(el);
+              showFieldError("err-email", "{% trans 'Email must be under 254 characters.' %}");
+              return false;
+            }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+              if (showMark) markInvalid(el); else clearMark(el);
+              showFieldError("err-email", "{% trans 'Enter a valid email address.' %}");
+              return false;
+            }
+            if (showMark) markValid(el); else clearMark(el);
+            return true;
+          }
+
+          // ---- Phone: flag-image country dropdown + live per-country grouping ----
+          // The *submitted* `mobile` field must stay pure digits, 7-15
+          // characters (recruitment/forms.py ApplicationForm.clean_mobile:
+          // `^\d{7,15}$`, no "+", no spaces survive there) - the country
+          // picker and grouped spacing are a display-only aid on top of
+          // that, never part of what's actually posted.
+          // A native <select> can't render an <img> per option, so real
+          // flag *images* (not flag emoji - many Windows font configs
+          // fall back to showing the bare "IN"/"US" region-code letters
+          // instead of a flag glyph) need a custom button + panel here
+          // instead. Flags load from flagcdn.com by ISO 3166-1 alpha-2 code.
+          var PHONE_COUNTRIES = [
+            { iso: "in", name: "India", dial: "91", fmt: "##### #####" },
+            { iso: "us", name: "United States", dial: "1", fmt: "(###) ###-####" },
+            { iso: "ca", name: "Canada", dial: "1", fmt: "(###) ###-####" },
+            { iso: "gb", name: "United Kingdom", dial: "44", fmt: "#### ######" },
+            { iso: "au", name: "Australia", dial: "61", fmt: "#### ### ###" },
+            { iso: "nz", name: "New Zealand", dial: "64", fmt: "##-#######" },
+            { iso: "ae", name: "United Arab Emirates", dial: "971", fmt: "## ### ####" },
+            { iso: "sa", name: "Saudi Arabia", dial: "966", fmt: "## ### ####" },
+            { iso: "qa", name: "Qatar", dial: "974", fmt: "#### ####" },
+            { iso: "kw", name: "Kuwait", dial: "965", fmt: "#### ####" },
+            { iso: "bh", name: "Bahrain", dial: "973", fmt: "#### ####" },
+            { iso: "om", name: "Oman", dial: "968", fmt: "#### ####" },
+            { iso: "sg", name: "Singapore", dial: "65", fmt: "#### ####" },
+            { iso: "my", name: "Malaysia", dial: "60", fmt: "##-#### ####" },
+            { iso: "ph", name: "Philippines", dial: "63", fmt: "### #######" },
+            { iso: "id", name: "Indonesia", dial: "62", fmt: "###-####-####" },
+            { iso: "th", name: "Thailand", dial: "66", fmt: "## ### ####" },
+            { iso: "vn", name: "Vietnam", dial: "84", fmt: "### ### ####" },
+            { iso: "pk", name: "Pakistan", dial: "92", fmt: "### #######" },
+            { iso: "bd", name: "Bangladesh", dial: "880", fmt: "####-######" },
+            { iso: "lk", name: "Sri Lanka", dial: "94", fmt: "## #######" },
+            { iso: "np", name: "Nepal", dial: "977", fmt: "###-#######" },
+            { iso: "bt", name: "Bhutan", dial: "975", fmt: "## ######" },
+            { iso: "mm", name: "Myanmar", dial: "95", fmt: "## ### ####" },
+            { iso: "kh", name: "Cambodia", dial: "855", fmt: "## ### ###" },
+            { iso: "la", name: "Laos", dial: "856", fmt: "## ## ### ###" },
+            { iso: "hk", name: "Hong Kong", dial: "852", fmt: "#### ####" },
+            { iso: "mo", name: "Macau", dial: "853", fmt: "#### ####" },
+            { iso: "tw", name: "Taiwan", dial: "886", fmt: "###-###-###" },
+            { iso: "jp", name: "Japan", dial: "81", fmt: "##-####-####" },
+            { iso: "kr", name: "South Korea", dial: "82", fmt: "##-####-####" },
+            { iso: "kp", name: "North Korea", dial: "850", fmt: "### ### ####" },
+            { iso: "cn", name: "China", dial: "86", fmt: "### #### ####" },
+            { iso: "mn", name: "Mongolia", dial: "976", fmt: "## ## ####" },
+            { iso: "kz", name: "Kazakhstan", dial: "7", fmt: "### ###-##-##" },
+            { iso: "uz", name: "Uzbekistan", dial: "998", fmt: "## ### ## ##" },
+            { iso: "kg", name: "Kyrgyzstan", dial: "996", fmt: "### ######" },
+            { iso: "tj", name: "Tajikistan", dial: "992", fmt: "## ###-####" },
+            { iso: "tm", name: "Turkmenistan", dial: "993", fmt: "## ######" },
+            { iso: "af", name: "Afghanistan", dial: "93", fmt: "## ### ####" },
+            { iso: "ir", name: "Iran", dial: "98", fmt: "### ### ####" },
+            { iso: "iq", name: "Iraq", dial: "964", fmt: "### ### ####" },
+            { iso: "il", name: "Israel", dial: "972", fmt: "##-###-####" },
+            { iso: "ps", name: "Palestine", dial: "970", fmt: "### ### ###" },
+            { iso: "jo", name: "Jordan", dial: "962", fmt: "# #### ####" },
+            { iso: "lb", name: "Lebanon", dial: "961", fmt: "## ### ###" },
+            { iso: "sy", name: "Syria", dial: "963", fmt: "## #### ###" },
+            { iso: "ye", name: "Yemen", dial: "967", fmt: "### ### ###" },
+            { iso: "tr", name: "Turkey", dial: "90", fmt: "### ### ####" },
+            { iso: "cy", name: "Cyprus", dial: "357", fmt: "## ######" },
+            { iso: "ge", name: "Georgia", dial: "995", fmt: "### ### ###" },
+            { iso: "am", name: "Armenia", dial: "374", fmt: "## ######" },
+            { iso: "az", name: "Azerbaijan", dial: "994", fmt: "## ### ## ##" },
+            { iso: "ru", name: "Russia", dial: "7", fmt: "### ###-##-##" },
+            { iso: "ua", name: "Ukraine", dial: "380", fmt: "## ### ####" },
+            { iso: "by", name: "Belarus", dial: "375", fmt: "## ###-##-##" },
+            { iso: "md", name: "Moldova", dial: "373", fmt: "## ######" },
+            { iso: "de", name: "Germany", dial: "49", fmt: "### ########" },
+            { iso: "fr", name: "France", dial: "33", fmt: "# ## ## ## ##" },
+            { iso: "it", name: "Italy", dial: "39", fmt: "### ### ####" },
+            { iso: "es", name: "Spain", dial: "34", fmt: "### ### ###" },
+            { iso: "pt", name: "Portugal", dial: "351", fmt: "### ### ###" },
+            { iso: "nl", name: "Netherlands", dial: "31", fmt: "# ########" },
+            { iso: "be", name: "Belgium", dial: "32", fmt: "### ## ## ##" },
+            { iso: "lu", name: "Luxembourg", dial: "352", fmt: "### ### ###" },
+            { iso: "ie", name: "Ireland", dial: "353", fmt: "##-#######" },
+            { iso: "is", name: "Iceland", dial: "354", fmt: "### ####" },
+            { iso: "se", name: "Sweden", dial: "46", fmt: "##-### ## ##" },
+            { iso: "no", name: "Norway", dial: "47", fmt: "### ## ###" },
+            { iso: "dk", name: "Denmark", dial: "45", fmt: "## ## ## ##" },
+            { iso: "fi", name: "Finland", dial: "358", fmt: "## ### ## ##" },
+            { iso: "ee", name: "Estonia", dial: "372", fmt: "#### ####" },
+            { iso: "lv", name: "Latvia", dial: "371", fmt: "## ### ###" },
+            { iso: "lt", name: "Lithuania", dial: "370", fmt: "### #####" },
+            { iso: "pl", name: "Poland", dial: "48", fmt: "### ### ###" },
+            { iso: "cz", name: "Czechia", dial: "420", fmt: "### ### ###" },
+            { iso: "sk", name: "Slovakia", dial: "421", fmt: "### ### ###" },
+            { iso: "hu", name: "Hungary", dial: "36", fmt: "## ### ####" },
+            { iso: "at", name: "Austria", dial: "43", fmt: "### #######" },
+            { iso: "ch", name: "Switzerland", dial: "41", fmt: "## ### ## ##" },
+            { iso: "li", name: "Liechtenstein", dial: "423", fmt: "### ####" },
+            { iso: "ro", name: "Romania", dial: "40", fmt: "### ### ###" },
+            { iso: "bg", name: "Bulgaria", dial: "359", fmt: "## ### ####" },
+            { iso: "gr", name: "Greece", dial: "30", fmt: "### ### ####" },
+            { iso: "al", name: "Albania", dial: "355", fmt: "## ### ####" },
+            { iso: "mk", name: "North Macedonia", dial: "389", fmt: "## ### ###" },
+            { iso: "rs", name: "Serbia", dial: "381", fmt: "## #######" },
+            { iso: "me", name: "Montenegro", dial: "382", fmt: "## ######" },
+            { iso: "ba", name: "Bosnia and Herzegovina", dial: "387", fmt: "## ######" },
+            { iso: "hr", name: "Croatia", dial: "385", fmt: "## ### ####" },
+            { iso: "si", name: "Slovenia", dial: "386", fmt: "## ### ###" },
+            { iso: "xk", name: "Kosovo", dial: "383", fmt: "## ######" },
+            { iso: "mt", name: "Malta", dial: "356", fmt: "#### ####" },
+            { iso: "za", name: "South Africa", dial: "27", fmt: "## ### ####" },
+            { iso: "ng", name: "Nigeria", dial: "234", fmt: "### ### ####" },
+            { iso: "gh", name: "Ghana", dial: "233", fmt: "## ### ####" },
+            { iso: "ke", name: "Kenya", dial: "254", fmt: "### ######" },
+            { iso: "tz", name: "Tanzania", dial: "255", fmt: "### ######" },
+            { iso: "ug", name: "Uganda", dial: "256", fmt: "### ######" },
+            { iso: "et", name: "Ethiopia", dial: "251", fmt: "## ### ####" },
+            { iso: "eg", name: "Egypt", dial: "20", fmt: "### ### ####" },
+            { iso: "ma", name: "Morocco", dial: "212", fmt: "##-####-####" },
+            { iso: "dz", name: "Algeria", dial: "213", fmt: "### ### ###" },
+            { iso: "tn", name: "Tunisia", dial: "216", fmt: "## ### ###" },
+            { iso: "ly", name: "Libya", dial: "218", fmt: "##-#######" },
+            { iso: "sd", name: "Sudan", dial: "249", fmt: "## ### ####" },
+            { iso: "sn", name: "Senegal", dial: "221", fmt: "## ### ####" },
+            { iso: "ci", name: "Cote d'Ivoire", dial: "225", fmt: "## ### ####" },
+            { iso: "cm", name: "Cameroon", dial: "237", fmt: "# ## ## ## ##" },
+            { iso: "zm", name: "Zambia", dial: "260", fmt: "## #######" },
+            { iso: "zw", name: "Zimbabwe", dial: "263", fmt: "## #######" },
+            { iso: "mz", name: "Mozambique", dial: "258", fmt: "## ### ####" },
+            { iso: "na", name: "Namibia", dial: "264", fmt: "## ### ####" },
+            { iso: "bw", name: "Botswana", dial: "267", fmt: "## ### ###" },
+            { iso: "rw", name: "Rwanda", dial: "250", fmt: "### ### ###" },
+            { iso: "br", name: "Brazil", dial: "55", fmt: "(##) #####-####" },
+            { iso: "mx", name: "Mexico", dial: "52", fmt: "## #### ####" },
+            { iso: "ar", name: "Argentina", dial: "54", fmt: "## ####-####" },
+            { iso: "cl", name: "Chile", dial: "56", fmt: "# #### ####" },
+            { iso: "co", name: "Colombia", dial: "57", fmt: "### ### ####" },
+            { iso: "pe", name: "Peru", dial: "51", fmt: "### ### ###" },
+            { iso: "ve", name: "Venezuela", dial: "58", fmt: "###-#######" },
+            { iso: "ec", name: "Ecuador", dial: "593", fmt: "##-###-####" },
+            { iso: "bo", name: "Bolivia", dial: "591", fmt: "########" },
+            { iso: "py", name: "Paraguay", dial: "595", fmt: "###-######" },
+            { iso: "uy", name: "Uruguay", dial: "598", fmt: "# ### ####" },
+            { iso: "cr", name: "Costa Rica", dial: "506", fmt: "####-####" },
+            { iso: "pa", name: "Panama", dial: "507", fmt: "####-####" },
+            { iso: "gt", name: "Guatemala", dial: "502", fmt: "####-####" },
+            { iso: "hn", name: "Honduras", dial: "504", fmt: "####-####" },
+            { iso: "sv", name: "El Salvador", dial: "503", fmt: "####-####" },
+            { iso: "ni", name: "Nicaragua", dial: "505", fmt: "####-####" },
+            { iso: "do", name: "Dominican Republic", dial: "1", fmt: "(###) ###-####" },
+            { iso: "jm", name: "Jamaica", dial: "1", fmt: "(###) ###-####" },
+            { iso: "tt", name: "Trinidad and Tobago", dial: "1", fmt: "(###) ###-####" },
+            { iso: "cu", name: "Cuba", dial: "53", fmt: "# ### ####" },
+          ];
+          var DEFAULT_COUNTRY_ISO = "in";
+
+          var phoneCountryBtn = document.getElementById("phoneCountryBtn");
+          var phoneCountryFlagImg = document.getElementById("phoneCountryFlag");
+          var phoneCountryDialLabel = document.getElementById("phoneCountryDial");
+          var phoneCountryPanel = document.getElementById("phoneCountryPanel");
+          var phoneCountrySearch = document.getElementById("phoneCountrySearch");
+          var phoneCountryList = document.getElementById("phoneCountryList");
+          var phoneNumberInput = document.getElementById("phoneNumber");
+          var phoneHiddenInput = document.getElementById("phone");
+          var phoneGroupEl = document.getElementById("phoneGroup");
+          var selectedPhoneCountryIso = DEFAULT_COUNTRY_ISO;
+
+          function flagUrl(iso) {
+            return "https://flagcdn.com/24x18/" + iso + ".png";
+          }
+
+          function findPhoneCountry(iso) {
+            return PHONE_COUNTRIES.filter(function (c) { return c.iso === iso; })[0] || PHONE_COUNTRIES[0];
+          }
+
+          function currentPhoneCountry() {
+            return findPhoneCountry(selectedPhoneCountryIso);
+          }
+
+          function renderPhoneCountryList(filterText) {
+            var term = (filterText || "").trim().toLowerCase();
+            phoneCountryList.innerHTML = "";
+            var matches = PHONE_COUNTRIES.filter(function (c) {
+              if (!term) return true;
+              return c.name.toLowerCase().indexOf(term) !== -1 || c.dial.indexOf(term.replace(/^\+/, "")) !== -1;
+            });
+            if (!matches.length) {
+              var empty = document.createElement("div");
+              empty.className = "phone-country-empty";
+              empty.textContent = "{% trans 'No matching country' %}";
+              phoneCountryList.appendChild(empty);
+              return;
+            }
+            matches.forEach(function (c) {
+              var row = document.createElement("div");
+              row.className = "phone-country-option" + (c.iso === selectedPhoneCountryIso ? " is-active" : "");
+              row.setAttribute("role", "option");
+              row.innerHTML =
+                '<img src="' + flagUrl(c.iso) + '" alt="" loading="lazy">' +
+                '<span class="pco-name"></span>' +
+                '<span class="pco-dial">+' + c.dial + "</span>";
+              row.querySelector(".pco-name").textContent = c.name;
+              row.addEventListener("click", function () {
+                selectPhoneCountry(c.iso);
+                closePhoneCountryPanel();
+              });
+              phoneCountryList.appendChild(row);
+            });
+          }
+
+          function selectPhoneCountry(iso) {
+            var country = findPhoneCountry(iso);
+            selectedPhoneCountryIso = country.iso;
+            phoneCountryFlagImg.src = flagUrl(country.iso);
+            phoneCountryFlagImg.alt = country.name;
+            phoneCountryDialLabel.textContent = "+" + country.dial;
+            phoneCountryBtn.setAttribute("title", country.name);
+            reformatPhoneDisplay();
+          }
+
+          // Reparented into <body> for the same reason as the
+          // custom-select panels (see initCustomSelect) - a fixed-
+          // position element positioned purely from the button's live
+          // coordinates can't be stacked-under or clipped by any
+          // ancestor card/grid cell.
+          document.body.appendChild(phoneCountryPanel);
+          function openPhoneCountryPanel() {
+            phoneCountryPanel.classList.remove("hidden");
+            phoneCountryBtn.setAttribute("aria-expanded", "true");
+            phoneCountrySearch.value = "";
+            renderPhoneCountryList("");
+            phoneCountrySearch.focus();
+            var btnRect = phoneCountryBtn.getBoundingClientRect();
+            var panelHeight = phoneCountryPanel.getBoundingClientRect().height;
+            var openUpward = window.innerHeight - btnRect.bottom < panelHeight + 8 && btnRect.top > panelHeight + 8;
+            phoneCountryPanel.style.left = btnRect.left + "px";
+            phoneCountryPanel.style.top = openUpward
+              ? (btnRect.top - panelHeight - 6) + "px"
+              : (btnRect.bottom + 6) + "px";
+          }
+          function closePhoneCountryPanel() {
+            phoneCountryPanel.classList.add("hidden");
+            phoneCountryBtn.setAttribute("aria-expanded", "false");
+          }
+
+          phoneCountryBtn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            if (phoneCountryPanel.classList.contains("hidden")) {
+              openPhoneCountryPanel();
+            } else {
+              closePhoneCountryPanel();
+            }
+          });
+          phoneCountrySearch.addEventListener("input", function () {
+            renderPhoneCountryList(phoneCountrySearch.value);
+          });
+          phoneCountrySearch.addEventListener("click", function (e) { e.stopPropagation(); });
+          window.addEventListener("scroll", function (e) {
+            // Same exclusion as the custom-select panels above - without
+            // it, scrolling the country list's own results (searching
+            // "a" alone still leaves dozens of matches) closed the panel
+            // on the first scroll attempt instead of letting you scroll
+            // through it.
+            if (!phoneCountryPanel.classList.contains("hidden") && !phoneCountryPanel.contains(e.target)) {
+              closePhoneCountryPanel();
+            }
+          }, true);
+          window.addEventListener("resize", function () {
+            if (!phoneCountryPanel.classList.contains("hidden")) closePhoneCountryPanel();
+          });
+          document.addEventListener("click", function (e) {
+            if (!phoneCountryPanel.contains(e.target) && e.target !== phoneCountryBtn) {
+              closePhoneCountryPanel();
+            }
+          });
+          document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape") closePhoneCountryPanel();
+          });
+
+          selectPhoneCountry(DEFAULT_COUNTRY_ISO);
+
+          function formatByPattern(digits, pattern) {
+            var out = "";
+            var di = 0;
+            for (var i = 0; i < pattern.length && di < digits.length; i++) {
+              if (pattern[i] === "#") {
+                out += digits[di];
+                di++;
+              } else {
+                out += pattern[i];
+              }
+            }
+            if (di < digits.length) {
+              out += digits.slice(di);
+            }
+            return out;
+          }
+
+          function countryDigitLength(country) {
+            // The expected subscriber-number length for this country -
+            // counted straight from its own format pattern (India's
+            // "##### #####" has 10 '#'s, so 10 digits, not the old
+            // flat 15-digit cap that let a candidate keep typing well
+            // past a real Indian mobile number's length).
+            var count = 0;
+            for (var i = 0; i < country.fmt.length; i++) {
+              if (country.fmt[i] === "#") count++;
+            }
+            return count;
+          }
+          function reformatPhoneDisplay() {
+            var country = currentPhoneCountry();
+            var digits = phoneNumberInput.value.replace(/\D/g, "").slice(0, countryDigitLength(country));
+            var caret = phoneNumberInput.selectionStart;
+            var before = phoneNumberInput.value.slice(0, caret).replace(/\D/g, "").length;
+            phoneNumberInput.value = formatByPattern(digits, country.fmt);
+            phoneHiddenInput.value = digits;
+            // Best-effort caret restore after reformatting inserts/removes
+            // separators around the digit the user just typed.
+            var pos = 0, seen = 0;
+            while (pos < phoneNumberInput.value.length && seen < before) {
+              if (/\d/.test(phoneNumberInput.value[pos])) seen++;
+              pos++;
+            }
+            try { phoneNumberInput.setSelectionRange(pos, pos); } catch (e) {}
+          }
+
+          phoneNumberInput.addEventListener("input", function () {
+            reformatPhoneDisplay();
+            validatePhone(false);
+          });
+          // Seed from any server-rendered initial value (validation
+          // re-submit, or an internal recruiter reusing this form).
+          if (phoneHiddenInput.value) {
+            phoneNumberInput.value = phoneHiddenInput.value;
+            reformatPhoneDisplay();
+          }
+
+          function validatePhone(showMark) {
+            clearFieldError("err-phone");
+            var digits = phoneHiddenInput.value;
+            if (!digits) {
+              if (showMark) { phoneGroupEl.classList.add("is-invalid"); phoneGroupEl.classList.remove("is-valid"); }
+              else { phoneGroupEl.classList.remove("is-invalid", "is-valid"); }
+              showFieldError("err-phone", "{% trans 'Phone number is required.' %}");
+              return false;
+            }
+            if (!/^\d{7,15}$/.test(digits)) {
+              if (showMark) { phoneGroupEl.classList.add("is-invalid"); phoneGroupEl.classList.remove("is-valid"); }
+              else { phoneGroupEl.classList.remove("is-invalid", "is-valid"); }
+              showFieldError("err-phone", "{% trans 'Enter a valid phone number (7 to 15 digits).' %}");
+              return false;
+            }
+            if (showMark) { phoneGroupEl.classList.remove("is-invalid"); phoneGroupEl.classList.add("is-valid"); }
+            else { phoneGroupEl.classList.remove("is-invalid", "is-valid"); }
+            return true;
+          }
+          phoneNumberInput.addEventListener("blur", function () { validatePhone(true); });
+
+          function validateSource(showMark) {
+            var sourceSelectEl = document.getElementById("sourcePlatformSelect");
+            if (!sourceSelectEl) return true;
+            clearFieldError("err-source");
+            var newSourceInputEl = document.getElementById("newSourceInput");
+            if (sourceSelectEl.value === "__create_new__") {
+              if (!newSourceInputEl.value.trim()) {
+                showFieldError("err-source", "{% trans 'Enter a source name.' %}");
+                return false;
+              }
+            } else if (!sourceSelectEl.value) {
+              showFieldError("err-source", "{% trans 'Please choose a source.' %}");
+              return false;
+            }
+            return true;
+          }
+
+          function validateDob() {
+            var dobInput = document.getElementById("dob");
+            clearFieldError("err-dob");
+            if (!dobInput.value) return true;
+            var dobDate = new Date(dobInput.value + "T00:00:00");
+            var todayDate = new Date();
+            todayDate.setHours(0, 0, 0, 0);
+            if (dobDate > todayDate) {
+              showFieldError("err-dob", "{% trans 'Date of birth cannot be in the future.' %}");
+              return false;
+            }
+            var age = todayDate.getFullYear() - dobDate.getFullYear();
+            var monthDiff = todayDate.getMonth() - dobDate.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && todayDate.getDate() < dobDate.getDate())) {
+              age--;
+            }
+            if (age < 18) {
+              showFieldError("err-dob", "{% trans 'Candidate must be at least 18 years old.' %}");
+              return false;
+            } else if (age > 100) {
+              showFieldError("err-dob", "{% trans 'Enter a valid date of birth.' %}");
+              return false;
+            }
+            return true;
+          }
+
+          function validateExperience() {
+            var experienceYearsInput = document.getElementById("experience_years");
+            var experienceMonthsInput = document.getElementById("experience_months");
+            clearFieldError("err-experience_years");
+            if (experienceYearsInput.value !== "") {
+              var y = parseInt(experienceYearsInput.value, 10);
+              if (isNaN(y) || y < 0 || y > 60) {
+                showFieldError("err-experience_years", "{% trans 'Years must be between 0 and 60.' %}");
+                return false;
+              }
+            }
+            if (experienceMonthsInput.value !== "") {
+              var m = parseInt(experienceMonthsInput.value, 10);
+              if (isNaN(m) || m < 0 || m > 11) {
+                showFieldError("err-experience_years", "{% trans 'Months must be between 0 and 11.' %}");
+                return false;
+              }
+            }
+            return true;
+          }
+
+          function validateAvailableToJoin() {
+            var el = document.getElementById("available_to_join_days");
+            clearFieldError("err-available_to_join_days");
+            if (el.value === "") return true;
+            var v = parseInt(el.value, 10);
+            if (isNaN(v) || v < 0 || v > 365) {
+              showFieldError("err-available_to_join_days", "{% trans 'Enter a number of days between 0 and 365.' %}");
+              return false;
+            }
+            return true;
+          }
+
+          function validateSalary(id, errId) {
+            var el = document.getElementById(id);
+            clearFieldError(errId);
+            if (el.value !== "" && parseFloat(el.value) < 0) {
+              showFieldError(errId, "{% trans 'Salary cannot be negative.' %}");
+              return false;
+            }
+            if (el.value !== "" && parseFloat(el.value) > 9999999999.99) {
+              showFieldError(errId, "{% trans 'That salary looks too high - please check the value.' %}");
+              return false;
+            }
+            return true;
+          }
+
+          // Real-time caps on every plain numeric field - `type="number"`
+          // doesn't support `maxlength` at all, and the `max` attribute
+          // only matters for *native* form validation, which this form
+          // doesn't use (novalidate - see the top of this file for why).
+          // Without this, nothing stopped someone from typing an
+          // arbitrarily long number until they left the field and the
+          // blur-time validators above caught it after the fact.
+          function clampNumberInput(id, min, max) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener("input", function () {
+              if (el.value === "" || el.value === "-") return;
+              var v = parseFloat(el.value);
+              if (isNaN(v)) return;
+              if (v > max) el.value = max;
+              else if (v < min) el.value = min;
+            });
+          }
+          clampNumberInput("experience_years", 0, 60);
+          clampNumberInput("experience_months", 0, 11);
+          clampNumberInput("available_to_join_days", 0, 365);
+          clampNumberInput("current_salary", 0, 9999999999.99);
+          clampNumberInput("expected_salary", 0, 9999999999.99);
+
+          function validateReason() {
+            var el = document.getElementById("reason_to_leave");
+            clearFieldError("err-reason_to_leave");
+            if (el.value.length > 500) {
+              showFieldError("err-reason_to_leave", "{% trans 'Keep this under 500 characters.' %}");
+              return false;
+            }
+            return true;
+          }
+
+          function validateResume() {
+            clearFieldError("err-resume");
+            var dz = document.getElementById("resumeDropzone");
+            var resumeInput = document.getElementById("resumeUpload");
+            if (resumeInput.hasAttribute("required") && !(resumeInput.files && resumeInput.files.length)) {
+              if (dz) dz.classList.add("is-invalid");
+              showFieldError("err-resume", "{% trans 'Please upload your resume.' %}");
+              return false;
+            }
+            if (dz) dz.classList.remove("is-invalid");
+            return true;
+          }
+
+          function validateProfileImage() {
+            var profileInput = document.getElementById("profileImageUpload");
+            if (!profileInput) return true;
+            clearFieldError("err-profile");
+            if (!(profileInput.files && profileInput.files.length)) {
+              showFieldError("err-profile", "{% trans 'Please upload a profile image.' %}");
+              return false;
+            }
+            return true;
+          }
+
+          // Education/Experience formset row validation. Rows are cloned
+          // from a <template> with no per-field error markup of their own
+          // (see setupFormset below), so errors show as one summary line
+          // per row instead of the per-field err-* spans the static
+          // fields above use.
+          function rowHasAnyValue(rowEl) {
+            var inputs = rowEl.querySelectorAll('input[type="text"], input[type="date"], input[type="checkbox"]');
+            return Array.prototype.some.call(inputs, function (input) {
+              return input.type === "checkbox" ? input.checked : input.value.trim() !== "";
+            });
+          }
+
+          function setRowError(rowEl, message) {
+            var errEl = rowEl.querySelector(".formset-row-error");
+            if (!errEl) {
+              errEl = document.createElement("div");
+              errEl.className = "formset-row-error mt-1 text-sm flex items-center gap-1.5 md:col-span-2";
+              errEl.style.color = "#dc3545";
+              errEl.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i><span></span>';
+              rowEl.appendChild(errEl);
+            }
+            if (message) {
+              errEl.querySelector("span").textContent = message;
+              errEl.style.display = "flex";
+            } else {
+              errEl.style.display = "none";
+            }
+          }
+
+          // Mirrors CANDIDATE_TEXT_FIELD_PATTERN / CANDIDATE_CGPA_PATTERN in
+          // recruitment/forms.py exactly, so a row that passes here is
+          // guaranteed to also pass server-side (and vice versa - the
+          // server re-checks everything since this JS can be bypassed).
+          var TEXT_FIELD_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 .,'()&/-]*$/;
+          var CGPA_PATTERN = /^\d{1,3}(\.\d{1,2})?$/;
+
+          var FORMSET_TEXT_FIELDS = {
+            education: [
+              { name: "degree", label: "{% trans 'Course' %}", required: true },
+              { name: "specialization", label: "{% trans 'Branch/Specialization' %}", required: false },
+              { name: "university", label: "{% trans 'University/College' %}", required: false },
+              { name: "location", label: "{% trans 'Location' %}", required: false }
+            ],
+            experience: [
+              { name: "company_name", label: "{% trans 'Company Name' %}", required: true },
+              { name: "designation", label: "{% trans 'Job Title' %}", required: true },
+              { name: "location", label: "{% trans 'Location' %}", required: false }
+            ]
+          };
+
+          function validateFormsetRow(rowEl, prefix) {
+            // An entirely untouched row is fine - Django's formset treats
+            // it as "not submitted" and silently skips it, same as never
+            // having added the row at all.
+            if (!rowHasAnyValue(rowEl)) {
+              rowEl.querySelectorAll(".field-input").forEach(function (el) { el.classList.remove("is-invalid"); });
+              setRowError(rowEl, "");
+              return true;
+            }
+
+            rowEl.querySelectorAll(".field-input").forEach(function (el) { el.classList.remove("is-invalid"); });
+
+            var fields = FORMSET_TEXT_FIELDS[prefix] || [];
+            for (var i = 0; i < fields.length; i++) {
+              var field = fields[i];
+              var input = rowEl.querySelector('input[name$="-' + field.name + '"]');
+              if (!input) continue;
+              var value = input.value.trim();
+
+              if (!value) {
+                if (field.required) {
+                  input.classList.add("is-invalid");
+                  setRowError(rowEl, field.label + " {% trans 'is required.' %}");
+                  return false;
+                }
+                continue;
+              }
+              if (value.length < 2) {
+                input.classList.add("is-invalid");
+                setRowError(rowEl, field.label + " {% trans 'must be at least 2 characters.' %}");
+                return false;
+              }
+              if (!TEXT_FIELD_PATTERN.test(value)) {
+                input.classList.add("is-invalid");
+                setRowError(rowEl, field.label + " {% trans 'contains characters that are not allowed.' %}");
+                return false;
+              }
+            }
+
+            var startInput = rowEl.querySelector('input[name$="-start_date"]');
+            var endInput = rowEl.querySelector('input[name$="-end_date"]');
+            if (startInput && endInput && startInput.value && endInput.value && endInput.value < startInput.value) {
+              endInput.classList.add("is-invalid");
+              setRowError(rowEl, "{% trans 'End date cannot be before the start date.' %}");
+              return false;
+            }
+
+            if (prefix === "education") {
+              var cgpaInput = rowEl.querySelector('input[name$="-percentage_cgpa"]');
+              if (cgpaInput && cgpaInput.value.trim() !== "") {
+                var cgpaValue = cgpaInput.value.trim();
+                var v = parseFloat(cgpaValue);
+                if (!CGPA_PATTERN.test(cgpaValue) || isNaN(v) || v < 0 || v > 100) {
+                  cgpaInput.classList.add("is-invalid");
+                  setRowError(rowEl, "{% trans 'Enter a valid CGPA (0-10) or percentage (0-100), e.g. 8.5 or 82.' %}");
+                  return false;
+                }
+              }
+            }
+
+            setRowError(rowEl, "");
+            return true;
+          }
+
+          function validateAllFormsetRows() {
+            var ok = true;
+            document.querySelectorAll("#educationRows .formset-row").forEach(function (rowEl) {
+              if (!validateFormsetRow(rowEl, "education")) ok = false;
+            });
+            document.querySelectorAll("#experienceRows .formset-row").forEach(function (rowEl) {
+              if (!validateFormsetRow(rowEl, "experience")) ok = false;
+            });
+            return ok;
+          }
+
+          // Live validation as the candidate fills the form.
+          document.getElementById("name").addEventListener("input", function () { validateName(false); });
+          document.getElementById("name").addEventListener("blur", function () { validateName(true); });
+          document.getElementById("email").addEventListener("blur", function () { validateEmail(true); });
+          document.getElementById("dob").addEventListener("change", validateDob);
+          document.getElementById("experience_years").addEventListener("blur", validateExperience);
+          document.getElementById("available_to_join_days").addEventListener("blur", validateAvailableToJoin);
+          document.getElementById("current_salary").addEventListener("blur", function () { validateSalary("current_salary", "err-current_salary"); });
+          document.getElementById("expected_salary").addEventListener("blur", function () { validateSalary("expected_salary", "err-expected_salary"); });
+          var reasonEl = document.getElementById("reason_to_leave");
+          var reasonCounter = document.getElementById("reasonCounter");
+          reasonEl.addEventListener("input", function () {
+            reasonCounter.textContent = reasonEl.value.length + "/500";
+            validateReason();
+          });
+
+          document.getElementById("applicationForm").addEventListener("submit", function (event) {
+            var checks = [
+              validateResume(),
+              validateProfileImage(),
+              validateName(true),
+              validateEmail(true),
+              validatePhone(true),
+              validateSource(),
+              validateDob(),
+              validateExperience(),
+              validateAvailableToJoin(),
+              validateSalary("current_salary", "err-current_salary"),
+              validateSalary("expected_salary", "err-expected_salary"),
+              validateReason(),
+              validateAllFormsetRows(),
+            ];
+            var isValid = checks.every(Boolean);
+
+            if (!isValid) {
+              event.preventDefault();
+              var firstInvalid = document.querySelector(".is-invalid, .dropzone.is-invalid, .phone-group.is-invalid");
+              if (!firstInvalid) {
+                var firstErr = Array.prototype.find.call(
+                  document.querySelectorAll('[id^="err-"]'),
+                  function (e) { return e.style.display !== "none"; }
+                );
+                firstInvalid = firstErr ? firstErr.closest("div") : null;
+              }
+              if (firstInvalid) {
+                firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
+                firstInvalid.classList.add("shake-once");
+                setTimeout(function () { firstInvalid.classList.remove("shake-once"); }, 400);
+              }
+              return;
+            }
+
+            // Valid - show a submitting state. The browser proceeds with
+            // its normal multipart POST right after this handler returns;
+            // disabling the button here doesn't block that.
+            var btn = document.getElementById("submitApplicationBtn");
+            document.getElementById("submitBtnIcon").className = "fa-solid fa-circle-notch spin";
+            document.getElementById("submitBtnLabel").textContent = "{% trans 'Submitting...' %}";
+            btn.disabled = true;
+          });
+
+          // Lets an existing platform be picked from the dropdown, or a
+          // new one typed in - mirrors the same dynamic-create pattern
+          // used for the "Create Dynamic Link" platform field.
+          var sourceSelect = document.getElementById("sourcePlatformSelect");
+          if (sourceSelect) {
+            var newSourceGroup = document.getElementById("newSourceGroup");
+            var newSourceInput = document.getElementById("newSourceInput");
+            newSourceInput.name = "utm_source";
+            newSourceInput.disabled = true;
+
+            var syncSourceMode = function () {
+              var isCreate = sourceSelect.value === "__create_new__";
+              newSourceGroup.style.display = isCreate ? "" : "none";
+              newSourceInput.disabled = !isCreate;
+              newSourceInput.required = isCreate;
+              sourceSelect.name = isCreate ? "" : "utm_source";
+              if (isCreate) {
+                newSourceInput.value = "";
+                newSourceInput.focus();
+              }
+            };
+            sourceSelect.addEventListener("change", syncSourceMode);
+            syncSourceMode();
+          }
+
           function getCookie(name) {
             let cookieValue = null;
             if (document.cookie && document.cookie !== "") {
@@ -322,13 +2400,27 @@
             return cookieValue;
           }
 
+          // jQuery's .trigger("change") only reaches handlers registered
+          // through jQuery itself (.on("change", ...)) - it does *not*
+          // reach plain addEventListener("change", ...) handlers, since
+          // "change" has no native element method (unlike "click") for
+          // jQuery to piggyback a real dispatch on. The floating-label
+          // and custom-select code (initFloatingLabel, initCustomSelect)
+          // is addEventListener-based, so a bare .trigger("change") after
+          // programmatically setting a value - AI autofill, "apply from
+          // matched resume" - silently never reached it: the value
+          // changed, but the label never floated. This fires both, so
+          // every consumer (jQuery-based or native) picks it up.
+          function fireChange(selector) {
+            $(selector).trigger("change");
+            var el = document.querySelector(selector);
+            if (el) el.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+
           function setIfEmpty(selector, value) {
             if ($(selector).val() === "" ){
               $(selector).val(value);
-              $(selector).change();
-
-              $("[name=country]").parent().find("span").remove()
-              $("[name=country]").select2()
+              fireChange(selector);
             }
           }
 
@@ -346,21 +2438,16 @@
               },
               success: function(response) {
                 var full_name = response.full_name;
-                var address = response.address;
-                var country = response.country;
-                var state = response.state;
                 var phone = response.phone_number;
                 var dob = response.dob;
                 var email = response.email_id;
-                var zip = response.zip;
 
                 setIfEmpty("[name='name']", full_name);
                 setIfEmpty("[name='email']", email);
-                setIfEmpty("[name='mobile']", phone);
-                setIfEmpty("[name='address']", address);
-                setIfEmpty("[name='country']", country);
-                setIfEmpty("[name='state']", state);
-                setIfEmpty("[name='zip']", zip);
+                if (phone && !phoneHiddenInput.value) {
+                  phoneNumberInput.value = String(phone).replace(/\D/g, "");
+                  reformatPhoneDisplay();
+                }
                 $("[name='dob']").val(dob);
 
               },
@@ -372,81 +2459,727 @@
 
           $("#matching_resume").click()
 
-          $("[name='resume']").on("change", function(){
+          // DOCX/JPEG resumes are converted to a real PDF entirely in the
+          // browser (mammoth.js for docx text extraction, jsPDF to build
+          // the PDF) - nothing is uploaded until a PDF File object is
+          // sitting in the input, so the backend's PDF-only validation
+          // and the AI autofill endpoint both keep working unchanged.
+          function readFileAsArrayBuffer(file) {
+            return new Promise(function (resolve, reject) {
+              var reader = new FileReader();
+              reader.onload = function () { resolve(reader.result); };
+              reader.onerror = function () { reject(new Error("{% trans 'Could not read this file.' %}")); };
+              reader.readAsArrayBuffer(file);
+            });
+          }
+
+          function readFileAsDataUrl(file) {
+            return new Promise(function (resolve, reject) {
+              var reader = new FileReader();
+              reader.onload = function () { resolve(reader.result); };
+              reader.onerror = function () { reject(new Error("{% trans 'Could not read this file.' %}")); };
+              reader.readAsDataURL(file);
+            });
+          }
+
+          function withPdfExtension(name) {
+            return name.replace(/\.[^.]+$/, "") + ".pdf";
+          }
+
+          // Scoped styling for the off-screen render container so tables,
+          // headings and lists that docx produces (which mammoth emits as
+          // bare semantic HTML, with no inline styling of its own) still
+          // look like a real document instead of an unstyled text dump.
+          var DOCX_PREVIEW_CSS = [
+            ".docx-preview-container { font-family: Helvetica, Arial, sans-serif; font-size: 12px; line-height: 1.5; color: #111; }",
+            ".docx-preview-container h1, .docx-preview-container h2, .docx-preview-container h3 { margin: 0.6em 0 0.3em; }",
+            ".docx-preview-container p { margin: 0 0 0.6em; }",
+            ".docx-preview-container table { border-collapse: collapse; width: 100%; margin: 0.6em 0; }",
+            ".docx-preview-container table, .docx-preview-container th, .docx-preview-container td { border: 1px solid #999; }",
+            ".docx-preview-container th, .docx-preview-container td { padding: 4px 6px; vertical-align: top; }",
+            ".docx-preview-container img { max-width: 100%; }",
+            ".docx-preview-container ul, .docx-preview-container ol { margin: 0 0 0.6em; padding-left: 1.5em; }",
+          ].join(" ");
+
+          async function convertDocxToPdf(file) {
+            setConvertingStage("{% trans 'Reading document...' %}");
+            var arrayBuffer = await readFileAsArrayBuffer(file);
+            // convertToHtml (not extractRawText) is what keeps headings,
+            // bold/italic, lists, tables and embedded images (mammoth
+            // inlines these as data-URI <img> tags by default) instead of
+            // flattening the whole document down to plain paragraphs.
+            var result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
+            var cleanHtml = window.DOMPurify.sanitize(result.value || "", { ADD_ATTR: ["target"] });
+
+            var probe = document.createElement("div");
+            probe.innerHTML = cleanHtml;
+            var text = (probe.textContent || "").trim();
+            // A genuinely empty/corrupt docx still "converts" successfully
+            // as far as mammoth is concerned, so readability is checked on
+            // how much actual text came out of it, not on conversion
+            // success alone.
+            if (text.replace(/\s+/g, "").length < 20) {
+              throw new Error("{% trans 'This document appears to be empty or unreadable. Please check the file and try again.' %}");
+            }
+
+            var pageWidthPx = 794; // ~210mm (A4) at 96dpi
+            var container = document.createElement("div");
+            container.className = "docx-preview-container";
+            // html2canvas needs the element actually laid out (a real box
+            // to measure/rasterize), so it can't be display:none. It also
+            // can't be pushed off-screen with a large negative offset -
+            // jsPDF's html() plugin reads the element's real page position
+            // and bakes it into the output text/image placement, so a
+            // -99999px offset ends up shifting the whole rendered page
+            // thousands of points off the PDF canvas. Keeping it at (0,0)
+            // and hiding it with near-zero opacity instead avoids that.
+            container.style.position = "absolute";
+            container.style.top = "0";
+            container.style.left = "0";
+            container.style.opacity = "0.01";
+            container.style.pointerEvents = "none";
+            container.style.width = pageWidthPx + "px";
+            container.style.padding = "32px";
+            container.style.background = "#ffffff";
+            container.style.boxSizing = "border-box";
+            container.innerHTML = "<style>" + DOCX_PREVIEW_CSS + "</style>" + cleanHtml;
+            document.body.appendChild(container);
+
+            try {
+              setConvertingStage("{% trans 'Rendering pages...' %}");
+              var doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4" });
+              await new Promise(function (resolve, reject) {
+                doc.html(container, {
+                  x: 0,
+                  y: 0,
+                  width: doc.internal.pageSize.getWidth(),
+                  windowWidth: pageWidthPx,
+                  // "text" autoPaging is jsPDF's experimental vector-text
+                  // mode and produced corrupted/off-page coordinates in
+                  // testing; "slice" rasterizes each page via html2canvas
+                  // instead - not searchable, but reliable across
+                  // arbitrary docx content (tables, images, formatting).
+                  autoPaging: "slice",
+                  html2canvas: { useCORS: true, logging: false },
+                  callback: function () { resolve(); },
+                });
+              });
+              setConvertingStage("{% trans 'Finalizing PDF...' %}");
+              return new File([doc.output("blob")], withPdfExtension(file.name), { type: "application/pdf" });
+            } finally {
+              document.body.removeChild(container);
+            }
+          }
+
+          async function convertImageToPdf(file) {
+            setConvertingStage("{% trans 'Reading image...' %}");
+            var dataUrl = await readFileAsDataUrl(file);
+            var img = await new Promise(function (resolve, reject) {
+              var image = new Image();
+              image.onload = function () { resolve(image); };
+              image.onerror = function () { reject(new Error("{% trans 'This image could not be loaded. Please upload a valid JPEG.' %}")); };
+              image.src = dataUrl;
+            });
+
+            if (img.naturalWidth < 100 || img.naturalHeight < 100) {
+              throw new Error("{% trans 'This image is too small to be a readable resume.' %}");
+            }
+
+            // No OCR available client-side, so "readable" is approximated
+            // by pixel variance on a downscaled sample - a blank/near-solid
+            // scan (accidental photo of a blank page, a corrupt capture)
+            // has ~0 variance, real content does not.
+            var sampleW = 100;
+            var sampleH = Math.max(1, Math.round(sampleW * (img.naturalHeight / img.naturalWidth)));
+            var canvas = document.createElement("canvas");
+            canvas.width = sampleW;
+            canvas.height = sampleH;
+            var ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, sampleW, sampleH);
+            var pixels = ctx.getImageData(0, 0, sampleW, sampleH).data;
+            var sum = 0, sumSq = 0, n = pixels.length / 4;
+            for (var i = 0; i < pixels.length; i += 4) {
+              var gray = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+              sum += gray;
+              sumSq += gray * gray;
+            }
+            var mean = sum / n;
+            var variance = sumSq / n - mean * mean;
+            if (variance < 25) {
+              throw new Error("{% trans 'This image looks blank or unreadable. Please upload a clearer scan or photo.' %}");
+            }
+
+            setConvertingStage("{% trans 'Building PDF page...' %}");
+            var orientation = img.naturalWidth >= img.naturalHeight ? "l" : "p";
+            var doc = new window.jspdf.jsPDF({
+              unit: "pt",
+              format: [img.naturalWidth, img.naturalHeight],
+              orientation: orientation,
+            });
+            doc.addImage(img, "JPEG", 0, 0, img.naturalWidth, img.naturalHeight);
+
+            return new File([doc.output("blob")], withPdfExtension(file.name), { type: "application/pdf" });
+          }
+
+          async function ensurePdfFile(file) {
+            var ext = (file.name.split(".").pop() || "").toLowerCase();
+            if (ext === "pdf" || file.type === "application/pdf") {
+              return file;
+            }
+            if (ext === "docx" || file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+              return convertDocxToPdf(file);
+            }
+            if (ext === "jpg" || ext === "jpeg" || file.type === "image/jpeg") {
+              return convertImageToPdf(file);
+            }
+            throw new Error("{% trans 'Unsupported file type. Please upload a PDF, DOCX, or JPEG.' %}");
+          }
+
+          function setConvertingStage(text) {
+            document.getElementById("resumeConvertingLabel").textContent = text;
+          }
+
+          function processResumeFile(file) {
+            clearFieldError("err-resume");
+            var dz = document.getElementById("resumeDropzone");
+            if (dz) dz.classList.remove("is-invalid");
+            $("#aiAutofillMessage").hide().text("");
+            $("#aiAutofillBtn").prop("disabled", true);
+            $("#pdfPreview").addClass("hidden");
+            aiClearWarnings();
+
+            if (!file) {
+              return;
+            }
+
+            var input = document.getElementById("resumeUpload");
+            var needsConversion = !(file.type === "application/pdf" || /\.pdf$/i.test(file.name));
+            if (needsConversion) {
+              setConvertingStage("{% trans 'Converting to PDF...' %}");
+              $("#resumeConvertingMsg").removeClass("hidden");
+            }
+            ensurePdfFile(file).then(function (pdfFile) {
+              var dataTransfer = new DataTransfer();
+              dataTransfer.items.add(pdfFile);
+              input.files = dataTransfer.files;
+              $("#pdfFileName").text(pdfFile.name);
+              $("#pdfPreview").removeClass("hidden");
+              $("#aiAutofillBtn").prop("disabled", false);
+              showResumePreview(pdfFile);
+            }).catch(function (err) {
+              if (dz) dz.classList.add("is-invalid");
+              showFieldError("err-resume", err.message || "{% trans 'Could not process this file. Please upload a PDF, DOCX, or JPEG.' %}");
+              input.value = "";
+            }).finally(function () {
+              $("#resumeConvertingMsg").addClass("hidden");
+            });
+          }
+
+          // "Autofill with AI" only becomes available once a resume is
+          // chosen (and, for docx/jpeg, only once it has been converted
+          // and passed the readability check) - nothing runs on file
+          // selection alone beyond that.
+          $("#resumeUpload").on("change", function () {
+            var file = this.files && this.files[0];
+            processResumeFile(file);
+          });
+
+          // Drag & drop onto the resume dropzone - feeds the same
+          // change-driven conversion/validation pipeline as a manual
+          // click-to-browse pick, just via a synthetic FileList assignment.
+          (function () {
+            var dz = document.getElementById("resumeDropzone");
+            var input = document.getElementById("resumeUpload");
+            if (!dz || !input) return;
+            ["dragenter", "dragover"].forEach(function (evt) {
+              dz.addEventListener(evt, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dz.classList.add("drag-over");
+              });
+            });
+            ["dragleave", "drop"].forEach(function (evt) {
+              dz.addEventListener(evt, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dz.classList.remove("drag-over");
+              });
+            });
+            dz.addEventListener("drop", function (e) {
+              var files = e.dataTransfer && e.dataTransfer.files;
+              if (!files || !files.length) return;
+              var dataTransfer = new DataTransfer();
+              dataTransfer.items.add(files[0]);
+              input.files = dataTransfer.files;
+              processResumeFile(files[0]);
+            });
+          })();
+
+          function aiClearWarnings() {
+            $("[id^='ai-warn-']").hide().text("");
+          }
+
+          function aiShowMessage(text, isError) {
+            $("#aiAutofillMessage")
+              .css("color", isError ? "#dc3545" : "#28a745")
+              .html((isError ? '<i class="fa-solid fa-circle-exclamation"></i> ' : '<i class="fa-solid fa-circle-check"></i> ') + text)
+              .show();
+          }
+
+          // Only fills a field when the backend marked it valid (see
+          // recruitment/resume_ai_fill.py) and the candidate hasn't already
+          // typed something in it. Anything the AI found but couldn't
+          // verify shows up as an inline hint under that field instead of
+          // being silently discarded or auto-filled unchecked.
+          function aiFillField(name, field) {
+            if (!field) return;
+            var selector = "[name='" + name + "']";
+            var $warn = $("#ai-warn-" + name);
+
+            if (field.valid && field.value) {
+              if ($(selector).val() === "") {
+                // fireChange (not a bare .trigger) so this reaches both
+                // the addEventListener-based floating-label/custom-select
+                // sync and, for Country specifically, the Country->State
+                // cascade bridge - see fireChange's own comment above.
+                $(selector).val(field.value);
+                fireChange(selector);
+                flashField(document.querySelector(selector));
+              }
+            } else if (field.raw && $warn.length) {
+              $warn
+                .addClass("skill-hint")
+                .text(
+                  "{% trans 'Found on the resume but could not be verified:' %} \""
+                  + field.raw + "\" - {% trans 'please check/fill this in.' %}"
+                )
+                .show();
+            }
+          }
+
+          $("#aiAutofillBtn").on("click", function () {
+            var file = document.getElementById("resumeUpload").files[0];
+            if (!file) {
+              return;
+            }
+            aiClearWarnings();
+            var $btn = $(this);
+            $btn.prop("disabled", true).addClass("is-thinking");
+            $("#aiAutofillBtnIcon").removeClass("fa-wand-magic-sparkles").addClass("fa-circle-notch spin");
+            $("#aiAutofillBtnLabel").text("{% trans 'Analyzing resume...' %}");
+            $("#aiAutofillMessage").hide().text("");
+
             var formData = new FormData();
-            var file = this.files[0];
-            formData.append('resume', file);
+            formData.append("resume", file);
 
             $.ajax({
-              url: "{% url 'resume-completion' %}",
-              type: 'POST',
+              url: "{% url 'resume-ai-autofill' %}",
+              type: "POST",
               data: formData,
               processData: false,
               contentType: false,
               headers: {
-                  'X-CSRFToken': getCookie("csrftoken")
+                "X-CSRFToken": getCookie("csrftoken")
               },
-              success: function(response) {
+              success: function (response) {
+                if (response.error) {
+                  aiShowMessage(response.error, true);
+                  return;
+                }
+                var fields = response.fields || {};
+                // Country before state so the state dropdown is rebuilt
+                // for the right country before a state is selected in it.
+                aiFillField("name", fields.name);
+                aiFillField("email", fields.email);
+                if (fields.mobile && fields.mobile.valid && fields.mobile.value && !phoneHiddenInput.value) {
+                  phoneNumberInput.value = fields.mobile.value.replace(/\D/g, "");
+                  reformatPhoneDisplay();
+                  flashField(phoneGroupEl);
+                } else if (fields.mobile && !fields.mobile.valid && fields.mobile.raw) {
+                  $("#ai-warn-mobile").text(
+                    "{% trans 'Found on the resume but could not be verified:' %} \""
+                    + fields.mobile.raw + "\" - {% trans 'please check/fill this in.' %}"
+                  ).show();
+                }
+                aiFillField("gender", fields.gender);
+                aiFillField("dob", fields.dob);
+                aiFillField("address", fields.address);
+                aiFillField("country", fields.country);
+                aiFillField("state", fields.state);
+                aiFillField("zip", fields.zip);
+                validateName(true);
+                validateEmail(true);
+                validatePhone(true);
+                validateDob();
 
-                var full_name = response.full_name;
-                var address = response.address;
-                var country = response.country;
-                var state = response.state;
-                var phone = response.phone_number;
-                var dob = response.dob;
-                var email = response.email_id;
-                var zip = response.zip;
+                (response.skills || []).forEach(function (name) {
+                  window.addSkillChip(name);
+                });
 
-                setIfEmpty("[name='name']", full_name);
-                setIfEmpty("[name='email']", email);
-                setIfEmpty("[name='mobile']", phone);
-                setIfEmpty("[name='address']", address);
-                setIfEmpty("[name='country']", country);
-                setIfEmpty("[name='state']", state);
-                setIfEmpty("[name='zip']", zip);
-                $("[name='dob']").val(dob);
+                (response.education || []).forEach(function (entry) {
+                  if (window.formsetAddRow.education) {
+                    window.formsetAddRow.education(entry);
+                  }
+                });
 
+                (response.experience || []).forEach(function (entry) {
+                  if (window.formsetAddRow.experience) {
+                    window.formsetAddRow.experience(entry);
+                  }
+                });
+
+                // Estimated from the experience entries' own date ranges
+                // (recruitment/resume_ai_fill.py), not asked from the LLM
+                // directly - only fills if the candidate hasn't already
+                // entered something themselves.
+                var $expYears = $("#experience_years");
+                var $expMonths = $("#experience_months");
+                if (response.experience_years !== null && response.experience_years !== undefined && $expYears.val() === "") {
+                  $expYears.val(response.experience_years);
+                  fireChange("#experience_years");
+                  flashField($expYears[0]);
+                }
+                if (response.experience_months !== null && response.experience_months !== undefined && $expMonths.val() === "") {
+                  $expMonths.val(String(response.experience_months));
+                  fireChange("#experience_months");
+                }
+
+                aiShowMessage(
+                  "{% trans 'Form filled from your resume - please review before applying.' %}",
+                  false
+                );
               },
-              error: function(xhr, status, error) {
-                  console.error('File upload failed: ', status, error);
+              error: function (xhr) {
+                var message = "{% trans 'Something went wrong analyzing the resume. Please fill the form in manually.' %}";
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                  message = xhr.responseJSON.error;
+                }
+                aiShowMessage(message, true);
+              },
+              complete: function () {
+                $btn.prop("disabled", false).removeClass("is-thinking");
+                $("#aiAutofillBtnIcon").removeClass("fa-circle-notch spin").addClass("fa-wand-magic-sparkles");
+                $("#aiAutofillBtnLabel").text("{% trans 'Autofill with AI' %}");
               }
             });
           })
-        })
-      </script>
 
-    <script>
-        // Image preview
-        document.getElementById("profileImageUpload").addEventListener("change", function () {
-            const file = this.files[0];
-            const previewContainer = document.getElementById("imagePreview");
-            const previewImg = previewContainer.querySelector("img");
+          // Generic "Add another" row handler for the Education/Experience
+          // formsets - clones the <template> row, swaps
+          // __PREFIX__ for the current TOTAL_FORMS index, and bumps
+          // TOTAL_FORMS so Django's formset picks it up. Removing a row
+          // just drops it from the DOM without renumbering: Django
+          // formsets tolerate "gaps" in the index range (a missing index
+          // is treated as an empty/unchanged form and skipped on save).
+          // window.formsetAddRow[prefix](values) is exposed so the AI
+          // autofill handler below can programmatically add and prefill
+          // rows the same way a manual "+ Add" click would, instead of
+          // duplicating the clone/index/TOTAL_FORMS logic.
+          window.formsetAddRow = {};
 
-            if (file && file.type.startsWith("image/")) {
-                const reader = new FileReader();
+          function setupFormset(containerId, addBtnId, templateId, prefix) {
+            var container = document.getElementById(containerId);
+            var addBtn = document.getElementById(addBtnId);
+            var template = document.getElementById(templateId);
+            var totalFormsInput = document.querySelector(
+              'input[name="' + prefix + '-TOTAL_FORMS"]'
+            );
+            if (!container || !addBtn || !template || !totalFormsInput) {
+              return;
+            }
+
+            function wireRemove(rowEl) {
+              var removeBtn = rowEl.querySelector(".formset-remove-row");
+              if (removeBtn) {
+                removeBtn.addEventListener("click", function () {
+                  rowEl.style.opacity = "0";
+                  rowEl.style.transform = "scale(0.96)";
+                  setTimeout(function () { rowEl.remove(); }, 150);
+                });
+              }
+            }
+
+            // Only present on an experience row - hides/clears "Date of
+            // Relieving" while "Currently working here" is checked, since
+            // an ongoing job has no end date. Also enforces that at most
+            // one experience row is marked current at a time (a candidate
+            // can't currently work two jobs) by unchecking any other row's
+            // toggle when this one is checked.
+            function wireCurrentJobToggle(rowEl) {
+              var checkbox = rowEl.querySelector(".formset-current-job-toggle");
+              var endDateGroup = rowEl.querySelector(".formset-end-date-group");
+              if (!checkbox || !endDateGroup) {
+                return;
+              }
+              var endDateInput = endDateGroup.querySelector("input");
+              function sync() {
+                endDateGroup.style.display = checkbox.checked ? "none" : "";
+                if (checkbox.checked && endDateInput) {
+                  endDateInput.value = "";
+                }
+              }
+              checkbox.addEventListener("change", function () {
+                if (checkbox.checked) {
+                  container.querySelectorAll(".formset-current-job-toggle").forEach(function (other) {
+                    if (other !== checkbox && other.checked) {
+                      other.checked = false;
+                      other.dispatchEvent(new Event("change"));
+                    }
+                  });
+                }
+                sync();
+              });
+              sync();
+            }
+
+            // Re-validates the row (required fields, date range, and for
+            // education rows CGPA/percentage format) whenever focus
+            // leaves one of its fields, so mistakes surface immediately
+            // instead of only on submit.
+            function wireRowValidation(rowEl) {
+              rowEl.addEventListener("focusout", function () {
+                validateFormsetRow(rowEl, prefix);
+              });
+            }
+
+            function addRow(values) {
+              var index = parseInt(totalFormsInput.value, 10) || 0;
+              var html = template.innerHTML.split("__PREFIX__").join(index);
+              var wrapper = document.createElement("div");
+              wrapper.innerHTML = html.trim();
+              var rowEl = wrapper.firstElementChild;
+              container.appendChild(rowEl);
+              totalFormsInput.value = index + 1;
+              wireRemove(rowEl);
+              wireCurrentJobToggle(rowEl);
+              wireRowValidation(rowEl);
+              if (values) {
+                Object.keys(values).forEach(function (fieldName) {
+                  var input = rowEl.querySelector(
+                    '[name="' + prefix + '-' + index + '-' + fieldName + '"]'
+                  );
+                  if (!input || !values[fieldName]) {
+                    return;
+                  }
+                  if (input.type === "checkbox") {
+                    input.checked = true;
+                    input.dispatchEvent(new Event("change"));
+                  } else {
+                    input.value = values[fieldName];
+                  }
+                });
+              }
+              return rowEl;
+            }
+
+            addBtn.addEventListener("click", function () {
+              addRow();
+            });
+
+            container.querySelectorAll(".formset-row").forEach(wireRemove);
+            container.querySelectorAll(".formset-row").forEach(wireRowValidation);
+            window.formsetAddRow[prefix] = addRow;
+          }
+
+          setupFormset("educationRows", "addEducationRow", "educationRowTemplate", "education");
+          setupFormset("experienceRows", "addExperienceRow", "experienceRowTemplate", "experience");
+
+          // Skills - same Skill model/table the Job Opening "Skills" field
+          // uses (recruitment/forms.py RecruitmentCreationForm), but that
+          // field's "create new skill" flow round-trips through an
+          // @login_required htmx endpoint, which an anonymous applicant
+          // can't call. Select2's own tags:true mode sidesteps that: typing
+          // a name not in the list adds it locally as a plain-text option
+          // with no server call, and the server resolves each submitted
+          // value on save (numeric = existing Skill pk, text = new Skill
+          // name to get-or-create) - see application_form() in
+          // recruitment/views/surveys.py.
+          // Blocks nonsense entries like "[]" or "&" - a valid skill has to
+          // start with a letter/digit, keeping the rest to characters that
+          // show up in real skill names (spaces, and the handful of
+          // punctuation marks used in things like "C++", "C#", "Node.js",
+          // "CI/CD"). Mirrors skill_name_pattern in
+          // recruitment/views/surveys.py, which is the real gate since this
+          // is only a client-side nicety.
+          var SKILL_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 .+#\/&-]{0,49}$/;
+          $("#skillsSelect").select2({
+            tags: true,
+            width: "100%",
+            // No placeholder text - the floating "Skills" label (wired up
+            // just below) covers that, and select2's own placeholder
+            // would sit inside the box competing with it exactly the way
+            // a floating label collides with a native <select>'s own
+            // rendered text.
+            // Caps how many skills a candidate can pile on - mirrors the
+            // [:25] slice on skills_input server-side.
+            maximumSelectionLength: 25,
+            language: {
+              maximumSelected: function () {
+                return "{% trans 'You can add up to 25 skills.' %}";
+              }
+            },
+            // Default tags:true renders a brand-new (not-yet-a-Skill-row)
+            // entry identically to a real existing skill, so typing a new
+            // name "worked" but looked exactly like nothing happened -
+            // this marks/labels new entries so it's obvious the option
+            // being offered is "add this as a new skill", not a match.
+            createTag: function (params) {
+              var term = $.trim(params.term);
+              if (!term || !SKILL_NAME_PATTERN.test(term)) {
+                return null;
+              }
+              return { id: term, text: term, newTag: true };
+            },
+            templateResult: function (data) {
+              if (data.newTag) {
+                return $(
+                  '<span>+ {% trans "Add" %} "' + data.text + '" {% trans "as a new skill" %}</span>'
+                );
+              }
+              return data.text;
+            },
+          });
+          // Skills is the one floating-label field not built on the
+          // .fl-input/.cs-native convention (it's select2's own multi-
+          // select chip UI), so it gets its own small sync instead of
+          // going through initFloatingLabel/initCustomSelect.
+          (function () {
+            var skillsWrap = document.getElementById("skillsFlWrap");
+            function syncSkillsLabel() {
+              skillsWrap.classList.toggle("fl-filled", ($("#skillsSelect").val() || []).length > 0);
+            }
+            $("#skillsSelect").on("change", syncSkillsLabel);
+            $("#skillsSelect").on("select2:open", function () { skillsWrap.classList.add("fl-focused"); });
+            $("#skillsSelect").on("select2:close", function () { skillsWrap.classList.remove("fl-focused"); });
+            syncSkillsLabel();
+          })();
+
+          // Used by the AI autofill handler below to add a skill extracted
+          // from the resume - creates the option (if it's not already one
+          // of the pre-rendered existing Skill options) and selects it.
+          window.addSkillChip = function (name) {
+            name = (name || "").trim();
+            var $select = $("#skillsSelect");
+            var existing = $select.find("option").filter(function () {
+              return $(this).text().toLowerCase() === name.toLowerCase();
+            });
+            // Same nonsense-entry and 25-skill-cap guards as manual entry
+            // (createTag/maximumSelectionLength above) - the AI autofill
+            // path adds chips directly and skips select2's own checks.
+            if (!name || (!existing.length && !SKILL_NAME_PATTERN.test(name))) {
+              return;
+            }
+            var current = $select.val() || [];
+            if (!existing.length && current.length >= 25) {
+              return;
+            }
+            var value = existing.length ? existing.val() : name;
+            if (!existing.length) {
+              $select.append(new Option(name, name, false, false));
+            }
+            current = $select.val() || [];
+            if (current.indexOf(value) === -1) {
+              current.push(value);
+              $select.val(current).trigger("change");
+            }
+          };
+
+          // Only present when the recruitment has optional_profile_image
+          // enabled (mandatory profile photo).
+          var profileImageInput = document.getElementById("profileImageUpload");
+          if (profileImageInput) {
+            profileImageInput.addEventListener("change", function () {
+              var file = this.files[0];
+              var previewContainer = document.getElementById("imagePreview");
+              var previewImg = previewContainer.querySelector("img");
+              clearFieldError("err-profile");
+
+              if (file && file.type.startsWith("image/")) {
+                var reader = new FileReader();
                 reader.onload = function (e) {
-                    previewImg.src = e.target.result;
-                    previewContainer.classList.remove("hidden");
+                  previewImg.src = e.target.result;
+                  previewContainer.classList.remove("hidden");
                 };
                 reader.readAsDataURL(file);
-            } else {
+              } else {
                 previewContainer.classList.add("hidden");
-            }
-        });
+              }
+            });
+          }
 
-        // PDF file name preview
-        document.getElementById("resumeUpload").addEventListener("change", function () {
-            const file = this.files[0];
-            const previewContainer = document.getElementById("pdfPreview");
-            const fileNameSpan = document.getElementById("pdfFileName");
-
-            if (file && file.type === "application/pdf") {
-                fileNameSpan.textContent = file.name;
-                previewContainer.classList.remove("hidden");
-            } else {
-                previewContainer.classList.add("hidden");
+          // Restores everything a JS-built widget can't get back just from
+          // the bound Django form being redisplayed - education/experience
+          // rows, skills chips, and the Source "create new" text - after a
+          // validation error elsewhere on the form (e.g. a duplicate email)
+          // sends the candidate back here. Runs last so formsetAddRow/
+          // addSkillChip/the Source "create new" wiring above already
+          // exist. See education_initial/experience_initial/
+          // submitted_skill_names in recruitment/views/surveys.py.
+          (function () {
+            function readJsonScript(id) {
+              var el = document.getElementById(id);
+              if (!el) return null;
+              try {
+                return JSON.parse(el.textContent);
+              } catch (e) {
+                return null;
+              }
             }
-        });
-    </script>
+
+            var educationRows = readJsonScript("educationInitialData");
+            if (Array.isArray(educationRows) && window.formsetAddRow.education) {
+              educationRows.forEach(function (row) { window.formsetAddRow.education(row); });
+            }
+
+            var experienceRows = readJsonScript("experienceInitialData");
+            if (Array.isArray(experienceRows) && window.formsetAddRow.experience) {
+              experienceRows.forEach(function (row) { window.formsetAddRow.experience(row); });
+            }
+
+            var skillNames = readJsonScript("submittedSkillsData");
+            if (Array.isArray(skillNames)) {
+              skillNames.forEach(function (name) { window.addSkillChip(name); });
+            }
+
+            var submittedSource = "{{ request.POST.utm_source|default:''|escapejs }}";
+            var sourceSelectEl = document.getElementById("sourcePlatformSelect");
+            var newSourceInputEl = document.getElementById("newSourceInput");
+            if (submittedSource && sourceSelectEl) {
+              var matchesExistingOption = Array.prototype.some.call(
+                sourceSelectEl.options,
+                function (opt) { return opt.value === submittedSource; }
+              );
+              sourceSelectEl.value = matchesExistingOption ? submittedSource : "__create_new__";
+              sourceSelectEl.dispatchEvent(new Event("change"));
+              if (!matchesExistingOption && newSourceInputEl) {
+                newSourceInputEl.value = submittedSource;
+              }
+            }
+
+            // Belt-and-suspenders re-assertion of the phone number: the
+            // hidden #phone field already carries the right server-
+            // rendered value on its own (see value="{{ form.mobile.value }}"
+            // near its <input> tag), and normally that's enough - but
+            // under some combinations of the other restorations just
+            // above running first, it's been observed empty by the time
+            // this script runs. Re-driving it through the same "input"
+            // event #phoneNumber's own listener already reacts to (see
+            // reformatPhoneDisplay() above) re-syncs both the visible and
+            // hidden fields using the page's own real formatting logic,
+            // rather than duplicating it here.
+            var submittedMobile = "{{ request.POST.mobile|default:''|escapejs }}";
+            var phoneHiddenEl = document.getElementById("phone");
+            var phoneNumberEl = document.getElementById("phoneNumber");
+            if (submittedMobile && phoneHiddenEl && phoneHiddenEl.value !== submittedMobile) {
+              if (phoneNumberEl) {
+                phoneNumberEl.value = submittedMobile;
+                phoneNumberEl.dispatchEvent(new Event("input", { bubbles: true }));
+              } else {
+                phoneHiddenEl.value = submittedMobile;
+              }
+            }
+          })();
+        })
+      </script>
 
 {% endblock content %}

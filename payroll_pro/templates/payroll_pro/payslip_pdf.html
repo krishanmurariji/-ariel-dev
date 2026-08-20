@@ -1,0 +1,96 @@
+{% load i18n payroll_pro_tags %}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  body{font-family:Helvetica, Arial, sans-serif; font-size:12px; color:#252A3D; margin:0;}
+  .head{background:#3A2F94; color:#fff; padding:20px 28px; display:flex; justify-content:space-between;}
+  .head .co{font-size:18px; font-weight:800;}
+  .head .co-sub{font-size:10.5px; color:#c8c3ee; margin-top:2px;}
+  .head .title{font-size:18px; font-weight:800; text-align:right;}
+  .body{padding:22px 28px;}
+  .meta{border:1px solid #E4E7F0; border-radius:6px; background:#F7F8FB; padding:12px 14px; margin-bottom:12px;}
+  .meta h5{margin:0 0 8px; font-size:10px; text-transform:uppercase; color:#6C5CE7;}
+  .meta table{width:100%; font-size:11px;}
+  .meta td{padding:3px 6px;}
+  .meta td span{color:#6B7085; font-size:9.5px; text-transform:uppercase; display:block;}
+  table.slip{width:100%; border-collapse:collapse; border:1px solid #E4E7F0; font-size:11.5px; margin-top:10px;}
+  table.slip thead th{background:#3A2F94; color:#fff; font-size:10px; text-transform:uppercase; padding:7px 10px; text-align:left;}
+  table.slip th.amt, table.slip td.amt{text-align:right;}
+  table.slip td{padding:6px 10px; border-bottom:1px solid #EFF1F7;}
+  table.slip tr.total td{font-weight:bold; background:#F1EEFE; border-top:2px solid #6C5CE7; border-bottom:2px solid #6C5CE7;}
+  .att{background:#F7F8FB; border-radius:6px; padding:8px 12px; font-size:11px; margin-bottom:8px;}
+  .net{background:#F1EEFE; border-radius:6px; padding:12px 14px; margin-top:14px; font-weight:bold;
+       display:flex; justify-content:space-between; font-size:13px;}
+  .net .amt{color:#6C5CE7; font-size:17px;}
+  .note{font-size:9.5px; color:#9AA0B4; margin-top:12px;}
+</style>
+</head>
+<body>
+  <div class="head">
+    <div>
+      <div class="co">{{ company.company|default:"Company" }}</div>
+      <div class="co-sub">{{ company.address|default:"" }} {{ company.city|default:"" }} {{ company.state|default:"" }}</div>
+    </div>
+    <div>
+      <div class="title">{% trans "PAYSLIP" %}</div>
+      <div style="font-size:11px; color:#d8d5f2; text-align:right;">{% trans "Pay Period" %} <b>{{ period_label }}</b></div>
+    </div>
+  </div>
+  <div class="body">
+    <div class="meta">
+      <h5>{% trans "Employee Details" %}</h5>
+      <table>
+        <tr>
+          <td><span>{% trans "Employee ID" %}</span>{{ employee.badge_id|default:employee.pk }}</td>
+          <td><span>{% trans "Name" %}</span>{{ employee.get_full_name }}</td>
+          <td><span>{% trans "Designation" %}</span>{{ employee.get_job_position|default:"—" }}</td>
+        </tr>
+        <tr>
+          <td><span>{% trans "Salary Structure" %}</span>{{ calc.structure.name }}</td>
+          <td><span>{% trans "Tax Regime" %}</span>{{ calc.regime_name|default:"—" }}</td>
+          <td><span>{% trans "Monthly CTC" %}</span>{{ calc.monthly_ctc|pp_money0 }}</td>
+        </tr>
+      </table>
+    </div>
+    <div class="att">
+      {% trans "Actual Working Days" %}: <b>{{ calc.total_days|floatformat:"-2" }}</b> &nbsp;·&nbsp;
+      {% trans "LOP Days" %}: <b>{{ calc.lop_days|floatformat:"-2" }}</b> &nbsp;·&nbsp;
+      {% trans "Payable Days" %}: <b>{{ calc.payable_days|floatformat:"-2" }}</b>
+    </div>
+    <table class="slip">
+      <thead><tr><th>{% trans "Earnings" %}</th><th class="amt">{% trans "Amount" %}</th></tr></thead>
+      <tbody>
+        {% for comp in calc.components %}
+        <tr><td>{{ comp.name }}</td><td class="amt">{{ comp.prorated|pp_money }}</td></tr>
+        {% endfor %}
+        {% if calc.bonus %}<tr><td>{% trans "Bonus" %}</td><td class="amt">{{ calc.bonus|pp_money }}</td></tr>{% endif %}
+        {% if calc.overtime %}<tr><td>{% trans "Overtime" %}</td><td class="amt">{{ calc.overtime|pp_money }}</td></tr>{% endif %}
+        {% if calc.reimbursement %}<tr><td>{% trans "Reimbursement" %}</td><td class="amt">{{ calc.reimbursement|pp_money }}</td></tr>{% endif %}
+        {% if calc.adhoc_pay %}<tr><td>{% trans "Adhoc Payment" %}</td><td class="amt">{{ calc.adhoc_pay|pp_money }}</td></tr>{% endif %}
+        <tr class="total"><td>{% trans "Gross Earnings" %}</td><td class="amt">{{ calc.gross_earnings|pp_money }}</td></tr>
+      </tbody>
+    </table>
+    <table class="slip">
+      <thead><tr><th>{% trans "Deductions" %}</th><th class="amt">{% trans "Amount" %}</th></tr></thead>
+      <tbody>
+        {% if calc.employee_pf %}<tr><td>{% trans "Provident Fund (Employee)" %}</td><td class="amt">{{ calc.employee_pf|pp_money }}</td></tr>{% endif %}
+        {% if calc.pt %}<tr><td>{% trans "Professional Tax" %}</td><td class="amt">{{ calc.pt|pp_money }}</td></tr>{% endif %}
+        {% if calc.tds %}<tr><td>{% trans "TDS (Income Tax)" %}</td><td class="amt">{{ calc.tds|pp_money }}</td></tr>{% endif %}
+        {% if calc.adhoc_deduction %}<tr><td>{% trans "Adhoc Deduction" %}</td><td class="amt">{{ calc.adhoc_deduction|pp_money }}</td></tr>{% endif %}
+        <tr class="total"><td>{% trans "Total Deductions" %}</td><td class="amt">{{ calc.total_deductions|pp_money }}</td></tr>
+        {% if calc.employer_pf %}
+        <tr><td style="color:#6B7085; font-style:italic;">{% trans "Employer PF (contribution — not deducted)" %}</td>
+            <td class="amt" style="color:#6B7085;">{{ calc.employer_pf|pp_money }}</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+    <div class="net">
+      <div>{% trans "Net Pay for" %} {{ period_label }}</div>
+      <div class="amt">{{ calc.net_pay|pp_money }}</div>
+    </div>
+    <div class="note">{% trans "This is a system-generated payslip and does not require a signature." %}</div>
+  </div>
+</body>
+</html>

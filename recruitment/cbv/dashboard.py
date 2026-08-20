@@ -153,7 +153,7 @@ class OnGoingRecruitmentList(HorillaListView):
 
     columns = [
         (_("Recrutment"), "title"),
-        (_("Managers"), "managers"),
+        (_("Interviewers"), "managers"),
     ]
 
     def get_queryset(self):

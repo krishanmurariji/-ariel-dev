@@ -1,0 +1,17 @@
+{% load i18n %}
+{# Bank & Statutory Details card for `employee` — included by timeline.html and _revision_history.html. #}
+<div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5">
+  <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+    <h3 class="text-sm font-semibold">{% trans "Bank & Statutory Details" %}</h3>
+    <a href="{% url 'employee-view-individual' employee.pk %}#bank" class="text-primary-600" title="{% trans 'Edit in Employee profile' %}" aria-label="{% trans 'Edit in Employee profile' %}">
+      <ion-icon name="create-outline" class="text-base"></ion-icon>
+    </a>
+  </div>
+  <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+    <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "Bank Name" %}</span><b>{{ employee.employee_bank_details.bank_name|default:"—" }}</b></div>
+    <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "Account Number" %}</span><b>{{ employee.employee_bank_details.account_number|default:"—" }}</b></div>
+    <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "IFSC Code" %}</span><b>{{ employee.employee_bank_details.any_other_code1|default:"—" }}</b></div>
+    <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "PAN" %}</span><b>{{ employee.employee_bank_details.pan_number|default:"—" }}</b></div>
+    <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "UAN" %}</span><b>{{ employee.employee_bank_details.uan_number|default:"—" }}</b></div>
+  </div>
+</div>

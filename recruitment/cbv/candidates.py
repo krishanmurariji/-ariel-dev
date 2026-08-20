@@ -174,8 +174,10 @@ class ListCandidates(HorillaListView):
         (_("Email"), "email"),
         (_("Phone"), "mobile"),
         (_("Rating"), "rating"),
+        (_("AI Score"), "ai_score_number"),
         (_("Recruitment"), "recruitment_id"),
         (_("Job Position"), "job_position_id"),
+        (_("Source"), "platform"),
         (_("Hired Date"), "hired_date"),
         (_("Resume"), "resume_pdf"),
     ]
@@ -188,6 +190,7 @@ class ListCandidates(HorillaListView):
         (_("Scheduled Interview"), "get_total_interview"),
         (_("Recruitment"), "recruitment_id"),
         (_("Job Position"), "job_position_id"),
+        (_("Source"), "platform"),
         (_("Hired Date"), "hired_date"),
     ]
     default_columns = columns
@@ -564,7 +567,7 @@ class CardCandidates(HorillaCardView):
     details = {
         "image_src": "get_avatar",
         "title": "{get_full_name}",
-        "subtitle": "{email} <br> {get_job_position}",
+        "subtitle": "{email} <br> {get_job_position} <br> AI Score: {ai_score_number}",
     }
 
     actions = [

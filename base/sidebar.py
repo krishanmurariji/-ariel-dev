@@ -80,9 +80,7 @@ def audit_history_accessibility(request, submenu, user_perms, *args, **kwargs):
 
 
 def mail_server_accessibility(request, submenu, user_perms, *args, **kwargs):
-    return request.user.has_perm(
-        "base.view_dynamicemailconfiguration"
-    ) and not apps.is_installed("outlook_auth")
+    return request.user.has_perm("base.view_dynamicemailconfiguration")
 
 
 def mail_template_accessibility(request, submenu, user_perms, *args, **kwargs):
@@ -107,6 +105,12 @@ def outlook_mail_accessibility(request, submenu, user_perms, *args, **kwargs):
     return request.user.has_perm(
         "base.view_dynamicemailconfiguration"
     ) and apps.is_installed("outlook_auth")
+
+
+def gmail_mail_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm(
+        "base.view_dynamicemailconfiguration"
+    ) and apps.is_installed("gmail_auth")
 
 
 def department_accessibility(request, submenu, user_perms, *args, **kwargs):
@@ -166,6 +170,12 @@ def whatsapp_accessibility(request, submenu, user_perms, *args, **kwargs):
     )
 
 
+def ai_settings_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return apps.is_installed("recruitment") and request.user.has_perm(
+        "recruitment.change_aisettings"
+    )
+
+
 # ---------------------------------------------------------------------------
 # 1. General settings section
 # ---------------------------------------------------------------------------
@@ -200,11 +210,6 @@ class GeneralSettings:
             "label": _("Audit & History"),
             "url": reverse_lazy("audit-history-view"),
             "accessibility": audit_history_accessibility,
-        },
-        {
-            "label": _("Outlook Mail"),
-            "url": reverse_lazy("outlook_view_records"),
-            "accessibility": outlook_mail_accessibility,
         },
     ]
 
@@ -349,8 +354,23 @@ class IntegrationsSettings:
             "accessibility": google_meet_accessibility,
         },
         {
+            "label": _("Outlook Mail"),
+            "url": reverse_lazy("outlook_view_records"),
+            "accessibility": outlook_mail_accessibility,
+        },
+        {
+            "label": _("Gmail Mail"),
+            "url": reverse_lazy("gmail_view_records"),
+            "accessibility": gmail_mail_accessibility,
+        },
+        {
             "label": _("Whatsapp"),
             "url": reverse_lazy("whatsapp-credential-view"),
             "accessibility": whatsapp_accessibility,
+        },
+        {
+            "label": _("AI Settings"),
+            "url": reverse_lazy("ai-settings"),
+            "accessibility": ai_settings_accessibility,
         },
     ]

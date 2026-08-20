@@ -43,6 +43,14 @@
 <script src="{% static 'horilla_theme/assets/js/tailwind.js' %}"></script>
 <script>
     window.tailwind.config = {
+        // Disabled: this app is otherwise Bootstrap-styled (oh-btn, SweetAlert2
+        // popups, etc.) and Tailwind's base reset applies globally to the whole
+        // page, not just Tailwind-authored markup - it was silently breaking
+        // click/cursor behavior on unrelated buttons (e.g. the SweetAlert2
+        // confirm button in the interview "Send Meeting Link" flow).
+        corePlugins: {
+            preflight: false,
+        },
         theme: {
             colors: {
                 white: '#FFFFFF',

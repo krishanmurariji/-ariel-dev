@@ -58,6 +58,92 @@
                         </label>
                     </div>
                 </div>
+                <div class="col-span-12 lg:col-span-6" id="candidatePortalMailRow" {% if not check_candidate_self_tracking %}style="display:none;"{% endif %}>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex space-x-2">
+                            <h3 class="text-sm font-medium">{% trans "Send Candidate Portal Mail" %}</h3>
+                            <span
+                                class="oh-info mr-2"
+                                title='{% trans "By enabling the feature, applicants receive an email with their Candidate Portal login details right after submitting an application" %}'
+                            >
+                            </span>
+                        </div>
+                        <label class="toggle-label">
+                            <input
+                                type="checkbox"
+                                class="toggle-input"
+                                name="send_candidate_portal_mail"
+                                onchange="candidatePortalMail($(this))"
+                                {% if check_candidate_portal_mail %}
+                                    checked
+                                {% endif %}
+                            >
+                            <div class="toggle-switch"></div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="border border-[#ebebeb] rounded-md overflow-hidden mb-5">
+        <h5 class="text-sm font-semibold bg-[#f3f3f3] px-4 py-3 text-[#333]">
+            {% trans 'Recruitment Dashboard' %}
+        </h5>
+        <div class="p-4">
+            <div class="grid grid-cols-12 gap-4 myform">
+                <div class="col-span-12 lg:col-span-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex space-x-2">
+                            <h3 class="text-sm font-medium">{% trans "Source Conversion Widget" %}</h3>
+                            <span
+                                class="oh-info mr-2"
+                                title='{% trans "Shows the Source Conversion Rate chart (hire rate per candidate source) on the Recruitment Dashboard" %}'
+                            >
+                            </span>
+                        </div>
+                        <label class="toggle-label">
+                            <input
+                                type="checkbox"
+                                class="toggle-input"
+                                name="show_platform_conversion"
+                                onchange="platformConversionWidget($(this))"
+                                {% if check_platform_conversion_widget %}
+                                    checked
+                                {% endif %}
+                            >
+                            <div class="toggle-switch"></div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="border border-[#ebebeb] rounded-md overflow-hidden mb-5">
+        <h5 class="text-sm font-semibold bg-[#f3f3f3] px-4 py-3 text-[#333]">
+            {% trans 'Interview Meeting' %}
+        </h5>
+        <div class="p-4">
+            <div class="grid grid-cols-12 gap-4 myform">
+                <div class="col-span-12 lg:col-span-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex space-x-2">
+                            <h3 class="text-sm font-medium">{% trans "Default Meeting Provider" %}</h3>
+                            <span
+                                class="oh-info mr-2"
+                                title='{% trans "Platform used to create the meeting link when Send Meeting Link is clicked on an interview" %}'
+                            >
+                            </span>
+                        </div>
+                        <select
+                            class="border border-[#d9d9d9] rounded-md text-sm px-3 py-1.5"
+                            id="default_meeting_provider"
+                            onchange="defaultMeetingProvider($(this))"
+                        >
+                            <option value="google_meet" {% if check_default_meeting_provider == "google_meet" %}selected{% endif %}>{% trans "Google Meet" %}</option>
+                            <option value="teams" {% if check_default_meeting_provider == "teams" %}selected{% endif %}>{% trans "Microsoft Teams" %}</option>
+                        </select>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -70,16 +156,56 @@
         hidden
     >
     </button>
+    <button
+        id="candidatePortalMailButton"
+        hx-get="{% url 'candidate-portal-mail-setting' %}"
+        hx-target="#reloadMessages"
+        hidden
+    >
+    </button>
+    <button
+        id="platformConversionWidgetButton"
+        hx-get="{% url 'platform-conversion-widget-setting' %}"
+        hx-target="#reloadMessages"
+        hidden
+    >
+    </button>
+    <button
+        id="meetingProviderButton"
+        hx-get="{% url 'default-meeting-provider' %}"
+        hx-target="#reloadMessages"
+        hidden
+    >
+    </button>
     <script>
         function selfTrack(element){
             var value = $(element).is(':checked')
             $('#selfTrackButton').attr('hx-vals', `{"candidate_self_tracking":${value}}`);
             $('#selfTrackButton').click()
+            // "Send Candidate Portal Mail" only makes sense once Application
+            // Tracking is on, so it's shown/hidden in lockstep - no page
+            // reload needed to see it appear or disappear.
+            $('#candidatePortalMailRow').toggle(value);
         }
         function ratingVisibility(element){
             var value = $(element).is(':checked')
             $('#ratingButton').attr('hx-vals', `{"candidate_self_tracking":${value}}`);
             $('#ratingButton').click()
+        }
+        function candidatePortalMail(element){
+            var value = $(element).is(':checked')
+            $('#candidatePortalMailButton').attr('hx-vals', `{"send_candidate_portal_mail":${value}}`);
+            $('#candidatePortalMailButton').click()
+        }
+        function platformConversionWidget(element){
+            var value = $(element).is(':checked')
+            $('#platformConversionWidgetButton').attr('hx-vals', `{"show_platform_conversion":${value}}`);
+            $('#platformConversionWidgetButton').click()
+        }
+        function defaultMeetingProvider(element){
+            var value = $(element).val()
+            $('#meetingProviderButton').attr('hx-vals', `{"default_meeting_provider":"${value}"}`);
+            $('#meetingProviderButton').click()
         }
     </script>
 {% endblock settings %}

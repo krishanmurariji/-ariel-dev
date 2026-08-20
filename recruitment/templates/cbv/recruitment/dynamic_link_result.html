@@ -1,0 +1,30 @@
+{% load i18n %}
+<div class="oh-modal__dialog-header">
+  <h2 class="oh-modal__dialog-title" id="dynamicLinkResultLabel">
+    {% trans "Dynamic Link Ready" %}
+  </h2>
+  <button class="oh-modal__close" aria-label="Close">
+    <ion-icon name="close-outline"></ion-icon>
+  </button>
+</div>
+<div class="oh-modal__dialog-body">
+  <div class="oh-input-group mb-3">
+    <label class="oh-label">{% trans "Application Link" %}</label>
+    <input type="text" class="oh-input w-100" value="{{ link }}" id="dynamicLinkResultInput" readonly onclick="this.select();">
+  </div>
+  <div class="oh-btn-group">
+    <button type="button" class="oh-btn oh-btn--secondary w-100" onclick="copyLink('{{ link|escapejs }}')">
+      <ion-icon name="copy-outline" class="me-1"></ion-icon>
+      {% trans "Copy Link" %}
+    </button>
+    <a
+      href="#"
+      class="oh-btn oh-btn--light-bkg w-100"
+      hx-get="{% url 'recruitment-dynamic-link' recruitment.id %}"
+      hx-target="#genericModalBody"
+      hx-swap="innerHTML"
+    >
+      {% trans "Create Another" %}
+    </a>
+  </div>
+</div>

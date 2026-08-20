@@ -1,0 +1,70 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+
+  <div class="flex items-center justify-between gap-3 mb-5 flex-wrap">
+    <div class="flex items-center gap-3">
+      <img src="{{ employee.get_avatar }}" class="w-8 h-8 rounded-full object-cover" alt="">
+      <div>
+        <h1 class="text-xl font-bold leading-tight">{{ employee.get_full_name }}</h1>
+        <p class="text-xs text-dark-400">{% trans "Salary Details" %}</p>
+      </div>
+    </div>
+    <a href="{% url 'pp-salary-overview' %}" class="text-primary-600 text-sm font-semibold flex items-center gap-1">
+      <ion-icon name="arrow-back-outline"></ion-icon>{% trans "Back" %}
+    </a>
+  </div>
+
+  {% if current and breakup %}
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+    <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5">
+      <h3 class="text-sm font-semibold mb-3">{% trans "Current Salary Breakup" %} <span class="text-xs font-normal text-dark-400">({{ current.salary_structure_id.name }})</span></h3>
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="text-left text-dark-400 uppercase text-[10px] border-b border-[#ebebeb]">
+            <th class="py-1.5">{% trans "Earnings" %}</th><th class="py-1.5 text-right">{% trans "Monthly" %}</th><th class="py-1.5 text-right">{% trans "Annually" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for comp in breakup.components %}
+          <tr class="border-b border-[#ebebeb] last:border-b-0">
+            <td class="py-1.5">{{ comp.name }}</td><td class="py-1.5 text-right">{{ comp.full|pp_money }}</td>
+            <td class="py-1.5 text-right">{% widthratio comp.full 1 12 as annual %}{{ annual|pp_money }}</td>
+          </tr>
+          {% endfor %}
+          <tr class="border-b border-[#ebebeb] font-semibold bg-primary-100">
+            <td class="py-1.5 px-1">{% trans "Total Earnings" %}</td><td class="py-1.5 px-1 text-right">{{ breakup.gross_monthly|pp_money }}</td>
+            <td class="py-1.5 px-1 text-right">{% widthratio breakup.gross_monthly 1 12 as ag %}{{ ag|pp_money }}</td>
+          </tr>
+          <tr class="border-b border-[#ebebeb]"><td class="py-1.5">{% trans "PF Employee" %}</td><td class="py-1.5 text-right">{{ breakup.employee_pf|pp_money }}</td><td class="py-1.5 text-right">{% widthratio breakup.employee_pf 1 12 as a %}{{ a|pp_money }}</td></tr>
+          <tr class="border-b border-[#ebebeb]"><td class="py-1.5">{% trans "PF Employer (contribution)" %}</td><td class="py-1.5 text-right">{{ breakup.employer_pf|pp_money }}</td><td class="py-1.5 text-right">{% widthratio breakup.employer_pf 1 12 as b %}{{ b|pp_money }}</td></tr>
+          <tr class="border-b border-[#ebebeb]"><td class="py-1.5">{% trans "Professional Tax" %}</td><td class="py-1.5 text-right">{{ breakup.pt|pp_money }}</td><td class="py-1.5 text-right">{% widthratio breakup.pt 1 12 as c %}{{ c|pp_money }}</td></tr>
+          <tr><td class="py-1.5">{% trans "TDS (estimate)" %}</td><td class="py-1.5 text-right">{{ breakup.tds|pp_money }}</td><td class="py-1.5 text-right">{% widthratio breakup.tds 1 12 as d %}{{ d|pp_money }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="flex flex-col gap-4">
+      <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5">
+        <h3 class="text-sm font-semibold mb-3">{% trans "Summary" %}</h3>
+        <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+          <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "Annual CTC" %}</span><b>{{ current.annual_ctc|pp_money0 }}</b></div>
+          <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "Monthly CTC" %}</span><b>{{ current.monthly_ctc|pp_money0 }}</b></div>
+          <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "Structure" %}</span><b>{{ current.salary_structure_id.name }}</b></div>
+          <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "Tax Regime" %}</span><b>{{ current.effective_tax_regime|default:"—" }}</b></div>
+          <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "Effective Since" %}</span><b>{{ current.effective_date }}</b></div>
+          <div><span class="block text-dark-400 text-[11px] mb-0.5">{% trans "Est. Net Pay (full month)" %}</span><b>{{ breakup.net_pay|pp_money0 }}</b></div>
+        </div>
+        <p class="text-[11px] text-dark-400 mt-3">{% trans "Estimates assume full attendance; actual payslips depend on each month's attendance and LOP." %}</p>
+      </div>
+      {% include "payroll_pro/_bank_details_card.html" %}
+    </div>
+  </div>
+  {% else %}
+  <div class="mb-4">{% include "payroll_pro/_bank_details_card.html" %}</div>
+  {% endif %}
+
+  {% include "payroll_pro/_revision_history.html" with hide_add_form=True %}
+</div>
+{% endblock %}

@@ -61,7 +61,7 @@ class InterviewNavView(HorillaNavView):
         else:
             self.create_attrs = None
 
-    nav_title = _("Scheduled Interviews")
+    nav_title = _("Interviews")
     filter_instance = InterviewFilter()
     filter_body_template = "cbv/interview/interview_filter.html"
     filter_form_context_name = "form"
@@ -108,6 +108,7 @@ class InterviewLIstView(HorillaListView):
 
     columns = [
         (_("Candidate"), "candidate_custom_col"),
+        (_("Job Opening"), "candidate_id__recruitment_id__title"),
         (_("Interviewer"), "interviewer_custom_col"),
         (_("Interview Date"), "interview_date"),
         (_("Interview Time"), "interview_time"),
@@ -214,6 +215,7 @@ class InterviewForm(HorillaFormView):
             HttpResponse: Redirect response or HTTP response.
         """
         if form.is_valid():
+            is_new_interview = not form.instance.pk
             emp_ids = self.form.cleaned_data["employee_id"]
             cand_id = self.form.cleaned_data["candidate_id"]
             interview_date = self.form.cleaned_data["interview_date"]
@@ -235,6 +237,21 @@ class InterviewForm(HorillaFormView):
             else:
                 messages.success(self.request, _("Interview Scheduled successfully."))
             form.save()
+
+            if is_new_interview:
+                # Best-effort: a candidate/interviewer without the meeting
+                # provider connected yet (needs_auth) or a provider-side
+                # error must not undo the interview that was just
+                # scheduled - they can still generate it later via the
+                # existing "Send Meeting Link" action.
+                from recruitment.views.views import generate_interview_meeting
+
+                meeting_result = generate_interview_meeting(
+                    form.instance, self.request
+                )
+                if meeting_result.get("success"):
+                    messages.success(self.request, _("Meeting link generated."))
+
             return HttpResponse(
                 "<script>"
                 "$('#genericModal').removeClass('oh-modal--show');"

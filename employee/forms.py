@@ -217,6 +217,15 @@ class EmployeeForm(ModelForm):
             "is_from_onboarding",
             "is_directly_converted",
             "is_active",
+            # Replaced by EmployeeEmergencyContact (see employee_view_update's
+            # emergency_contact_formset) - a single employee can have more
+            # than one emergency contact now, these three flat fields only
+            # ever held one. Kept on the model itself (existing reports/
+            # exports/API still read them) but no longer collected here -
+            # matches onboarding.forms.EmployeeCreationForm's exclude.
+            "emergency_contact",
+            "emergency_contact_name",
+            "emergency_contact_relation",
         )
         widgets = {
             "dob": TextInput(attrs={"type": "date", "id": "dob"}),
@@ -514,6 +523,8 @@ class EmployeeBankDetailsForm(ModelForm):
             "state",
             "city",
             "any_other_code2",
+            "pan_number",
+            "uan_number",
         )
         exclude = ["employee_id", "is_active", "additional_info"]
 
@@ -522,6 +533,14 @@ class EmployeeBankDetailsForm(ModelForm):
         self.fields["address"].widget.attrs["autocomplete"] = "address"
         for visible in self.visible_fields():
             visible.field.widget.attrs["class"] = "oh-input w-100"
+        self.fields["pan_number"].widget.attrs["style"] = "text-transform:uppercase"
+        self.fields["pan_number"].widget.attrs["placeholder"] = "ABCDE1234F"
+        self.fields["uan_number"].widget.attrs["placeholder"] = "100123456789"
+        # PAN/UAN are optional on the model (existing employees may not have
+        # them on file yet) but are now required going forward for every new
+        # save, since Payroll Pro can't process anyone without them.
+        self.fields["pan_number"].required = True
+        self.fields["uan_number"].required = True
 
     def as_p(self, *args, **kwargs):
         context = {"form": self}
@@ -539,7 +558,26 @@ class EmployeeBankDetailsUpdateForm(ModelForm):
         """
 
         model = EmployeeBankDetails
-        fields = "__all__"
+        # Explicit order matching EmployeeBankDetailsForm — this form is used
+        # for the same Bank Info tab's POST/re-render while the other form
+        # handles the initial GET; previously this used fields="__all__",
+        # which falls back to the model's declaration order (different from
+        # the tuple above) and made the whole field grid visibly reshuffle
+        # itself the instant Save was clicked, since both render through the
+        # same order-driven bank_info_as_p.html template.
+        fields = (
+            "bank_name",
+            "account_number",
+            "branch",
+            "any_other_code1",
+            "address",
+            "country",
+            "state",
+            "city",
+            "any_other_code2",
+            "pan_number",
+            "uan_number",
+        )
         exclude = ["employee_id", "is_active", "additional_info"]
 
     def __init__(self, *args, **kwargs):
@@ -548,6 +586,11 @@ class EmployeeBankDetailsUpdateForm(ModelForm):
             visible.field.widget.attrs["class"] = "oh-input w-100"
         for field in self.fields:
             self.fields[field].widget.attrs["placeholder"] = self.fields[field].label
+        self.fields["pan_number"].widget.attrs["style"] = "text-transform:uppercase"
+        self.fields["pan_number"].widget.attrs["placeholder"] = "ABCDE1234F"
+        self.fields["uan_number"].widget.attrs["placeholder"] = "100123456789"
+        self.fields["pan_number"].required = True
+        self.fields["uan_number"].required = True
 
     def as_p(self, *args, **kwargs):
         context = {"form": self}
@@ -555,7 +598,7 @@ class EmployeeBankDetailsUpdateForm(ModelForm):
 
 
 excel_columns = [
-    ("badge_id", _("Badge ID")),
+    ("badge_id", _("Employee ID")),
     ("employee_first_name", _("First Name")),
     ("employee_last_name", _("Last Name")),
     ("email", _("Email")),

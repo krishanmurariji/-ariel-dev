@@ -1,0 +1,26 @@
+{% extends 'index.html' %}
+{% block content %}
+{% load i18n %}{% load static %}
+{% include "generic/components.html" %}
+
+<div class="oh-wrapper">
+  <div hx-get="{% url "candidate-intake-mailbox-nav" %}" hx-trigger="load">
+  </div>
+
+  <div
+    class="oh-checkpoint-badge mb-2"
+    id="selectedInstances"
+    data-ids="[]"
+    data-clicked=""
+    style="display: none"
+  ></div>
+
+  <div
+    id="listContainer"
+    hx-get="{% url "candidate-intake-mailbox-list" %}"
+    hx-trigger="load"
+  >
+    <div class="animated-background"></div>
+  </div>
+</div>
+{% endblock %}

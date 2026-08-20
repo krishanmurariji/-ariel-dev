@@ -1,0 +1,19 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+  <div class="mb-5">
+    <h1 class="text-xl font-bold">{% trans "Pay Revisions" %}</h1>
+    <p class="text-sm text-dark-400 mt-1">{% trans "Record CTC revisions & increments for employees — bifurcated from Salary Overview's initial assignment flow" %}</p>
+  </div>
+
+  {% if employee %}
+    {% include "payroll_pro/_revision_history.html" with next_page="revisions" show_picker=True %}
+  {% else %}
+    <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-10 text-center text-dark-400">
+      {% trans "No employees on payroll yet — assign a salary first from Salary Overview." %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

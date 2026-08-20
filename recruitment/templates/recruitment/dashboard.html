@@ -246,8 +246,8 @@
     .rd-cust-item__toggle--on { background: var(--rd-indigo); }
     .dark .rd-cust-item__toggle--on { background: var(--rd-indigo); }
     .rd-cust-item__toggle--on::after { transform: translateX(16px); }
-    @media (max-width: 1024px) { .rd-customize-panel { width: 320px; right: -340px; } }
-    @media (max-width: 640px) { .rd-customize-panel { width: 100%; right: -100%; } }
+    @media (max-width: 1024px) { .rd-customize-panel { width: 320px; right: -340px; } .rd-customize-panel--open { right: 0; } }
+    @media (max-width: 640px) { .rd-customize-panel { width: 100%; right: -100%; } .rd-customize-panel--open { right: 0; } }
 
     /* Period Picker */
     .rd-period-picker { display: flex; align-items: center; gap: 6px; font-size: 12px; }
@@ -269,7 +269,6 @@
 
     /* Clickable charts */
     #chart-stage-summary .apexcharts-bar-area,
-    #chart-source-hire .apexcharts-pie-slice-donut,
     #chart-offer-status .apexcharts-pie-slice-donut,
     #chart-hire-rate .apexcharts-bar-area,
     #chart-time-to-hire .apexcharts-bar-area,
@@ -345,10 +344,18 @@
                     <div class="rd-chart-card__body"><div id="chart-offer-status"></div></div>
                 </div>
 
-                <!-- Source of Hire -->
-                <div class="rd-chart-card" data-chart-id="source_hire" data-chart-label="{% trans 'Source of Hire' %}">
-                    <div class="rd-chart-card__header"><div><div class="rd-chart-card__title">{% trans "Source of Hire" %}</div><div class="rd-chart-card__subtitle">{% trans "Where candidates come from" %}</div></div></div>
-                    <div class="rd-chart-card__body"><div id="chart-source-hire"></div></div>
+                <!-- Candidate Response Status -->
+                <div class="rd-chart-card" data-chart-id="response_status" data-chart-label="{% trans 'Candidate Response Status' %}">
+                    <div class="rd-chart-card__header"><div><div class="rd-chart-card__title">{% trans "Candidate Response Status" %}</div><div class="rd-chart-card__subtitle">{% trans "Assisted vs. still waiting, in selected period" %}</div></div></div>
+                    <div class="rd-chart-card__body"><div id="chart-response-status"></div></div>
+                </div>
+
+                <!-- Candidates Awaiting Response -->
+                <div class="rd-chart-card rd-chart-card--wide" data-chart-id="pending_candidates" data-chart-label="{% trans 'Candidates Awaiting Response' %}">
+                    <div class="rd-chart-card__header"><div><div class="rd-chart-card__title">{% trans "Candidates Awaiting Response" %}</div><div class="rd-chart-card__subtitle">{% trans "No note, interview, or stage movement yet - oldest first" %}</div></div></div>
+                    <div class="rd-chart-card__body"><div id="rd-pending-table">
+                        <div class="rd-empty">{% trans "Loading..." %}</div>
+                    </div></div>
                 </div>
 
                 <!-- Open Positions by Department -->
@@ -377,6 +384,14 @@
                     <div class="rd-chart-card__body"><div id="chart-time-to-hire"></div></div>
                 </div>
 
+                <!-- Candidates Applied by Date -->
+                <div class="rd-chart-card rd-chart-card--wide" data-chart-id="candidates_by_date" data-chart-label="{% trans 'Candidates Applied by Date' %}">
+                    <div class="rd-chart-card__header">
+                        <div><div class="rd-chart-card__title">{% trans "Candidates Applied by Date" %}</div><div class="rd-chart-card__subtitle">{% trans "In selected period" %}</div></div>
+                    </div>
+                    <div class="rd-chart-card__body"><div id="chart-candidates-by-date"></div></div>
+                </div>
+
                 <!-- Joinings Per Month -->
                 <div class="rd-chart-card rd-chart-card--wide" data-chart-id="joinings_monthly" data-chart-label="{% trans 'Joinings Per Month' %}">
                     <div class="rd-chart-card__header">
@@ -386,17 +401,19 @@
                 </div>
 
                 <!-- Ongoing Recruitments & Managers -->
-                <div class="rd-chart-card rd-chart-card--wide" data-chart-id="managers_table" data-chart-label="{% trans 'Ongoing Recruitments & Managers' %}">
-                    <div class="rd-chart-card__header"><div><div class="rd-chart-card__title">{% trans "Ongoing Recruitments & Managers" %}</div><div class="rd-chart-card__subtitle">{% trans "Active hiring with assigned managers" %}</div></div></div>
+                <div class="rd-chart-card rd-chart-card--wide" data-chart-id="managers_table" data-chart-label="{% trans 'Ongoing Recruitments & Interviewers' %}">
+                    <div class="rd-chart-card__header"><div><div class="rd-chart-card__title">{% trans "Ongoing Recruitments & Interviewers" %}</div><div class="rd-chart-card__subtitle">{% trans "Active hiring with assigned interviewers" %}</div></div></div>
                     <div class="rd-chart-card__body"><div id="rd-managers-table">
                         <div class="rd-empty">{% trans "Loading..." %}</div>
                     </div></div>
                 </div>
 
+                {% if check_platform_conversion_widget %}
                 <div class="rd-chart-card rd-chart-card--wide" data-chart-id="source_conversion" data-chart-label="{% trans 'Source Conversion Rate' %}">
                     <div class="rd-chart-card__header"><div><div class="rd-chart-card__title">{% trans "Source Conversion Rate" %}</div><div class="rd-chart-card__subtitle">{% trans "Hire rate per candidate source" %}</div></div></div>
-                    <div class="rd-chart-card__body"><div id="chart-source-conv"></div></div>
+                    <div class="rd-chart-card__body"><div id="chart-platform-conv"></div></div>
                 </div>
+                {% endif %}
 
             </div>
         </div>
@@ -620,36 +637,6 @@
             el.innerHTML = html;
         });
 
-    // ─── SOURCE OF HIRE ───
-    fetchP("{% url 'recruitment-dashboard-source' %}")
-        .then(r => r.json())
-        .then(data => {
-            if (!data.sources.length) { document.querySelector("#chart-source-hire").innerHTML = emptyHtml('{% trans "No source data" %}'); return; }
-            const sourceColors = { 'Application Form': '#3b82f6', 'Inside Software': '#6366f1', 'Referral': '#22c55e', 'Other': '#94a3b8' };
-            new ApexCharts(document.querySelector("#chart-source-hire"), {
-                series: data.sources.map(s => s.count),
-                chart: { type: 'donut', height: 300, background: 'transparent', fontFamily: 'inherit',
-                    events: { dataPointSelection: (e, ctx, config) => {
-                        const src = data.sources[config.dataPointIndex];
-                        if (src.key === 'referral') {
-                            window.location.href = "{% url 'candidate-view' %}?referral=true";
-                        } else if (src.key && src.key !== 'not_set') {
-                            window.location.href = "{% url 'candidate-view' %}?source=" + src.key;
-                        } else {
-                            window.location.href = "{% url 'candidate-view' %}";
-                        }
-                    }}
-                },
-                labels: data.sources.map(s => s.source),
-                colors: data.sources.map(s => sourceColors[s.source] || COLORS[data.sources.indexOf(s) % COLORS.length]),
-                plotOptions: { pie: { donut: { size: '65%', labels: { show: true, total: { show: true, label: '{% trans "Total" %}', color: textColor, fontSize: '13px', fontWeight: 600, formatter: w => w.globals.seriesTotals.reduce((a,b)=>a+b,0) } } } } },
-                stroke: { width: 2, colors: [isDark ? '#242424' : '#ffffff'] },
-                dataLabels: { enabled: false },
-                legend: { position: 'bottom', labels: { colors: textColor }, fontSize: '11px', markers: { width: 8, height: 8, radius: 2 } },
-                tooltip: { theme: isDark ? 'dark' : 'light' },
-            }).render();
-        });
-
     // ─── OPEN POSITIONS BY DEPARTMENT ───
     fetchP("{% url 'recruitment-dashboard-open-dept' %}")
         .then(r => r.json())
@@ -672,27 +659,29 @@
             }).render();
         });
 
+    {% if check_platform_conversion_widget %}
     // ─── SOURCE CONVERSION ───
-    fetchP("{% url 'recruitment-dashboard-source-conv' %}")
+    fetchP("{% url 'recruitment-dashboard-platform-conv' %}")
         .then(r => r.json())
         .then(data => {
-            if (!data.sources.length) { document.querySelector("#chart-source-conv").innerHTML = emptyHtml('{% trans "No source data" %}'); return; }
-            new ApexCharts(document.querySelector("#chart-source-conv"), {
+            if (!data.platforms || !data.platforms.length) { document.querySelector("#chart-platform-conv").innerHTML = emptyHtml('{% trans "No source data" %}'); return; }
+            new ApexCharts(document.querySelector("#chart-platform-conv"), {
                 series: [
-                    { name: '{% trans "Hired" %}', data: data.sources.map(s => s.hired) },
-                    { name: '{% trans "Total" %}', data: data.sources.map(s => s.total - s.hired) },
+                    { name: '{% trans "Hired" %}', data: data.platforms.map(p => p.hired) },
+                    { name: '{% trans "Total" %}', data: data.platforms.map(p => p.total - p.hired) },
                 ],
                 chart: { type: 'bar', height: 280, toolbar: { show: false }, background: 'transparent', fontFamily: 'inherit', stacked: true },
                 colors: ['#22c55e', '#e2e8f0'],
-                plotOptions: { bar: { borderRadius: 4, columnWidth: '50%' } },
-                xaxis: { categories: data.sources.map(s => s.source), labels: { style: { colors: textColor, fontSize: '12px' } }, axisBorder: { show: false }, axisTicks: { show: false } },
+                plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '50%' } },
+                xaxis: { categories: data.platforms.map(p => p.source), labels: { style: { colors: textColor, fontSize: '12px' } } },
                 yaxis: { labels: { style: { colors: textColor } } },
                 grid: { borderColor: gridColor, strokeDashArray: 4 },
                 dataLabels: { enabled: false },
                 legend: { position: 'top', horizontalAlign: 'right', labels: { colors: textColor }, fontSize: '11px', markers: { width: 8, height: 8, radius: 2 } },
-                tooltip: { theme: isDark ? 'dark' : 'light', y: { formatter: (v, { seriesIndex: si, dataPointIndex: di }) => si === 0 ? `${v} hired (${data.sources[di].rate}%)` : `${v} not hired` } },
+                tooltip: { theme: isDark ? 'dark' : 'light', y: { formatter: (v, { seriesIndex: si, dataPointIndex: di }) => si === 0 ? `${v} hired (${data.platforms[di].rate}%)` : `${v} not hired` } },
             }).render();
         });
+    {% endif %}
 
     // ─── INTERVIEWS IN PERIOD ───
     fetchP("{% url 'recruitment-dashboard-interviews' %}")
@@ -759,6 +748,42 @@
                 legend: { position: 'bottom', labels: { colors: textColor }, fontSize: '11px', markers: { width: 8, height: 8, radius: 2 } },
                 tooltip: { theme: isDark ? 'dark' : 'light' },
             }).render();
+        });
+
+    // ─── CANDIDATE RESPONSE STATUS + CANDIDATES AWAITING RESPONSE (shared fetch) ───
+    fetchP("{% url 'recruitment-dashboard-response-status' %}")
+        .then(r => r.json())
+        .then(data => {
+            if (!data.total) { document.querySelector("#chart-response-status").innerHTML = emptyHtml('{% trans "No candidates in this period" %}'); }
+            else {
+                new ApexCharts(document.querySelector("#chart-response-status"), {
+                    series: [data.assisted, data.not_assisted],
+                    chart: { type: 'donut', height: 300, background: 'transparent', fontFamily: 'inherit' },
+                    labels: ['{% trans "Assisted" %}', '{% trans "Not Assisted Yet" %}'],
+                    colors: ['#22c55e', '#ef4444'],
+                    plotOptions: { pie: { donut: { size: '65%', labels: { show: true, total: { show: true, label: '{% trans "Total" %}', color: textColor, fontSize: '13px', fontWeight: 600, formatter: w => w.globals.seriesTotals.reduce((a,b)=>a+b,0) } } } } },
+                    stroke: { width: 2, colors: [isDark ? '#242424' : '#ffffff'] },
+                    dataLabels: { enabled: true, style: { fontSize: '12px', colors: ['#fff'] } },
+                    legend: { position: 'bottom', labels: { colors: textColor }, fontSize: '11px', markers: { width: 8, height: 8, radius: 2 } },
+                    tooltip: { theme: isDark ? 'dark' : 'light', y: { formatter: v => v + ' candidate(s)' } },
+                }).render();
+            }
+
+            const el = document.getElementById('rd-pending-table');
+            if (!data.pending.length) { el.innerHTML = emptyHtml('{% trans "Everyone in this period has been assisted" %}'); return; }
+            const waitClass = (days) => days == null ? '' : days >= 7 ? 'rd-pipeline-cell--cancelled' : days >= 3 ? 'rd-pipeline-cell--interview' : 'rd-pipeline-cell--initial';
+            let html = '<table class="rd-pipeline-table"><thead><tr>'
+                + '<th>{% trans "Candidate" %}</th><th>{% trans "Recruitment" %}</th>'
+                + '<th style="text-align:center">{% trans "Applied On" %}</th><th style="text-align:center">{% trans "Days Waiting" %}</th>'
+                + '</tr></thead><tbody>';
+            data.pending.forEach(p => {
+                html += `<tr><td><a href="${p.profile_url}" style="color:var(--rd-indigo);text-decoration:none;font-weight:500;">${p.name}</a></td>`
+                    + `<td>${p.recruitment || '-'}</td>`
+                    + `<td style="text-align:center">${p.applied_on}</td>`
+                    + `<td style="text-align:center"><span class="rd-pipeline-cell ${waitClass(p.days_waiting)}">${p.days_waiting == null ? '-' : p.days_waiting}</span></td></tr>`;
+            });
+            html += '</tbody></table>';
+            el.innerHTML = html;
         });
 
     // ─── HIRING PIPELINE TABLE ───
@@ -829,6 +854,27 @@
             }).render();
         });
 
+    // ─── CANDIDATES APPLIED BY DATE (period-driven) ───
+    fetchP("{% url 'recruitment-dashboard-candidates-by-date' %}")
+        .then(r => r.json())
+        .then(data => {
+            if (!data.data || !data.data.length || !data.data.some(v => v > 0)) {
+                document.querySelector("#chart-candidates-by-date").innerHTML = emptyHtml('{% trans "No candidates in this period" %}');
+                return;
+            }
+            new ApexCharts(document.querySelector("#chart-candidates-by-date"), {
+                series: [{ name: '{% trans "Applied" %}', data: data.data }],
+                chart: { type: 'bar', height: 280, toolbar: { show: false }, background: 'transparent', fontFamily: 'inherit' },
+                colors: ['#6366f1'],
+                plotOptions: { bar: { borderRadius: 6, columnWidth: '60%' } },
+                xaxis: { categories: data.labels, labels: { style: { colors: textColor, fontSize: '10px' }, rotate: -45 }, axisBorder: { show: false }, axisTicks: { show: false } },
+                yaxis: { labels: { style: { colors: textColor } }, forceNiceScale: true },
+                grid: { borderColor: gridColor, strokeDashArray: 4 },
+                dataLabels: { enabled: false },
+                tooltip: { theme: isDark ? 'dark' : 'light', y: { formatter: v => v + ' candidate(s)' } },
+            }).render();
+        });
+
     // ─── JOININGS PER MONTH (period-driven) ───
     fetchP("{% url 'recruitment-dashboard-joinings' %}")
         .then(r => r.json())
@@ -866,7 +912,7 @@
         .then(data => {
             const el = document.getElementById('rd-managers-table');
             if (!data.recruitments.length) { el.innerHTML = emptyHtml('{% trans "No ongoing recruitments" %}'); return; }
-            let html = '<table class="rd-pipeline-table"><thead><tr><th>{% trans "Recruitment" %}</th><th style="text-align:center">{% trans "Vacancy" %}</th><th style="text-align:center">{% trans "Candidates" %}</th><th>{% trans "Managers" %}</th></tr></thead><tbody>';
+            let html = '<table class="rd-pipeline-table"><thead><tr><th>{% trans "Recruitment" %}</th><th style="text-align:center">{% trans "Vacancy" %}</th><th style="text-align:center">{% trans "Candidates" %}</th><th>{% trans "Interviewers" %}</th></tr></thead><tbody>';
             data.recruitments.forEach(r => {
                 const chips = r.managers.map(m => `<span class="rd-chip">${m}</span>`).join('');
                 html += `<tr>

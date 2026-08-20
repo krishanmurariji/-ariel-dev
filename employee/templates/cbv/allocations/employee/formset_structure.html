@@ -1,0 +1,152 @@
+<form hx-post="{{ request.path }}?{{ request.GET.urlencode }}" hx-swap="outerHTML" hx-encoding="multipart/form-data">
+    <input hidden type="submit" id="allocationEmployeeFormsSubmit">
+    <input hidden type="text" name="instance_id" value="{{ request.GET.instance_id }}">
+
+    {% load widget_tweaks %} {% load i18n %}
+    <script>
+        $("#reloadMessagesButton").click()
+    </script>
+    <style>
+        .oh-label {
+            font-weight: bold;
+        }
+        /* .oh-profile-section__card has its own padding; combining that
+           with Bootstrap's .row negative gutter margins on the same
+           element lets row content spill past the card edge (the
+           original bug behind "not responsive" - it overflows/gets cut
+           off in this screen's narrow column). Kept as plain blocks
+           instead, with .row only nested one level in for the 2-column
+           field grid, where padding and the grid live on different
+           elements. */
+        .formset-row-box {
+            border: 1px solid #e5e5e5;
+            border-radius: 4px;
+            padding: 14px;
+            margin-bottom: 10px;
+        }
+        .formset-remove-row {
+            border: none;
+            background: none;
+            color: #dc3545;
+            padding: 0;
+        }
+    </style>
+
+    <div class="oh-profile-section__card">
+        {{ formset.management_form }}
+        {{ formset.non_form_errors }}
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <label class="oh-label mb-0">{{ formset_title }}</label>
+            <button type="button" id="addFormsetRow-{{ formset.prefix }}" class="oh-btn oh-btn--light-bkg oh-btn--sm">
+                <ion-icon name="add-outline"></ion-icon> {% trans "Add" %}
+            </button>
+        </div>
+        <div id="formsetRows-{{ formset.prefix }}">
+            {% for row_form in formset %}
+                <div class="formset-row formset-row-box">
+                    {{ row_form.id }}
+                    <div style="display:none;">{{ row_form.DELETE }}</div>
+                    <div class="d-flex justify-content-end mb-2">
+                        <button type="button" class="formset-remove-row" data-existing="{% if row_form.instance.pk %}true{% else %}false{% endif %}" title="{% trans 'Remove' %}">
+                            <ion-icon name="close-outline"></ion-icon>
+                        </button>
+                    </div>
+                    <div class="row">
+                        {% for field in row_form.visible_fields %}
+                            {% if field.name != 'DELETE' %}
+                                <div class="col-12 col-md-6 mb-2">
+                                    <div class="oh-label__info" for="id_{{ field.name }}">
+                                        <label class="oh-label {% if field.field.required %} required-star{% endif %}" for="id_{{ field.name }}">{% trans field.label %}</label>
+                                    </div>
+                                    {{ field|add_class:'form-control w-100' }}
+                                    {{ field.errors }}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    {{ row_form.non_field_errors }}
+                </div>
+            {% endfor %}
+        </div>
+        <template id="formsetRowTemplate-{{ formset.prefix }}">
+            <div class="formset-row formset-row-box">
+                <div class="d-flex justify-content-end mb-2">
+                    <button type="button" class="formset-remove-row" data-existing="false" title="{% trans 'Remove' %}">
+                        <ion-icon name="close-outline"></ion-icon>
+                    </button>
+                </div>
+                <div class="row">
+                    {% for field in formset.empty_form.visible_fields %}
+                        {% if field.name != 'DELETE' %}
+                            <div class="col-12 col-md-6 mb-2">
+                                <div class="oh-label__info">
+                                    <label class="oh-label {% if field.field.required %} required-star{% endif %}">{% trans field.label %}</label>
+                                </div>
+                                {{ field|add_class:'form-control w-100' }}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </template>
+    </div>
+</form>
+<script>
+    (function () {
+        // Same clone/index/TOTAL_FORMS pattern used on employee_view_update's
+        // Education/Experience/Emergency Contact tabs (horilla_theme/templates/
+        // employee/update_form/*_details.html) - a row added via the
+        // <template> has no saved instance yet, so removing it just drops it
+        // from the DOM. A row that came from an existing saved instance
+        // (data-existing="true") instead checks its hidden DELETE checkbox
+        // and hides it, so it's actually deleted on save.
+        //
+        // Element ids are scoped by formset.prefix (education/experience/
+        // emergency) rather than bare static ids: this template is shared
+        // by all three tabs on the Allocations -> Employee screen, and
+        // switching tabs there only toggles a d-none class - it doesn't
+        // remove the previous tab's DOM. Bare ids meant getElementById
+        // always resolved to whichever tab loaded first, so every other
+        // tab's "Add" button silently wired up the wrong (hidden) row
+        // container instead of its own.
+        var prefix = "{{ formset.prefix }}";
+        var container = document.getElementById("formsetRows-" + prefix);
+        var addBtn = document.getElementById("addFormsetRow-" + prefix);
+        var template = document.getElementById("formsetRowTemplate-" + prefix);
+        var totalFormsInput = document.querySelector('input[name="' + prefix + '-TOTAL_FORMS"]');
+        if (!container || !addBtn || !template || !totalFormsInput) {
+            return;
+        }
+
+        function wireRemove(rowEl) {
+            var removeBtn = rowEl.querySelector(".formset-remove-row");
+            if (!removeBtn) {
+                return;
+            }
+            removeBtn.addEventListener("click", function () {
+                if (removeBtn.dataset.existing === "true") {
+                    var deleteBox = rowEl.querySelector('input[type="checkbox"][name$="-DELETE"]');
+                    if (deleteBox) {
+                        deleteBox.checked = true;
+                    }
+                    rowEl.style.display = "none";
+                } else {
+                    rowEl.remove();
+                }
+            });
+        }
+
+        addBtn.addEventListener("click", function () {
+            var index = parseInt(totalFormsInput.value, 10) || 0;
+            var html = template.innerHTML.split("__prefix__").join(index);
+            var wrapper = document.createElement("div");
+            wrapper.innerHTML = html.trim();
+            var rowEl = wrapper.firstElementChild;
+            container.appendChild(rowEl);
+            totalFormsInput.value = index + 1;
+            wireRemove(rowEl);
+        });
+
+        container.querySelectorAll(".formset-row").forEach(wireRemove);
+    })();
+</script>

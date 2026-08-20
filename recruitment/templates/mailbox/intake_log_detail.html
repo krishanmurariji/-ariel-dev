@@ -1,0 +1,63 @@
+{% load i18n %}
+<div class="oh-modal__dialog-header">
+  <h4 class="oh-modal__dialog-title">{% trans "Email Application Detail" %}</h4>
+  <button type="button" class="oh-modal__close" aria-label="Close"><ion-icon name="close-outline"></ion-icon></button>
+</div>
+<div class="oh-modal__dialog-body">
+  <table class="oh-table--sortable w-100">
+    <tbody>
+      <tr>
+        <th>{% trans "Subject" %}</th>
+        <td>{{ instance.subject|default:"-" }}</td>
+      </tr>
+      <tr>
+        <th>{% trans "From" %}</th>
+        <td>{{ instance.from_email }}</td>
+      </tr>
+      <tr>
+        <th>{% trans "Received At" %}</th>
+        <td>{{ instance.received_at }}</td>
+      </tr>
+      <tr>
+        <th>{% trans "Mailbox" %}</th>
+        <td>{{ instance.mailbox }}</td>
+      </tr>
+      <tr>
+        <th>{% trans "Status" %}</th>
+        <td>{{ instance.get_status_display }}</td>
+      </tr>
+      <tr>
+        <th>{% trans "Resume" %}</th>
+        <td>
+          {% if instance.resume %}
+            <a href="{{ instance.resume.url }}" target="_blank">{% trans "Download" %}</a>
+          {% else %}
+            -
+          {% endif %}
+        </td>
+      </tr>
+      <tr>
+        <th>{% trans "Matched Recruitment" %}</th>
+        <td>{{ instance.matched_recruitment|default:"-" }}</td>
+      </tr>
+      <tr>
+        <th>{% trans "Candidate" %}</th>
+        <td>
+          {% if instance.candidate %}
+            <a href="{% url 'candidate-view-individual' instance.candidate.id %}">{{ instance.candidate }}</a>
+          {% else %}
+            -
+          {% endif %}
+        </td>
+      </tr>
+      <tr>
+        <th>{% trans "Reason" %}</th>
+        <td>{{ instance.error_message|default:"-" }}</td>
+      </tr>
+      <tr>
+        <th>{% trans "Logged At" %}</th>
+        <td>{{ instance.created_at }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>

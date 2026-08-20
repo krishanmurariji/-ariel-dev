@@ -293,7 +293,11 @@
         });
     }); {% endcomment %}
 
-    $(document).on("click", ".accordion-btn-gp", function () {
+    // .off() before .on(), namespaced: this script re-runs every time
+    // #settingsContainer is swapped via outerHTML (e.g. reloadSettingsContainer()
+    // after a group delete, or the generic settings form-submit fallback), which
+    // would otherwise stack a duplicate delegated handler on every re-run.
+    $(document).off("click.accordionGp").on("click.accordionGp", ".accordion-btn-gp", function () {
         const $btn = $(this);
         const $panel = $btn.next(".accordion-panel-gp");
 
@@ -338,38 +342,31 @@
     });
 
     // Inner accordion logic (supports multiple)
-    document.addEventListener("DOMContentLoaded", () => {
-        document
-            .querySelectorAll(".inner-accordion-toggle")
-            .forEach((toggle) => {
-                const content = toggle.nextElementSibling;
+    // Delegated on document (like the outer accordion above) so toggles added
+    // later via htmx swaps (e.g. the permission search box replacing
+    // #permissionContainer) keep working without a page reload. Namespaced
+    // .off()/.on() for the same reason as the outer accordion above.
+    $(document).off("click.innerAccordionGp").on("click.innerAccordionGp", ".inner-accordion-toggle", function () {
+        const toggle = this;
+        const content = toggle.nextElementSibling;
 
-                // Open by default if needed (optional)
-                // content.style.maxHeight = content.scrollHeight + "px";
-                // content.style.opacity = "1";
+        const isOpen =
+            content.style.maxHeight && content.style.maxHeight !== "0px";
 
-                toggle.addEventListener("click", () => {
-                    const isOpen =
-                        content.style.maxHeight &&
-                        content.style.maxHeight !== "0px";
+        if (isOpen) {
+            content.style.maxHeight = "0";
+            content.style.opacity = "0";
+        } else {
+            content.style.maxHeight = "500px";
+            content.style.opacity = "1";
+        }
 
-                    if (isOpen) {
-                        content.style.maxHeight = "0";
-                        content.style.opacity = "0";
-                    } else {
-                        content.style.maxHeight = "500px";
-                        content.style.opacity = "1";
-                    }
-
-                    // Adjust parent height (if inside outer accordion)
-                    const outerPanel = toggle.closest(".accordion-panel-gp");
-                    if (outerPanel) {
-                        setTimeout(() => {
-                            outerPanel.style.maxHeight =
-                                outerPanel.scrollHeight + "px";
-                        }, 250);
-                    }
-                });
-            });
+        // Adjust parent height (if inside outer accordion)
+        const outerPanel = toggle.closest(".accordion-panel-gp");
+        if (outerPanel) {
+            setTimeout(() => {
+                outerPanel.style.maxHeight = outerPanel.scrollHeight + "px";
+            }, 250);
+        }
     });
 </script>

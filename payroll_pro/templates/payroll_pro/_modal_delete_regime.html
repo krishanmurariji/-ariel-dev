@@ -1,0 +1,38 @@
+{% load i18n payroll_pro_tags %}
+<div class="oh-modal__dialog-header">
+  <span class="oh-modal__dialog-title">{% trans "Delete Tax Regime" %}</span>
+  <button class="oh-modal__close" onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')" aria-label="{% trans 'Close' %}">
+    <ion-icon name="close-outline"></ion-icon>
+  </button>
+</div>
+<div class="oh-modal__dialog-body">
+  {% if dependents.structures or dependents.employee_count %}
+    <p class="text-sm mb-3">
+      {% blocktrans with name=regime.name %}"{{ name }}" is still linked to other records and can't be deleted yet:{% endblocktrans %}
+    </p>
+    <ul class="text-xs list-disc pl-5 mb-3 flex flex-col gap-1">
+      {% if dependents.structures %}
+        <li>
+          {% blocktrans count counter=dependents.structures|length %}Linked to {{ counter }} Salary Structure:{% plural %}Linked to {{ counter }} Salary Structures:{% endblocktrans %}
+          {% for structure in dependents.structures %}<b>{{ structure.name }}</b>{% if not forloop.last %}, {% endif %}{% endfor %}
+        </li>
+      {% endif %}
+      {% if dependents.employee_count %}
+        <li>{% blocktrans count counter=dependents.employee_count %}{{ counter }} employee is currently taxed under this regime{% plural %}{{ counter }} employees are currently taxed under this regime{% endblocktrans %}</li>
+      {% endif %}
+    </ul>
+    <p class="text-xs text-dark-400">{% trans "Reassign or remove these first — historical payslips are unaffected either way." %}</p>
+  {% else %}
+    <p class="text-sm mb-4">{% blocktrans with name=regime.name %}Delete "{{ name }}"? This cannot be undone.{% endblocktrans %}</p>
+    <form method="post" action="{% url 'pp-tax-regime-delete' regime.pk %}" class="flex justify-end gap-2">
+      {% csrf_token %}
+      <button type="button" class="oh-btn oh-btn--light" onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')">{% trans "Cancel" %}</button>
+      <button type="submit" class="oh-btn oh-btn--danger">{% trans "Delete" %}</button>
+    </form>
+  {% endif %}
+</div>
+{% if dependents.structures or dependents.employee_count %}
+<div class="oh-modal__dialog-footer">
+  <button type="button" class="oh-btn oh-btn--light" onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')">{% trans "Got it" %}</button>
+</div>
+{% endif %}

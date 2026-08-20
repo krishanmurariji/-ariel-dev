@@ -28,14 +28,17 @@ from django.conf import settings
 from django.contrib import messages
 from django.core import serializers
 from django.core.cache import cache as CACHE
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.mail import EmailMessage
 from django.core.paginator import Paginator
+from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
 from django.db.models import Case, IntegerField, ProtectedError, Q, When
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import strip_tags
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_http_methods
 
@@ -66,6 +69,12 @@ from horilla.http import HorillaRedirect
 from horilla_auth.models import HorillaUser
 from horilla_documents.models import Document
 from notifications.signals import notify
+from recruitment.ai_description import (
+    DescriptionGenerationError,
+    generate_job_description,
+    generate_job_skills,
+    generate_skills_from_description,
+)
 from recruitment.auth import CandidateAuthenticationBackend
 from recruitment.decorators import (
     all_manager_can_enter,
@@ -109,6 +118,7 @@ from recruitment.models import (
     CandidateRating,
     InterviewSchedule,
     LinkedInAccount,
+    Platform,
     Recruitment,
     RecruitmentGeneralSetting,
     RecruitmentSurvey,
@@ -287,6 +297,98 @@ def recruitment(request):
     return render(
         request, "recruitment/recruitment_form.html", {"form": form, "dynamic": dynamic}
     )
+
+
+@login_required
+@permission_required(perm="recruitment.add_recruitment")
+@require_http_methods(["POST"])
+def generate_recruitment_description(request):
+    """
+    AJAX endpoint used by the recruitment create form: given a job title,
+    returns an AI-drafted job description (HTML) plus a short list of
+    relevant skills, for the recruiter to review before saving. Skill
+    names are matched against existing Skill rows case-insensitively -
+    only genuinely new names get a new row - so re-generating for similar
+    titles doesn't pile up near-duplicate skills.
+    """
+    title = request.POST.get("title", "").strip()
+    if not title:
+        return JsonResponse({"error": _("Enter a job title first.")}, status=400)
+    try:
+        description = generate_job_description(title)
+    except DescriptionGenerationError:
+        return JsonResponse(
+            {
+                "error": _(
+                    "Couldn't generate a description right now. Please "
+                    "try again or write it manually."
+                )
+            },
+            status=502,
+        )
+
+    skills_payload = []
+    try:
+        skill_names = generate_job_skills(title)
+    except DescriptionGenerationError:
+        # The description is the main deliverable and already succeeded -
+        # don't fail the whole request just because the skills half didn't.
+        skill_names = []
+    for name in skill_names:
+        skill, _created = Skill.objects.get_or_create(
+            title__iexact=name, defaults={"title": name}
+        )
+        skills_payload.append({"id": skill.id, "title": skill.title})
+
+    return JsonResponse({"description": description, "skills": skills_payload})
+
+
+@login_required
+@require_http_methods(["POST"])
+def sync_recruitment_skills(request):
+    """
+    AJAX endpoint backing the "Sync Skills" button next to the Skills
+    field on the recruitment create/edit form: given the description
+    currently in the editor (not necessarily saved yet), returns the
+    skills the AI reads out of it, resolved/created the same way
+    generate_recruitment_description does. Available on both create and
+    edit - unlike "Generate with AI" for the description itself, syncing
+    skills from whatever description already exists is meaningful either
+    way.
+    """
+    if not (
+        request.user.has_perm("recruitment.add_recruitment")
+        or request.user.has_perm("recruitment.change_recruitment")
+    ):
+        return JsonResponse({"error": _("Permission denied.")}, status=403)
+
+    description = strip_tags(request.POST.get("description", "")).strip()
+    if not description:
+        return JsonResponse(
+            {"error": _("Write a job description first, then sync skills.")},
+            status=400,
+        )
+
+    try:
+        skill_names = generate_skills_from_description(description)
+    except DescriptionGenerationError:
+        return JsonResponse(
+            {
+                "error": _(
+                    "Couldn't analyze the description right now. Please try again."
+                )
+            },
+            status=502,
+        )
+
+    skills_payload = []
+    for name in skill_names:
+        skill, _created = Skill.objects.get_or_create(
+            title__iexact=name, defaults={"title": name}
+        )
+        skills_payload.append({"id": skill.id, "title": skill.title})
+
+    return JsonResponse({"skills": skills_payload})
 
 
 @login_required
@@ -689,7 +791,7 @@ def change_candidate_stage(request):
                         candidate.save()
                         if stage.stage_type == "hired":
                             if stage.recruitment_id.is_vacancy_filled():
-                                context["message"] = _("Vaccancy is filled")
+                                context["message"] = _("Vacancy is filled")
                                 context["vacancy"] = stage.recruitment_id.vacancy
                         messages.success(request, _("Candidate stage updated"))
                 except Candidate.DoesNotExist:
@@ -705,7 +807,7 @@ def change_candidate_stage(request):
                     candidate.save()
                     if stage.stage_type == "hired":
                         if stage.recruitment_id.is_vacancy_filled():
-                            context["message"] = _("Vaccancy is filled")
+                            context["message"] = _("Vacancy is filled")
                             context["vacancy"] = stage.recruitment_id.vacancy
                     candidate.stage_id = stage
                     candidate.save()
@@ -887,6 +989,31 @@ def recruitment_reopen_pipeline(request, rec_id):
     recruitment_obj.save()
     messages.success(request, "Recruitment reopend successfully")
     return HorillaRedirect(request)
+
+
+@login_required
+@recruitment_manager_can_enter(perm="recruitment.change_recruitment")
+def update_recruitment_closed(request, obj_id):
+    """
+    htmx toggle used by the Recruitment grid's Status column (see
+    Recruitment.closed_toggle) - the switch reads "on" when the
+    recruitment is open, so checking it reopens and unchecking closes.
+    """
+    recruitment_obj = Recruitment.find(obj_id)
+    if not recruitment_obj:
+        return HorillaRedirect(
+            request, message=_("No Recruitment found matching the query.")
+        )
+
+    if request.POST.get("open") == "on":
+        recruitment_obj.closed = False
+        messages.success(request, _("Recruitment reopened successfully"))
+    else:
+        recruitment_obj.closed = True
+        messages.success(request, _("Recruitment closed successfully"))
+    recruitment_obj.save()
+
+    return HttpResponse("<script>$('#reloadMessagesButton').click();</script>")
 
 
 @login_required
@@ -1418,7 +1545,6 @@ def candidate(request):
         if form.is_valid():
             candidate_obj = form.save(commit=False)
             candidate_obj.start_onboard = False
-            candidate_obj.source = "software"
             if candidate_obj.stage_id is None:
                 candidate_obj.stage_id = Stage.objects.filter(
                     recruitment_id=candidate_obj.recruitment_id, stage_type="initial"
@@ -1703,11 +1829,14 @@ def candidate_about_tab(request, pk, **kwargs):
     if not candidate_obj:
         messages.error(request, _("Candidate not found"))
         return HorillaRedirect(request)
+    from horilla_theme.methods import get_active_company_theme
+
     return render(
         request,
         "cbv/candidates/profile_about_tab.html",
         {
             "candidate": candidate_obj,
+            "theme_obj": get_active_company_theme(request),
         },
     )
 
@@ -1873,66 +2002,52 @@ def candidate_view_individual(request, cand_id, **kwargs):
     """
     This method is used to view profile of candidate.
     """
-    # candidate_obj = Candidate.find(cand_id)
-    # # if not candidate_obj:
-    # #     messages.error(request, _("Candidate not found"))
-    # #     return HorillaRedirect(request)
+    candidate_obj = get_object_or_404(Candidate, pk=cand_id)
 
-    # mails = list(Candidate.objects.values_list("email", flat=True))
-    # # Query the HorillaUser model to check if any email is present
-    # existing_emails = list(
-    #     HorillaUser.objects.filter(username__in=mails).values_list("email", flat=True)
-    # )
-    # ratings = candidate_obj.candidate_rating.all()
-    # documents = CandidateDocument.objects.filter(candidate_id=cand_id)
-    # rating_list = []
-    # avg_rate = 0
-    # for rating in ratings:
-    #     rating_list.append(rating.rating)
-    # if len(rating_list) != 0:
-    #     avg_rate = round(sum(rating_list) / len(rating_list))
+    # Candidate.find(cand_id) (the previous version of this call) isn't a
+    # real method on Candidate - get_object_or_404 is the equivalent
+    # lookup already used elsewhere in this file.
+    mails = list(Candidate.objects.values_list("email", flat=True))
+    # Query the HorillaUser model to check if any email is present
+    existing_emails = list(
+        HorillaUser.objects.filter(username__in=mails).values_list("email", flat=True)
+    )
+    documents = CandidateDocument.objects.filter(candidate_id=cand_id)
 
-    # # Retrieve the filtered candidate from the session
-    # filtered_candidate_ids = request.session.get("filtered_candidates", [])
+    # Retrieve the filtered candidate list from the session (set by the
+    # candidate list view) so the Previous/Next Candidate arrows on this
+    # page can step through the same filtered set.
+    filtered_candidate_ids = request.session.get("filtered_candidates", [])
 
-    # # Convert the string to an actual list of integers
-    # requests_ids = (
-    #     ast.literal_eval(filtered_candidate_ids)
-    #     if isinstance(filtered_candidate_ids, str)
-    #     else filtered_candidate_ids
-    # )
+    # Convert the string to an actual list of integers
+    requests_ids = (
+        ast.literal_eval(filtered_candidate_ids)
+        if isinstance(filtered_candidate_ids, str)
+        else filtered_candidate_ids
+    )
 
-    # next_id = None
-    # previous_id = None
+    next_id = None
+    previous_id = None
 
-    # for index, req_id in enumerate(requests_ids):
-    #     if req_id == cand_id:
-
-    #         if index == len(requests_ids) - 1:
-    #             next_id = None
-    #         else:
-    #             next_id = requests_ids[index + 1]
-    #         if index == 0:
-    #             previous_id = None
-    #         else:
-    #             previous_id = requests_ids[index - 1]
-    #         break
-
-    # now = timezone.now()
+    for index, req_id in enumerate(requests_ids):
+        if req_id == cand_id:
+            if index != len(requests_ids) - 1:
+                next_id = requests_ids[index + 1]
+            if index != 0:
+                previous_id = requests_ids[index - 1]
+            break
 
     return render(
         request,
         "candidate/individual.html",
-        # {
-        #     "candidate": candidate_obj,
-        #     "previous": previous_id,
-        #     "next": next_id,
-        #     "requests_ids": requests_ids,
-        #     "emp_list": existing_emails,
-        #     "average_rate": avg_rate,
-        #     "documents": documents,
-        #     "now": now,
-        # },
+        {
+            "candidate": candidate_obj,
+            "previous": previous_id,
+            "next": next_id,
+            "requests_ids": requests_ids,
+            "emp_list": existing_emails,
+            "documents": documents,
+        },
     )
 
 
@@ -2461,6 +2576,20 @@ def send_acknowledgement(request):
     candidate_ids = request.POST.getlist("candidates")
     candidates = Candidate.objects.filter(id__in=candidate_ids)
 
+    # Recipients who aren't a candidate yet (e.g. an external interviewer) -
+    # CC'd on every mail sent below since they have no Candidate record to
+    # personalize the template body against.
+    extra_emails = []
+    for raw_email in request.POST.get("extra_emails", "").split(","):
+        raw_email = raw_email.strip()
+        if not raw_email:
+            continue
+        try:
+            validate_email(raw_email)
+            extra_emails.append(raw_email)
+        except DjangoValidationError:
+            messages.warning(request, f"Skipped invalid email address: {raw_email}")
+
     other_attachments = request.FILES.getlist("other_attachments")
 
     if candidate_id:
@@ -2512,6 +2641,7 @@ def send_acknowledgement(request):
             subject=subject,
             body=render_bdy,
             to=[to],
+            cc=extra_emails,
         )
         email.content_subtype = "html"
 
@@ -3163,6 +3293,29 @@ def get_mail_log(request, pk):
     )
 
 
+def _sync_candidate_portal_mail_automation(is_on):
+    """
+    Keeps the "Candidate Portal Login" MailAutomation (the one an admin
+    manages through Settings > Recruitment > Mail > Mail Automation, with
+    its own editable HorillaMailTemplate) in lockstep with the simple
+    Settings > Recruitment > Candidate Self Tracking toggle.
+
+    Looked up by mail_template title rather than a hardcoded pk, since
+    that's the stable, admin-visible identifier - it survives the
+    automation itself being renamed and doesn't assume any particular
+    fixture was loaded.
+    """
+    from horilla_automations.models import MailAutomation
+
+    automation = MailAutomation.objects.filter(
+        model="recruitment.models.Candidate",
+        mail_template__title="Candidate Portal Login",
+    ).first()
+    if automation and automation.is_active != is_on:
+        automation.is_active = is_on
+        automation.save()
+
+
 @login_required
 @hx_request_required
 @permission_required("recruitment.add_recruitmentgeneralsetting")
@@ -3182,8 +3335,15 @@ def candidate_self_tracking(request):
         message = _("Application Tracking is enabled ")
     else:
         settings.candidate_self_tracking = False
+        # Application Tracking is a hard prerequisite for the portal mail
+        # (its toggle isn't even shown without it) - turning tracking off
+        # also turns the mail off rather than leaving it silently primed.
+        settings.send_candidate_portal_mail = False
         message = _("Application Tracking is disabled ")
     settings.save()
+    _sync_candidate_portal_mail_automation(
+        settings.candidate_self_tracking and settings.send_candidate_portal_mail
+    )
     messages.success(request, message)
     return HttpResponse("<script>$('#reloadMessagesButton').click()</script>")
 
@@ -3208,6 +3368,233 @@ def candidate_self_tracking_rating_option(request):
     else:
         settings.show_overall_rating = False
         message = _("Rating visibility is disabled ")
+    settings.save()
+    messages.success(request, message)
+    return HttpResponse("<script>$('#reloadMessagesButton').click()</script>")
+
+
+@login_required
+@hx_request_required
+@permission_required("recruitment.add_recruitmentgeneralsetting")
+def candidate_portal_mail_setting(request):
+    """
+    This method is used to enable/disable the candidate portal login mail
+    sent to applicants on application submit
+    """
+    selected_company = request.session.get("selected_company")
+    company_id = (
+        None if not selected_company or selected_company == "all" else selected_company
+    )
+    settings, created = RecruitmentGeneralSetting.objects.get_or_create(
+        company_id_id=company_id
+    )
+    if request.GET.get("send_candidate_portal_mail") == "true":
+        settings.send_candidate_portal_mail = True
+        message = _("Candidate portal mail is enabled ")
+    else:
+        settings.send_candidate_portal_mail = False
+        message = _("Candidate portal mail is disabled ")
+    settings.save()
+    _sync_candidate_portal_mail_automation(
+        settings.candidate_self_tracking and settings.send_candidate_portal_mail
+    )
+    messages.success(request, message)
+    return HttpResponse("<script>$('#reloadMessagesButton').click()</script>")
+
+
+@login_required
+@hx_request_required
+@permission_required("recruitment.change_recruitmentgeneralsetting")
+def default_meeting_provider(request):
+    """
+    This method is used to set which platform (Google Meet / Teams) is
+    used to create the meeting link when 'Send Meeting Link' is clicked
+    on an interview.
+    """
+    selected_company = request.session.get("selected_company")
+    company_id = (
+        None if not selected_company or selected_company == "all" else selected_company
+    )
+    settings, created = RecruitmentGeneralSetting.objects.get_or_create(
+        company_id_id=company_id
+    )
+    provider = request.GET.get("default_meeting_provider")
+    if provider in dict(RecruitmentGeneralSetting.meeting_providers):
+        settings.default_meeting_provider = provider
+        settings.save()
+        messages.success(request, _("Default meeting provider updated "))
+    return HttpResponse("<script>$('#reloadMessagesButton').click()</script>")
+
+
+def generate_interview_meeting(interview, request):
+    """
+    Creates/updates the interview's meeting link using whichever platform
+    (Google Meet / Teams) is configured as the company's default meeting
+    provider (RecruitmentGeneralSetting.default_meeting_provider),
+    dispatching to the horilla_meet or outlook_auth adapter accordingly -
+    mirrors the "app decides, adapter does the work" pattern already used
+    for candidate email intake (see CandidateIntakeMailbox).
+
+    Shared by the manual "Send Meeting Link" action (create_interview_meeting
+    below) and automatic generation right after an interview is scheduled
+    (recruitment.cbv.interview.InterviewForm.form_valid) - callers decide
+    how to surface the result dict; this never raises, since a meeting-link
+    failure must never be treated as an interview-scheduling failure.
+
+    Returns a dict, one of:
+      {"success": True, "created": bool}
+      {"needs_auth": True, "message"/"redirect": ...}
+      {"error": str, "status": int}
+    """
+    from django.apps import apps as django_apps
+
+    from base.models import IntegrationApps
+
+    selected_company = request.session.get("selected_company")
+    company_id = (
+        None if not selected_company or selected_company == "all" else selected_company
+    )
+    setting = RecruitmentGeneralSetting.objects.filter(company_id_id=company_id).first()
+    provider = setting.default_meeting_provider if setting else "google_meet"
+
+    title = f"Interview for {interview.candidate_id}"
+    description = interview.description or f"Interview for {interview.candidate_id}"
+    start_time = datetime.combine(interview.interview_date, interview.interview_time)
+    attendees = [employee.get_mail() for employee in interview.employee_id.all()]
+    attendees.append(interview.candidate_id.get_email())
+
+    if provider == "teams":
+        if not django_apps.is_installed("outlook_auth"):
+            return {
+                "error": str(_("Teams integration is not installed.")),
+                "status": 400,
+            }
+        from outlook_auth.methods import get_azure_api
+        from outlook_auth.models import InterviewOutlookMeetingLink, OutlookMeeting
+
+        api = get_azure_api(request)
+        if not api or not api.token:
+            return {
+                "needs_auth": True,
+                "message": str(
+                    _(
+                        "Outlook is not connected yet. Configure and "
+                        "authenticate the Outlook Mail integration first."
+                    )
+                ),
+            }
+
+        link = InterviewOutlookMeetingLink.objects.filter(interview=interview).first()
+        meeting_id = link.meeting.id if link else None
+        try:
+            meeting, created = OutlookMeeting.objects.update_or_create(
+                id=meeting_id,
+                defaults={
+                    "employee_id": request.user.employee_get,
+                    "title": title,
+                    "start_time": start_time,
+                    "description": description,
+                    "attendees": attendees,
+                },
+            )
+            meeting.refresh_from_db()
+            if not link:
+                InterviewOutlookMeetingLink.objects.create(
+                    interview=interview, meeting=meeting
+                )
+            return {"success": True, "created": created}
+        except Exception as e:
+            logger.error(f"Error creating/updating Teams Meeting: {e}")
+            return {"error": str(e), "status": 500}
+
+    # default: google_meet
+    if not django_apps.is_installed("horilla_meet"):
+        return {
+            "error": str(_("Google Meet integration is not installed.")),
+            "status": 400,
+        }
+    if not IntegrationApps.objects.filter(
+        app_label="horilla_meet", is_enabled=True
+    ).exists():
+        return {"error": str(_("Google Meet integration is disabled.")), "status": 400}
+    from horilla_meet.models import GoogleCredential, GoogleMeeting, InterviewMeetingLink
+
+    if not GoogleCredential.objects.filter(
+        employee_id=request.user.employee_get
+    ).exists():
+        return {"needs_auth": True, "redirect": reverse("authenticate-gmeet")}
+
+    link = InterviewMeetingLink.objects.filter(interview=interview).first()
+    meeting_id = link.meeting.id if link else None
+    try:
+        meeting, created = GoogleMeeting.objects.update_or_create(
+            id=meeting_id,
+            defaults={
+                "title": title,
+                "start_time": start_time,
+                "description": description,
+                "attendees": attendees,
+            },
+        )
+        meeting.refresh_from_db()
+        if not link:
+            InterviewMeetingLink.objects.create(interview=interview, meeting=meeting)
+        return {"success": True, "created": created}
+    except Exception as e:
+        logger.error(f"Error creating/updating Google Meeting: {e}")
+        return {"error": str(e), "status": 500}
+
+
+@login_required
+@permission_required("recruitment.change_interviewschedule")
+def create_interview_meeting(request):
+    """
+    HTTP entry point for the manual "Send Meeting Link" action - see
+    generate_interview_meeting for the actual provider logic.
+    """
+    interview_id = request.GET.get("id")
+    try:
+        interview = get_object_or_404(InterviewSchedule, id=interview_id)
+    except Exception as e:
+        logger.error(f"Error fetching interview: {e}")
+        return JsonResponse({"error": str(e)}, status=500)
+
+    result = generate_interview_meeting(interview, request)
+    if result.get("needs_auth"):
+        return JsonResponse(result)
+    if "error" in result:
+        return JsonResponse({"error": result["error"]}, status=result.get("status", 500))
+
+    messages.success(
+        request,
+        _("Meeting created successfully")
+        if result.get("created")
+        else _("Meeting updated successfully"),
+    )
+    return JsonResponse({"success": "true"})
+
+
+@login_required
+@hx_request_required
+@permission_required("recruitment.add_recruitmentgeneralsetting")
+def platform_conversion_widget_setting(request):
+    """
+    This method is used to enable/disable the 'Source Conversion Rate'
+    widget on the Recruitment Dashboard
+    """
+    selected_company = request.session.get("selected_company")
+    company_id = (
+        None if not selected_company or selected_company == "all" else selected_company
+    )
+    settings, created = RecruitmentGeneralSetting.objects.get_or_create(
+        company_id_id=company_id
+    )
+    if request.GET.get("show_platform_conversion") == "true":
+        settings.show_platform_conversion = True
+        message = _("Source Conversion widget is enabled ")
+    else:
+        settings.show_platform_conversion = False
+        message = _("Source Conversion widget is disabled ")
     settings.save()
     messages.success(request, message)
     return HttpResponse("<script>$('#reloadMessagesButton').click()</script>")
@@ -3247,16 +3634,29 @@ def candidate_self_status_tracking(request):
     """
     This method is accessed by the candidates
     """
-    self_tracking_feature = check_candidate_self_tracking(request)[
-        "check_candidate_self_tracking"
-    ]
+    candidate_id = request.session.get("candidate_id")
+
+    if not candidate_id:
+        return redirect("candidate-login/")
+
+    candidate = Candidate.objects.get(pk=candidate_id)
+
+    # check_candidate_self_tracking() resolves the setting via
+    # request.session["selected_company"], which is only ever populated for
+    # internal staff (the company switcher) - a candidate's own session never
+    # has it, so that lookup falls through to the company_id__isnull=True row,
+    # which doesn't exist here. Resolve by the candidate's own company instead.
+    candidate_company = (
+        candidate.recruitment_id.company_id if candidate.recruitment_id else None
+    )
+    setting = RecruitmentGeneralSetting.objects.filter(
+        company_id=candidate_company
+    ).first() or RecruitmentGeneralSetting.objects.filter(
+        company_id__isnull=True
+    ).first()
+    self_tracking_feature = setting.candidate_self_tracking if setting else False
+
     if self_tracking_feature:
-        candidate_id = request.session.get("candidate_id")
-
-        if not candidate_id:
-            return redirect("candidate-login/")
-
-        candidate = Candidate.objects.get(pk=candidate_id)
         interviews = candidate.candidate_interview.annotate(
             is_today=Case(
                 When(interview_date=date.today(), then=0),
@@ -3541,7 +3941,7 @@ def check_vaccancy(request):
     stage = Stage.objects.get(id=stage_id)
     message = _("No message")
     if stage and stage.recruitment_id.is_vacancy_filled():
-        message = _("Vaccancy is filled")
+        message = _("Vacancy is filled")
     return JsonResponse({"message": message})
 
 
@@ -3552,6 +3952,17 @@ def skills_view(request):
     """
     skills = Skill.objects.all()
     return render(request, "settings/skills/skills_view.html", {"skills": skills})
+
+
+@login_required
+def platforms_view(request):
+    """
+    This function is used to view platforms page in settings
+    """
+    platforms = Platform.objects.all()
+    return render(
+        request, "settings/platforms/platforms_view.html", {"platforms": platforms}
+    )
 
 
 @login_required
@@ -3616,6 +4027,30 @@ def delete_skills(request, id=None):
 
     count_before = skills.count()
     deleted_count, d = skills.delete()
+
+    for title in titles:
+        messages.success(request, f"{title} is deleted.")
+
+    if count_before - deleted_count == 0:
+        return HttpResponse("<script>$('#reloadMessagesButton').click()</script>")
+
+    return HttpResponse("<script>$('.reload-record').click()</script>")
+
+
+@login_required
+@hx_request_required
+@permission_required("recruitment.delete_recruitment")
+def delete_platforms(request, id=None):
+    """
+    This method is used to delete the platforms
+    """
+    ids = request.GET.getlist("ids")
+
+    platforms = Platform.objects.filter(id__in=ids)
+    titles = list(platforms.values_list("title", flat=True))
+
+    count_before = platforms.count()
+    deleted_count, d = platforms.delete()
 
     for title in titles:
         messages.success(request, f"{title} is deleted.")

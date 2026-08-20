@@ -1,0 +1,76 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+  <div class="mb-5">
+    <h1 class="text-xl font-bold">{% trans "Run Payroll" %}</h1>
+    <p class="text-sm text-dark-400 mt-1">{% trans "Six-step payroll wizard — attendance to finalize" %}</p>
+  </div>
+  {% include "payroll_pro/run/_strip.html" %}
+
+  <div class="bg-white rounded-md shadow-card border border-[#ebebeb] mb-4">
+    <div class="px-5 py-3 border-b border-[#ebebeb] flex items-center justify-between flex-wrap gap-2">
+      <h3 class="text-sm font-semibold">{% trans "Run Payroll" %} — {{ month_name }} {{ year }}
+        <span class="text-xs font-normal text-dark-400">({{ run.total_days|floatformat:"-2" }} {% trans "working days" %} · {{ record_count }} {% trans "employees" %})</span>
+      </h3>
+      {% if run.is_locked %}
+        <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-success-light text-success-dark">{% trans "Completed" %}</span>
+      {% else %}
+        <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-warning-light text-warning-dark">{% trans "Draft — in progress" %}</span>
+      {% endif %}
+    </div>
+    <div class="p-5">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        {% for s in steps %}
+        <a class="flex items-center gap-3.5 bg-white border border-[#ebebeb] rounded-md p-4 pp-lift"
+           href="{% url 'pp-run-payroll' %}?year={{ year }}&month={{ month }}&step={{ s.id }}">
+          <div class="w-11 h-11 rounded-full flex items-center justify-center text-lg flex-shrink-0 bg-primary-100 text-primary-600">
+            <ion-icon name="{{ s.icon }}"></ion-icon>
+          </div>
+          <div class="min-w-0">
+            <div class="text-primary-600 font-semibold text-sm">{{ s.title }}</div>
+            <div class="text-xs text-dark-400 mt-0.5">
+              {% with stamp=steps_data|get_item:s.id %}
+                {% if stamp %}{% trans "Last changes on" %} {{ stamp.at }} {% trans "by" %} {{ stamp.by }}
+                {% else %}{% trans "No action taken" %}{% endif %}
+              {% endwith %}
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      <div class="flex items-center gap-3 mt-4 flex-wrap">
+        <div class="text-xs text-dark-400">{% trans "Work through the six steps, then review the full register and finalize the month." %}</div>
+        <span class="flex-1"></span>
+        <a class="oh-btn oh-btn--secondary" href="{% url 'pp-run-payroll' %}?year={{ year }}&month={{ month }}&step=review">
+          {% trans "Review & Finalize" %} <ion-icon name="arrow-forward-outline" class="ms-1"></ion-icon>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {% if run.is_locked %}
+  <div class="bg-white rounded-md shadow-card border border-[#ebebeb]">
+    <div class="px-5 py-3 border-b border-[#ebebeb] flex items-center justify-between">
+      <h3 class="text-sm font-semibold">{% trans "Payroll Outcome" %}</h3>
+      <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-success-light text-success-dark">{% trans "Completed — locked" %}</span>
+    </div>
+    <div class="p-5 flex items-center gap-6 flex-wrap">
+      <div><div class="text-xs text-dark-400">{% trans "Total Net Pay" %}</div><b>{{ run.total_net_pay|pp_money0 }}</b></div>
+      <div><div class="text-xs text-dark-400">{% trans "Payslips" %}</div>
+        <b>{% if run.payslips_released %}{% trans "Released to all employees" %}{% else %}{% trans "Not released yet" %}{% endif %}</b></div>
+      <span class="flex-1"></span>
+      {% if not run.payslips_released and perms.payroll_pro.change_payrollrun %}
+        <form method="post" action="{% url 'pp-run-release' run.pk %}">{% csrf_token %}
+          <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Release Payslips" %}</button></form>
+      {% endif %}
+      {% if perms.payroll_pro.change_payrollrun %}
+        <form method="post" action="{% url 'pp-run-reopen' run.pk %}" onsubmit="return confirm('{% trans "Reopen this payroll run for editing? Payslips will be withdrawn." %}');">
+          {% csrf_token %}<button type="submit" class="oh-btn oh-btn--light-bkg">{% trans "Reopen for editing" %}</button></form>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

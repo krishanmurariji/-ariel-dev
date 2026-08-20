@@ -27,7 +27,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import models
+from django.db import IntegrityError, models
 from django.db.models import F, ProtectedError, Q
 from django.db.models.query import QuerySet
 from django.forms import DateInput, HiddenInput, Select
@@ -131,6 +131,11 @@ from horilla_documents.forms import (
 )
 from horilla_documents.models import Document, DocumentRequest
 from notifications.signals import notify
+from onboarding.forms import (
+    build_employee_education_formset,
+    build_employee_emergency_contact_formset,
+    build_employee_experience_formset,
+)
 
 
 def return_none(a, b):
@@ -252,6 +257,36 @@ def self_info_update(request):
         instance=EmployeeBankDetails.objects.filter(employee_id=employee).first()
     )
     form = EmployeeForm(instance=Employee.objects.filter(employee_user_id=user).first())
+
+    EducationFormSet = build_employee_education_formset()
+    ExperienceFormSet = build_employee_experience_formset()
+    education_formset = EducationFormSet(instance=employee, prefix="education")
+    experience_formset = ExperienceFormSet(instance=employee, prefix="experience")
+    # Same candidate-fallback prefill as employee_view_update
+    # (employee/views.py) and the Allocations -> Employee screen
+    # (employee/cbv/allocations.py) - if this employee has no emergency
+    # contacts of their own yet, show whatever their originating candidate
+    # listed on their application instead of leaving this blank.
+    if employee.emergency_contact_set.exists():
+        emergency_initial, emergency_extra = None, 0
+    else:
+        source_candidate = employee.candidate_get.first()
+        emergency_initial = (
+            [
+                {"name": c.name, "phone": c.phone, "relation": c.relation}
+                for c in source_candidate.emergency_contact_set.all()
+            ]
+            if source_candidate
+            else []
+        )
+        emergency_extra = len(emergency_initial)
+    EmergencyContactFormSet = build_employee_emergency_contact_formset(
+        extra=emergency_extra
+    )
+    emergency_contact_formset = EmergencyContactFormSet(
+        instance=employee, initial=emergency_initial, prefix="emergency"
+    )
+
     if request.POST:
         if request.POST.get("employee_first_name") is not None:
             instance = Employee.objects.filter(employee_user_id=request.user).first()
@@ -269,14 +304,55 @@ def self_info_update(request):
             if bank_form.is_valid():
                 instance = bank_form.save(commit=False)
                 instance.employee_id = employee
-                instance.save()
-                messages.success(request, _("Bank details updated."))
+                try:
+                    instance.save()
+                    messages.success(request, _("Bank details updated."))
+                except IntegrityError:
+                    messages.error(
+                        request,
+                        _(
+                            "Couldn't save — that PAN or PF/UAN number is "
+                            "already on file for another employee."
+                        ),
+                    )
+            else:
+                messages.error(
+                    request,
+                    _(
+                        "Couldn't save bank details — please fix the "
+                        "highlighted fields below."
+                    ),
+                )
+        elif request.POST.get("education-TOTAL_FORMS") is not None:
+            education_formset = EducationFormSet(
+                request.POST, instance=employee, prefix="education"
+            )
+            if education_formset.is_valid():
+                education_formset.save()
+                messages.success(request, _("Education details updated."))
+        elif request.POST.get("experience-TOTAL_FORMS") is not None:
+            experience_formset = ExperienceFormSet(
+                request.POST, instance=employee, prefix="experience"
+            )
+            if experience_formset.is_valid():
+                experience_formset.save()
+                messages.success(request, _("Experience details updated."))
+        elif request.POST.get("emergency-TOTAL_FORMS") is not None:
+            emergency_contact_formset = EmergencyContactFormSet(
+                request.POST, instance=employee, prefix="emergency"
+            )
+            if emergency_contact_formset.is_valid():
+                emergency_contact_formset.save()
+                messages.success(request, _("Emergency contact details updated."))
     return render(
         request,
         "employee/profile/profile.html",
         {
             "form": form,
             "bank_form": bank_form,
+            "education_formset": education_formset,
+            "experience_formset": experience_formset,
+            "emergency_contact_formset": emergency_contact_formset,
         },
     )
 
@@ -1662,6 +1738,35 @@ def employee_view_update(request, obj_id, **kwargs):
         bank_form = EmployeeBankDetailsForm(
             instance=EmployeeBankDetails.objects.filter(employee_id=employee).first()
         )
+        EducationFormSet = build_employee_education_formset()
+        ExperienceFormSet = build_employee_experience_formset()
+        education_formset = EducationFormSet(instance=employee, prefix="education")
+        experience_formset = ExperienceFormSet(instance=employee, prefix="experience")
+        # This employee already has their own saved emergency contacts -
+        # show those. Otherwise, fall back to whatever the candidate they
+        # were hired from listed on their application (converted_employee_id
+        # is the FK the other way; candidate_get is its related_name), so
+        # that data isn't silently lost just because it was never copied
+        # over at onboarding time.
+        if employee.emergency_contact_set.exists():
+            emergency_initial, emergency_extra = None, 0
+        else:
+            source_candidate = employee.candidate_get.first()
+            emergency_initial = (
+                [
+                    {"name": c.name, "phone": c.phone, "relation": c.relation}
+                    for c in source_candidate.emergency_contact_set.all()
+                ]
+                if source_candidate
+                else []
+            )
+            emergency_extra = len(emergency_initial)
+        EmergencyContactFormSet = build_employee_emergency_contact_formset(
+            extra=emergency_extra
+        )
+        emergency_contact_formset = EmergencyContactFormSet(
+            instance=employee, initial=emergency_initial, prefix="emergency"
+        )
         if request.POST:
             if request.POST.get("form") == "personal":
                 form = EmployeeForm(request.POST, instance=employee)
@@ -1709,8 +1814,50 @@ def employee_view_update(request, obj_id, **kwargs):
                 if bank_form.is_valid():
                     instance = bank_form.save(commit=False)
                     instance.employee_id = employee
-                    instance.save()
-                    messages.success(request, _("Employee bank details updated."))
+                    try:
+                        instance.save()
+                        messages.success(
+                            request, _("Employee bank details updated.")
+                        )
+                    except IntegrityError:
+                        messages.error(
+                            request,
+                            _(
+                                "Couldn't save — that PAN or PF/UAN number is "
+                                "already on file for another employee."
+                            ),
+                        )
+                else:
+                    messages.error(
+                        request,
+                        _(
+                            "Couldn't save bank details — please fix the "
+                            "highlighted fields below."
+                        ),
+                    )
+            elif request.POST.get("form") == "education":
+                education_formset = EducationFormSet(
+                    request.POST, instance=employee, prefix="education"
+                )
+                if education_formset.is_valid():
+                    education_formset.save()
+                    messages.success(request, _("Employee education details updated."))
+            elif request.POST.get("form") == "experience":
+                experience_formset = ExperienceFormSet(
+                    request.POST, instance=employee, prefix="experience"
+                )
+                if experience_formset.is_valid():
+                    experience_formset.save()
+                    messages.success(request, _("Employee experience details updated."))
+            elif request.POST.get("form") == "emergency":
+                emergency_contact_formset = EmergencyContactFormSet(
+                    request.POST, instance=employee, prefix="emergency"
+                )
+                if emergency_contact_formset.is_valid():
+                    emergency_contact_formset.save()
+                    messages.success(
+                        request, _("Employee emergency contact details updated.")
+                    )
         use_edit_fragment = request.META.get("HTTP_HX_REQUEST") == "true"
         template_name = (
             "employee/update_form/form_view_fragment.html"
@@ -1719,7 +1866,10 @@ def employee_view_update(request, obj_id, **kwargs):
         )
         submitted_form = request.POST.get("form", "") if request.POST else ""
         active_tab = (
-            submitted_form if submitted_form in ("personal", "work", "bank") else ""
+            submitted_form
+            if submitted_form
+            in ("personal", "work", "bank", "education", "experience", "emergency")
+            else ""
         )
         response = render(
             request,
@@ -1729,6 +1879,9 @@ def employee_view_update(request, obj_id, **kwargs):
                 "form": form,
                 "work_form": work_form,
                 "bank_form": bank_form,
+                "education_formset": education_formset,
+                "experience_formset": experience_formset,
+                "emergency_contact_formset": emergency_contact_formset,
                 "work_info_history": work_info_history,
                 "container_mode": container_mode,
                 "active_tab": active_tab,

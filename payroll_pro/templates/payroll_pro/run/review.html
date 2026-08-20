@@ -1,0 +1,71 @@
+{% extends "index.html" %}
+{% load i18n payroll_pro_tags %}
+{% block content %}
+{% include "payroll_pro/style.html" %}
+<div class="pp-fade">
+  {% include "payroll_pro/run/_strip.html" %}
+
+  <div class="flex items-center gap-3 mb-4 flex-wrap">
+    <a class="text-primary-600 text-sm font-semibold flex items-center gap-1" href="{% url 'pp-run-payroll' %}?year={{ year }}&month={{ month }}">
+      <ion-icon name="arrow-back-outline"></ion-icon>{% trans "Back" %}
+    </a>
+    <h2 class="text-lg font-bold">{% trans "Review & Finalize" %} — {{ month_name }} {{ year }}</h2>
+    <span class="flex-1"></span>
+    {% if run.is_locked %}
+      <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-success-light text-success-dark">{% trans "Completed — locked" %}</span>
+    {% elif perms.payroll_pro.change_payrollrun %}
+      <form method="post" action="{% url 'pp-run-finalize' run.pk %}"
+            onsubmit="return confirm('{% trans "Finalize and lock this payroll run? A frozen snapshot of every calculation will be stored." %}');">
+        {% csrf_token %}<button type="submit" class="oh-btn oh-btn--secondary">
+          <ion-icon name="checkmark-circle-outline" class="me-1"></ion-icon>{% trans "Finalize Payroll" %}</button>
+      </form>
+    {% endif %}
+  </div>
+
+  {% if excluded %}
+  <div class="bg-primary-100 border border-primary-300 rounded-md p-3 text-xs mb-4">
+    {% trans "Excluded from this run:" %}
+    {% for record in excluded %}<b>{{ record.employee_id.get_full_name }}</b> ({{ record.get_pay_action_display }}){% if not forloop.last %}, {% endif %}{% endfor %}
+    — {% trans "manage under Salaries on Hold." %}
+  </div>
+  {% endif %}
+
+  <div class="bg-white rounded-md shadow-card border border-[#ebebeb] mb-4">
+    <div class="hidden md:grid grid-cols-[26px_2.2fr_1fr_1fr_1.2fr_1.3fr_1.2fr] gap-2 px-5 py-2 text-[10px] uppercase tracking-wide text-dark-400 border-b border-[#ebebeb] bg-primary-50">
+      <span></span><div>{% trans "Employee" %}</div><div>{% trans "Payable Days" %}</div><div>{% trans "Prorated Gross" %}</div>
+      <div>{% trans "Gross Earnings" %}</div><div>{% trans "Deductions" %}</div><div>{% trans "Net Pay" %}</div>
+    </div>
+    {% for record, calc in rows %}
+    <div class="grid grid-cols-2 md:grid-cols-[26px_2.2fr_1fr_1fr_1.2fr_1.3fr_1.2fr] gap-2 items-center px-5 py-2.5 text-xs border-b border-[#ebebeb] last:border-b-0 cursor-pointer hover:bg-primary-100 transition duration-200"
+         hx-get="{% url 'pp-run-record-detail' run.pk record.pk %}" hx-target="#ppMiniModalTarget" hx-swap="innerHTML"
+         data-toggle="oh-modal-toggle" data-target="#ppMiniModal">
+      <span class="hidden md:inline-block"><ion-icon name="chevron-forward-outline"></ion-icon></span>
+      <div class="col-span-2 md:col-span-1 flex items-center gap-2">
+        <img src="{{ record.employee_id.get_avatar }}" class="w-7 h-7 rounded-full object-cover flex-shrink-0" alt="">
+        <div class="min-w-0">
+          <b class="block truncate">{{ record.employee_id.get_full_name }}</b>
+          <div class="text-dark-400 text-[11px] truncate">{{ calc.structure.name }} · {{ calc.regime_name|default:"—" }}</div>
+        </div>
+      </div>
+      <div>{{ calc.payable_days|floatformat:"-2" }} / {{ calc.total_days|floatformat:"-2" }}</div>
+      <div>{{ calc.prorated_gross|pp_money0 }}</div>
+      <div>{{ calc.gross_earnings|pp_money0 }}{% if calc.additions %}<div class="text-dark-400 text-[11px]">{% trans "incl. additions" %} {{ calc.additions|pp_money0 }}</div>{% endif %}</div>
+      <div>{{ calc.total_deductions|pp_money0 }}</div>
+      <div><b>{{ calc.net_pay|pp_money0 }}</b></div>
+    </div>
+    {% empty %}
+    <div class="p-10 text-center text-dark-400">
+      <ion-icon name="file-tray-outline" class="text-3xl"></ion-icon>
+      <p class="text-sm mt-1">{% trans "No employees to process" %}</p>
+    </div>
+    {% endfor %}
+    <div class="flex flex-wrap gap-8 px-5 py-4 border-t border-[#ebebeb]">
+      <div><div class="text-xs text-dark-400">{% trans "Total Gross Earnings" %}</div><b>{{ totals.gross|pp_money0 }}</b></div>
+      <div><div class="text-xs text-dark-400">{% trans "Total Deductions" %}</div><b>{{ totals.deductions|pp_money0 }}</b></div>
+      <div><div class="text-xs text-dark-400">{% trans "Total Net Pay" %}</div><b>{{ totals.net|pp_money0 }}</b></div>
+      <div><div class="text-xs text-dark-400">{% trans "Total Employer Cost" %}</div><b>{{ totals.cost|pp_money0 }}</b></div>
+    </div>
+  </div>
+  <p class="text-xs text-dark-400">{% trans "Click any employee row to view the full step-by-step calculation as per their assigned salary structure." %}</p>
+</div>
+{% endblock %}

@@ -19,7 +19,7 @@
     <div>
         <script class="dynamic_{{ field_tuple.0 }}_scripts">
             {{ form.initial|get_item:field_tuple.0 }}
-            $("#{{ view_id }}Form [name='{{ field_tuple.0|escapejs }}']").val({{ form.initial|get_item:field_tuple.0|safe }}).change()
+            $("#{{ view_id }}Form [name='{{ field_tuple.0|escapejs }}']").val({{ form.initial|get_item:field_tuple.0|default:"null"|safe }}).change()
         </script>
 
         <form hidden id="modalButton{{ field_tuple.0 }}Form"

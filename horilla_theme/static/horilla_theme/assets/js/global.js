@@ -63,28 +63,28 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // SIDEBARModal DSESIGN
-document.addEventListener("DOMContentLoaded", () => {
-  // Toggle any sidebar based on data-sidebar attribute
-  document.querySelectorAll(".toggleSidemenu").forEach((button) => {
-    button.addEventListener("click", () => {
-      const sidebarId = button.getAttribute("data-sidebar");
-      const sidebar = document.getElementById(sidebarId);
-      if (sidebar) {
-        sidebar.classList.toggle("active");
-        document.body.classList.toggle("overflow-hidden");
-      }
-    });
-  });
+// Delegated on document (not bound per-button at DOMContentLoaded) because
+// pages are swapped in later via htmx navigation (hx-get + hx-push-url) —
+// a listener attached only to buttons present at the first page load would
+// never fire for a .toggleSidemenu/.closeSidemenu button that arrives in a
+// later htmx-swapped page, only working again after a full refresh.
+document.addEventListener("click", (e) => {
+  const openButton = e.target.closest(".toggleSidemenu");
+  if (openButton) {
+    const sidebar = document.getElementById(openButton.getAttribute("data-sidebar"));
+    if (sidebar) {
+      sidebar.classList.toggle("active");
+      document.body.classList.toggle("overflow-hidden");
+    }
+    return;
+  }
 
-  // Close any sidebar based on data-sidebar attribute
-  document.querySelectorAll(".closeSidemenu").forEach((button) => {
-    button.addEventListener("click", () => {
-      const sidebarId = button.getAttribute("data-sidebar");
-      const sidebar = document.getElementById(sidebarId);
-      if (sidebar) {
-        sidebar.classList.remove("active");
-        document.body.classList.remove("overflow-hidden");
-      }
-    });
-  });
+  const closeButton = e.target.closest(".closeSidemenu");
+  if (closeButton) {
+    const sidebar = document.getElementById(closeButton.getAttribute("data-sidebar"));
+    if (sidebar) {
+      sidebar.classList.remove("active");
+      document.body.classList.remove("overflow-hidden");
+    }
+  }
 });

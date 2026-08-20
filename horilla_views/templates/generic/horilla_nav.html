@@ -91,7 +91,7 @@
           ></a>
           {% if active_view.type == type.type %}
           <script>
-            $("form#filterForm.oh-main__titlebar oh-main__titlebar--right").attr('hx-get','{{type.url}}');
+            $("form#filterForm.oh-main__titlebar oh-main__titlebar--right").attr('hx-get','{{type.url|safe}}');
             $(".oh-view-types .oh-view-type[data-type={{type.type}}] a").addClass("oh-btn--view-active")
 
           </script>
@@ -255,14 +255,6 @@
         }
       }
     }
-    setTimeout(() => {
-      $(".oh-btn--view-active").click();
-      {% if apply_first_filter %}
-      if (!$(".oh-btn--view-active").length) {
-        $("#applyFilter").click()
-      }
-      {% endif %}
-    }, 100);
     $(".oh-btn--view").click(function (e) {
       e.preventDefault();
       $(".oh-btn--view-active").removeClass("oh-btn--view-active");

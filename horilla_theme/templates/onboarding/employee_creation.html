@@ -181,18 +181,156 @@
                                     </div>
                                 </div>
                                 <div class="col-sm-12 col-md-12 col-lg-12">
-                                    <div class="oh-input-group">
-                                        <label for="" class="oh-label">{% trans "Qualification" %}</label>
-                                        {{ form.qualification }}
-                                        {{ form.qualification.errors }}
+                                    {{ education_formset.management_form }}
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <label class="oh-label mb-0">{% trans "Education" %}</label>
+                                        <button type="button" id="addEducationRow" class="oh-btn oh-btn--light-bkg oh-btn--sm">
+                                            <ion-icon name="add-outline"></ion-icon> {% trans "Add Education" %}
+                                        </button>
                                     </div>
+                                    <div id="educationRows">
+                                        {% for edu_form in education_formset %}
+                                            <div class="formset-row" style="border:1px solid #e5e5e5; border-radius:4px; padding:14px 14px 4px; margin-bottom:10px; position:relative;">
+                                                {{ edu_form.id }}
+                                                <div style="display:none;">{{ edu_form.DELETE }}</div>
+                                                <button type="button" class="formset-remove-row" data-existing="{% if edu_form.instance.pk %}true{% else %}false{% endif %}" style="position:absolute; top:10px; right:10px; border:none; background:none; color:#dc3545;" title="{% trans 'Remove' %}">
+                                                    <ion-icon name="close-outline"></ion-icon>
+                                                </button>
+                                                <div class="oh-input-group">
+                                                    <label class="oh-label">{% trans "Course/Degree" %}</label>
+                                                    {{ edu_form.degree }}
+                                                </div>
+                                                <div class="oh-input-group">
+                                                    <label class="oh-label">{% trans "University/College" %}</label>
+                                                    {{ edu_form.university }}
+                                                </div>
+                                                <div class="oh-input-group">
+                                                    <label class="oh-label">{% trans "Branch/Specialization" %}</label>
+                                                    {{ edu_form.specialization }}
+                                                </div>
+                                                <div class="oh-input-group">
+                                                    <label class="oh-label">{% trans "CGPA/Percentage" %}</label>
+                                                    {{ edu_form.percentage_cgpa }}
+                                                </div>
+                                                <div class="oh-input-group">
+                                                    <label class="oh-label">{% trans "Start of Course" %}</label>
+                                                    {{ edu_form.start_date }}
+                                                </div>
+                                                <div class="oh-input-group">
+                                                    <label class="oh-label">{% trans "End of Course" %}</label>
+                                                    {{ edu_form.end_date }}
+                                                </div>
+                                                <div class="oh-input-group">
+                                                    <label class="oh-label">{% trans "Location" %}</label>
+                                                    {{ edu_form.location }}
+                                                </div>
+                                                {{ edu_form.errors }}
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                    <template id="educationRowTemplate">
+                                        <div class="formset-row" style="border:1px solid #e5e5e5; border-radius:4px; padding:14px 14px 4px; margin-bottom:10px; position:relative;">
+                                            <button type="button" class="formset-remove-row" data-existing="false" style="position:absolute; top:10px; right:10px; border:none; background:none; color:#dc3545;" title="{% trans 'Remove' %}">
+                                                <ion-icon name="close-outline"></ion-icon>
+                                            </button>
+                                            <div class="oh-input-group">
+                                                <label class="oh-label">{% trans "Course/Degree" %}</label>
+                                                <input type="text" class="oh-input w-100 mb-2" name="education-__PREFIX__-degree">
+                                            </div>
+                                            <div class="oh-input-group">
+                                                <label class="oh-label">{% trans "University/College" %}</label>
+                                                <input type="text" class="oh-input w-100 mb-2" name="education-__PREFIX__-university">
+                                            </div>
+                                            <div class="oh-input-group">
+                                                <label class="oh-label">{% trans "Branch/Specialization" %}</label>
+                                                <input type="text" class="oh-input w-100 mb-2" name="education-__PREFIX__-specialization">
+                                            </div>
+                                            <div class="oh-input-group">
+                                                <label class="oh-label">{% trans "CGPA/Percentage" %}</label>
+                                                <input type="text" class="oh-input w-100 mb-2" name="education-__PREFIX__-percentage_cgpa">
+                                            </div>
+                                            <div class="oh-input-group">
+                                                <label class="oh-label">{% trans "Start of Course" %}</label>
+                                                <input type="date" class="oh-input w-100 mb-2" name="education-__PREFIX__-start_date">
+                                            </div>
+                                            <div class="oh-input-group">
+                                                <label class="oh-label">{% trans "End of Course" %}</label>
+                                                <input type="date" class="oh-input w-100 mb-2" name="education-__PREFIX__-end_date">
+                                            </div>
+                                            <div class="oh-input-group">
+                                                <label class="oh-label">{% trans "Location" %}</label>
+                                                <input type="text" class="oh-input w-100 mb-2" name="education-__PREFIX__-location">
+                                            </div>
+                                        </div>
+                                    </template>
                                 </div>
                                 <div class="col-sm-12 col-md-12 col-lg-12">
-                                    <div class="oh-input-group">
-                                        <label for="" class="oh-label">{% trans "Experience" %}</label>
-                                        {{ form.experience }}
-                                        {{ form.experience.errors }}
+                                    {{ experience_formset.management_form }}
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <label class="oh-label mb-0">{% trans "Experience" %}</label>
+                                        <button type="button" id="addExperienceRow" class="oh-btn oh-btn--light-bkg oh-btn--sm">
+                                            <ion-icon name="add-outline"></ion-icon> {% trans "Add Experience" %}
+                                        </button>
                                     </div>
+                                    <div id="experienceRows">
+                                        {% for exp_form in experience_formset %}
+                                            <div class="formset-row" style="border:1px solid #e5e5e5; border-radius:4px; padding:14px 14px 4px; margin-bottom:10px; position:relative;">
+                                                {{ exp_form.id }}
+                                                <div style="display:none;">{{ exp_form.DELETE }}</div>
+                                                <button type="button" class="formset-remove-row" data-existing="{% if exp_form.instance.pk %}true{% else %}false{% endif %}" style="position:absolute; top:10px; right:10px; border:none; background:none; color:#dc3545;" title="{% trans 'Remove' %}">
+                                                    <ion-icon name="close-outline"></ion-icon>
+                                                </button>
+                                                <div class="oh-input-group">
+                                                    <label class="oh-label">{% trans "Company Name" %}</label>
+                                                    {{ exp_form.company_name }}
+                                                </div>
+                                                <div class="oh-input-group">
+                                                    <label class="oh-label">{% trans "Job Title" %}</label>
+                                                    {{ exp_form.designation }}
+                                                </div>
+                                                <div class="oh-input-group">
+                                                    <label class="oh-label">{% trans "Location" %}</label>
+                                                    {{ exp_form.location }}
+                                                </div>
+                                                <div class="oh-input-group">
+                                                    <label class="oh-label">{% trans "Date of Joining" %}</label>
+                                                    {{ exp_form.start_date }}
+                                                </div>
+                                                <div class="oh-input-group">
+                                                    <label class="oh-label">{% trans "Date of Relieving" %}</label>
+                                                    {{ exp_form.end_date }}
+                                                </div>
+                                                {{ exp_form.errors }}
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                    <template id="experienceRowTemplate">
+                                        <div class="formset-row" style="border:1px solid #e5e5e5; border-radius:4px; padding:14px 14px 4px; margin-bottom:10px; position:relative;">
+                                            <button type="button" class="formset-remove-row" data-existing="false" style="position:absolute; top:10px; right:10px; border:none; background:none; color:#dc3545;" title="{% trans 'Remove' %}">
+                                                <ion-icon name="close-outline"></ion-icon>
+                                            </button>
+                                            <div class="oh-input-group">
+                                                <label class="oh-label">{% trans "Company Name" %}</label>
+                                                <input type="text" class="oh-input w-100 mb-2" name="experience-__PREFIX__-company_name">
+                                            </div>
+                                            <div class="oh-input-group">
+                                                <label class="oh-label">{% trans "Job Title" %}</label>
+                                                <input type="text" class="oh-input w-100 mb-2" name="experience-__PREFIX__-designation">
+                                            </div>
+                                            <div class="oh-input-group">
+                                                <label class="oh-label">{% trans "Location" %}</label>
+                                                <input type="text" class="oh-input w-100 mb-2" name="experience-__PREFIX__-location">
+                                            </div>
+                                            <div class="oh-input-group">
+                                                <label class="oh-label">{% trans "Date of Joining" %}</label>
+                                                <input type="date" class="oh-input w-100 mb-2" name="experience-__PREFIX__-start_date">
+                                            </div>
+                                            <div class="oh-input-group">
+                                                <label class="oh-label">{% trans "Date of Relieving" %}</label>
+                                                <input type="date" class="oh-input w-100 mb-2" name="experience-__PREFIX__-end_date">
+                                            </div>
+                                        </div>
+                                    </template>
                                 </div>
                                 <div class="col-sm-12 col-md-12 col-lg-12">
                                     <div class="oh-input-group">
@@ -209,25 +347,27 @@
                                     </div>
                                 </div>
                                 <div class="col-sm-12 col-md-12 col-lg-12">
-                                    <div class="oh-input-group">
-                                        <label for="" class="oh-label">{% trans "Emergency Contact Number" %}</label>
-                                        {{ form.emergency_contact }}
-                                        {{ form.emergency_contact.errors }}
+                                    {{ emergency_contact_formset.management_form }}
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <label class="oh-label mb-0">{% trans "Emergency Contacts" %}</label>
+                                        <button type="button" id="addEmergencyContactRow" class="oh-btn oh-btn--light-bkg oh-btn--sm">
+                                            <ion-icon name="add-outline"></ion-icon> {% trans "Add Contact" %}
+                                        </button>
                                     </div>
-                                </div>
-                                <div class="col-sm-12 col-md-12 col-lg-12">
-                                    <div class="oh-input-group">
-                                        <label for="" class="oh-label">{% trans "Emergency Contact Name" %}</label>
-                                        {{ form.emergency_contact_name }}
-                                        {{ form.emergency_contact_name.errors }}
-                                    </div>
-                                </div>
-                                <div class="col-sm-12 col-md-12 col-lg-12">
-                                    <div class="oh-input-group">
-                                        <label for="" class="oh-label">{% trans "Emergency Contact Relation" %}</label>
-                                        {{ form.emergency_contact_relation }}
-                                        {{ form.emergency_contact_relation.errors }}
-                                    </div>
+                                    <div id="emergencyContactRows"></div>
+                                    <template id="emergencyContactRowTemplate">
+                                        <div class="formset-row oh-input-group" style="border:1px solid #e5e5e5; border-radius:4px; padding:10px; margin-bottom:10px; position:relative;">
+                                            <button type="button" class="formset-remove-row" style="position:absolute; top:6px; right:6px; border:none; background:none; color:#dc3545;" title="{% trans 'Remove' %}">
+                                                <ion-icon name="close-outline"></ion-icon>
+                                            </button>
+                                            <label class="oh-label">{% trans "Name" %}</label>
+                                            <input type="text" class="oh-input w-100 mb-2" name="emergency-__PREFIX__-name">
+                                            <label class="oh-label">{% trans "Phone" %}</label>
+                                            <input type="text" class="oh-input w-100 mb-2" name="emergency-__PREFIX__-phone">
+                                            <label class="oh-label">{% trans "Relation" %}</label>
+                                            <input type="text" class="oh-input w-100" name="emergency-__PREFIX__-relation" placeholder="{% trans 'e.g. Father, Spouse' %}">
+                                        </div>
+                                    </template>
                                 </div>
                             </div>
                         </div>
@@ -259,6 +399,59 @@
                         label.append('<span> *</span>');
                     }
                 });
+
+                // Formset row add/remove - same clone/index/TOTAL_FORMS
+                // pattern as the candidate application form (recruitment
+                // app). A row added via the template has no saved instance
+                // yet, so removing it just drops it from the DOM - Django
+                // formsets tolerate gaps in the index range. A row that
+                // already came from a saved instance (education/experience
+                // prefilled from the candidate's application, or an
+                // existing employee's own saved rows) has data-existing
+                // set - removing that instead checks its hidden DELETE
+                // checkbox so the row is actually deleted on save, rather
+                // than silently left untouched in the database.
+                function wireFormsetSection(containerId, addBtnId, templateId, totalFormsName) {
+                    var container = document.getElementById(containerId);
+                    var addBtn = document.getElementById(addBtnId);
+                    var template = document.getElementById(templateId);
+                    var totalFormsInput = document.querySelector('input[name="' + totalFormsName + '"]');
+                    if (!container || !addBtn || !template || !totalFormsInput) {
+                        return;
+                    }
+                    function wireRemove(rowEl) {
+                        var removeBtn = rowEl.querySelector(".formset-remove-row");
+                        if (!removeBtn) {
+                            return;
+                        }
+                        removeBtn.addEventListener("click", function () {
+                            if (removeBtn.dataset.existing === "true") {
+                                var deleteBox = rowEl.querySelector('input[type="checkbox"][name$="-DELETE"]');
+                                if (deleteBox) {
+                                    deleteBox.checked = true;
+                                }
+                                rowEl.style.display = "none";
+                            } else {
+                                rowEl.remove();
+                            }
+                        });
+                    }
+                    addBtn.addEventListener("click", function () {
+                        var index = parseInt(totalFormsInput.value, 10) || 0;
+                        var html = template.innerHTML.split("__PREFIX__").join(index);
+                        var wrapper = document.createElement("div");
+                        wrapper.innerHTML = html.trim();
+                        var rowEl = wrapper.firstElementChild;
+                        container.appendChild(rowEl);
+                        totalFormsInput.value = index + 1;
+                        wireRemove(rowEl);
+                    });
+                    container.querySelectorAll(".formset-row").forEach(wireRemove);
+                }
+
+                wireFormsetSection("emergencyContactRows", "addEmergencyContactRow", "emergencyContactRowTemplate", "emergency-TOTAL_FORMS");
+                wireFormsetSection("educationRows", "addEducationRow", "educationRowTemplate", "education-TOTAL_FORMS");
+                wireFormsetSection("experienceRows", "addExperienceRow", "experienceRowTemplate", "experience-TOTAL_FORMS");
             });
         </script>
     </body>

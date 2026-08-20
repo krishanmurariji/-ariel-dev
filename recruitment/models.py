@@ -159,6 +159,46 @@ class Skill(HorillaModel):
         verbose_name_plural = _("Skills")
 
 
+class Platform(HorillaModel):
+    """
+    A candidate's source (LinkedIn, Indeed, Manual Entry, Email Intake,
+    ...). Displayed to users as "Source" - also used to tag dynamic
+    application links for a Recruitment / Job Opening.
+    """
+
+    title = models.CharField(max_length=100, unique=True)
+
+    def save(self, *args, **kwargs):
+        self.title = self.title.strip()
+        super().save(*args, **kwargs)
+
+    def get_update_url(self):
+        """
+        This method to get update url
+        """
+        return reverse_lazy("settings-update-platforms", kwargs={"pk": self.pk})
+
+    def get_delete_url(self):
+        """
+        This method to get delete url
+        """
+        base_url = reverse_lazy("delete-platforms")
+        return f"{base_url}?ids={self.pk}"
+
+    def get_delete_instance(self):
+        """
+        to get instance for delete
+        """
+        return self.pk
+
+    def __str__(self) -> str:
+        return self.title
+
+    class Meta:
+        verbose_name = _("Source")
+        verbose_name_plural = _("Sources")
+
+
 class Recruitment(HorillaModel):
     """
     Recruitment model
@@ -204,7 +244,13 @@ class Recruitment(HorillaModel):
         editable=False,
     )
     vacancy = models.IntegerField(default=0, null=True, verbose_name=_("Vacancy"))
-    recruitment_managers = models.ManyToManyField(Employee, verbose_name=_("Managers"))
+    recruitment_managers = models.ManyToManyField(Employee, verbose_name=_("Interviewers"))
+    recruitment_heads = models.ManyToManyField(
+        Employee,
+        blank=True,
+        related_name="recruitment_heads",
+        verbose_name=_("Recruitment Heads"),
+    )
     survey_templates = models.ManyToManyField(
         SurveyTemplate, blank=True, verbose_name=_("Survey Templates")
     )
@@ -219,6 +265,14 @@ class Recruitment(HorillaModel):
         default=django.utils.timezone.now, verbose_name=_("Start Date")
     )
     end_date = models.DateField(blank=True, null=True, verbose_name=_("End Date"))
+    end_date_reminder_sent = models.BooleanField(
+        default=False,
+        editable=False,
+        help_text=_(
+            "Whether the recruitment managers have already been notified "
+            "that this recruitment's end date is 5 days away."
+        ),
+    )
     skills = models.ManyToManyField(Skill, blank=True, verbose_name=_("Skills"))
     linkedin_account_id = models.ForeignKey(
         "recruitment.LinkedInAccount",
@@ -240,8 +294,12 @@ class Recruitment(HorillaModel):
     default = models.manager.Manager()
     optional_profile_image = models.BooleanField(
         default=False,
-        help_text=_("Profile image not mandatory for candidate creation"),
-        verbose_name=_("Optional Profile Image"),
+        help_text=_(
+            "If off, the profile image upload is hidden on the application "
+            "form and never required. If on, applicants must upload a "
+            "profile image."
+        ),
+        verbose_name=_("Optional Profile Image?"),
     )
     optional_resume = models.BooleanField(
         default=False,
@@ -308,6 +366,17 @@ class Recruitment(HorillaModel):
         if not self.publish_in_linkedin:
             self.linkedin_account_id = None
             self.linkedin_post_id = None
+        if self.pk:
+            previous_end_date = (
+                Recruitment.objects.filter(pk=self.pk)
+                .values_list("end_date", flat=True)
+                .first()
+            )
+            # Re-arm the reminder if the deadline moved, so extending a
+            # recruitment's end date gets a fresh 5-day-out notice instead
+            # of staying silent because the old date already fired one.
+            if previous_end_date != self.end_date:
+                self.end_date_reminder_sent = False
         super().save(*args, **kwargs)  # Save the Recruitment instance first
         if self.is_event_based and self.open_positions is None:
             raise ValidationError({"open_positions": _("This field is required")})
@@ -413,6 +482,17 @@ class Recruitment(HorillaModel):
             return "Closed"
         else:
             return "Open"
+
+    def closed_toggle(self):
+        """
+        For toggle the closed field from the Recruitment grid - checked
+        means the recruitment is open.
+        """
+        url = f"update-recruitment-closed/{self.id}"
+        return render_template(
+            path="cbv/recruitment/closed_toggle.html",
+            context={"instance": self, "url": url},
+        )
 
     def rec_actions(self):
         """
@@ -623,11 +703,6 @@ class Candidate(HorillaModel):
         ("rejected", _("Rejected")),
         ("joined", _("Joined")),
     ]
-    source_choices = [
-        ("application", _("Application Form")),
-        ("software", _("Inside software")),
-        ("other", _("Other")),
-    ]
     name = models.CharField(max_length=100, null=True, verbose_name=_("Name"))
     profile = models.ImageField(upload_to=upload_path, null=True)  # 853
     portfolio = models.URLField(max_length=200, blank=True, verbose_name=_("Portfolio"))
@@ -709,9 +784,59 @@ class Candidate(HorillaModel):
         default="male",
         verbose_name=_("Gender"),
     )
-    source = models.CharField(
-        max_length=20,
-        choices=source_choices,
+    experience_years = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        validators=[MaxValueValidator(60)],
+        verbose_name=_("Experience (Years)"),
+    )
+    experience_months = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        validators=[MaxValueValidator(11)],
+        verbose_name=_("Experience (Months)"),
+    )
+    current_salary = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name=_("Current Salary (per month)"),
+    )
+    expected_salary = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name=_("Expected Salary"),
+    )
+    is_salary_negotiable = models.BooleanField(
+        default=False,
+        verbose_name=_("Open to Salary Negotiation"),
+    )
+    available_to_join_days = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        validators=[MaxValueValidator(365)],
+        verbose_name=_("Available To Join (Days)"),
+    )
+    skills = models.ManyToManyField(
+        Skill,
+        blank=True,
+        related_name="candidates",
+        verbose_name=_("Skills"),
+    )
+    reason_to_leave = models.CharField(
+        max_length=500,
+        null=True,
+        blank=True,
+        verbose_name=_("Reason to Leave"),
+    )
+    platform = models.ForeignKey(
+        Platform,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         verbose_name=_("Source"),
@@ -730,6 +855,28 @@ class Candidate(HorillaModel):
         ],
     )
     sequence = models.IntegerField(null=True, default=0)
+    latest_ai_score = models.IntegerField(
+        null=True,
+        blank=True,
+        editable=False,
+        verbose_name=_("Latest AI Score"),
+        help_text=_(
+            "Denormalized copy of the most recent CandidateAIScore.score, "
+            "kept in sync by recruitment/ai_scoring.py, so the candidate "
+            "grid and pipeline can sort/filter on it directly."
+        ),
+    )
+    has_better_job_suggestion = models.BooleanField(
+        default=False,
+        editable=False,
+        verbose_name=_("Has Better Job Suggestion"),
+        help_text=_(
+            "Denormalized copy of whether the latest CandidateJobSuggestion "
+            "found a stronger-matching open job, kept in sync by "
+            "recruitment/ai_job_match.py, so the pipeline card can show a "
+            "notification badge without a query per card."
+        ),
+    )
 
     probation_end = models.DateField(null=True, editable=False)
     offer_letter_status = models.CharField(
@@ -745,7 +892,7 @@ class Candidate(HorillaModel):
     converted_employee_id.exclude_from_automation = True
     mail_to_related_fields = [
         ("stage_id__stage_managers__get_mail", "Stage Managers"),
-        ("recruitment_id__recruitment_managers__get_mail", "Recruitment Managers"),
+        ("recruitment_id__recruitment_managers__get_mail", "Recruitment Interviewers"),
     ]
     hired_date = models.DateField(null=True, blank=True, editable=False)
 
@@ -777,6 +924,15 @@ class Candidate(HorillaModel):
         return render_template(
             path="cbv/pipeline/rating.html", context={"instance": self}
         )
+
+    @property
+    def salary_comparison_max(self):
+        """
+        The larger of current/expected salary, used as the shared 100%
+        reference point so the two comparison bars on the profile page
+        are actually proportional to each other instead of fixed widths.
+        """
+        return max(self.current_salary or 0, self.expected_salary or 0) or 1
 
     def get_avg_rating(self):
         """
@@ -846,6 +1002,28 @@ class Candidate(HorillaModel):
 
         return render_template(
             path="cbv/candidates/rating.html",
+            context={"instance": self},
+        )
+
+    def ai_score_number(self):
+        """
+        This method for get custom column showing the latest AI score as
+        a plain colored number (no "/100" suffix) - used in both the
+        Candidates grid and the Recruitment Pipeline card.
+        """
+        return render_template(
+            path="cbv/candidates/ai_score_number.html",
+            context={"instance": self},
+        )
+
+    def job_suggestion_badge(self):
+        """
+        This method for get custom column showing a notification badge
+        when the AI found this candidate a stronger match for a
+        different open job - used in the Recruitment Pipeline card.
+        """
+        return render_template(
+            path="cbv/candidates/job_suggestion_badge.html",
             context={"instance": self},
         )
 
@@ -947,6 +1125,12 @@ class Candidate(HorillaModel):
         base_url = reverse_lazy("add-to-rejected-candidates")
         query_params = urlencode({"candidate_id": self.pk})
         return f"{base_url}?{query_params}"
+
+    def get_move_pipeline_url(self):
+        """
+        This method to get the url for the move-to-another-pipeline modal.
+        """
+        return reverse_lazy("candidate-move-pipeline-form", kwargs={"pk": self.pk})
 
     def get_document_request(self):
         """
@@ -1091,6 +1275,13 @@ class Candidate(HorillaModel):
         Method will return employee full name
         """
         return str(self.name)
+
+    def applied_on_display(self):
+        """
+        Human-readable date the candidate applied (created_at doubles as the
+        application date - there's no separate "applied on" field).
+        """
+        return self.created_at.strftime("%b %d, %Y") if self.created_at else ""
 
     def get_avatar(self):
         if self.profile and default_storage.exists(self.profile.name):
@@ -1365,6 +1556,122 @@ class Candidate(HorillaModel):
         ordering = ["sequence"]
         verbose_name = _("Candidate")
         verbose_name_plural = _("Candidates")
+
+
+class CandidateEducation(HorillaModel):
+    """
+    One education entry (degree) for a candidate. A candidate can have
+    multiple - collected on the public application form.
+    """
+
+    candidate_id = models.ForeignKey(
+        Candidate,
+        on_delete=models.CASCADE,
+        related_name="education_set",
+        verbose_name=_("Candidate"),
+    )
+    degree = models.CharField(max_length=100, verbose_name=_("Course"))
+    specialization = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        verbose_name=_("Branch/Specialization"),
+    )
+    percentage_cgpa = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        verbose_name=_("CGPA/Percentage"),
+    )
+    start_date = models.DateField(
+        null=True, blank=True, verbose_name=_("Start of Course")
+    )
+    end_date = models.DateField(
+        null=True, blank=True, verbose_name=_("End of Course")
+    )
+    university = models.CharField(
+        max_length=150,
+        null=True,
+        blank=True,
+        verbose_name=_("University/College"),
+    )
+    location = models.CharField(
+        max_length=100, null=True, blank=True, verbose_name=_("Location")
+    )
+
+    def __str__(self):
+        return f"{self.degree} - {self.university or ''}".strip(" -")
+
+    class Meta:
+        verbose_name = _("Candidate Education")
+        verbose_name_plural = _("Candidate Education")
+        ordering = ["-end_date"]
+
+
+class CandidateExperience(HorillaModel):
+    """
+    One work-experience entry for a candidate. A candidate can have
+    multiple - collected on the public application form.
+    """
+
+    candidate_id = models.ForeignKey(
+        Candidate,
+        on_delete=models.CASCADE,
+        related_name="experience_set",
+        verbose_name=_("Candidate"),
+    )
+    company_name = models.CharField(max_length=150, verbose_name=_("Company Name"))
+    designation = models.CharField(max_length=100, verbose_name=_("Job Title"))
+    is_current_job = models.BooleanField(
+        default=False, verbose_name=_("Currently working here")
+    )
+    start_date = models.DateField(
+        null=True, blank=True, verbose_name=_("Date of Joining")
+    )
+    end_date = models.DateField(
+        null=True, blank=True, verbose_name=_("Date of Relieving")
+    )
+    location = models.CharField(
+        max_length=100, null=True, blank=True, verbose_name=_("Location")
+    )
+
+    def __str__(self):
+        return f"{self.designation} - {self.company_name}".strip(" -")
+
+    class Meta:
+        verbose_name = _("Candidate Experience")
+        verbose_name_plural = _("Candidate Experience")
+        ordering = ["-end_date"]
+
+
+class CandidateEmergencyContact(HorillaModel):
+    """
+    One emergency contact for a candidate. A candidate can have multiple -
+    collected on the public application form.
+    """
+
+    candidate_id = models.ForeignKey(
+        Candidate,
+        on_delete=models.CASCADE,
+        related_name="emergency_contact_set",
+        verbose_name=_("Candidate"),
+    )
+    name = models.CharField(max_length=100, verbose_name=_("Name"))
+    phone = models.CharField(
+        max_length=15,
+        validators=[validate_mobile],
+        verbose_name=_("Phone"),
+    )
+    relation = models.CharField(
+        max_length=50, null=True, blank=True, verbose_name=_("Relation")
+    )
+
+    def __str__(self):
+        return f"{self.name} ({self.relation or _('Emergency Contact')})"
+
+    class Meta:
+        verbose_name = _("Candidate Emergency Contact")
+        verbose_name_plural = _("Candidate Emergency Contacts")
 
 
 class RejectReason(HorillaModel):
@@ -1764,6 +2071,39 @@ class RecruitmentGeneralSetting(HorillaModel):
 
     candidate_self_tracking = models.BooleanField(default=False)
     show_overall_rating = models.BooleanField(default=False)
+    send_candidate_portal_mail = models.BooleanField(
+        default=False,
+        verbose_name=_("Send Candidate Portal Mail"),
+        help_text=_(
+            "When enabled, applicants receive an email with their "
+            "Candidate Portal login details right after submitting an "
+            "application. Only takes effect while Application Tracking "
+            "is also enabled."
+        ),
+    )
+    show_platform_conversion = models.BooleanField(
+        default=True,
+        verbose_name=_("Show Source Conversion Widget"),
+        help_text=_(
+            "Shows the 'Source Conversion Rate' chart (hire rate per "
+            "candidate source - LinkedIn, Indeed, etc.) on the "
+            "Recruitment Dashboard."
+        ),
+    )
+    meeting_providers = [
+        ("google_meet", _("Google Meet")),
+        ("teams", _("Microsoft Teams")),
+    ]
+    default_meeting_provider = models.CharField(
+        max_length=15,
+        choices=meeting_providers,
+        default="google_meet",
+        verbose_name=_("Default Meeting Provider"),
+        help_text=_(
+            "Platform used to create the meeting link when 'Send Meeting "
+            "Link' is clicked on an interview."
+        ),
+    )
     company_id = models.OneToOneField(
         Company, on_delete=models.CASCADE, null=True, blank=True, unique=True
     )
@@ -2047,3 +2387,555 @@ class LinkedInAccount(HorillaModel):
             path="is_active_toggle.html",
             context={"instance": self, "url": url},
         )
+
+
+class CandidateIntakeMailbox(HorillaModel):
+    """
+    Connects an outlook_auth or gmail_auth mailbox to the recruitment
+    module so incoming candidate application emails can be polled and
+    turned into Candidate records automatically. See
+    recruitment/intake_providers/ for how `provider` maps to actual
+    polling/fetch code - nothing outside that package should branch on
+    provider directly.
+    """
+
+    providers = [
+        ("outlook", _("Outlook")),
+        ("gmail", _("Gmail")),
+    ]
+
+    provider = models.CharField(
+        max_length=10,
+        choices=providers,
+        default="outlook",
+        verbose_name=_("Provider"),
+    )
+    azure_api = models.OneToOneField(
+        "outlook_auth.AzureApi",
+        on_delete=models.CASCADE,
+        related_name="candidate_intake_mailbox",
+        null=True,
+        blank=True,
+        verbose_name=_("Outlook Mailbox"),
+    )
+    google_api = models.OneToOneField(
+        "gmail_auth.GoogleApi",
+        on_delete=models.CASCADE,
+        related_name="candidate_intake_mailbox",
+        null=True,
+        blank=True,
+        verbose_name=_("Gmail Mailbox"),
+    )
+    is_active = models.BooleanField(default=True, verbose_name=_("Active"))
+    fallback_recruitment_id = models.ForeignKey(
+        Recruitment,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_("Fallback Recruitment"),
+        help_text=_(
+            "Used only when the job opening cannot be confidently \
+            matched from the email/resume content."
+        ),
+    )
+    daily_candidate_cap = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name=_("Daily Candidate Cap"),
+        help_text=_(
+            "Max candidates this mailbox may auto-create per day. Leave "
+            "blank to use the site-wide default (INTAKE_DAILY_CANDIDATE_CAP)."
+        ),
+    )
+    last_polled_at = models.DateTimeField(null=True, blank=True, editable=False)
+    last_error = models.TextField(
+        blank=True,
+        editable=False,
+        verbose_name=_("Last Error"),
+        help_text=_(
+            "Set when the last poll failed before it could even read the "
+            "inbox (e.g. expired Outlook login) - cleared on the next "
+            "successful poll."
+        ),
+    )
+    company_id = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, verbose_name=_("Company")
+    )
+    objects = HorillaCompanyManager("company_id")
+
+    class Meta:
+        verbose_name = _("Candidate Intake Mailbox")
+        verbose_name_plural = _("Candidate Intake Mailboxes")
+
+    def __str__(self):
+        return str(self.get_provider_account())
+
+    def get_provider_account(self):
+        """
+        Returns whichever provider-specific account row (AzureApi /
+        GoogleApi) matches `provider` - the single object
+        recruitment/intake_providers/ adapters need to do anything.
+        """
+        return self.azure_api if self.provider == "outlook" else self.google_api
+
+    def clean(self):
+        super().clean()
+        account = self.get_provider_account()
+        if account is None:
+            raise ValidationError(
+                {
+                    "provider": _(
+                        "Choose the matching mailbox for this provider "
+                        "(Outlook Mailbox for Outlook, Gmail Mailbox for Gmail)."
+                    )
+                }
+            )
+        other_account = self.google_api if self.provider == "outlook" else self.azure_api
+        if other_account is not None:
+            raise ValidationError(
+                {
+                    "provider": _(
+                        "Only one mailbox account may be set, matching the "
+                        "selected provider."
+                    )
+                }
+            )
+
+    def action_template(self):
+        """
+        This method for get custom column for managers.
+        """
+        return render_template(
+            path="mailbox/mailbox_action.html",
+            context={"instance": self},
+        )
+
+    def is_active_toggle(self):
+        """
+        For toggle is_active field
+        """
+        url = f"update-isactive-intake-mailbox/{self.id}"
+        return render_template(
+            path="is_active_toggle.html",
+            context={"instance": self, "url": url},
+        )
+
+    def error_status(self):
+        """
+        Custom column showing whether the last poll of this mailbox failed
+        before it could even read the inbox (e.g. expired Outlook login).
+        """
+        return render_template(
+            path="mailbox/mailbox_error_status.html",
+            context={"instance": self},
+        )
+
+    def mailbox_account_display(self):
+        """
+        Custom column showing the connected account, regardless of provider.
+        """
+        return str(self.get_provider_account())
+
+
+class CandidateIntakeLog(models.Model):
+    """
+    Audit trail for every email processed by a CandidateIntakeMailbox,
+    whether it resulted in a new candidate or not.
+    """
+
+    statuses = [
+        ("created", _("Candidate Created")),
+        ("duplicate", _("Duplicate Candidate")),
+        ("no_resume", _("No Resume Attached")),
+        ("invalid_resume_format", _("Invalid Resume Format")),
+        ("attachment_too_large", _("Attachment Too Large")),
+        ("no_job_match", _("No Matching Job Opening")),
+        ("parse_failed", _("Resume/Email Parsing Failed")),
+        ("daily_cap_exceeded", _("Daily Candidate Cap Exceeded")),
+        ("error", _("Unexpected Error")),
+    ]
+
+    mailbox = models.ForeignKey(
+        CandidateIntakeMailbox,
+        on_delete=models.CASCADE,
+        related_name="intake_logs",
+        verbose_name=_("Mailbox"),
+    )
+    message_id = models.CharField(max_length=255, unique=True)
+    from_email = models.EmailField(verbose_name=_("From"))
+    subject = models.CharField(max_length=255, blank=True, verbose_name=_("Subject"))
+    received_at = models.DateTimeField(verbose_name=_("Received At"))
+    status = models.CharField(max_length=25, choices=statuses, verbose_name=_("Status"))
+    candidate = models.ForeignKey(
+        Candidate,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_("Candidate"),
+    )
+    matched_recruitment = models.ForeignKey(
+        Recruitment,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_("Matched Recruitment"),
+    )
+    error_message = models.TextField(blank=True, verbose_name=_("Reason"))
+    resume = models.FileField(
+        upload_to=upload_path,
+        null=True,
+        blank=True,
+        verbose_name=_("Resume"),
+        help_text=_(
+            "Saved whenever a PDF attachment was found, regardless of "
+            "outcome, so it can be reviewed even for failed/no-match emails."
+        ),
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    company_id = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, editable=False
+    )
+    objects = HorillaCompanyManager("company_id")
+
+    class Meta:
+        verbose_name = _("Candidate Intake Log")
+        verbose_name_plural = _("Candidate Intake Logs")
+        ordering = ["-received_at"]
+
+    def __str__(self):
+        return f"{self.subject} <{self.from_email}> - {self.status}"
+
+    def status_badge(self):
+        """
+        This method for get custom column showing a colored status badge.
+        """
+        return render_template(
+            path="mailbox/intake_log_status.html",
+            context={"instance": self},
+        )
+
+    def resume_link(self):
+        """
+        This method for get custom column showing a resume download link.
+        """
+        return render_template(
+            path="mailbox/intake_log_resume.html",
+            context={"instance": self},
+        )
+
+
+class IntakePollLock(models.Model):
+    """
+    Singleton row (always pk=1) used as a real DB-level mutex around
+    recruitment.intake.run_guarded_poll(), so the candidate-intake poll
+    can never run concurrently across multiple app-server processes (e.g.
+    several gunicorn workers, each running its own copy of the
+    APScheduler job) - a per-process cache lock can't provide that.
+    """
+
+    locked_at = models.DateTimeField(null=True, blank=True, editable=False)
+    locked_by = models.CharField(
+        max_length=100, blank=True, editable=False, verbose_name=_("Locked By")
+    )
+
+    class Meta:
+        verbose_name = _("Intake Poll Lock")
+        verbose_name_plural = _("Intake Poll Locks")
+
+    def __str__(self):
+        return f"IntakePollLock(locked_at={self.locked_at})"
+
+
+class CandidateAIScore(models.Model):
+    """
+    A local-AI-generated ATS-style match score for a candidate against the
+    job they applied for, with the reasoning behind the score. Kept fully
+    separate from CandidateRating (the manual per-employee star rating).
+    One row per scoring attempt - re-scoring keeps history rather than
+    overwriting, and failed attempts are recorded too (why it couldn't
+    score), mirroring CandidateIntakeLog's audit-trail shape.
+    """
+
+    statuses = [
+        ("scored", _("Scored")),
+        ("no_resume", _("No Resume Attached")),
+        ("parse_failed", _("Resume Parsing Failed")),
+        ("error", _("Unexpected Error")),
+    ]
+
+    candidate = models.ForeignKey(
+        Candidate,
+        on_delete=models.CASCADE,
+        related_name="ai_scores",
+        verbose_name=_("Candidate"),
+    )
+    scored_against = models.ForeignKey(
+        Recruitment,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_("Scored Against"),
+        help_text=_("The job opening this score was evaluated against."),
+    )
+    status = models.CharField(max_length=20, choices=statuses, verbose_name=_("Status"))
+    score = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        verbose_name=_("Score"),
+    )
+    key_points = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name=_("Key Points"),
+        help_text=_("Short, specific reasons behind the score."),
+    )
+    reasoning = models.TextField(blank=True, verbose_name=_("Reasoning"))
+    confidence = models.CharField(
+        max_length=10,
+        choices=[("high", _("High")), ("low", _("Low"))],
+        blank=True,
+        verbose_name=_("Confidence"),
+        help_text=_(
+            "Automated confidence signal - 'low' means this score was "
+            "flagged (e.g. inconsistent re-scoring, or the candidate's "
+            "name wasn't found in the resume) and needs manual review."
+        ),
+    )
+    flags = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name=_("Flags"),
+        help_text=_("Machine-readable reasons this score was flagged for review."),
+    )
+    error_message = models.TextField(blank=True, verbose_name=_("Reason"))
+    model_used = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    objects = models.Manager()
+    company_id = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, editable=False
+    )
+
+    class Meta:
+        verbose_name = _("Candidate AI Score")
+        verbose_name_plural = _("Candidate AI Scores")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        if self.status == "scored":
+            return f"{self.candidate} - {self.score}/100"
+        return f"{self.candidate} - {self.status}"
+
+    def score_badge(self):
+        """
+        This method for get custom column showing a colored score badge.
+        """
+        return render_template(
+            path="candidate/ai_score_badge.html",
+            context={"instance": self},
+        )
+
+    @property
+    def score_remaining(self):
+        """
+        100 minus the score - the unfilled portion of the AI Score gauge
+        chart on the candidate profile.
+        """
+        return 100 - self.score if self.score is not None else 0
+
+
+class CandidateJobSuggestion(models.Model):
+    """
+    A local-AI-generated suggestion that a candidate's resume may be a
+    stronger match for a different currently-open job in the same
+    company than the one they applied to. Kept fully separate from
+    CandidateAIScore (which only scores against the applied job) - see
+    recruitment/ai_job_match.py. One row per check attempt, history kept.
+    """
+
+    statuses = [
+        ("suggested", _("Better Match Found")),
+        ("no_better_match", _("No Better Match")),
+        ("no_resume", _("No Resume Attached")),
+        ("parse_failed", _("Resume Parsing Failed")),
+        ("error", _("Unexpected Error")),
+    ]
+
+    candidate = models.ForeignKey(
+        Candidate,
+        on_delete=models.CASCADE,
+        related_name="job_suggestions",
+        verbose_name=_("Candidate"),
+    )
+    current_recruitment = models.ForeignKey(
+        Recruitment,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("Applied Job"),
+    )
+    suggested_recruitment = models.ForeignKey(
+        Recruitment,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("Suggested Job"),
+    )
+    status = models.CharField(max_length=20, choices=statuses, verbose_name=_("Status"))
+    current_score = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        verbose_name=_("Current Job Score"),
+    )
+    suggested_score = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        verbose_name=_("Suggested Job Score"),
+    )
+    reasoning = models.TextField(blank=True, verbose_name=_("Reasoning"))
+    error_message = models.TextField(blank=True, verbose_name=_("Reason"))
+    model_used = models.CharField(max_length=100, blank=True)
+    acted_on = models.BooleanField(
+        default=False,
+        verbose_name=_("Acted On"),
+        help_text=_("Whether the candidate was moved to the suggested job."),
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    objects = models.Manager()
+    company_id = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, editable=False
+    )
+
+    class Meta:
+        verbose_name = _("Candidate Job Suggestion")
+        verbose_name_plural = _("Candidate Job Suggestions")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        if self.status == "suggested":
+            return f"{self.candidate} -> {self.suggested_recruitment} ({self.suggested_score}/100)"
+        return f"{self.candidate} - {self.status}"
+
+    @property
+    def current_score_remaining(self):
+        """100 minus current_score - for the applied-job gauge chart."""
+        return 100 - self.current_score if self.current_score is not None else 100
+
+    @property
+    def suggested_score_remaining(self):
+        """100 minus suggested_score - for the suggested-job gauge chart."""
+        return 100 - self.suggested_score if self.suggested_score is not None else 100
+
+
+class CandidateHistorySummary(models.Model):
+    """
+    A local-AI-generated, step-by-step plain-language narrative of a
+    candidate's tracked history (stage moves, field edits, who made
+    them and when) - one formal sentence per recorded event, rather
+    than a compressed summary. One row per generation attempt -
+    re-generating keeps history rather than overwriting, mirroring
+    CandidateAIScore's shape.
+    """
+
+    statuses = [
+        ("summarized", _("Summarized")),
+        ("no_history", _("No History Available")),
+        ("error", _("Unexpected Error")),
+    ]
+
+    candidate = models.ForeignKey(
+        Candidate,
+        on_delete=models.CASCADE,
+        related_name="history_summaries",
+        verbose_name=_("Candidate"),
+    )
+    status = models.CharField(max_length=20, choices=statuses, verbose_name=_("Status"))
+    summary = models.TextField(blank=True, verbose_name=_("Summary"))
+    milestones = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name=_("Steps"),
+        help_text=_(
+            "One formal, plain-language sentence per recorded event, "
+            "in chronological order."
+        ),
+    )
+    error_message = models.TextField(blank=True, verbose_name=_("Reason"))
+    model_used = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    objects = models.Manager()
+    company_id = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, editable=False
+    )
+
+    class Meta:
+        verbose_name = _("Candidate History Summary")
+        verbose_name_plural = _("Candidate History Summaries")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.candidate} - {self.status}"
+
+
+class AISettings(models.Model):
+    """
+    Single global switch + credentials for which LLM provider recruitment's
+    AI features (email intake, resume autofill, AI scoring, job description/
+    skill generation, history summaries) use. See recruitment/ai_client.py -
+    nothing outside that module should branch on provider directly.
+
+    Always exactly one row (pk=1) - see get_solo().
+    """
+
+    PROVIDERS = [
+        ("ollama", _("Ollama (Local)")),
+        ("openai", _("OpenAI")),
+    ]
+
+    provider = models.CharField(
+        max_length=10,
+        choices=PROVIDERS,
+        default="ollama",
+        verbose_name=_("AI Provider"),
+    )
+    openai_api_key = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("OpenAI API Key"),
+    )
+    openai_model = models.CharField(
+        max_length=100,
+        blank=True,
+        default="gpt-4o-mini",
+        verbose_name=_("OpenAI Model"),
+    )
+    ollama_base_url = models.CharField(
+        max_length=255,
+        blank=True,
+        default="http://localhost:11434",
+        verbose_name=_("Ollama Base URL"),
+    )
+    ollama_model = models.CharField(
+        max_length=100,
+        blank=True,
+        default="llama3.2:3b",
+        verbose_name=_("Ollama Model"),
+    )
+
+    def __str__(self):
+        return f"AI Settings ({self.get_provider_display()})"
+
+    @classmethod
+    def get_solo(cls):
+        """
+        Fetches the single settings row, creating it with defaults on first
+        use - callers that need to bind a row to a form (the AI Settings
+        page) should use this rather than .first(), which stays None until
+        someone has actually saved the form once.
+        """
+        obj, _created = cls.objects.get_or_create(pk=1)
+        return obj

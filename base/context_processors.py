@@ -297,6 +297,84 @@ def check_candidate_self_tracking_rating(request):
     return {"check_candidate_self_tracking_rating": rating_option}
 
 
+def check_candidate_portal_mail(request):
+    """
+    This method is used to check enabled/disabled of the candidate portal
+    login mail sent on application submit
+    """
+    portal_mail_enabled = False
+    selected_company = request.session.get("selected_company")
+    if apps.is_installed("recruitment"):
+        RecruitmentGeneralSetting = get_horilla_model_class(
+            app_label="recruitment", model="recruitmentgeneralsetting"
+        )
+        if selected_company and selected_company != "all":
+            first = RecruitmentGeneralSetting.objects.filter(
+                company_id_id=selected_company
+            ).first()
+        else:
+            first = RecruitmentGeneralSetting.objects.filter(
+                company_id__isnull=True
+            ).first()
+    else:
+        first = None
+    if first:
+        portal_mail_enabled = first.send_candidate_portal_mail
+    return {"check_candidate_portal_mail": portal_mail_enabled}
+
+
+def check_default_meeting_provider(request):
+    """
+    This method is used to get which platform (Google Meet / Teams) is
+    configured as the default for creating interview meeting links.
+    """
+    default_meeting_provider = "google_meet"
+    selected_company = request.session.get("selected_company")
+    if apps.is_installed("recruitment"):
+        RecruitmentGeneralSetting = get_horilla_model_class(
+            app_label="recruitment", model="recruitmentgeneralsetting"
+        )
+        if selected_company and selected_company != "all":
+            first = RecruitmentGeneralSetting.objects.filter(
+                company_id_id=selected_company
+            ).first()
+        else:
+            first = RecruitmentGeneralSetting.objects.filter(
+                company_id__isnull=True
+            ).first()
+    else:
+        first = None
+    if first:
+        default_meeting_provider = first.default_meeting_provider
+    return {"check_default_meeting_provider": default_meeting_provider}
+
+
+def check_platform_conversion_widget(request):
+    """
+    This method is used to check enabled/disabled of the 'Platform
+    Conversion Rate' widget on the Recruitment Dashboard.
+    """
+    show_platform_conversion = True
+    selected_company = request.session.get("selected_company")
+    if apps.is_installed("recruitment"):
+        RecruitmentGeneralSetting = get_horilla_model_class(
+            app_label="recruitment", model="recruitmentgeneralsetting"
+        )
+        if selected_company and selected_company != "all":
+            first = RecruitmentGeneralSetting.objects.filter(
+                company_id_id=selected_company
+            ).first()
+        else:
+            first = RecruitmentGeneralSetting.objects.filter(
+                company_id__isnull=True
+            ).first()
+    else:
+        first = None
+    if first:
+        show_platform_conversion = first.show_platform_conversion
+    return {"check_platform_conversion_widget": show_platform_conversion}
+
+
 def get_initial_prefix(request):
     """
     This method is used to get the initial prefix

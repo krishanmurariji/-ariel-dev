@@ -6,7 +6,7 @@
 	role="dialog"
 	aria-labelledby="allocationModal"
 >
-	<div class="oh-modal__dialog oh-modal__dialog-process max-w-[900px]">
+	<div class="oh-modal__dialog oh-modal__dialog-process max-w-[1100px]">
 		<div class="oh-modal__dialog-header">
 			<span class="text-md font-semibold" id="addEmployeeModalLabel"
 				>{% trans "Allocation" %}</span
@@ -53,7 +53,7 @@
 </div>
 
 <div class="oh-modal" id="allocationModal" role="dialog" aria-labelledby="allocationModal" aria-hidden="true">
-  <div class="oh-modal__dialog oh-modal__dialog--custom oh-modal__dialog-process">
+  <div class="oh-modal__dialog oh-modal__dialog--custom oh-modal__dialog-process max-w-[1100px]">
     <div class="oh-modal__dialog-header">
       <span class="oh-modal__dialog-title" id="addEmployeeModalLabel">{% trans "Allocation" %}</span>
       <button class="oh-modal__close" aria-label="Close"><ion-icon name="close-outline"></ion-icon></button>
@@ -78,18 +78,26 @@
 
 
 <script>
-	$(document).on("htmx:afterOnLoad", function (event) {
-		$("[data-toggle='oh-modal-toggle']").click(function (e) {
+	// Delegated on document (bound once) instead of re-binding a fresh
+	// .click() handler on every htmx:afterOnLoad - the previous version
+	// stacked a new duplicate handler on every matching element each time
+	// ANY htmx request completed anywhere on the page, without ever
+	// unbinding the old ones. Pages with more htmx activity nearby (tabs
+	// with polling, nested fragment loads) accumulated many redundant
+	// handlers on the same button, causing flaky/inconsistent behavior
+	// that pages with less htmx traffic didn't show.
+	$(document)
+		.off("click.ohModalToggle", "[data-toggle='oh-modal-toggle']")
+		.on("click.ohModalToggle", "[data-toggle='oh-modal-toggle']", function (e) {
 			e.preventDefault();
 			let clickedEl = $(e.target).closest(
 				'[data-toggle = "oh-modal-toggle"]'
 			);
-			if (clickedEl != null) {
+			if (clickedEl.length) {
 				const targetEl = clickedEl.data("target");
 				$(targetEl).addClass("oh-modal--show");
 			}
 		});
-	});
 	{% comment %} function switchTab(e) {
 		let parentContainerEl = e.target.closest(".oh-tabs");
 		let tabElement = e.target.closest(".oh-tabs__tab");

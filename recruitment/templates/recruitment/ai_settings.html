@@ -1,0 +1,79 @@
+{% extends 'settings.html' %}
+{% load i18n %}
+{% block settings %}
+<h2 class="oh-inner-sidebar-content__title mb-3">{% trans "AI Settings" %}</h2>
+<p style="color: hsl(0deg, 0%, 40%); font-size: 13px; margin-top: -10px;">
+    {% trans "Choose which AI provider powers resume parsing, email intake, candidate scoring, and job description generation." %}
+</p>
+
+<div class="oh-switch mb-3" style="display: flex; align-items: center; gap: 10px; padding: 0.5rem 0;">
+    <span id="ollamaSwitchLabel" style="font-weight: 600;">{% trans "Ollama (Local)" %}</span>
+    <input
+        type="checkbox"
+        id="aiProviderSwitch"
+        class="oh-switch__checkbox"
+        {% if form.instance.provider == "openai" %}checked{% endif %}
+    >
+    <span id="openaiSwitchLabel">{% trans "OpenAI" %}</span>
+</div>
+
+<form method="post" data-settings-native="true">
+    {% csrf_token %}
+    <div style="display: none;">{{ form.provider }}</div>
+
+    <div id="openaiFieldsGroup">
+        <div class="oh-input-group mb-3">
+            <label class="oh-label" for="{{ form.openai_api_key.id_for_label }}">{{ form.openai_api_key.label }}</label>
+            {{ form.openai_api_key }}
+            {% if has_openai_key %}
+                <small style="color: hsl(0deg, 0%, 45%);">
+                    {% trans "A key is already saved. Leave blank to keep using it." %}
+                </small>
+            {% endif %}
+            {% for error in form.openai_api_key.errors %}
+                <small class="text-danger">{{ error }}</small>
+            {% endfor %}
+        </div>
+        <div class="oh-input-group mb-3">
+            <label class="oh-label" for="{{ form.openai_model.id_for_label }}">{{ form.openai_model.label }}</label>
+            {{ form.openai_model }}
+            <small style="color: hsl(0deg, 0%, 45%);">{% trans "e.g. gpt-4o-mini" %}</small>
+        </div>
+    </div>
+
+    <div id="ollamaFieldsGroup">
+        <div class="oh-input-group mb-3">
+            <label class="oh-label" for="{{ form.ollama_base_url.id_for_label }}">{{ form.ollama_base_url.label }}</label>
+            {{ form.ollama_base_url }}
+        </div>
+        <div class="oh-input-group mb-3">
+            <label class="oh-label" for="{{ form.ollama_model.id_for_label }}">{{ form.ollama_model.label }}</label>
+            {{ form.ollama_model }}
+        </div>
+    </div>
+
+    <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Save" %}</button>
+</form>
+
+<script>
+    function aiProviderChange(selectElement) {
+        var provider = selectElement && selectElement.val ? selectElement.val() : $("#id_provider").val();
+        var isOpenAI = provider === "openai";
+
+        $("#openaiFieldsGroup").toggle(isOpenAI);
+        $("#ollamaFieldsGroup").toggle(!isOpenAI);
+        $("#ollamaSwitchLabel, #openaiSwitchLabel").css("opacity", 1);
+        $(isOpenAI ? "#ollamaSwitchLabel" : "#openaiSwitchLabel").css("opacity", 0.5);
+    }
+
+    $(document).ready(function () {
+        aiProviderChange($("#id_provider"));
+
+        $("#aiProviderSwitch").on("change", function () {
+            var provider = this.checked ? "openai" : "ollama";
+            $("#id_provider").val(provider);
+            aiProviderChange($("#id_provider"));
+        });
+    });
+</script>
+{% endblock settings %}
