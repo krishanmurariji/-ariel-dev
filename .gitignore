@@ -60,6 +60,10 @@ local_settings.py
 TestDB_Horilla.sqlite3
 db.sqlite3
 db.sqlite3-journal
+ArielDb.sqlite3
+TestDB_backup.sqlite3
+TestDB_backup.sqlite3.*
+TestDB_threaded_test.sqlite3
 
 # Flask stuff:
 instance/

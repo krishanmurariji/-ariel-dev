@@ -6,9 +6,9 @@ name: Docker CI
 
 on:
   push:
-    branches: [dev/v2.0]
+    branches: [master]
   pull_request:
-    branches: [dev/v2.0]
+    branches: [master]
 
 env:
   COMPOSE_FILE: docker-compose.yml
@@ -66,6 +66,13 @@ jobs:
               python manage.py collectstatic --noinput
               python manage.py check
             "
+
+      - name: Run Django test suite
+        run: |
+          set -e
+          docker compose -f "$COMPOSE_FILE" run --rm --no-deps \
+            --entrypoint "" \
+            web sh -c "python manage.py test --noinput"
 
       - name: Start web (gunicorn) and wait for health
         run: |

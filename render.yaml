@@ -1,0 +1,41 @@
+# Render Blueprint — Render reads this automatically when you connect the repo
+# and choose "New Blueprint Instance". Deploys happen on every push to `master`
+# automatically; nothing in GitHub Actions is needed for CD, only for CI.
+services:
+  - type: web
+    name: arielhr
+    runtime: python
+    plan: free
+    branch: master
+    buildCommand: "pip install -r requirements.txt"
+    preDeployCommand: "python manage.py migrate --noinput && python manage.py collectstatic --noinput"
+    startCommand: "gunicorn horilla.wsgi:application --config docker/gunicorn.conf.py"
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        value: arielhr.onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://arielhr.onrender.com
+      - key: TIME_ZONE
+        value: Asia/Kolkata
+      # Neon Postgres — paste the connection string from your Neon dashboard.
+      - key: DATABASE_URL
+        sync: false
+      # Backblaze B2 (S3-compatible, free, no card required) — for uploaded
+      # files. Render's free web service has no persistent disk, so without
+      # this, uploads vanish on every deploy/restart.
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_STORAGE_BUCKET_NAME
+        sync: false
+      - key: AWS_S3_ENDPOINT_URL
+        sync: false
+      - key: MEDIA_URL
+        value: /media
+      - key: NAMESPACE
+        value: arielhr
