@@ -1,0 +1,117 @@
+{% load i18n %}
+<div id="addCandidateFormContainer">
+    {% include "generic/horilla_form.html" %}
+</div>
+
+<script>
+    (function () {
+        var $resumeInput = $("#addCandidateFormContainer #id_resume");
+        if (!$resumeInput.length) {
+            return;
+        }
+
+        var $wrapper = $("#addCandidateFormContainer #dynamic_field_resume");
+        var $btn = $(
+            '<button type="button" id="candidateAiAutofillBtn" ' +
+            'class="oh-btn oh-btn--light-primary w-100 mt-2" disabled>' +
+            '<ion-icon name="sparkles-outline" class="me-1"></ion-icon>' +
+            '<span id="candidateAiAutofillBtnLabel">{% trans "Autofill with AI" %}</span>' +
+            '</button>'
+        );
+        var $message = $(
+            '<div id="candidateAiAutofillMessage" class="small mt-1" style="display:none;"></div>'
+        );
+        $wrapper.append($btn).append($message);
+
+        function getCookie(name) {
+            var cookieValue = null;
+            if (document.cookie && document.cookie !== "") {
+                var cookies = document.cookie.split(";");
+                for (var i = 0; i < cookies.length; i++) {
+                    var cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === name + "=") {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        function showMessage(text, isError) {
+            $message
+                .css("color", isError ? "#dc3545" : "#28a745")
+                .text(text)
+                .show();
+        }
+
+        // The button is an explicit, re-clickable "fill from this resume"
+        // action (unlike the public application form, which only prefills
+        // once on page load) - so picking a different resume and clicking
+        // again is expected to replace whatever the previous resume filled
+        // in, not just fill blanks. Only skips a field the backend couldn't
+        // validate, never one that already has a value.
+        function fillField(name, field) {
+            if (!field || !field.valid || !field.value) {
+                return;
+            }
+            var $el = $("#addCandidateFormContainer [name='" + name + "']");
+            if ($el.length) {
+                $el.val(field.value).trigger("change");
+            }
+        }
+
+        $resumeInput.on("change", function () {
+            $btn.prop("disabled", !(this.files && this.files.length));
+            $message.hide().text("");
+        });
+
+        $btn.on("click", function () {
+            var file = $resumeInput[0].files[0];
+            if (!file) {
+                return;
+            }
+            $btn.prop("disabled", true);
+            $("#candidateAiAutofillBtnLabel").text("{% trans 'Analyzing resume...' %}");
+            $message.hide().text("");
+
+            var formData = new FormData();
+            formData.append("resume", file);
+
+            $.ajax({
+                url: "{% url 'resume-ai-autofill' %}",
+                type: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: { "X-CSRFToken": getCookie("csrftoken") },
+                success: function (response) {
+                    if (response.error) {
+                        showMessage(response.error, true);
+                        return;
+                    }
+                    var fields = response.fields || {};
+                    fillField("name", fields.name);
+                    fillField("email", fields.email);
+                    fillField("mobile", fields.mobile);
+                    fillField("gender", fields.gender);
+                    showMessage(
+                        "{% trans 'Form filled from the resume - please review before saving.' %}",
+                        false
+                    );
+                },
+                error: function (xhr) {
+                    var message = "{% trans 'Something went wrong analyzing the resume. Please fill the form in manually.' %}";
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        message = xhr.responseJSON.error;
+                    }
+                    showMessage(message, true);
+                },
+                complete: function () {
+                    $btn.prop("disabled", false);
+                    $("#candidateAiAutofillBtnLabel").text("{% trans 'Autofill with AI' %}");
+                }
+            });
+        });
+    })();
+</script>

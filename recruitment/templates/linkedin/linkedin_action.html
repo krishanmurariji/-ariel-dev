@@ -1,5 +1,14 @@
 {% load i18n %}
 <div onclick="event.stopPropagation();" class="oh-btn-group">
+    {% if perms.recruitment.change_linkedinaccount %}
+    <a
+      class="oh-btn oh-btn--light-bkg w-100"
+      title="{% if instance.is_connected %}{% trans 'Reconnect with LinkedIn' %}{% else %}{% trans 'Connect with LinkedIn' %}{% endif %}"
+      href="{% url 'linkedin-login' instance.id %}"
+    >
+      <ion-icon name="logo-linkedin"></ion-icon>
+    </a>
+    {% endif %}
     <button
       class="oh-btn oh-btn--light-bkg w-100"
       title="{% trans 'Check Connection' %}"

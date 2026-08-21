@@ -1,0 +1,64 @@
+{% load i18n %}
+{% include "onboarding/stepper/_nav.html" %}
+{% include "onboarding/stepper/_messages.html" %}
+<div class="oh-step">
+  <div class="oh-step__header">
+    <ion-icon name="rocket-outline" class="oh-step__icon"></ion-icon>
+    <div>
+      <h4 class="m-0">{% trans "Finalize" %}</h4>
+    </div>
+  </div>
+
+  <form method="post" action="{% url 'email-send' %}">
+    {% csrf_token %}
+    <input type="hidden" name="ids" value="{{ candidate.pk }}">
+    <input type="hidden" name="next" value="{% url 'candidates-view' %}">
+    <div class="oh-step__body">
+      <div class="oh-finalize-preview">
+        <div class="oh-finalize-card">
+          <div class="oh-finalize-card__title"><ion-icon name="hand-left-outline"></ion-icon> {% trans "Welcome Message" %}</div>
+          <p class="m-0">{{ detail.welcome_message|default:"—" }}</p>
+        </div>
+        <div class="oh-finalize-card">
+          <div class="oh-finalize-card__title"><ion-icon name="briefcase-outline"></ion-icon> {% trans "Role" %}</div>
+          <p class="m-0">{{ candidate.get_job_position|default:"—" }} &middot; {{ detail.department_id|default:"—" }}</p>
+          <p class="oh-text-light small m-0">{% trans "Reports to" %} {{ detail.reporting_manager_id|default:"—" }}</p>
+          <p class="oh-text-light small m-0">{% trans "Buddy" %}: {{ detail.buddy_id|default:"—" }}</p>
+        </div>
+        <div class="oh-finalize-card">
+          <div class="oh-finalize-card__title"><ion-icon name="checkbox-outline"></ion-icon> {% trans "Checklists" %}</div>
+          <p class="m-0">{{ pre_joining_count }} {% trans "pre-joining tasks" %} &middot; {{ post_joining_count }} {% trans "post-joining tasks" %}</p>
+        </div>
+        <div class="oh-finalize-card">
+          <div class="oh-finalize-card__title"><ion-icon name="document-attach-outline"></ion-icon> {% trans "Documents" %}</div>
+          {% if mandatory_requests %}
+          <ul class="m-0 ps-3">
+            {% for req in mandatory_requests %}
+            <li>{{ req.title }}</li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="oh-text-light m-0">{% trans "No mandatory documents requested." %}</p>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if portal_sent %}
+      <div class="oh-alert oh-alert--success mb-3">
+        <ion-icon name="checkmark-circle-outline"></ion-icon>
+        {% trans "Onboarding invite sent. The candidate can now set their password and complete their portal." %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="oh-step__footer">
+      <button type="button" class="oh-btn oh-btn--light"
+        hx-get="{% url 'onboarding-stepper-step' candidate.pk back_key %}"
+        hx-target="#stepperContent" hx-swap="innerHTML">
+        <ion-icon name="arrow-back-outline"></ion-icon> {% trans "Back" %}
+      </button>
+      <button type="submit" class="oh-btn oh-btn--secondary">
+        <ion-icon name="paper-plane-outline"></ion-icon> {% trans "Start Onboarding" %}
+      </button>
+    </div>
+  </form>
+</div>

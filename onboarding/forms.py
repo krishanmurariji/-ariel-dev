@@ -45,13 +45,27 @@ from employee.models import (
 from horilla_auth.models import HorillaUser
 from horilla_widgets.widgets.horilla_multi_select_field import HorillaMultiSelectField
 from horilla_widgets.widgets.select_widgets import HorillaMultiSelectWidget
+from base.forms import Form as HorillaForm
+from base.forms import ModelForm as HorillaModelForm
+from base.models import (
+    Department,
+    EmployeeShift,
+    EmployeeType,
+    JobPosition,
+    JobRole,
+    WorkType,
+)
 from onboarding.models import (
+    CandidateChecklistTask,
     CandidateStage,
     CandidateTask,
+    OnboardingCandidateDetail,
     OnboardingStage,
     OnboardingTask,
+    TaskTemplate,
+    TaskTemplateTask,
 )
-from recruitment.models import Candidate
+from recruitment.models import FORMATS, Candidate
 
 
 class UserCreationFormCustom(UserForm):
@@ -637,3 +651,206 @@ class StageChangeForm(forms.ModelForm):
                     % {"tasks": task_titles}
                 )
         return cleaned_data
+
+
+# ── Start Onboarding stepper ─────────────────────────────────────────────
+
+
+class WelcomeMessageForm(HorillaModelForm):
+    """
+    Step 1 - Welcome. Also carries the Offer Letter status + document, so
+    this step isn't just a bare textarea.
+    """
+
+    offer_letter_status = forms.ChoiceField(
+        choices=Candidate.offer_letter_statuses,
+        required=False,
+        label=_("Offer Letter Status"),
+        widget=forms.Select(attrs={"class": "oh-select oh-select-2"}),
+    )
+
+    class Meta:
+        model = OnboardingCandidateDetail
+        fields = ["welcome_message", "offer_letter"]
+        widgets = {
+            "welcome_message": forms.Textarea(
+                attrs={"rows": 6, "placeholder": _("Write a welcome note...")}
+            ),
+        }
+        labels = {
+            "offer_letter": _("Offer Letter Document"),
+        }
+
+
+def _choice_field(queryset, label_field, label, required=False):
+    """
+    Builds a plain ChoiceField off a "settings" queryset, matching the
+    "---Choose X---" empty-option convention used across the app (see
+    employee.forms.EmployeeWorkInformationForm).
+    """
+    choices = [("", _("---Choose %(label)s---") % {"label": label})] + list(
+        queryset.values_list("id", label_field)
+    )
+    return forms.ChoiceField(
+        choices=choices,
+        required=required,
+        label=label,
+        widget=forms.Select(attrs={"class": "oh-select oh-select-2"}),
+    )
+
+
+class OnboardingDetailsForm(HorillaForm):
+    """
+    Step 2 - Onboarding Details. Spans two models (existing fields on
+    Candidate + the new OnboardingCandidateDetail), so this is a plain Form;
+    the view is responsible for writing each field to the right place.
+    """
+
+    job_position_id = forms.ChoiceField(
+        label=_("Job Position"),
+        required=False,
+        widget=forms.Select(attrs={"class": "oh-select oh-select-2"}),
+    )
+    department_id = forms.ChoiceField(label=_("Department"), required=False)
+    job_role_id = forms.ChoiceField(label=_("Job Role"), required=False)
+    reporting_manager_id = forms.ChoiceField(
+        label=_("Reporting Manager"), required=False
+    )
+    shift_id = forms.ChoiceField(label=_("Shift"), required=False)
+    work_type_id = forms.ChoiceField(label=_("Work Type"), required=False)
+    employee_type_id = forms.ChoiceField(label=_("Employee Type"), required=False)
+    date_of_joining = forms.DateField(
+        required=False,
+        label=_("Date of joining"),
+        widget=forms.DateInput(attrs={"type": "date", "class": "oh-input w-100"}),
+    )
+    probation_period = forms.IntegerField(
+        required=False,
+        min_value=0,
+        label=_("Probation period (months)"),
+        widget=forms.NumberInput(attrs={"class": "oh-input w-100"}),
+    )
+    buddy_id = forms.ChoiceField(label=_("Buddy"), required=False)
+
+    def __init__(self, *args, exclude_employee_id=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["job_position_id"] = _choice_field(
+            JobPosition.objects.filter(is_active=True), "job_position", _("Job Position")
+        )
+        self.fields["department_id"] = _choice_field(
+            Department.objects.filter(is_active=True), "department", _("Department")
+        )
+        self.fields["job_role_id"] = _choice_field(
+            JobRole.objects.filter(is_active=True), "job_role", _("Job Role")
+        )
+        employees = Employee.objects.filter(is_active=True)
+        if exclude_employee_id:
+            employees = employees.exclude(pk=exclude_employee_id)
+        employee_choices = [("", _("---Choose Employee---"))] + [
+            (emp.pk, emp.get_full_name()) for emp in employees
+        ]
+        self.fields["reporting_manager_id"] = forms.ChoiceField(
+            choices=[("", _("---Choose Reporting Manager---"))] + employee_choices[1:],
+            required=False,
+            label=_("Reporting Manager"),
+            widget=forms.Select(attrs={"class": "oh-select oh-select-2"}),
+        )
+        self.fields["buddy_id"] = forms.ChoiceField(
+            choices=[("", _("---Choose Buddy---"))] + employee_choices[1:],
+            required=False,
+            label=_("Buddy"),
+            widget=forms.Select(attrs={"class": "oh-select oh-select-2"}),
+        )
+        self.fields["shift_id"] = _choice_field(
+            EmployeeShift.objects.filter(is_active=True), "employee_shift", _("Shift")
+        )
+        self.fields["work_type_id"] = _choice_field(
+            WorkType.objects.filter(is_active=True), "work_type", _("Work Type")
+        )
+        self.fields["employee_type_id"] = _choice_field(
+            EmployeeType.objects.filter(is_active=True),
+            "employee_type",
+            _("Employee Type"),
+        )
+
+
+class TaskTemplateForm(HorillaModelForm):
+    """
+    Task Group header - the tasks within it are managed via
+    TaskTemplateTaskFormSet on the same page.
+    """
+
+    class Meta:
+        model = TaskTemplate
+        fields = ["title", "description"]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 2}),
+        }
+
+
+TaskTemplateTaskFormSet = forms.inlineformset_factory(
+    TaskTemplate,
+    TaskTemplateTask,
+    fields=["title", "description", "is_mandatory", "requires_proof", "sequence"],
+    widgets={
+        "title": forms.TextInput(
+            attrs={"class": "oh-input w-100", "placeholder": _("Task title")}
+        ),
+        "description": forms.TextInput(
+            attrs={"class": "oh-input w-100", "placeholder": _("Description (optional)")}
+        ),
+        "is_mandatory": forms.CheckboxInput(attrs={"class": "oh-switch__checkbox"}),
+        "requires_proof": forms.CheckboxInput(attrs={"class": "oh-switch__checkbox"}),
+        "sequence": forms.HiddenInput(attrs={"class": "task-sequence-input"}),
+    },
+    extra=1,
+    can_delete=False,
+)
+
+
+class ChecklistTemplateSelectForm(HorillaForm):
+    """
+    Shared by both the Pre-Joining and Post-Joining checklist steps -
+    picking template(s) here drives which TaskTemplateTask rows get shown
+    for assignment.
+    """
+
+    templates = forms.ModelMultipleChoiceField(
+        queryset=TaskTemplate.objects.all(),
+        label=_("Task Groups"),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+
+class OnboardingDocumentRequestForm(HorillaForm):
+    """
+    Document Verification step - creates a CandidateDocumentRequest scoped
+    to one candidate (candidate_id is set by the view, not shown here).
+    """
+
+    title = forms.CharField(
+        label=_("Document Title"),
+        widget=forms.TextInput(attrs={"class": "oh-input w-100"}),
+    )
+    format = forms.ChoiceField(
+        choices=FORMATS,
+        label=_("Accepted Format"),
+        widget=forms.Select(attrs={"class": "oh-select oh-select-2"}),
+    )
+    max_size = forms.IntegerField(
+        required=False,
+        min_value=1,
+        label=_("Max Size (MB)"),
+        widget=forms.NumberInput(attrs={"class": "oh-input w-100"}),
+    )
+    is_mandatory = forms.BooleanField(
+        required=False,
+        label=_("Mandatory"),
+        widget=forms.CheckboxInput(attrs={"class": "oh-switch__checkbox"}),
+    )
+    description = forms.CharField(
+        required=False,
+        label=_("Description"),
+        widget=forms.Textarea(attrs={"rows": 2, "class": "oh-input w-100"}),
+    )

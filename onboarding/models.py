@@ -5,10 +5,12 @@ This module is used to register models for onboarding app
 
 """
 
+import os
 from ast import literal_eval
 from datetime import datetime
 from urllib.parse import urlencode
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -16,6 +18,7 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from base.horilla_company_manager import HorillaCompanyManager
+from base.models import Company, Department, EmployeeShift, EmployeeType, JobRole, WorkType
 from employee.models import Employee
 from horilla.models import HorillaModel
 from horilla_audit.models import HorillaAuditInfo, HorillaAuditLog
@@ -288,3 +291,287 @@ class OnboardingPortal(HorillaModel):
 
     def __str__(self):
         return f"{self.candidate_id} | {self.token}"
+
+
+def validate_proof_file(value):
+    """
+    Proof-of-completion uploads accept documents, images, or short clips -
+    nothing else exists in the codebase for this combined allowlist, so this
+    mirrors recruitment.models.validate_pdf's extension-check style.
+    """
+    allowed = {".pdf", ".jpg", ".jpeg", ".png", ".mp4", ".mov", ".mkv"}
+    ext = os.path.splitext(value.name)[1].lower()
+    if ext not in allowed:
+        raise DjangoValidationError(
+            _("Proof must be a PDF, image (jpg/png), or video (mp4/mov/mkv) file.")
+        )
+
+
+class TaskTemplate(HorillaModel):
+    """
+    A Task Group: a reusable, named set of onboarding tasks (e.g.
+    "Recruitment Survey"), assignable to candidates from both the
+    Pre-Joining and Post-Joining checklist steps.
+    """
+
+    title = models.CharField(
+        max_length=100, unique=True, verbose_name=_("Group Name")
+    )
+    description = models.TextField(blank=True, null=True, verbose_name=_("Description"))
+    company_id = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name=_("Company"),
+    )
+    objects = HorillaCompanyManager("company_id")
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        """
+        Meta class for additional options
+        """
+
+        verbose_name = _("Task Group")
+        verbose_name_plural = _("Task Groups")
+
+
+class TaskTemplateTask(HorillaModel):
+    """
+    A single task belonging to a Task Group (TaskTemplate).
+    """
+
+    template_id = models.ForeignKey(
+        TaskTemplate,
+        on_delete=models.CASCADE,
+        related_name="tasks",
+        verbose_name=_("Task Group"),
+    )
+    title = models.CharField(max_length=200, verbose_name=_("Task Title"))
+    description = models.TextField(blank=True, null=True, verbose_name=_("Description"))
+    is_mandatory = models.BooleanField(default=True, verbose_name=_("Mandatory"))
+    requires_proof = models.BooleanField(
+        default=False, verbose_name=_("Requires Proof of Completion")
+    )
+    sequence = models.IntegerField(default=0, verbose_name=_("Priority"))
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        """
+        Meta class for additional options
+        """
+
+        verbose_name = _("Task")
+        verbose_name_plural = _("Tasks")
+        ordering = ["sequence", "id"]
+
+
+class CandidateChecklistTask(HorillaModel):
+    """
+    A per-candidate instance of a TaskTemplateTask, created when a Task
+    Group is assigned from the Start Onboarding stepper's Pre-Joining or
+    Post-Joining checklist step.
+
+    Every task has exactly one assignee - the person who does the work and
+    updates its status - plus an optional "ask candidate for feedback"
+    switch. There is no second/verifying person: the only other party who
+    could ever be involved is the candidate themself, and that's handled by
+    the feedback switch, not a second assignee dropdown.
+    """
+
+    PHASE_CHOICES = [
+        ("pre_joining", _("Pre-Joining")),
+        ("post_joining", _("Post-Joining")),
+    ]
+    STATUS_CHOICES = [
+        ("todo", _("Todo")),
+        ("scheduled", _("Scheduled")),
+        ("ongoing", _("Ongoing")),
+        ("stuck", _("Stuck")),
+        ("done", _("Done")),
+    ]
+
+    candidate_id = models.ForeignKey(
+        Candidate,
+        on_delete=models.CASCADE,
+        related_name="checklist_tasks",
+        verbose_name=_("Candidate"),
+    )
+    template_task_id = models.ForeignKey(
+        TaskTemplateTask,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="candidate_tasks",
+        verbose_name=_("Template Task"),
+    )
+    title = models.CharField(max_length=200, verbose_name=_("Task"))
+    phase = models.CharField(
+        max_length=15, choices=PHASE_CHOICES, verbose_name=_("Phase")
+    )
+    assignee_id = models.ForeignKey(
+        Employee,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="checklist_tasks",
+        verbose_name=_("Assigned To"),
+    )
+    requires_feedback = models.BooleanField(
+        default=False, verbose_name=_("Response Required")
+    )
+    is_mandatory = models.BooleanField(
+        default=True,
+        verbose_name=_("Mandatory"),
+        help_text=_(
+            "Copied from the Task Group's task when assigned, then editable "
+            "per candidate without changing the shared template."
+        ),
+    )
+    requires_proof = models.BooleanField(
+        default=False, verbose_name=_("Requires Proof of Completion")
+    )
+    candidate_feedback = models.TextField(
+        null=True, blank=True, verbose_name=_("Candidate Feedback")
+    )
+    candidate_feedback_at = models.DateTimeField(null=True, blank=True)
+    candidate_satisfied = models.BooleanField(
+        default=False,
+        verbose_name=_("Candidate Satisfied"),
+        help_text=_(
+            "Only meaningful once the task is Done and Response Required is "
+            "on - whether the candidate confirmed they're satisfied with "
+            "how this task was handled."
+        ),
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="todo",
+        verbose_name=_("Status"),
+    )
+    status_updated_at = models.DateTimeField(
+        null=True, blank=True, verbose_name=_("Status Last Updated")
+    )
+    proof_file = models.FileField(
+        upload_to="onboarding/task_proof",
+        null=True,
+        blank=True,
+        validators=[validate_proof_file],
+        verbose_name=_("Proof of Completion"),
+    )
+    completed_at = models.DateTimeField(null=True, blank=True)
+    objects = HorillaCompanyManager("candidate_id__recruitment_id__company_id")
+
+    def __str__(self):
+        return f"{self.candidate_id} | {self.title}"
+
+    class Meta:
+        """
+        Meta class for additional options
+        """
+
+        verbose_name = _("Candidate Checklist Task")
+        verbose_name_plural = _("Candidate Checklist Tasks")
+
+
+class OnboardingCandidateDetail(HorillaModel):
+    """
+    Staging area for the "Onboarding Details" step of the Start Onboarding
+    stepper - only fields that don't already exist on `Candidate`. Kept as
+    its own OneToOne rather than added onto `recruitment.Candidate` directly,
+    so this feature's data stays self-contained in the `onboarding` app.
+    """
+
+    candidate_id = models.OneToOneField(
+        Candidate,
+        on_delete=models.CASCADE,
+        related_name="onboarding_detail",
+        verbose_name=_("Candidate"),
+    )
+    welcome_message = models.TextField(blank=True, null=True, verbose_name=_("Welcome Message"))
+    department_id = models.ForeignKey(
+        Department,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_("Department"),
+    )
+    job_role_id = models.ForeignKey(
+        JobRole,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_("Job Role"),
+    )
+    reporting_manager_id = models.ForeignKey(
+        Employee,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="onboarding_reportees",
+        verbose_name=_("Reporting Manager"),
+    )
+    shift_id = models.ForeignKey(
+        EmployeeShift,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_("Shift"),
+    )
+    work_type_id = models.ForeignKey(
+        WorkType,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_("Work Type"),
+    )
+    employee_type_id = models.ForeignKey(
+        EmployeeType,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_("Employee Type"),
+    )
+    probation_period = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name=_("Probation Period (months)")
+    )
+    offer_letter = models.FileField(
+        upload_to="onboarding/offer_letters",
+        null=True,
+        blank=True,
+        verbose_name=_("Offer Letter"),
+    )
+    buddy_id = models.ForeignKey(
+        Employee,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="onboarding_buddy_for",
+        verbose_name=_("Buddy"),
+    )
+    furthest_step_key = models.CharField(
+        max_length=20,
+        default="welcome",
+        verbose_name=_("Furthest Reached Step"),
+        help_text=_(
+            "The furthest stepper step this candidate has actually reached. "
+            "Nav items beyond this stay locked so the flow can't be jumped "
+            "past without going through each step in order."
+        ),
+    )
+    objects = HorillaCompanyManager("candidate_id__recruitment_id__company_id")
+
+    def __str__(self):
+        return f"{self.candidate_id}"
+
+    class Meta:
+        """
+        Meta class for additional options
+        """
+
+        verbose_name = _("Onboarding Candidate Detail")

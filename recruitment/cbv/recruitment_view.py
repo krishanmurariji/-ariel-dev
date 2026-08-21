@@ -337,6 +337,36 @@ class RecruitmentForm(HorillaFormView):
             self.form_class.verbose_name = "Edit Recruitment"
         return context
 
+    @staticmethod
+    def _linkedin_content_signature(pk):
+        """
+        A cheap fingerprint of everything that actually shows up in a
+        LinkedIn post for this recruitment (title, description, company,
+        vacancy count, skills). Used to tell a save that changed one of
+        these from a save that didn't, so editing something unrelated
+        (interviewers, dates, ...) while "Post on LinkedIn" is on doesn't
+        burn a delete+publish round trip against LinkedIn's API on every
+        save - repeatedly doing that is what was tripping LinkedIn's rate
+        limiting (a 429) on frequently-edited jobs.
+        """
+        row = Recruitment.objects.filter(pk=pk).values(
+            "title", "description", "company_id", "vacancy"
+        ).first()
+        if not row:
+            return None
+        skill_ids = tuple(
+            Recruitment.objects.get(pk=pk).skills.order_by("id").values_list(
+                "id", flat=True
+            )
+        )
+        return (
+            row["title"],
+            row["description"],
+            row["company_id"],
+            row["vacancy"],
+            skill_ids,
+        )
+
     def form_valid(self, form: RecruitmentCreationFormExtended) -> HttpResponse:
         """
         Process form submission to save or update a Recruitment object and display success message.
@@ -344,6 +374,7 @@ class RecruitmentForm(HorillaFormView):
         targets_to_reload = []
 
         if form.instance.pk:
+            previous_signature = self._linkedin_content_signature(form.instance.pk)
             recruitment = form.save()
             recruitment_managers = self.request.POST.getlist("recruitment_managers")
             if recruitment_managers:
@@ -351,10 +382,23 @@ class RecruitmentForm(HorillaFormView):
             recruitment_heads = self.request.POST.getlist("recruitment_heads")
             recruitment.recruitment_heads.set(recruitment_heads)
             if recruitment.publish_in_linkedin and recruitment.linkedin_account_id:
-                delete_post(recruitment)
-                post_recruitment_in_linkedin(
-                    self.request, recruitment, recruitment.linkedin_account_id
+                never_posted = not recruitment.linkedin_post_id
+                content_changed = never_posted or (
+                    self._linkedin_content_signature(recruitment.pk)
+                    != previous_signature
                 )
+                if content_changed:
+                    # Publish the refreshed post first and only remove the
+                    # old one once that succeeds - if LinkedIn rate-limits
+                    # or otherwise rejects the new post, the job keeps
+                    # showing its last-published (still valid) post instead
+                    # of ending up with none.
+                    old_post_id = recruitment.linkedin_post_id
+                    published = post_recruitment_in_linkedin(
+                        self.request, recruitment, recruitment.linkedin_account_id
+                    )
+                    if published and old_post_id:
+                        delete_post(recruitment, post_id=old_post_id)
             message = _("Recruitment Updated Successfully")
         else:
             recruitment = form.save()
@@ -391,6 +435,7 @@ class AddCandidateFormView(HorillaFormView):
     form_class = AddCandidateForm
     model = Candidate
     new_display_title = _("Add Candidate")
+    template_name = "cbv/candidates/add_candidate_form.html"
 
     def get_initial(self) -> dict:
         initial = super().get_initial()

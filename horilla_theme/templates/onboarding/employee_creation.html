@@ -88,7 +88,7 @@
                             </li>
                         </ul>
                     </div>
-                    <form method="post">
+                    <form method="post" enctype="multipart/form-data">
                         {% csrf_token %}
                         <div class="oh-onboarding-card__address-group">
                             <h2 class="oh-onboarding-card__section-title">{% trans "Personal Details" %}</h2>
@@ -371,6 +371,42 @@
                                 </div>
                             </div>
                         </div>
+
+                        {% if document_requests %}
+                        <div class="oh-onboarding-card__address-group mt-3">
+                            <h2 class="oh-onboarding-card__section-title">{% trans "Documents" %}</h2>
+                            <p style="color:#888; font-size:0.85rem; margin-top:-8px;">
+                                {% trans "Upload the documents requested by HR. Documents marked Required must be uploaded before you can continue." %}
+                            </p>
+                            <div class="row">
+                                {% for doc_request, submitted_doc in document_rows %}
+                                <div class="col-sm-12 col-md-6 col-lg-6">
+                                    <div class="oh-input-group" style="border:1px solid #e5e5e5; border-radius:8px; padding:12px; margin-bottom:12px;">
+                                        <label class="oh-label d-flex align-items-center gap-1">
+                                            <ion-icon name="document-text-outline"></ion-icon>
+                                            {{ doc_request.title }}
+                                            {% if doc_request.is_mandatory %}
+                                            <span style="background:#f3ddd7; color:#b3402f; font-size:0.62rem; padding:2px 8px; border-radius:20px; text-transform:uppercase;">{% trans "Required" %}</span>
+                                            {% endif %}
+                                        </label>
+                                        {% if doc_request.description %}
+                                        <p style="color:#888; font-size:0.78rem;">{{ doc_request.description }}</p>
+                                        {% endif %}
+                                        <input type="file" name="doc_request_{{ doc_request.pk }}" class="oh-input w-100">
+                                        {% if submitted_doc %}
+                                        <p style="color:#3e7d4f; font-size:0.78rem; margin-top:6px; margin-bottom:4px;">
+                                            <ion-icon name="checkmark-circle-outline"></ion-icon> {% trans "Uploaded" %}
+                                        </p>
+                                        <iframe src="{{ submitted_doc.document.url }}" style="width:100%; height:220px; border:1px solid #e5e5e5; border-radius:6px;"></iframe>
+                                        <a href="{{ submitted_doc.document.url }}" target="_blank" style="font-size:0.75rem;">{% trans "Open full preview" %}</a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
                         <button
                             href="#"
                             style="background-color: {{ theme_obj.primary_600 }}; color: {{ theme_obj.secondary_100 }}"

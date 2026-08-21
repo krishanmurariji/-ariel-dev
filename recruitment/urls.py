@@ -1004,6 +1004,11 @@ urlpatterns = [
         name="candidate-document-reject",
     ),
     path(
+        "candidate-document-under-verification/<int:id>/",
+        views.document_mark_under_verification,
+        name="candidate-document-under-verification",
+    ),
+    path(
         "candidate-document-delete/<int:id>/",
         views.document_delete,
         name="candidate-document-delete",
@@ -1100,6 +1105,16 @@ urlpatterns = [
         "update-isactive-linkedin-account/<int:obj_id>/",
         linkedin.update_isactive_linkedin,
         name="update-isactive-linkedin-account",
+    ),
+    path(
+        "linkedin-login/<int:pk>/",
+        linkedin.linkedin_login,
+        name="linkedin-login",
+    ),
+    path(
+        "linkedin-callback/",
+        linkedin.linkedin_callback,
+        name="linkedin-callback",
     ),
     path(
         "val-linkedin/<int:pk>/", linkedin.validate_linkedin_token, name="val-linkedin"

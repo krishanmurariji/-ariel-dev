@@ -1,0 +1,38 @@
+{% load i18n %}
+{% include "onboarding/stepper/_nav.html" %}
+{% include "onboarding/stepper/_messages.html" %}
+<div class="oh-step">
+  <div class="oh-step__header">
+    <ion-icon name="hand-left-outline" class="oh-step__icon"></ion-icon>
+    <div>
+      <h4 class="m-0">{% trans "Offer Letter & Welcome Message" %}</h4>
+    </div>
+  </div>
+  <form
+    hx-post="{% url 'onboarding-stepper-step' candidate.pk 'welcome' %}"
+    hx-target="#stepperContent"
+    hx-swap="innerHTML"
+    hx-encoding="multipart/form-data">
+    {% csrf_token %}
+    <div class="oh-step__body">
+      <div class="oh-field">
+        <label>{% trans "Welcome Message" %}</label>
+        {{ form.welcome_message }}
+      </div>
+      <div class="oh-step-grid mt-3">
+        <div class="oh-field">
+          <label>{{ form.offer_letter_status.label }}</label>
+          {{ form.offer_letter_status }}
+        </div>
+        <div class="oh-field">
+          <label>{{ form.offer_letter.label }}</label>
+          {{ form.offer_letter }}
+        </div>
+      </div>
+    </div>
+    <div class="oh-step__footer">
+      <span></span>
+      <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Next" %} <ion-icon name="arrow-forward-outline"></ion-icon></button>
+    </div>
+  </form>
+</div>

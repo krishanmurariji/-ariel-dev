@@ -947,8 +947,9 @@ class AddCandidateForm(ModelForm):
             self.fields["job_position_id"].queryset = recruitment.open_positions
         self.fields["profile"].widget.attrs["accept"] = ".jpg, .jpeg, .png"
         self.fields["resume"].widget.attrs["accept"] = ".pdf"
-        if recruitment.optional_profile_image:
-            self.fields["profile"].required = False
+        # Profile photo is never required on this internal quick-add form,
+        # regardless of the recruitment's optional_profile_image setting.
+        self.fields["profile"].required = False
         if recruitment.optional_resume:
             self.fields["resume"].required = False
         self.fields["gender"].empty_label = None
@@ -1873,10 +1874,14 @@ class LinkedInAccountForm(BaseModelForm):
         fields = [
             "username",
             "email",
-            "api_token",
+            "client_id",
+            "client_secret",
             "is_active",
             "company_id",
         ]
+        widgets = {
+            "client_secret": forms.PasswordInput(render_value=True),
+        }
 
 
 class CandidateIntakeMailboxForm(BaseModelForm):

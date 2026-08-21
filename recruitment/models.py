@@ -2259,7 +2259,9 @@ class Resume(models.Model):
 
 STATUS = [
     ("requested", "Requested"),
-    ("approved", "Approved"),
+    ("submitted", "Submitted"),
+    ("under_verification", "Under Verification"),
+    ("approved", "Verified"),
     ("rejected", "Rejected"),
 ]
 
@@ -2282,6 +2284,7 @@ class CandidateDocumentRequest(HorillaModel):
     max_size = models.IntegerField(
         blank=True, null=True, verbose_name=_("Max size (In MB)")
     )
+    is_mandatory = models.BooleanField(default=False, verbose_name=_("Mandatory"))
     description = models.TextField(blank=True, null=True, verbose_name=_("Description"))
     objects = HorillaCompanyManager(
         related_company_field="candidate_id__recruitment_id__company_id"
@@ -2301,7 +2304,7 @@ class CandidateDocument(HorillaModel):
     )
     document = models.FileField(upload_to=upload_path, null=True)
     status = models.CharField(
-        choices=STATUS, max_length=10, default="requested", verbose_name=_("Status")
+        choices=STATUS, max_length=20, default="requested", verbose_name=_("Status")
     )
     reject_reason = models.TextField(
         blank=True, null=True, max_length=255, verbose_name=_("Reject Reason")
@@ -2341,8 +2344,19 @@ class CandidateDocument(HorillaModel):
 class LinkedInAccount(HorillaModel):
     username = models.CharField(max_length=250, verbose_name=_("App Name"))
     email = models.EmailField(max_length=254, verbose_name=_("Email"))
-    api_token = models.CharField(max_length=500, verbose_name=_("API Token"))
-    sub_id = models.CharField(max_length=250, unique=True)
+    client_id = models.CharField(
+        max_length=250, blank=True, verbose_name=_("Client ID")
+    )
+    client_secret = models.CharField(
+        max_length=500, blank=True, verbose_name=_("Client Secret")
+    )
+    # Populated automatically by the OAuth "Connect with LinkedIn" flow
+    # (recruitment/views/linkedin.py linkedin_login/linkedin_callback) —
+    # no longer entered manually.
+    api_token = models.CharField(max_length=500, blank=True, null=True)
+    sub_id = models.CharField(max_length=250, unique=True, blank=True, null=True)
+    # Temporary CSRF/lookup value for one in-flight OAuth authorization.
+    oauth_state = models.CharField(max_length=250, blank=True, null=True)
     company_id = models.ForeignKey(
         Company, on_delete=models.CASCADE, null=True, verbose_name=_("Company")
     )
@@ -2356,6 +2370,9 @@ class LinkedInAccount(HorillaModel):
 
     def clean(self, *args, **kwargs):
         super().clean(*args, **kwargs)
+        # Nothing to verify yet before the OAuth "Connect" step has run.
+        if not self.api_token:
+            return
         url = "https://api.linkedin.com/v2/userinfo"
         headers = {"Authorization": f"Bearer {self.api_token}"}
 
@@ -2368,6 +2385,9 @@ class LinkedInAccount(HorillaModel):
             self.sub_id = response.json()["sub"]
         else:
             raise ValidationError(_("Check the credentials"))
+
+    def is_connected(self):
+        return bool(self.api_token)
 
     def action_template(self):
         """

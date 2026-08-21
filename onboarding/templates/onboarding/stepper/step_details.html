@@ -1,0 +1,39 @@
+{% load i18n %}
+{% include "onboarding/stepper/_nav.html" %}
+{% include "onboarding/stepper/_messages.html" %}
+<div class="oh-step">
+  <div class="oh-step__header">
+    <ion-icon name="briefcase-outline" class="oh-step__icon"></ion-icon>
+    <div>
+      <h4 class="m-0">{% trans "Job Profile Details" %}</h4>
+    </div>
+  </div>
+  <form
+    hx-post="{% url 'onboarding-stepper-step' candidate.pk 'details' %}"
+    hx-target="#stepperContent"
+    hx-swap="innerHTML">
+    {% csrf_token %}
+    <div class="oh-step__body">
+      <div class="oh-step-grid">
+        <div class="oh-field"><label>{{ form.department_id.label }}</label>{{ form.department_id }}</div>
+        <div class="oh-field"><label>{{ form.job_position_id.label }}</label>{{ form.job_position_id }}</div>
+        <div class="oh-field"><label>{{ form.job_role_id.label }}</label>{{ form.job_role_id }}</div>
+        <div class="oh-field"><label>{{ form.reporting_manager_id.label }}</label>{{ form.reporting_manager_id }}</div>
+        <div class="oh-field"><label>{{ form.buddy_id.label }}</label>{{ form.buddy_id }}</div>
+        <div class="oh-field"><label>{{ form.shift_id.label }}</label>{{ form.shift_id }}</div>
+        <div class="oh-field"><label>{{ form.work_type_id.label }}</label>{{ form.work_type_id }}</div>
+        <div class="oh-field"><label>{{ form.employee_type_id.label }}</label>{{ form.employee_type_id }}</div>
+        <div class="oh-field"><label>{{ form.date_of_joining.label }}</label>{{ form.date_of_joining }}</div>
+        <div class="oh-field"><label>{{ form.probation_period.label }}</label>{{ form.probation_period }}</div>
+      </div>
+    </div>
+    <div class="oh-step__footer">
+      <button type="button" class="oh-btn oh-btn--light"
+        hx-get="{% url 'onboarding-stepper-step' candidate.pk back_key %}"
+        hx-target="#stepperContent" hx-swap="innerHTML">
+        <ion-icon name="arrow-back-outline"></ion-icon> {% trans "Back" %}
+      </button>
+      <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Next" %} <ion-icon name="arrow-forward-outline"></ion-icon></button>
+    </div>
+  </form>
+</div>

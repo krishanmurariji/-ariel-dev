@@ -1,0 +1,42 @@
+{% load i18n %}
+<div id="documentListContainer">
+  {% if requests %}
+  <div class="oh-doc-request-list">
+    {% for req in requests %}
+    <div class="oh-doc-request-row">
+      <div class="oh-doc-request-row__icon">
+        {% if req.format == "pdf" %}
+        <ion-icon name="document-text-outline"></ion-icon>
+        {% elif req.format == "jpg" or req.format == "png" or req.format == "jpeg" %}
+        <ion-icon name="image-outline"></ion-icon>
+        {% elif req.format == "xlsx" %}
+        <ion-icon name="grid-outline"></ion-icon>
+        {% elif req.format == "docx" or req.format == "txt" %}
+        <ion-icon name="document-outline"></ion-icon>
+        {% else %}
+        <ion-icon name="attach-outline"></ion-icon>
+        {% endif %}
+      </div>
+      <div class="oh-doc-request-row__body">
+        <div class="oh-doc-request-row__title">
+          {{ req.title }}
+          {% if req.is_mandatory %}<span class="oh-status-pill oh-status-pill--rejected">{% trans "Mandatory" %}</span>{% endif %}
+        </div>
+        {% if req.description %}
+        <div class="oh-text-light small">{{ req.description }}</div>
+        {% endif %}
+        <div class="oh-doc-request-row__meta">
+          <span>{% trans "Format" %}: {{ req.get_format_display }}</span>
+          {% if req.max_size %}<span>{% trans "Max size" %}: {{ req.max_size }} MB</span>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="oh-empty-hint">
+    <ion-icon name="folder-open-outline"></ion-icon>
+    <span>{% trans "No document requests yet." %}</span>
+  </div>
+  {% endif %}
+</div>

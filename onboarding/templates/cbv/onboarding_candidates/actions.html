@@ -137,6 +137,25 @@
 		></a>
 	{% endif %}
 
+	<a
+		class="oh-btn oh-btn--light-bkg w-100"
+		title="{% trans 'Start Onboarding' %}"
+		href="{% url 'onboarding-stepper-page' instance.pk %}"
+		><ion-icon name="rocket-outline"></ion-icon
+	></a>
+
+	<button
+		type="button"
+		class="oh-btn oh-btn--light-bkg w-100"
+		title="{% trans 'Allocations' %}"
+		hx-get="{% url 'allocation-view' instance.pk %}?model=recruitment.models.Candidate"
+		hx-target="#allocationModalBody"
+		data-toggle="oh-modal-toggle"
+		data-target="#allocationModal"
+	>
+		<ion-icon name="layers-outline"></ion-icon>
+	</button>
+
 	<button
 		type="button"
 		class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100"

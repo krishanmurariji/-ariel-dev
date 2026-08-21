@@ -1,0 +1,42 @@
+{% load i18n %}
+<div id="stepperNavInner" hx-swap-oob="true">
+  <div class="oh-stepper-nav__header">
+    <ion-icon name="rocket-outline"></ion-icon>
+    <span class="title">{% trans "Onboarding" %}</span>
+  </div>
+  <ul class="oh-stepper-nav__list">
+    {% for step in nav_steps %}
+    <li class="oh-stepper-nav__li
+      {% if step.key == active_key %}is-active{% elif forloop.counter0 < active_index %}is-done{% endif %}
+      {% if forloop.counter0 > unlocked_index %}is-locked{% endif %}">
+      <div class="oh-stepper-nav__rail">
+        <span class="oh-stepper-nav__num">
+          {% if forloop.counter0 > unlocked_index %}
+          <ion-icon name="lock-closed-outline"></ion-icon>
+          {% elif forloop.counter0 < active_index %}
+          <ion-icon name="checkmark-outline"></ion-icon>
+          {% else %}
+          {{ forloop.counter }}
+          {% endif %}
+        </span>
+        {% if not forloop.last %}<span class="oh-stepper-nav__line"></span>{% endif %}
+      </div>
+      {% if forloop.counter0 <= unlocked_index %}
+      <div
+        class="oh-stepper-nav__item"
+        hx-get="{% url 'onboarding-stepper-step' candidate.pk step.key %}"
+        hx-target="#stepperContent"
+        hx-swap="innerHTML">
+        <span class="oh-stepper-nav__label">{{ step.label }}</span>
+      </div>
+      {% else %}
+      <div
+        class="oh-stepper-nav__item oh-stepper-nav__item--locked"
+        title="{% trans 'Complete the previous steps first' %}">
+        <span class="oh-stepper-nav__label">{{ step.label }}</span>
+      </div>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>

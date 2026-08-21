@@ -1,0 +1,52 @@
+{% load i18n %}
+<div id="candidateTasksList">
+  {% if not tasks %}
+  <div class="oh-empty-hint">
+    <ion-icon name="list-outline"></ion-icon>
+    <span>{% trans "No checklist tasks assigned for this candidate yet." %}</span>
+  </div>
+  {% endif %}
+  {% for task in tasks %}
+  <div class="oh-ctask-row">
+    {% if task.status == "done" %}
+    <ion-icon name="checkmark-circle-outline" class="oh-ctask-row__status-icon oh-ctask-row__status-icon--done" title="{% trans 'Done' %}"></ion-icon>
+    {% else %}
+    <ion-icon name="time-outline" class="oh-ctask-row__status-icon oh-ctask-row__status-icon--pending" title="{{ task.get_status_display }}"></ion-icon>
+    {% endif %}
+    <div class="oh-ctask-row__main">
+      <div class="oh-ctask-row__title">{{ task.title }}</div>
+      {% if task.template_task_id.description %}
+      <div class="oh-ctask-row__desc">{{ task.template_task_id.description }}</div>
+      {% endif %}
+      <div class="oh-ctask-row__meta">
+        <span class="oh-status-pill oh-status-pill--phase">{{ task.get_phase_display }}</span>
+        {% if task.assignee_id %}
+        <span class="oh-ctask-row__assignee">
+          <img src="{{ task.assignee_id.get_avatar }}" alt="{{ task.assignee_id.get_full_name }}">
+          {{ task.assignee_id.get_full_name }}
+        </span>
+        {% else %}
+        <span class="oh-ctask-row__assignee oh-text-light">{% trans "Unassigned" %}</span>
+        {% endif %}
+      </div>
+    </div>
+    {% if task.requires_feedback %}
+    <div class="oh-ctask-row__side">
+      <button
+        type="button"
+        class="oh-ctask-row__thumb {% if task.candidate_satisfied %}oh-ctask-row__thumb--filled{% endif %} {% if task.status != 'done' %}oh-ctask-row__thumb--disabled{% endif %}"
+        title="{% if task.status != 'done' %}{% trans 'Available once this task is Done' %}{% elif task.candidate_satisfied %}{% trans 'Candidate satisfied - click to undo' %}{% else %}{% trans 'Mark candidate satisfied' %}{% endif %}"
+        {% if task.status == "done" %}
+        hx-post="{% url 'candidate-task-toggle-satisfaction' task.pk %}"
+        hx-target="#candidateTasksList"
+        hx-swap="outerHTML"
+        {% endif %}
+      >
+        <ion-icon name="thumbs-up-outline"></ion-icon>
+      </button>
+      <span class="oh-ctask-row__thumb-label">{% trans "Satisfied" %}</span>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>

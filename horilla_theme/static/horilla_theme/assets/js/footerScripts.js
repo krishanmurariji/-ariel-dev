@@ -1,3 +1,39 @@
+// Modal open/close buttons need a *direct* bind (not $(document).on('click',
+// selector, fn) delegation), because many of them carry an inline
+// onclick="event.stopPropagation()" (to stop the click from also triggering
+// a parent row's click-to-navigate handler in tables) - that stops the
+// click from ever bubbling up to a document-level delegated listener, so
+// delegation silently never fires for those buttons.
+//
+// A huge amount of this app's content - including entire sections like
+// Settings > Company/Mail Server, whose Create/Edit/Delete buttons open
+// generic modals - loads into *unnamed* lazy divs, e.g.
+// <div hx-get="/company-navbar/" hx-trigger="load"></div>, which have no
+// `id`. htmxSelect2.js's existing htmx:afterSettle rebinding keys off
+// e.detail.target.id, so for these nameless targets it falls back to a
+// "someDemoId" selector that matches nothing - the rebind silently never
+// happens, and those buttons are left permanently unbound. So: bind once
+// for whatever exists at page-ready time, then rebind on every single
+// htmx:afterSettle across the *whole* document (not scoped to the swap
+// target's id) so newly-swapped buttons - named target or not - always end
+// up bound. .off() first so repeated swaps don't stack duplicate handlers.
+function bindGenericModalToggles() {
+    $("[data-toggle='oh-modal-toggle']")
+        .off("click.ohModalToggle")
+        .on("click.ohModalToggle", function () {
+            let modalId = $(this).attr("data-target");
+            $(modalId).addClass("oh-modal--show");
+        });
+
+    $(".oh-modal__close, .oh-modal__cancel")
+        .off("click.ohModalClose")
+        .on("click.ohModalClose", function () {
+            $(this).closest(".oh-modal--show").removeClass("oh-modal--show");
+        });
+}
+bindGenericModalToggles();
+$(document).on("htmx:afterSettle", bindGenericModalToggles);
+
 $(function () {
     $(document).tooltip({
         position: {
@@ -666,10 +702,6 @@ $(".oh-password-input--toggle").on("click", function (e) {
         $hideIcon.addClass("hidden");
     }
 });
-
-$(".oh-modal__close").on("click", function () {
-    $(this).closest(".oh-modal--show").removeClass("oh-modal--show")
-})
 
 $(document).on("click", ".oh-accordion-header", function (event) {
     event.stopImmediatePropagation();

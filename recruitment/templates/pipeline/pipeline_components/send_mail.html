@@ -45,17 +45,19 @@
                     placeholder="Subject">
             </div>
             {% endif %}
+            {% if not cand %}
             <div class="form-group mt-2">
                 <label for="candidates">
                     <h6>{% trans "Also send to" %}</h6>
                 </label>
-                <select class="oh-select oh-select-2" {% if not cand %} required {% endif %} name="candidates"
+                <select class="oh-select oh-select-2" required name="candidates"
                     id="candidates" multiple>
                     {% for cand in candidates %}
                     <option value="{{cand.id}}">{{cand}}</option>
                     {% endfor %}
                 </select>
             </div>
+            {% endif %}
             <div class="form-group mt-2">
                 <label for="extra_emails">
                     <h6>{% trans "CC" %}</h6>
@@ -154,7 +156,7 @@
 
     document.querySelector('.submit-send').onclick = function (event) {
         const element = event.target;
-        const candidates = $('#candidates').val();
+        const candidates = $('#candidates').val() || [];
         const subject = $('#subject').val().trim();
         const body = $('#writeField').val().trim();
         const cand = "{{cand|default:'false'|safe}}";

@@ -5,9 +5,10 @@ This module is used to map url path with view methods.
 """
 
 from django.urls import path
+from django.utils.translation import gettext_lazy as _
 
 from onboarding import dashboard as on_dashboard
-from onboarding import views
+from onboarding import stepper, task_templates, views
 from onboarding.cbv import dashboard, onboarding_candidates, onboarding_view, pipeline
 from recruitment.cbv import candidates
 from recruitment.models import Candidate
@@ -336,4 +337,98 @@ urlpatterns = [
         on_dashboard.onboarding_portal_status,
         name="onboarding-dashboard-portal-status",
     ),
+    # ── Candidate card view ──────────────────────────────────────────────────
+    path(
+        "candidate-card-view/",
+        onboarding_candidates.OnboardingCandidateCard.as_view(),
+        name="onboarding-candidate-card-view",
+    ),
+    # ── Start Onboarding stepper (full page) ─────────────────────────────────
+    path(
+        "candidate/<int:pk>/onboard/",
+        stepper.onboarding_stepper_page,
+        name="onboarding-stepper-page",
+    ),
+    path(
+        "candidate/<int:pk>/onboard/<str:step_key>/",
+        stepper.stepper_step,
+        name="onboarding-stepper-step",
+    ),
+    path(
+        "candidate/<int:pk>/onboard-checklist-task-rows/<str:phase>/",
+        stepper.checklist_task_rows,
+        name="onboarding-stepper-checklist-task-rows",
+    ),
+    path(
+        "candidate/<int:pk>/onboard-document-request/",
+        stepper.document_request_modal,
+        name="onboarding-stepper-document-request",
+    ),
+    path(
+        "candidate/<int:pk>/onboard-document-upload/",
+        stepper.document_upload,
+        name="onboarding-stepper-document-upload",
+    ),
+    path(
+        "candidate/<int:pk>/onboard-document/<int:doc_id>/<str:action>/",
+        stepper.document_status_update,
+        name="onboarding-stepper-document-status",
+    ),
+    # ── Task Template CRUD ───────────────────────────────────────────────────
+    path(
+        "task-templates/",
+        task_templates.TaskTemplateListView.as_view(),
+        name="task-template-list",
+    ),
+    path(
+        "task-templates/create/",
+        task_templates.TaskTemplateFormView.as_view(),
+        name="task-template-create",
+    ),
+    path(
+        "task-templates/<int:pk>/edit/",
+        task_templates.TaskTemplateFormView.as_view(),
+        name="task-template-edit",
+    ),
+    path(
+        "task-templates/<int:pk>/delete/",
+        task_templates.task_template_delete,
+        name="task-template-delete",
+    ),
+    # ── My Checklist Tasks ───────────────────────────────────────────────────
+    path(
+        "my-checklist-tasks/",
+        task_templates.my_checklist_tasks,
+        name="my-checklist-tasks",
+    ),
+    path(
+        "my-checklist-tasks/<int:pk>/update/",
+        task_templates.checklist_task_self_update,
+        name="checklist-task-self-update",
+    ),
+    path(
+        "my-checklist-tasks/<int:pk>/edit-modal/",
+        task_templates.checklist_task_edit_modal,
+        name="checklist-task-edit-modal",
+    ),
+    path(
+        "my-checklist-tasks/<int:pk>/remove-proof/",
+        task_templates.checklist_task_remove_proof,
+        name="checklist-task-remove-proof",
+    ),
+    path(
+        "candidate-task/<int:pk>/toggle-satisfaction/",
+        stepper.candidate_task_toggle_satisfaction,
+        name="candidate-task-toggle-satisfaction",
+    ),
 ]
+
+from recruitment.cbv.candidate_profile import CandidateProfileView  # noqa: E402
+
+CandidateProfileView.add_tab(
+    tab={
+        "title": _("Task"),
+        "view": stepper.candidate_tasks_tab,
+        "accessibility": "recruitment.cbv.accessibility.if_manager_accessibility",
+    }
+)

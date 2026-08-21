@@ -84,7 +84,13 @@ from onboarding.models import (
 )
 from recruitment.filters import CandidateFilter, CandidateReGroup, RecruitmentFilter
 from recruitment.forms import RejectedCandidateForm
-from recruitment.models import Candidate, Recruitment, RejectedCandidate
+from recruitment.models import (
+    Candidate,
+    CandidateDocument,
+    CandidateDocumentRequest,
+    Recruitment,
+    RejectedCandidate,
+)
 from recruitment.pipeline_grouper import group_by_queryset
 
 logger = logging.getLogger(__name__)
@@ -941,7 +947,8 @@ def email_send(request):
         except Exception as e:
             logger.error(e)
 
-    return HorillaRedirect(request)
+    next_url = request.POST.get("next") or request.GET.get("next")
+    return HorillaRedirect(request, redirect_to=next_url)
 
 
 def onboarding_query_grouper(request, queryset):
@@ -1350,6 +1357,22 @@ def employee_creation(request, token):
         instance=existing_employee, initial=experience_initial, prefix="experience"
     )
 
+    # Evaluated eagerly (not left as a lazy queryset) because the POST branch
+    # below calls login(request, user), which swaps the authenticated user
+    # mid-request; HorillaCompanyManager scopes querysets to the current
+    # user's company, so re-evaluating these after login() can silently
+    # return an empty set for the brand-new user/employee.
+    document_requests = list(candidate.candidatedocumentrequest_set.all())
+    # A CandidateDocumentRequest auto-creates a placeholder CandidateDocument
+    # row (status="requested") the moment it's created - that row existing is
+    # not the same as the candidate having actually uploaded something, so
+    # only count rows that carry a real uploaded file.
+    submitted_docs_by_request = {
+        doc.document_request_id_id: doc
+        for doc in CandidateDocument.objects.filter(candidate_id=candidate)
+        if doc.document_request_id_id and doc.document
+    }
+
     # form.errors.clear()
     if request.method == "POST":
         instance = employee_qs.first() if getattr(user, "pk", None) else None
@@ -1425,25 +1448,60 @@ def employee_creation(request, token):
                 },
             )
 
-            Document.objects.bulk_create(
-                [
-                    Document(
-                        title=doc.title,
-                        employee_id=employee_personal_info,
-                        document=doc.document,
-                        status=doc.status,
-                        reject_reason=doc.reject_reason,
+            for doc_request in document_requests:
+                uploaded = request.FILES.get(f"doc_request_{doc_request.pk}")
+                if not uploaded:
+                    continue
+                existing_doc = submitted_docs_by_request.get(doc_request.pk)
+                if existing_doc:
+                    existing_doc.document = uploaded
+                    existing_doc.status = "submitted"
+                    existing_doc.save()
+                    submitted_docs_by_request[doc_request.pk] = existing_doc
+                else:
+                    submitted_docs_by_request[doc_request.pk] = CandidateDocument.objects.create(
+                        title=doc_request.title,
+                        candidate_id=candidate,
+                        document_request_id=doc_request,
+                        document=uploaded,
+                        status="submitted",
                     )
-                    for doc in candidate.candidatedocument_set.all()
-                ]
-            )
 
-            onboarding_portal.count = 3
-            onboarding_portal.save()
-            messages.success(
-                request, _("Employee personal details created successfully..")
-            )
-            return redirect("employee-bank-details", token)
+            missing_mandatory = [
+                req.title
+                for req in document_requests
+                if req.is_mandatory and req.pk not in submitted_docs_by_request
+            ]
+            if missing_mandatory:
+                messages.error(
+                    request,
+                    _("Please upload these required documents before continuing: %(docs)s")
+                    % {"docs": ", ".join(missing_mandatory)},
+                )
+            else:
+                Document.objects.bulk_create(
+                    [
+                        Document(
+                            title=doc.title,
+                            employee_id=employee_personal_info,
+                            document=doc.document,
+                            status=doc.status,
+                            reject_reason=doc.reject_reason,
+                        )
+                        for doc in candidate.candidatedocument_set.all()
+                    ]
+                )
+
+                onboarding_portal.count = 3
+                onboarding_portal.save()
+                messages.success(
+                    request, _("Employee personal details created successfully..")
+                )
+                return redirect("employee-bank-details", token)
+    document_rows = [
+        (doc_request, submitted_docs_by_request.get(doc_request.pk))
+        for doc_request in document_requests
+    ]
     return render(
         request,
         "onboarding/employee_creation.html",
@@ -1453,6 +1511,7 @@ def employee_creation(request, token):
             "emergency_contact_formset": emergency_contact_formset,
             "education_formset": education_formset,
             "experience_formset": experience_formset,
+            "document_rows": document_rows,
         },
     )
 

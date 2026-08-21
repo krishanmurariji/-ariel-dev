@@ -1,0 +1,235 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+<div class="oh-wrapper oh-my-tasks">
+  <div class="oh-my-tasks__head">
+    <div>
+      <h3 class="m-0">{% trans "My Tasks" %}</h3>
+    </div>
+  </div>
+
+  {% if total_count %}
+  <div class="oh-status-tabs" role="tablist">
+    {% for tab in status_tabs %}
+    <button type="button" class="oh-status-tab {% if tab.key == default_status %}active{% endif %}" data-status="{{ tab.key }}">
+      {% if tab.key == "priority" %}<ion-icon name="flash-outline"></ion-icon>{% else %}<span class="dot"></span>{% endif %}
+      {{ tab.label }}<span class="tab-count">{{ tab.tasks|length }}</span>
+    </button>
+    {% endfor %}
+  </div>
+
+  {% for tab in status_tabs %}
+  <div class="oh-status-section {% if tab.key == default_status %}active{% endif %}" data-status="{{ tab.key }}">
+    {% if not tab.tasks %}
+    <div class="oh-empty-hint">
+      <ion-icon name="checkmark-done-outline"></ion-icon>
+      {% if tab.key == "priority" %}
+      <span>{% trans "Nothing blocking right now - no mandatory task is Stuck or Todo." %}</span>
+      {% else %}
+      <span>{% blocktrans with label=tab.label|lower %}Nothing {{ label }} right now.{% endblocktrans %}</span>
+      {% endif %}
+    </div>
+    {% endif %}
+    <div class="oh-task-grid">
+      {% for task in tab.tasks %}
+      <div class="oh-task-card" id="task-{{ tab.key }}-{{ task.pk }}" data-status="{{ task.status }}">
+        <div class="oh-task-card__top">
+          <div class="oh-task-card__candidate">
+            <span class="cand-dot">{{ task.candidate_id.name|first|upper }}</span> {{ task.candidate_id.name }}
+          </div>
+          <div class="oh-task-card__top-actions">
+            <span class="oh-task-card__status-flag oh-task-card__status-flag--{{ task.status }}">{{ task.get_status_display }}</span>
+            <button
+              type="button"
+              class="oh-task-card__icon-btn"
+              title="{% trans 'Send Mail' %}"
+              hx-get="{% url 'send-mail' task.candidate_id.id %}"
+              hx-target="#objectDetailsModalTarget"
+              hx-swap="innerHTML"
+              data-toggle="oh-modal-toggle"
+              data-target="#objectDetailsModal">
+              <ion-icon name="mail-open-outline"></ion-icon>
+            </button>
+            <button
+              type="button"
+              class="oh-task-card__icon-btn"
+              title="{% trans 'Edit' %}"
+              hx-get="{% url 'checklist-task-edit-modal' task.pk %}"
+              hx-target="#genericModalBody"
+              data-toggle="oh-modal-toggle"
+              data-target="#genericModal">
+              <ion-icon name="create-outline"></ion-icon>
+            </button>
+          </div>
+        </div>
+        <strong class="oh-task-card__title">{{ task.title }}</strong>
+        {% if task.template_task_id.description %}
+        <div class="oh-task-card__desc">{{ task.template_task_id.description }}</div>
+        {% endif %}
+        <div class="oh-task-card__dates">
+          <div><span class="oh-task-card__dates-label">{% trans "Assigned" %}</span> {{ task.created_at|date:"M d, Y"|default:"—" }}</div>
+          <div><span class="oh-task-card__dates-label">{% trans "Completed" %}</span> {{ task.completed_at|date:"M d, Y"|default:"—" }}</div>
+          <div><span class="oh-task-card__dates-label">{% trans "Last Updated" %}</span> {{ task.status_updated_at|date:"M d, Y"|default:"—" }}</div>
+        </div>
+        {% if task.proof_file %}
+        <a href="{{ task.proof_file.url }}" target="_blank" class="oh-proof-view">
+          <ion-icon name="attach-outline"></ion-icon> {% trans "View submitted proof" %}
+        </a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="oh-empty-hint">
+    <ion-icon name="checkmark-done-outline"></ion-icon>
+    <span>{% trans "No checklist tasks assigned to you." %}</span>
+  </div>
+  {% endif %}
+</div>
+
+<style>
+  .oh-my-tasks { max-width: 100%; }
+  .oh-my-tasks__head { margin-bottom: 18px; }
+
+  .oh-status-tabs { display: flex; gap: 6px; margin: 22px 0; border-bottom: 1px solid var(--oh-border-color, #e4e6ef); flex-wrap: wrap; }
+  .oh-status-tab {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-weight: 600; font-size: 0.85rem;
+    color: var(--oh-text-muted, #666);
+    background: none; border: none;
+    padding: 10px 6px 12px; cursor: pointer; position: relative;
+  }
+  .oh-status-tab .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--tab-color, #6c757d); }
+  .oh-status-tab ion-icon { font-size: 15px; color: var(--tab-color, #93690f); }
+  .oh-status-tab .tab-count {
+    font-size: 0.72rem; font-weight: 600; color: var(--oh-text-muted, #888);
+    background: #eceeee; border-radius: 20px; padding: 1px 7px;
+  }
+  .oh-status-tab::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+    background: transparent; border-radius: 2px 2px 0 0;
+  }
+  .oh-status-tab.active { color: var(--oh-heading-color, #1b211f); }
+  .oh-status-tab.active::after { background: var(--tab-color, #2f6f63); }
+  .oh-status-tab.active .tab-count { background: var(--tab-color-soft, #eceeee); color: var(--tab-color, #666); }
+  .oh-status-tab[data-status="priority"] { --tab-color: #93690f; --tab-color-soft: #f6ecd2; }
+  .oh-status-tab[data-status="stuck"] { --tab-color: #b3402f; --tab-color-soft: #f3ddd7; }
+  .oh-status-tab[data-status="todo"] { --tab-color: #6c757d; --tab-color-soft: #eceeee; }
+  .oh-status-tab[data-status="scheduled"] { --tab-color: #3e6b99; --tab-color-soft: #e3ecf7; }
+  .oh-status-tab[data-status="ongoing"] { --tab-color: #a6672e; --tab-color-soft: #f3e6cc; }
+  .oh-status-tab[data-status="done"] { --tab-color: #3e7d4f; --tab-color-soft: #dcedde; }
+
+  .oh-status-section { display: none; }
+  .oh-status-section.active { display: block; }
+  .oh-status-section[data-status="done"] .oh-task-card { opacity: 0.85; }
+
+  .oh-task-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 16px;
+  }
+
+  .oh-task-card {
+    display: flex; flex-direction: column; gap: 10px;
+    background: var(--oh-body-bg, #fff);
+    border: 1px solid var(--oh-border-color, #e4e6ef);
+    border-top: 3px solid var(--rail-color, #6c757d);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03), 0 6px 18px -12px rgba(0,0,0,0.12);
+  }
+  .oh-task-card[data-status="stuck"] { --rail-color: #b3402f; }
+  .oh-task-card[data-status="todo"] { --rail-color: #6c757d; }
+  .oh-task-card[data-status="scheduled"] { --rail-color: #3e6b99; }
+  .oh-task-card[data-status="ongoing"] { --rail-color: #a6672e; }
+  .oh-task-card[data-status="done"] { --rail-color: #3e7d4f; }
+
+  .oh-task-card__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .oh-task-card__candidate {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.76rem; color: var(--oh-text-muted, #888);
+  }
+  .oh-task-card__candidate .cand-dot {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: rgba(47,111,99,0.12); color: #2f6f63;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.64rem; flex: none;
+  }
+  .oh-task-card__status-flag {
+    font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.03em; padding: 3px 9px; border-radius: 20px; flex: none;
+  }
+  .oh-task-card__status-flag--stuck { background: #f3ddd7; color: #b3402f; }
+  .oh-task-card__status-flag--todo { background: #eceeee; color: #6c757d; }
+  .oh-task-card__status-flag--scheduled { background: #e3ecf7; color: #3e6b99; }
+  .oh-task-card__status-flag--ongoing { background: #f3e6cc; color: #a6672e; }
+  .oh-task-card__status-flag--done { background: #dcedde; color: #3e7d4f; }
+
+  .oh-task-card__title { font-size: 0.95rem; line-height: 1.35; }
+  .oh-task-card__desc { color: var(--oh-text-muted, #888); font-size: 0.82rem; }
+
+  .oh-task-card__top-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+  .oh-task-card__icon-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 6px;
+    border: 1px solid var(--oh-border-color, #e4e6ef);
+    background: none; color: var(--oh-text-muted, #666);
+    font-size: 14px; cursor: pointer; flex: none;
+  }
+  .oh-task-card__icon-btn:hover { background: rgba(47,111,99,0.08); color: #2f6f63; border-color: #2f6f63; }
+
+  .oh-task-card__dates {
+    display: flex; flex-direction: column; gap: 3px;
+    margin-top: auto; padding-top: 10px;
+    border-top: 1px dashed var(--oh-border-color, #e4e6ef);
+    font-size: 0.76rem; color: var(--oh-text-muted, #888);
+  }
+  .oh-task-card__dates-label {
+    display: inline-block; min-width: 90px; font-weight: 600; color: var(--oh-heading-color, #444);
+  }
+  .oh-file-picker {
+    position: relative;
+    display: flex; align-items: center; gap: 8px;
+    border: 1px dashed rgba(47,111,99,0.35);
+    background: rgba(47,111,99,0.05);
+    color: #2f6f63;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .oh-file-picker:hover { background: rgba(47,111,99,0.1); border-color: #2f6f63; }
+  .oh-file-picker.has-file { border-style: solid; border-color: #2f6f63; }
+  .oh-file-picker ion-icon { font-size: 16px; flex: none; }
+  .oh-file-picker__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .oh-file-picker input[type="file"] {
+    position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none;
+  }
+  .oh-proof-view { display: flex; align-items: center; gap: 5px; font-size: 0.74rem; color: var(--oh-text-muted, #888); text-decoration: none; }
+  .oh-proof-view:hover { color: #2f6f63; }
+
+  .oh-empty-hint {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--oh-text-muted, #888); font-size: 0.85rem;
+    padding: 14px; border: 1px dashed var(--oh-border-color, #e4e6ef); border-radius: 8px;
+    margin-bottom: 14px;
+  }
+  .oh-empty-hint ion-icon { font-size: 20px; }
+</style>
+
+<script>
+  document.querySelectorAll('.oh-status-tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      document.querySelectorAll('.oh-status-tab').forEach(function (t) { t.classList.remove('active'); });
+      document.querySelectorAll('.oh-status-section').forEach(function (s) { s.classList.remove('active'); });
+      tab.classList.add('active');
+      var section = document.querySelector('.oh-status-section[data-status="' + tab.dataset.status + '"]');
+      if (section) { section.classList.add('active'); }
+    });
+  });
+</script>
+{% endblock content %}

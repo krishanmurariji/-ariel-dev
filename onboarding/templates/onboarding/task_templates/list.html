@@ -1,0 +1,78 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+<div class="oh-wrapper">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h3 class="m-0">{% trans "Task Templates" %}</h3>
+      <p class="oh-text-light small m-0">{% trans "Reusable Task Groups for the onboarding checklist steps." %}</p>
+    </div>
+    <a href="{% url 'task-template-create' %}" class="oh-btn oh-btn--secondary">
+      <ion-icon name="add-outline"></ion-icon> {% trans "New Task Group" %}
+    </a>
+  </div>
+  {% for template in templates %}
+  <div class="oh-task-group-card mb-3 p-3">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <div class="d-flex align-items-center gap-2">
+          <ion-icon name="folder-outline" class="oh-task-group-card__icon"></ion-icon>
+          <strong>{{ template.title }}</strong>
+        </div>
+        {% if template.description %}
+        <p class="oh-text-light small mt-1 mb-0">{{ template.description }}</p>
+        {% endif %}
+      </div>
+      <div class="d-flex gap-2">
+        <a href="{% url 'task-template-edit' template.pk %}" class="oh-btn oh-btn--light oh-btn--sm">
+          <ion-icon name="create-outline"></ion-icon> {% trans "Edit" %}
+        </a>
+        <a href="{% url 'task-template-delete' template.pk %}" class="oh-btn oh-btn--danger oh-btn--sm"
+          onclick="return confirm('{% trans "Delete this task group and all its tasks?" %}')">
+          <ion-icon name="trash-outline"></ion-icon>
+        </a>
+      </div>
+    </div>
+    <ul class="oh-task-group-card__tasks mt-2">
+      {% for task in template.tasks.all %}
+      <li>
+        <ion-icon name="checkmark-done-outline"></ion-icon>
+        <span>{{ task.title }}</span>
+        {% if task.is_mandatory %}<span class="oh-status-pill oh-status-pill--rejected">{% trans "Mandatory" %}</span>{% endif %}
+        {% if task.requires_proof %}<span class="oh-status-pill oh-status-pill--under_verification">{% trans "Proof Required" %}</span>{% endif %}
+      </li>
+      {% empty %}
+      <li class="oh-text-light">{% trans "No tasks yet" %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% empty %}
+  <div class="text-center py-5">
+    <ion-icon name="file-tray-outline" style="font-size: 48px; color: var(--oh-text-muted, #999);"></ion-icon>
+    <p class="oh-text-light mt-2">{% trans "No task groups yet. Create one to use it in onboarding checklists." %}</p>
+  </div>
+  {% endfor %}
+</div>
+
+<style>
+  .oh-task-group-card {
+    border: 1px solid var(--oh-border-color, #e4e6ef);
+    border-radius: 10px;
+    background: var(--oh-body-bg, #fff);
+  }
+  .oh-task-group-card__icon { font-size: 20px; color: #2f6f63; }
+  .oh-task-group-card__tasks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .oh-task-group-card__tasks li { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+  .oh-task-group-card__tasks ion-icon { color: #2f6f63; }
+  .oh-status-pill {
+    display: inline-block;
+    font-size: 0.62rem;
+    padding: 1px 8px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .oh-status-pill--rejected { background: #f3ddd7; color: #b3402f; }
+  .oh-status-pill--under_verification { background: #f3e6cc; color: #a6672e; }
+</style>
+{% endblock content %}

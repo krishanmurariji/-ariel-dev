@@ -1,0 +1,14 @@
+{% if messages %}
+<div class="oh-stepper-messages">
+  {% for message in messages %}
+  <div class="oh-alert {{ message.tags|default:'oh-alert--info' }}">{{ message }}</div>
+  {% endfor %}
+</div>
+<script>
+  {% for message in messages %}
+  if (window.Toast) {
+    Toast.fire({ icon: "{{ message.level_tag|default:'info'|escapejs }}", title: "{{ message|escapejs }}" });
+  }
+  {% endfor %}
+</script>
+{% endif %}

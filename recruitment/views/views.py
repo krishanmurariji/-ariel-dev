@@ -15,6 +15,7 @@ import ast
 import contextlib
 import io
 import json
+import logging
 import os
 import random
 import re
@@ -29,7 +30,7 @@ from django.contrib import messages
 from django.core import serializers
 from django.core.cache import cache as CACHE
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.core.paginator import Paginator
 from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
@@ -135,6 +136,8 @@ from recruitment.models import (
 )
 from recruitment.views.linkedin import delete_post, post_recruitment_in_linkedin
 from recruitment.views.paginator_qry import paginator_qry
+
+logger = logging.getLogger(__name__)
 
 
 def is_stagemanager(request, stage_id=False):
@@ -4476,6 +4479,25 @@ def document_approve(request, id):
 @login_required
 @hx_request_required
 @manager_can_enter("recruitment.change_candidatedocument")
+def document_mark_under_verification(request, id):
+    """
+    Moves a submitted document into the "Under Verification" state, between
+    submission and the final Verified/Rejected decision.
+    """
+    document_obj = get_object_or_404(CandidateDocument, id=id)
+    if document_obj.document:
+        document_obj.status = "under_verification"
+        document_obj.save()
+        messages.success(request, _("Document marked as under verification"))
+    else:
+        messages.error(request, _("No document uploaded"))
+
+    return HorillaRedirect(request)
+
+
+@login_required
+@hx_request_required
+@manager_can_enter("recruitment.change_candidatedocument")
 def document_reject(request, id):
     """
     This function used to view the reject uploaded document.
@@ -4497,6 +4519,7 @@ def document_reject(request, id):
                 document_obj.status = "rejected"
                 document_obj.save()
                 messages.error(request, _("Document request rejected"))
+                notify_candidate_of_document_rejection(document_obj)
 
                 return HorillaRedirect(request)
     else:
@@ -4508,6 +4531,40 @@ def document_reject(request, id):
         "candidate/reject_form.html",
         {"form": form, "document_obj": document_obj},
     )
+
+
+def notify_candidate_of_document_rejection(document_obj):
+    """
+    Emails the candidate that one of their submitted documents was rejected,
+    including the reason, so they know to resubmit without HR chasing them.
+    """
+    candidate = document_obj.candidate_id
+    if not candidate or not candidate.email:
+        return
+    email_backend = ConfiguredEmailBackend()
+    display_email_name = email_backend.dynamic_from_email_with_display_name
+    try:
+        email = EmailMultiAlternatives(
+            subject=_("Action needed: %(title)s was not accepted")
+            % {"title": document_obj.title},
+            body=_(
+                "Hi %(name)s,\n\n"
+                "Your submitted document \"%(title)s\" could not be accepted.\n\n"
+                "Reason: %(reason)s\n\n"
+                "Please resubmit the document at your earliest convenience."
+            )
+            % {
+                "name": candidate.name,
+                "title": document_obj.title,
+                "reason": document_obj.reject_reason or _("Not specified"),
+            },
+            from_email=display_email_name,
+            to=[candidate.email],
+            reply_to=[display_email_name],
+        )
+        email.send()
+    except Exception as e:
+        logger.error(f"Document rejection mail not sent to {candidate.email}: {e}")
 
 
 @candidate_login_required

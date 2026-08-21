@@ -1,0 +1,40 @@
+{% load i18n %}
+<div class="oh-modal__dialog-header">
+  <span class="oh-modal__dialog-title">{% trans "Request Document" %}</span>
+  <button type="button" class="oh-modal__close" aria-label="Close" onclick="$('#genericModal').removeClass('oh-modal--show');">
+    <ion-icon name="close-outline"></ion-icon>
+  </button>
+</div>
+<form
+  hx-post="{% url 'onboarding-stepper-document-request' candidate.pk %}"
+  hx-target="#documentListContainer"
+  hx-swap="outerHTML"
+  onsubmit="setTimeout(function(){ $('#genericModal').removeClass('oh-modal--show'); }, 150);">
+  {% csrf_token %}
+  <div class="oh-modal__dialog-body">
+    <div class="oh-input__group">
+      <label class="oh-input__label">{{ form.title.label }}</label>
+      {{ form.title }}
+    </div>
+    <div class="oh-input__group">
+      <label class="oh-input__label">{{ form.format.label }}</label>
+      {{ form.format }}
+    </div>
+    <div class="oh-input__group">
+      <label class="oh-input__label">{{ form.max_size.label }}</label>
+      {{ form.max_size }}
+    </div>
+    <div class="oh-input__group">
+      <label class="oh-input__label d-flex align-items-center gap-2">
+        <div class="oh-switch">{{ form.is_mandatory }}</div> {{ form.is_mandatory.label }}
+      </label>
+    </div>
+    <div class="oh-input__group">
+      <label class="oh-input__label">{{ form.description.label }}</label>
+      {{ form.description }}
+    </div>
+  </div>
+  <div class="oh-modal__dialog-footer">
+    <button type="submit" class="oh-btn oh-btn--secondary oh-btn--shadow">{% trans "Create Request" %}</button>
+  </div>
+</form>

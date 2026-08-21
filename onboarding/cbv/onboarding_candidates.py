@@ -12,12 +12,13 @@ from django.utils.translation import gettext_lazy as _
 from base.models import HorillaMailTemplate
 from horilla_views.cbv_methods import login_required, permission_required
 from horilla_views.generic.cbv.views import (
+    HorillaCardView,
     HorillaListView,
     HorillaNavView,
     TemplateView,
 )
 from recruitment.filters import CandidateFilter
-from recruitment.models import Candidate
+from recruitment.models import Candidate, CandidateDocument
 
 
 @method_decorator(login_required, name="dispatch")
@@ -170,6 +171,84 @@ class OnboardingCandidatesList(HorillaListView):
 @method_decorator(
     permission_required(perm="recruitment.view_candidate"), name="dispatch"
 )
+class OnboardingCandidateCard(HorillaCardView):
+    """
+    Long vertical candidate card view - profile photo + Start Onboarding
+    arrow button on the left, details on the right.
+    """
+
+    model = Candidate
+    filter_class = CandidateFilter
+    template_name = "cbv/onboarding_candidates/candidate_card.html"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.search_url = reverse("onboarding-candidate-card-view")
+
+    def get_queryset(self):
+        if not getattr(self, "queryset"):
+            queryset = super().get_queryset()
+            self.queryset = (
+                queryset.filter(
+                    is_active=True,
+                    recruitment_id__closed=False,
+                )
+                .filter(Q(hired=True) | Q(stage_id__stage_type="hired"))
+                .distinct()
+            ).order_by("-id")
+        return self.queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        for candidate in context["queryset"]:
+            tasks = list(candidate.checklist_tasks.all())
+            total = len(tasks)
+            done = len(
+                [t for t in tasks if t.status == "done"]
+            )
+            candidate.checklist_total = total
+            candidate.checklist_done = done
+            candidate.checklist_pct = int(done / total * 100) if total else 0
+
+            detail = getattr(candidate, "onboarding_detail", None)
+            basic_fields = [candidate.job_position_id_id, candidate.joining_date]
+            if detail:
+                basic_fields += [
+                    detail.department_id_id,
+                    detail.job_role_id_id,
+                    detail.reporting_manager_id_id,
+                    detail.buddy_id_id,
+                    detail.shift_id_id,
+                    detail.work_type_id_id,
+                    detail.employee_type_id_id,
+                    detail.probation_period,
+                ]
+            basic_filled = len([f for f in basic_fields if f])
+            candidate.basic_details_pct = (
+                int(basic_filled / len(basic_fields) * 100) if basic_fields else 0
+            )
+
+            doc_requests = list(candidate.candidatedocumentrequest_set.all())
+            doc_total = len(doc_requests)
+            doc_verified = (
+                CandidateDocument.objects.filter(
+                    document_request_id__in=doc_requests, status="approved"
+                ).count()
+                if doc_requests
+                else 0
+            )
+            candidate.documents_total = doc_total
+            candidate.documents_verified = doc_verified
+            candidate.documents_pct = (
+                int(doc_verified / doc_total * 100) if doc_total else 0
+            )
+        return context
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(
+    permission_required(perm="recruitment.view_candidate"), name="dispatch"
+)
 class OnboardingCandidatesNav(HorillaNavView):
     """
     Nav bar
@@ -182,6 +261,20 @@ class OnboardingCandidatesNav(HorillaNavView):
                                 href="{reverse_lazy('candidate-create')}?onboarding=True"
                                 """
         self.filter_instance = CandidateFilter()
+        self.view_types = [
+            {
+                "type": "list",
+                "icon": "list-outline",
+                "url": reverse("onboarding-candidates-list"),
+                "attrs": f"""title='{_("List")}'""",
+            },
+            {
+                "type": "card",
+                "icon": "grid-outline",
+                "url": reverse("onboarding-candidate-card-view"),
+                "attrs": f"""title='{_("Card")}'""",
+            },
+        ]
 
     nav_title = _("Hired Candidates")
     filter_body_template = "cbv/onboarding_candidates/filter.html"

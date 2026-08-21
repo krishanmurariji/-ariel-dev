@@ -1,0 +1,46 @@
+{% load i18n %}
+{% include "onboarding/stepper/_nav.html" %}
+{% include "onboarding/stepper/_messages.html" %}
+<div class="oh-step">
+  <div class="oh-step__header">
+    <ion-icon name="checkbox-outline" class="oh-step__icon"></ion-icon>
+    <div>
+      <h4 class="m-0">{{ phase_label }}</h4>
+    </div>
+  </div>
+  <form
+    hx-post="{% url 'onboarding-stepper-step' candidate.pk phase %}"
+    hx-target="#stepperContent"
+    hx-swap="innerHTML">
+    {% csrf_token %}
+    <div class="oh-step__body">
+      <div class="oh-field">
+        <label>{{ form.templates.label }}</label>
+        <div class="oh-chip-group">
+          {% for choice in form.templates %}
+          <label class="oh-chip">
+            {{ choice.tag }}
+            <span>{{ choice.choice_label }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div
+        hx-get="{% url 'onboarding-stepper-checklist-task-rows' candidate.pk phase %}"
+        hx-trigger="load, change from:input[name=templates]"
+        hx-target="#taskRowsContainer"
+        hx-swap="outerHTML"
+        hx-include="input[name=templates]">
+        {% include "onboarding/stepper/_task_rows.html" %}
+      </div>
+    </div>
+    <div class="oh-step__footer">
+      <button type="button" class="oh-btn oh-btn--light"
+        hx-get="{% url 'onboarding-stepper-step' candidate.pk back_key %}"
+        hx-target="#stepperContent" hx-swap="innerHTML">
+        <ion-icon name="arrow-back-outline"></ion-icon> {% trans "Back" %}
+      </button>
+      <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Next" %} <ion-icon name="arrow-forward-outline"></ion-icon></button>
+    </div>
+  </form>
+</div>

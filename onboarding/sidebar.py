@@ -20,6 +20,10 @@ SUBMENUS = [
         "redirect": reverse("onboarding-dashboard"),
     },
     {
+        "menu": _("My Tasks"),
+        "redirect": reverse("my-checklist-tasks"),
+    },
+    {
         "menu": _("Onboarding Tasks"),
         "redirect": reverse("cbv-pipeline-onboarding") + "?closed=false",
         "accessibility": "onboarding.sidebar.onboarding_view_accessibility",
@@ -28,6 +32,11 @@ SUBMENUS = [
         "menu": _("Candidates"),
         "redirect": reverse("candidates-view"),
         "accessibility": "onboarding.sidebar.candidates_view_accessibility",
+    },
+    {
+        "menu": _("Task Templates"),
+        "redirect": reverse("task-template-list"),
+        "accessibility": "onboarding.sidebar.task_templates_view_accessibility",
     },
 ]
 
@@ -54,3 +63,9 @@ def candidates_view_accessibility(
     request, _submenu: dict = {}, user_perms: PermWrapper = [], *args, **kwargs
 ) -> bool:
     return request.user.has_perm("onboarding.view_onboardingcandidate")
+
+
+def task_templates_view_accessibility(
+    request, _submenu: dict = {}, user_perms: PermWrapper = [], *args, **kwargs
+) -> bool:
+    return request.user.has_perm("onboarding.view_tasktemplate")
