@@ -1,0 +1,23 @@
+name: Deploy to Ubuntu Server (arielhr)
+
+on:
+  workflow_dispatch: {}   # ONLY manual trigger — no auto-deploy on push/commit
+                          # Run from: repo → Actions tab → this workflow → "Run workflow"
+
+jobs:
+  deploy-ubuntu-server:
+    # This job runs on the runner you installed ON THE SERVER ITSELF,
+    # not on GitHub's cloud runners — required since the server has no
+    # public SSH access (only 80/443 are forwarded).
+    runs-on: self-hosted
+    environment: production   # optional: set up required reviewers under
+                               # Settings > Environments > production
+
+    steps:
+      - name: Checkout (for reference only — deploy.sh does the real pull)
+        uses: actions/checkout@v4
+
+      - name: Run deploy script
+        run: bash scripts/deploy.sh
+        shell: bash
+
