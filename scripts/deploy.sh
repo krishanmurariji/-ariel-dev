@@ -16,6 +16,25 @@ echo "==> Backing up current code to $BACKUP_ROOT"
 mkdir -p "$BACKUP_ROOT"
 cp -r "$APP_DIR"/* "$APP_DIR/.env" "$BACKUP_ROOT/" 2>/dev/null || true
 
+if [ -n "${DB_HOST:-}" ]; then
+  if grep -q '^DATABASE_URL=' "$APP_DIR/.env" 2>/dev/null; then
+    echo "==> Disabling existing DATABASE_URL in .env (it would override DB_* vars)"
+    sed -i 's|^DATABASE_URL=|#DATABASE_URL=|' "$APP_DIR/.env"
+  fi
+  echo "==> Updating database config in .env from pipeline secrets"
+  for VAR in DB_ENGINE DB_NAME DB_USER DB_PASSWORD DB_HOST DB_PORT; do
+    VALUE="${!VAR:-}"
+    [ -z "$VALUE" ] && continue
+    if grep -q "^${VAR}=" "$APP_DIR/.env" 2>/dev/null; then
+      sed -i "s|^${VAR}=.*|${VAR}=${VALUE}|" "$APP_DIR/.env"
+    else
+      echo "${VAR}=${VALUE}" >> "$APP_DIR/.env"
+    fi
+  done
+  echo "==> .env DB-related lines after update (values masked):"
+  grep -E '^(DATABASE_URL|DB_ENGINE|DB_NAME|DB_USER|DB_HOST|DB_PORT)=' "$APP_DIR/.env" | sed -E 's/=.*/=***/'
+fi
+
 mkdir -p "$DB_BACKUP_DIR"
 if grep -qE '^(DB_ENGINE=django.db.backends.postgresql|DATABASE_URL=postgres)' "$APP_DIR/.env" 2>/dev/null; then
   echo "==> Backing up Postgres database"
@@ -43,25 +62,6 @@ else
     [ -e "$f" ] || continue
     cp "$f" "$DB_BACKUP_DIR/$(basename "$f" .sqlite3)_predeploy_${TIMESTAMP}.sqlite3"
   done
-fi
-
-if [ -n "${DB_HOST:-}" ]; then
-  if grep -q '^DATABASE_URL=' "$APP_DIR/.env" 2>/dev/null; then
-    echo "==> Disabling existing DATABASE_URL in .env (it would override DB_* vars)"
-    sed -i 's|^DATABASE_URL=|#DATABASE_URL=|' "$APP_DIR/.env"
-  fi
-  echo "==> Updating database config in .env from pipeline secrets"
-  for VAR in DB_ENGINE DB_NAME DB_USER DB_PASSWORD DB_HOST DB_PORT; do
-    VALUE="${!VAR:-}"
-    [ -z "$VALUE" ] && continue
-    if grep -q "^${VAR}=" "$APP_DIR/.env" 2>/dev/null; then
-      sed -i "s|^${VAR}=.*|${VAR}=${VALUE}|" "$APP_DIR/.env"
-    else
-      echo "${VAR}=${VALUE}" >> "$APP_DIR/.env"
-    fi
-  done
-  echo "==> .env DB-related lines after update (values masked):"
-  grep -E '^(DATABASE_URL|DB_ENGINE|DB_NAME|DB_USER|DB_HOST|DB_PORT)=' "$APP_DIR/.env" | sed -E 's/=.*/=***/'
 fi
 
 echo "==> Pulling latest code"
