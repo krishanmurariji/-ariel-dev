@@ -52,6 +52,8 @@ if [ -n "${DB_HOST:-}" ]; then
       echo "${VAR}=${VALUE}" >> "$APP_DIR/.env"
     fi
   done
+  echo "==> .env DB-related lines after update (values masked):"
+  grep -E '^(DATABASE_URL|DB_ENGINE|DB_NAME|DB_USER|DB_HOST|DB_PORT)=' "$APP_DIR/.env" | sed -E 's/=.*/=***/'
 fi
 
 echo "==> Pulling latest code"
@@ -69,6 +71,9 @@ echo "==> Installing dependencies and running migrations"
 source venv/bin/activate
 pip install -r requirements.txt
 python manage.py migrate
+
+echo "==> Active database connection Django is actually using:"
+python manage.py shell -c "from django.db import connection; d = connection.settings_dict; print('ENGINE:', d['ENGINE'], '| HOST:', d['HOST'], '| NAME:', d['NAME'])"
 
 if [ -n "${DJANGO_SUPERUSER_PASSWORD:-}" ]; then
   echo "==> Ensuring a superuser exists"
