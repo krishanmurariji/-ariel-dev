@@ -251,6 +251,26 @@ class InterviewForm(HorillaFormView):
                 )
                 if meeting_result.get("success"):
                     messages.success(self.request, _("Meeting link generated."))
+                elif meeting_result.get("needs_auth"):
+                    messages.warning(
+                        self.request,
+                        meeting_result.get("message")
+                        or _(
+                            "Interview scheduled, but the meeting link could "
+                            "not be generated: the meeting provider isn't "
+                            "connected yet. Use 'Send Meeting Link' from the "
+                            "interview once it's connected."
+                        ),
+                    )
+                elif meeting_result.get("error"):
+                    messages.warning(
+                        self.request,
+                        _(
+                            "Interview scheduled, but the meeting link could "
+                            "not be generated: %(error)s"
+                        )
+                        % {"error": meeting_result["error"]},
+                    )
 
             return HttpResponse(
                 "<script>"
