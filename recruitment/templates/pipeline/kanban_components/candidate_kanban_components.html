@@ -82,7 +82,7 @@
             </div>
         </div>
         <div class="oh-dropdown" x-data="{open: false}" onclick="event.stopPropagation();">
-            {% if request.user.employee_get in stage.stage_managers.all or perms.recruitment.change_candidate or perms.recruitment.delete_candidate or perms.recruitment.add_interviewschedule or perms.recruitment.add_candidatedocumentrequest or request.user.employee_get in rec.recruitment_managers.all or perms.view_stagenote or perms.recruitment.add_rejectedcandidate or perms.recruitment.add_skillzonecandidate %}
+            {% if request.user.employee_get in stage.stage_managers.all or perms.recruitment.change_candidate or perms.recruitment.delete_candidate or perms.recruitment.add_interviewschedule or perms.recruitment.add_candidatedocumentrequest or request.user.employee_get in rec.recruitment_managers.all or perms.recruitment.view_stagenote or perms.recruitment.add_rejectedcandidate or perms.recruitment.add_skillzonecandidate %}
                 <button class="oh-btn oh-stop-prop oh-btn--transparent oh-accordion-meta__btn" @click="open = !open"
                     @click.outside="open = false" title="{% trans " Actions" %}">
                     <ion-icon name="ellipsis-vertical"></ion-icon>
@@ -185,7 +185,7 @@
                         </li>
                         {% endif %}
                     {% endif %}
-                    {% if perms.view_stagenote or request.user.employee_get in stage.stage_managers.all %}
+                    {% if perms.recruitment.view_stagenote or request.user.employee_get in stage.stage_managers.all %}
                         <li class="oh-dropdown__item">
                             <a
                             class="oh-dropdown__link oh-dropdown__link--secondary oh-activity-sidebar__open"

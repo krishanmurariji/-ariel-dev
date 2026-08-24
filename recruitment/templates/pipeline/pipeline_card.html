@@ -245,7 +245,7 @@
                       </li>
                       {% endif %}
                     {% endif %}
-                    {% if perms.view_stagenote or request.user|is_stagemanager %}
+                    {% if perms.recruitment.view_stagenote or request.user|is_stagemanager %}
                     <li class="oh-dropdown__item">
                       <a
                         class="oh-dropdown__link oh-dropdown__link--secondary oh-activity-sidebar__open"

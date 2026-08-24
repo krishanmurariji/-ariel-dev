@@ -287,7 +287,7 @@
                                     </button>
                                 {% endif %}
                             {% endif %}
-                            {% if perms.view_stagenote or request.user.employee_get in stage.stage_managers.all %}
+                            {% if perms.recruitment.view_stagenote or request.user.employee_get in stage.stage_managers.all %}
                                 <button type="button" hx-get='{% url "view-note" cand.id %}' title="{% trans " View Note" %}"
                                     hx-target="#activitySidebar" hx-swap="innerHTML" data-target="#activitySidebar"
                                     onclick="$('#activitySidebar').addClass('oh-activity-sidebar--show')"
