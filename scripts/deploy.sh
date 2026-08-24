@@ -24,14 +24,17 @@ if grep -qE '^(DB_ENGINE=django.db.backends.postgresql|DATABASE_URL=postgres)' "
     echo "   sudo apt-get install -y postgresql-client"
     exit 1
   }
-  set -a
-  source "$APP_DIR/.env"
-  set +a
+  ENV_DATABASE_URL=$(grep -m1 '^DATABASE_URL=' "$APP_DIR/.env" | cut -d= -f2-)
+  ENV_DB_HOST=$(grep -m1 '^DB_HOST=' "$APP_DIR/.env" | cut -d= -f2-)
+  ENV_DB_PORT=$(grep -m1 '^DB_PORT=' "$APP_DIR/.env" | cut -d= -f2-)
+  ENV_DB_USER=$(grep -m1 '^DB_USER=' "$APP_DIR/.env" | cut -d= -f2-)
+  ENV_DB_PASSWORD=$(grep -m1 '^DB_PASSWORD=' "$APP_DIR/.env" | cut -d= -f2-)
+  ENV_DB_NAME=$(grep -m1 '^DB_NAME=' "$APP_DIR/.env" | cut -d= -f2-)
   PG_DUMP_FILE="$DB_BACKUP_DIR/arielhr_predeploy_${TIMESTAMP}.dump"
-  if [ -n "${DATABASE_URL:-}" ]; then
-    PGPASSWORD="" pg_dump --dbname="$DATABASE_URL" -F c -f "$PG_DUMP_FILE"
+  if [ -n "$ENV_DATABASE_URL" ]; then
+    pg_dump --dbname="$ENV_DATABASE_URL" -F c -f "$PG_DUMP_FILE"
   else
-    PGPASSWORD="${DB_PASSWORD:-}" pg_dump -h "${DB_HOST}" -p "${DB_PORT:-5432}" -U "${DB_USER}" -d "${DB_NAME}" -F c -f "$PG_DUMP_FILE"
+    PGPASSWORD="$ENV_DB_PASSWORD" pg_dump -h "$ENV_DB_HOST" -p "${ENV_DB_PORT:-5432}" -U "$ENV_DB_USER" -d "$ENV_DB_NAME" -F c -f "$PG_DUMP_FILE"
   fi
 else
   echo "==> Backing up SQLite database"
@@ -42,6 +45,10 @@ else
 fi
 
 if [ -n "${DB_HOST:-}" ]; then
+  if grep -q '^DATABASE_URL=' "$APP_DIR/.env" 2>/dev/null; then
+    echo "==> Disabling existing DATABASE_URL in .env (it would override DB_* vars)"
+    sed -i 's|^DATABASE_URL=|#DATABASE_URL=|' "$APP_DIR/.env"
+  fi
   echo "==> Updating database config in .env from pipeline secrets"
   for VAR in DB_ENGINE DB_NAME DB_USER DB_PASSWORD DB_HOST DB_PORT; do
     VALUE="${!VAR:-}"
