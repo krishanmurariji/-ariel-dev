@@ -100,7 +100,7 @@ class OutlookMeeting(HorillaModel):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     start_time = models.DateTimeField()
-    join_url = models.URLField(blank=True)
+    join_url = models.URLField(max_length=2048, blank=True)
     event_id = models.CharField(max_length=255, null=True, blank=True)
     duration = models.PositiveIntegerField(
         default=60, help_text=_("Duration in minutes")
