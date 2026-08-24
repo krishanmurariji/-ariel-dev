@@ -30,6 +30,7 @@ if grep -qE '^(DB_ENGINE=django.db.backends.postgresql|DATABASE_URL=postgres)' "
   ENV_DB_USER=$(grep -m1 '^DB_USER=' "$APP_DIR/.env" | cut -d= -f2-)
   ENV_DB_PASSWORD=$(grep -m1 '^DB_PASSWORD=' "$APP_DIR/.env" | cut -d= -f2-)
   ENV_DB_NAME=$(grep -m1 '^DB_NAME=' "$APP_DIR/.env" | cut -d= -f2-)
+  echo "==> pg_dump connection source: DATABASE_URL=${ENV_DATABASE_URL:+present} DB_HOST=${ENV_DB_HOST:-<empty>} DB_PORT=${ENV_DB_PORT:-<empty>} DB_USER=${ENV_DB_USER:-<empty>} DB_NAME=${ENV_DB_NAME:-<empty>} DB_PASSWORD=${ENV_DB_PASSWORD:+present}"
   PG_DUMP_FILE="$DB_BACKUP_DIR/arielhr_predeploy_${TIMESTAMP}.dump"
   if [ -n "$ENV_DATABASE_URL" ]; then
     pg_dump --dbname="$ENV_DATABASE_URL" -F c -f "$PG_DUMP_FILE"
