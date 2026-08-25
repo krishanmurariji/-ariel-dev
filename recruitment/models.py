@@ -244,7 +244,9 @@ class Recruitment(HorillaModel):
         editable=False,
     )
     vacancy = models.IntegerField(default=0, null=True, verbose_name=_("Vacancy"))
-    recruitment_managers = models.ManyToManyField(Employee, verbose_name=_("Interviewers"))
+    recruitment_managers = models.ManyToManyField(
+        Employee, blank=True, verbose_name=_("Interviewers")
+    )
     recruitment_heads = models.ManyToManyField(
         Employee,
         blank=True,
