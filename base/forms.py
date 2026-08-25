@@ -12,6 +12,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 import bleach
+from bleach.css_sanitizer import CSSSanitizer
 from django import forms
 from django.apps import apps
 from django.contrib import messages
@@ -2665,6 +2666,13 @@ class MailTemplateForm(ModelForm):
     def clean_body(self):
         body = self.cleaned_data.get("body", "")
 
+        # Tags/attributes needed by the branded HTML email layout shared
+        # across recruitment mail templates (see recruitment/migrations/0029,
+        # 0038): a couple of layout <div>s, an <h1> banner title, and inline
+        # `style` on the block elements that carry the actual design (not
+        # just <span>) - without these, bleach.clean(strip=True) silently
+        # drops the tags/attributes and flattens the email into plain text
+        # every time the template is saved through this form.
         ALLOWED_TAGS = [
             "p",
             "b",
@@ -2685,15 +2693,57 @@ class MailTemplateForm(ModelForm):
             "th",
             "a",
             "span",
+            "div",
+            "h1",
+            "h2",
+            "h3",
         ]
 
         ALLOWED_ATTRIBUTES = {
-            "a": ["href", "title"],
+            "a": ["href", "title", "target", "style"],
             "span": ["style"],
+            "div": ["style"],
+            "p": ["style"],
+            "h1": ["style"],
+            "h2": ["style"],
+            "h3": ["style"],
+            "table": ["style"],
+            "td": ["style"],
+            "th": ["style"],
         }
 
+        ALLOWED_CSS_PROPERTIES = [
+            "font-family",
+            "background",
+            "background-color",
+            "padding",
+            "margin",
+            "border",
+            "border-left",
+            "border-top",
+            "border-radius",
+            "box-shadow",
+            "overflow",
+            "color",
+            "font-size",
+            "font-weight",
+            "line-height",
+            "letter-spacing",
+            "text-transform",
+            "text-align",
+            "text-decoration",
+            "display",
+            "max-width",
+            "width",
+            "opacity",
+        ]
+
         cleaned_body = bleach.clean(
-            body, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRIBUTES, strip=True
+            body,
+            tags=ALLOWED_TAGS,
+            attributes=ALLOWED_ATTRIBUTES,
+            css_sanitizer=CSSSanitizer(allowed_css_properties=ALLOWED_CSS_PROPERTIES),
+            strip=True,
         )
 
         return cleaned_body
