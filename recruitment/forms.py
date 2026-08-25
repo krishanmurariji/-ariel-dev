@@ -325,15 +325,20 @@ class RecruitmentCreationForm(BaseModelForm):
         if "recruitment_managers" in self.fields:
             self.fields["recruitment_managers"] = HorillaMultiSelectField(
                 queryset=Employee.objects.filter(is_active=True),
+                required=False,
                 widget=HorillaMultiSelectWidget(
                     filter_route_name="employee-widget-filter",
                     filter_class=EmployeeFilter,
                     filter_instance_context_name="f",
                     filter_template_path="employee_filters.html",
-                    required=True,
+                    required=False,
                 ),
                 label=f"{self._meta.model()._meta.get_field('recruitment_managers').verbose_name}",
             )
+            # The model field itself has no blank=True, so the edit-mode form
+            # (which uses the default ModelForm-generated field instead of the
+            # HorillaMultiSelectField above) would otherwise still require it.
+            self.fields["recruitment_managers"].required = False
         if "recruitment_heads" in self.fields:
             self.fields["recruitment_heads"] = HorillaMultiSelectField(
                 queryset=Employee.objects.filter(is_active=True),
