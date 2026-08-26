@@ -775,6 +775,11 @@ urlpatterns = [
         name="candidate-self-status-tracking",
     ),
     path(
+        "candidate-task-feedback/<int:task_id>/",
+        views.candidate_task_feedback,
+        name="candidate-task-feedback",
+    ),
+    path(
         "candidate-login/",
         views.candidate_login,
         name="candidate-login",

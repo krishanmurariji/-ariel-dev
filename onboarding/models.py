@@ -556,13 +556,25 @@ class OnboardingCandidateDetail(HorillaModel):
     )
     furthest_step_key = models.CharField(
         max_length=20,
-        default="welcome",
+        default="pre_joining",
         verbose_name=_("Furthest Reached Step"),
         help_text=_(
             "The furthest stepper step this candidate has actually reached. "
             "Nav items beyond this stay locked so the flow can't be jumped "
             "past without going through each step in order."
         ),
+    )
+    onboarding_completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_("Onboarding Completed At"),
+        help_text=_(
+            "Set once, the first time every one of this candidate's "
+            "checklist tasks reaches Done - never unset afterward."
+        ),
+    )
+    roles_responsibilities = models.TextField(
+        blank=True, null=True, verbose_name=_("Roles & Responsibilities")
     )
     objects = HorillaCompanyManager("candidate_id__recruitment_id__company_id")
 

@@ -15,37 +15,33 @@
     {% for row in group.rows %}
     <div class="oh-checklist-row">
       <input type="hidden" name="task_id" value="{{ row.task.id }}">
-      <div class="oh-checklist-row__top">
-        <div class="oh-checklist-row__title">
-          <strong>{{ row.task.title }}</strong>
-          {% if row.task.description %}<div class="oh-text-light small">{{ row.task.description }}</div>{% endif %}
-        </div>
+      <div class="oh-checklist-row__title">
+        <strong>{{ row.task.title }}</strong>
+        {% if row.task.description %}<span class="oh-text-light small">{{ row.task.description }}</span>{% endif %}
       </div>
       <div class="oh-checklist-row__controls">
-        <label class="oh-checklist-row__feedback-switch">
-          <div class="oh-switch">
-            <input type="checkbox" name="mandatory_{{ row.task.id }}" class="oh-switch__checkbox" {% if row.is_mandatory %}checked{% endif %}>
-          </div>
-          {% trans "Mandatory" %}
-        </label>
-        <label class="oh-checklist-row__feedback-switch">
-          <div class="oh-switch">
-            <input type="checkbox" name="proof_{{ row.task.id }}" class="oh-switch__checkbox" {% if row.requires_proof %}checked{% endif %}>
-          </div>
-          {% trans "Proof Required" %}
-        </label>
-        <label class="oh-checklist-row__feedback-switch">
-          <div class="oh-switch">
-            <input type="checkbox" name="feedback_{{ row.task.id }}" class="oh-switch__checkbox" {% if row.requires_feedback %}checked{% endif %}>
-          </div>
-          {% trans "Response Required" %}
-        </label>
-        <select name="assignee_{{ row.task.id }}" class="oh-select oh-select-2 oh-checklist-row__assignee">
-          <option value="">{% trans "---Choose Assignee---" %}</option>
-          {% for emp in employees %}
-          <option value="{{ emp.id }}" {% if emp.id == row.assignee_id %}selected{% endif %}>{{ emp.get_full_name }}</option>
-          {% endfor %}
-        </select>
+        <div class="oh-checklist-row__chips">
+          <label class="oh-check-chip">
+            <input type="checkbox" name="mandatory_{{ row.task.id }}" {% if row.is_mandatory %}checked{% endif %}>
+            {% trans "Mandatory" %}
+          </label>
+          <label class="oh-check-chip">
+            <input type="checkbox" name="proof_{{ row.task.id }}" {% if row.requires_proof %}checked{% endif %}>
+            {% trans "Proof Required" %}
+          </label>
+          <label class="oh-check-chip">
+            <input type="checkbox" name="feedback_{{ row.task.id }}" {% if row.requires_feedback %}checked{% endif %}>
+            {% trans "Response Required" %}
+          </label>
+        </div>
+        <div class="oh-checklist-row__assignee-wrap">
+          <select name="assignee_{{ row.task.id }}" class="oh-select oh-select-2 oh-checklist-row__assignee">
+            <option value="">{% trans "---Choose Assignee---" %}</option>
+            {% for emp in employees %}
+            <option value="{{ emp.id }}" {% if emp.id == row.assignee_id %}selected{% endif %}>{{ emp.get_full_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
     </div>
     {% endfor %}

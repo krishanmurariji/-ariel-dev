@@ -1,0 +1,185 @@
+{% load static %}
+{% load i18n horillafilters %}
+{% get_company as theme_obj %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% trans "Employee Onboarding" %} - {{white_label_company_name}} {% trans "Dashboard" %}</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="{% if white_label_company.icon %}{{white_label_company.icon.url}} {% else %}{% static 'favicons/apple-touch-icon.png' %}{% endif %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% if white_label_company.icon %}{{white_label_company.icon.url}} {% else %}{% static 'favicons/favicon-32x32.png' %}{% endif %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% if white_label_company.icon %}{{white_label_company.icon.url}} {% else %}{% static 'favicons/favicon-16x16.png' %}{% endif %}">
+    <link rel="stylesheet" href="{% static 'build/css/style.min.css' %}" />
+    <style>
+        .oh-roles-box {
+            background-color: rgba(0, 0, 0, 0.02);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 8px;
+            padding: 1.25rem 1.5rem;
+            min-height: 140px;
+            font-size: 0.92rem;
+            line-height: 1.6;
+            color: #3a3a3a;
+            word-break: break-word;
+            white-space: normal;
+        }
+        .oh-roles-box--empty {
+            color: #9a9a9a;
+            font-style: italic;
+        }
+        .oh-roles-accept {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-top: 1rem;
+            padding: 0.9rem 1rem;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.015);
+            cursor: pointer;
+        }
+        .oh-roles-accept input[type="checkbox"] {
+            margin-top: 2px;
+            width: 17px;
+            height: 17px;
+            flex: none;
+            cursor: pointer;
+        }
+        .oh-roles-accept__label {
+            font-size: 0.88rem;
+            color: #333;
+            user-select: none;
+        }
+        .oh-onboarding-card__button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+    .oh-onboarding-card { max-width: 760px; }
+    .oh-onboarding-card__header { flex-wrap: wrap; row-gap: 10px; }
+    .oh-onboarding-card__steps { flex-wrap: wrap; row-gap: 8px; max-width: 100%; }
+    .oh-onboarding-card__step { margin-right: 0.85rem; margin-bottom: 2px; }
+</style>
+</head>
+
+<body>
+    {% if messages %}
+    <div class="oh-wrapper">
+        {% for message in messages %}
+        <div class="oh-alert-container">
+            <div class="oh-alert oh-alert--animated {{message.tags}}">
+                {{ message }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            {% for message in messages %}
+            if (window.Toast) {
+                Toast.fire({ icon: "{{ message.level_tag|default:'info'|escapejs }}", title: "{{ message|escapejs }}" });
+            }
+            {% endfor %}
+        });
+    </script>
+
+    <div id="main">
+        <main class="oh-onboarding">
+            <div class="oh-onboarding-card">
+                <div class="oh-onboarding-card__header">
+                    <span class="oh-onboarding-card__company-name">{{company}}</span>
+                    <ul class="oh-onboarding-card__steps">
+                        <li class="oh-onboarding-card__step">
+                            <div class="oh-onboarding-card__count" style="background-color:{{theme_obj.primary_100}}; color:{{theme_obj.primary_800}}">1</div>
+                            <span class="oh-onboarding-card__text">{% trans "Login" %}</span>
+                        </li>
+                        <li class="oh-onboarding-card__step">
+                            <div class="oh-onboarding-card__count" style="background-color:{{theme_obj.primary_100}}; color:{{theme_obj.primary_800}}">2</div>
+                            <span class="oh-onboarding-card__text">{% trans "Profile Setup" %}</span>
+                        </li>
+                        <li class="oh-onboarding-card__step oh-onboarding-card__step--active">
+                            <div class="oh-onboarding-card__count" style="background-color:{{theme_obj.primary_100}}; color:{{theme_obj.primary_800}}">3</div>
+                            <span class="oh-onboarding-card__text">{% trans "Roles & Responsibility" %}</span>
+                        </li>
+                        <li class="oh-onboarding-card__step">
+                            <div class="oh-onboarding-card__count" style="background-color:{{theme_obj.primary_100}}; color:{{theme_obj.primary_800}}">4</div>
+                            <span class="oh-onboarding-card__text">{% trans "Document" %}</span>
+                        </li>
+                        <li class="oh-onboarding-card__step">
+                            <div class="oh-onboarding-card__count" style="background-color:{{theme_obj.primary_100}}; color:{{theme_obj.primary_800}}">5</div>
+                            <span class="oh-onboarding-card__text">{% trans "Personal Details" %}</span>
+                        </li>
+                        <li class="oh-onboarding-card__step">
+                            <div class="oh-onboarding-card__count" style="background-color:{{theme_obj.primary_100}}; color:{{theme_obj.primary_800}}">6</div>
+                            <span class="oh-onboarding-card__text">{% trans "Bank Details" %}</span>
+                        </li>
+
+                    </ul>
+                </div>
+                <div class="oh-onboarding-card__container oh-onboarding-card__container--wide">
+                    <h2 class="oh-onboarding-card__section-title text-center mb-4">{% trans "Roles & Responsibility" %}</h2>
+                    <p class="oh-onboarding-card__lead text-center mb-3">
+                        {% trans "Here's what your role will involve, as shared by your HR team." %}
+                    </p>
+                    <div class="oh-roles-box{% if not roles_responsibilities %} oh-roles-box--empty{% endif %}">
+                        {% if roles_responsibilities %}
+                            {{ roles_responsibilities|safe }}
+                        {% else %}
+                            {% trans "Your roles and responsibilities will be shared with you shortly." %}
+                        {% endif %}
+                    </div>
+                    <form method="post" id="rolesAcceptForm">
+                        {% csrf_token %}
+                        <label class="oh-roles-accept">
+                            <input type="checkbox" name="accept_roles" id="acceptRolesCheckbox" required>
+                            <span class="oh-roles-accept__label">{% trans "I accept the Roles & Responsibilities" %}</span>
+                        </label>
+                        <button type="submit" id="rolesNextBtn"
+                            style="background-color:{{theme_obj.primary_600}}; color:{{theme_obj.secondary_100}}"
+                            class="oh-btn oh-onboarding-card__button mt-4 oh-btn--shadow w-100 mb-4" disabled>
+                            {% trans "Next Step" %}
+                            <ion-icon class="ms-2" name="arrow-forward-outline"></ion-icon>
+                        </button>
+                    </form>
+                    <script>
+                        (function () {
+                            var checkbox = document.getElementById("acceptRolesCheckbox");
+                            var button = document.getElementById("rolesNextBtn");
+                            checkbox.addEventListener("change", function () {
+                                button.disabled = !checkbox.checked;
+                            });
+                        })();
+                    </script>
+                </div>
+            </div>
+        </main>
+    </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
+    <script>
+        var Toast = Swal.mixin({
+            toast: true,
+            icon: "success",
+            title: "General Title",
+            animation: true,
+            position: "top-right",
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            didOpen: function (toast) {
+                toast.addEventListener("mouseenter", Swal.stopTimer);
+                toast.addEventListener("mouseleave", Swal.resumeTimer);
+            },
+        });
+    </script>
+<script src="{% static 'build/js/web.frontend.min.js' %}"></script>
+    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+</body>
+
+</html>

@@ -2,6 +2,12 @@
 Modern onboarding dashboard views — KPI summary + ApexCharts.
 
 Accessible at /onboarding/dashboard/modern/ alongside the existing dashboard.
+
+All data here is driven by the "Start Onboarding" stepper system
+(CandidateChecklistTask / OnboardingCandidateDetail / CandidateDocumentRequest
+/ CandidateDocument), not the older Kanban pipeline (CandidateStage /
+CandidateTask / OnboardingStage / OnboardingTask), which is still fully
+functional but no longer surfaced in the sidebar.
 """
 
 from datetime import date, timedelta
@@ -17,13 +23,18 @@ from horilla.methods import handle_no_permission
 def _has_onboarding_permission(request):
     """Return True if the user may access the onboarding dashboard."""
     user = request.user
-    if user.is_superuser or user.has_perm("onboarding.view_onboardingstage"):
+    if (
+        user.is_superuser
+        or user.has_perm("onboarding.view_onboardingstage")
+        or user.has_perm("recruitment.view_candidate")
+    ):
         return True
     try:
         employee = user.employee_get
         return (
             employee.onboardingstage_set.all().exists()
             or employee.onboarding_task.all().exists()
+            or employee.checklist_tasks.exists()
         )
     except Exception:
         return False
@@ -70,8 +81,11 @@ def onboarding_kpi_data(request):
     """Return onboarding KPI summary data as JSON."""
     if not _has_onboarding_permission(request):
         return JsonResponse({"no_permission": True})
-    from onboarding.models import CandidateStage, CandidateTask
-    from recruitment.models import Recruitment
+    from onboarding.models import (
+        CandidateChecklistTask,
+        OnboardingCandidateDetail,
+    )
+    from recruitment.models import Candidate, CandidateDocument, CandidateDocumentRequest, Recruitment
 
     period_candidates = _onboarding_candidates_in_period(request)
     total_candidates = period_candidates.count()
@@ -80,22 +94,52 @@ def onboarding_kpi_data(request):
     ).count()
 
     # Task stats — restrict to tasks belonging to candidates in the selected period
-    period_tasks = CandidateTask.objects.filter(candidate_id__in=period_candidates)
+    period_tasks = CandidateChecklistTask.objects.filter(
+        candidate_id__in=period_candidates
+    )
     total_tasks = period_tasks.count()
     completed_tasks = period_tasks.filter(status="done").count()
     stuck_tasks = period_tasks.filter(status="stuck").count()
     task_completion = (
         round((completed_tasks / total_tasks * 100), 1) if total_tasks > 0 else 0
     )
+    tasks_pending = period_tasks.exclude(status="done").count()
 
-    # Candidates who completed onboarding (on final stage) — within the period
-    completed_onboarding = CandidateStage.objects.filter(
-        onboarding_stage_id__is_final_stage=True,
+    # Candidates who fully completed onboarding — within the period
+    completed_onboarding = OnboardingCandidateDetail.objects.filter(
         candidate_id__in=period_candidates,
+        onboarding_completed_at__isnull=False,
     ).count()
 
-    # Candidates in progress (not on final stage)
+    # Candidates in progress (not yet marked complete)
     in_progress = total_candidates - completed_onboarding
+
+    today = date.today()
+    upcoming_joiners = (
+        Candidate.objects.filter(is_active=True, joining_date__gte=today)
+        .filter(Q(hired=True) | Q(start_onboard=True))
+        .count()
+    )
+
+    joined_this_month = Candidate.objects.filter(
+        is_active=True,
+        joining_date__year=today.year,
+        joining_date__month=today.month,
+    ).count()
+
+    doc_requests = CandidateDocumentRequest.objects.filter(
+        candidate_id__in=period_candidates
+    )
+    submitted_request_ids = set(
+        CandidateDocument.objects.filter(document_request_id__in=doc_requests)
+        .exclude(document="")
+        .exclude(document__isnull=True)
+        .values_list("document_request_id", flat=True)
+    )
+    documents_pending = doc_requests.exclude(pk__in=submitted_request_ids).count()
+    documents_under_verification = CandidateDocument.objects.filter(
+        candidate_id__in=period_candidates, status="under_verification"
+    ).count()
 
     return JsonResponse(
         {
@@ -107,41 +151,41 @@ def onboarding_kpi_data(request):
             "completed_tasks": completed_tasks,
             "stuck_tasks": stuck_tasks,
             "task_completion": task_completion,
+            "upcoming_joiners": upcoming_joiners,
+            "documents_pending": documents_pending,
+            "documents_under_verification": documents_under_verification,
+            "tasks_pending": tasks_pending,
+            "joined_this_month": joined_this_month,
         }
     )
 
 
 @login_required
 def onboarding_stage_distribution(request):
-    """Candidates by onboarding stage."""
+    """Candidates by furthest-reached stepper step ("Stepper Progress")."""
     if not _has_onboarding_permission(request):
         return JsonResponse({"no_permission": True})
-    from onboarding.models import CandidateStage, OnboardingStage
+    from onboarding.models import OnboardingCandidateDetail
+    from onboarding.stepper import STEPS
 
     period_candidates = _onboarding_candidates_in_period(request)
-    stages = []
+    counts = dict(
+        OnboardingCandidateDetail.objects.filter(candidate_id__in=period_candidates)
+        .values("furthest_step_key")
+        .annotate(count=Count("id"))
+        .values_list("furthest_step_key", "count")
+    )
 
-    try:
-        stage_qs = OnboardingStage.objects.all().order_by("sequence")
-        for stage in stage_qs:
-            count = CandidateStage.objects.filter(
-                onboarding_stage_id=stage,
-                candidate_id__in=period_candidates,
-            ).count()
-            if count > 0:
-                stages.append(
-                    {
-                        "id": stage.pk,
-                        "stage": stage.stage_title,
-                        "count": count,
-                        "is_final": stage.is_final_stage,
-                        "recruitment": (
-                            stage.recruitment_id.title if stage.recruitment_id else "—"
-                        ),
-                    }
-                )
-    except Exception:
-        pass
+    stages = [
+        {
+            "id": key,
+            "stage": str(label),
+            "count": counts.get(key, 0),
+            "is_final": key == "finalize",
+            "recruitment": "",
+        }
+        for key, label in STEPS
+    ]
 
     return JsonResponse({"stages": stages})
 
@@ -151,23 +195,17 @@ def onboarding_task_status(request):
     """Task status breakdown."""
     if not _has_onboarding_permission(request):
         return JsonResponse({"no_permission": True})
-    from onboarding.models import CandidateTask
+    from onboarding.models import CandidateChecklistTask
 
     period_candidates = _onboarding_candidates_in_period(request)
-    period_tasks = CandidateTask.objects.filter(candidate_id__in=period_candidates)
+    period_tasks = CandidateChecklistTask.objects.filter(
+        candidate_id__in=period_candidates
+    )
 
     statuses = []
-    task_choices = [
-        ("todo", "Todo"),
-        ("scheduled", "Scheduled"),
-        ("ongoing", "Ongoing"),
-        ("stuck", "Stuck"),
-        ("done", "Done"),
-    ]
-
-    for status, label in task_choices:
+    for status, label in CandidateChecklistTask.STATUS_CHOICES:
         count = period_tasks.filter(status=status).count()
-        statuses.append({"status": status, "label": label, "count": count})
+        statuses.append({"status": status, "label": str(label), "count": count})
 
     return JsonResponse({"statuses": statuses})
 
@@ -230,32 +268,29 @@ def onboarding_candidates_list(request):
     """Current onboarding candidates with progress."""
     if not _has_onboarding_permission(request):
         return JsonResponse({"no_permission": True})
-    from onboarding.models import CandidateTask
+    from onboarding.models import CandidateChecklistTask, OnboardingCandidateDetail
+    from onboarding.stepper import STEP_LABELS
 
     candidates = []
 
     try:
         qs = (
             _onboarding_candidates_in_period(request)
-            .select_related("recruitment_id", "job_position_id", "onboarding_stage")
+            .select_related("recruitment_id", "job_position_id")
             .order_by("-id")[:15]
         )
 
         for c in qs:
-            stage_name = "—"
-            try:
-                cs = c.onboarding_stage
-                stage_name = (
-                    cs.onboarding_stage_id.stage_title
-                    if cs and cs.onboarding_stage_id
-                    else "—"
-                )
-            except Exception:
-                pass
+            detail = OnboardingCandidateDetail.objects.filter(candidate_id=c).first()
+            stage_name = (
+                str(STEP_LABELS.get(detail.furthest_step_key, "—")) if detail else "—"
+            )
 
             # Task progress
-            total = CandidateTask.objects.filter(candidate_id=c).count()
-            done = CandidateTask.objects.filter(candidate_id=c, status="done").count()
+            total = CandidateChecklistTask.objects.filter(candidate_id=c).count()
+            done = CandidateChecklistTask.objects.filter(
+                candidate_id=c, status="done"
+            ).count()
             progress = round((done / total * 100)) if total > 0 else 0
 
             candidates.append(
@@ -281,10 +316,10 @@ def onboarding_candidates_list(request):
 
 @login_required
 def onboarding_task_managers(request):
-    """Task assignment by manager (logged-in user's tasks), scoped to the selected period."""
+    """The logged-in user's own assigned checklist tasks, grouped by task title."""
     if not _has_onboarding_permission(request):
         return JsonResponse({"no_permission": True})
-    from onboarding.models import CandidateTask, OnboardingTask
+    from onboarding.models import CandidateChecklistTask
 
     tasks = []
 
@@ -292,29 +327,31 @@ def onboarding_task_managers(request):
         user_emp = getattr(request.user, "employee_get", None)
         if user_emp:
             period_candidates = _onboarding_candidates_in_period(request)
-            task_qs = OnboardingTask.objects.filter(
-                employee_id=user_emp,
-            ).order_by("stage_id__sequence")
-
-            for task in task_qs[:10]:
-                ct_base = CandidateTask.objects.filter(
-                    onboarding_task_id=task,
-                    candidate_id__in=period_candidates,
+            groups = (
+                CandidateChecklistTask.objects.filter(
+                    assignee_id=user_emp, candidate_id__in=period_candidates
                 )
-                total = ct_base.count()
-                if total == 0:
-                    continue
-                done = ct_base.filter(status="done").count()
-                stuck = ct_base.filter(status="stuck").count()
+                .values("title")
+                .annotate(
+                    total=Count("id"),
+                    done=Count("id", filter=Q(status="done")),
+                    stuck=Count("id", filter=Q(status="stuck")),
+                )
+                .order_by("-total")[:10]
+            )
 
+            for group in groups:
+                total = group["total"]
                 tasks.append(
                     {
-                        "title": task.task_title,
-                        "stage": task.stage_id.stage_title if task.stage_id else "—",
+                        "title": group["title"],
+                        "stage": "",
                         "total": total,
-                        "done": done,
-                        "stuck": stuck,
-                        "progress": round((done / total * 100)) if total > 0 else 0,
+                        "done": group["done"],
+                        "stuck": group["stuck"],
+                        "progress": (
+                            round((group["done"] / total * 100)) if total > 0 else 0
+                        ),
                     }
                 )
     except Exception:
@@ -328,8 +365,9 @@ def onboarding_completion_trend(request):
     """Monthly onboarding completions within the selected period."""
     if not _has_onboarding_permission(request):
         return JsonResponse({"no_permission": True})
-    from onboarding.models import CandidateStage
+    from onboarding.models import OnboardingCandidateDetail
 
+    period_candidates = _onboarding_candidates_in_period(request)
     from_date, to_date = _parse_period(request)
     months = []
     try:
@@ -341,9 +379,10 @@ def onboarding_completion_trend(request):
             else:
                 next_month = cursor.replace(month=cursor.month + 1)
             month_end = next_month - timedelta(days=1)
-            count = CandidateStage.objects.filter(
-                onboarding_end_date__gte=cursor,
-                onboarding_end_date__lte=month_end,
+            count = OnboardingCandidateDetail.objects.filter(
+                candidate_id__in=period_candidates,
+                onboarding_completed_at__date__gte=cursor,
+                onboarding_completed_at__date__lte=month_end,
             ).count()
             months.append({"month": cursor.strftime("%b %Y"), "count": count})
             cursor = next_month

@@ -1,16 +1,18 @@
 """
 stepper.py
 
-Full-page "Start Onboarding" stepper for a candidate: Welcome -> Job
-Profile -> Pre-Joining Checklist -> Document Verification -> Post-Joining
-Checklist -> Finalize. Steps always run in this fixed order (no per-step
-skipping). Steps render as htmx fragments swapped into the page's
-right-hand content column; the left column (step list) persists across
-navigation, and any step can be jumped to directly.
+Full-page "Start Onboarding" stepper for a candidate: Pre-Joining
+Checklist -> Document Verification -> Offer Letter -> Job Profile ->
+Post-Joining Checklist -> Roles & Responsibility -> Finalize. Steps
+always run in this fixed order (no per-step skipping). Steps render as
+htmx fragments swapped into the page's right-hand content column; the
+left column (step list) persists across navigation, and any step can be
+jumped to directly, up to the furthest one actually reached.
 """
 
 from django.contrib import messages
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -21,10 +23,12 @@ from onboarding.forms import (
     ChecklistTemplateSelectForm,
     OnboardingDetailsForm,
     OnboardingDocumentRequestForm,
+    RolesResponsibilityForm,
     WelcomeMessageForm,
 )
 from onboarding.models import (
     CandidateChecklistTask,
+    CandidateStage,
     OnboardingCandidateDetail,
     TaskTemplate,
     TaskTemplateTask,
@@ -33,11 +37,12 @@ from recruitment.models import Candidate, CandidateDocument, CandidateDocumentRe
 from recruitment.views.views import notify_candidate_of_document_rejection
 
 STEPS = [
-    ("welcome", _("Offer Letter")),
-    ("details", _("Job Profile")),
     ("pre_joining", _("Pre-Joining Checklist")),
     ("documents", _("Document Verification")),
+    ("welcome", _("Offer Letter")),
+    ("details", _("Job Profile")),
     ("post_joining", _("Post-Joining Checklist")),
+    ("roles", _("Roles & Responsibility")),
     ("finalize", _("Finalize")),
 ]
 STEP_KEYS = [key for key, _label in STEPS]
@@ -51,6 +56,22 @@ PHASE_STEP_LABELS = {
 def _get_detail(candidate):
     detail, _created = OnboardingCandidateDetail.objects.get_or_create(candidate_id=candidate)
     return detail
+
+
+def _maybe_mark_onboarding_complete(candidate):
+    """
+    Marks the candidate's onboarding fully complete the first time every
+    one of their checklist tasks (pre- and post-joining alike) reaches
+    Done. One-directional - never unset once set, even if a task is later
+    reopened (e.g. a proof removal reverting a task to todo).
+    """
+    detail = _get_detail(candidate)
+    if detail.onboarding_completed_at:
+        return
+    tasks = candidate.checklist_tasks.all()
+    if tasks.exists() and not tasks.exclude(status="done").exists():
+        detail.onboarding_completed_at = timezone.now()
+        detail.save(update_fields=["onboarding_completed_at"])
 
 
 def _next_key(current_key):
@@ -187,8 +208,11 @@ def _checklist_context(candidate, phase):
 
 
 def _render_step(request, candidate, detail, step_key, extra=None):
+    if step_key not in STEP_KEYS:
+        return _render_step(request, candidate, detail, STEP_KEYS[0], extra)
+
     context = _nav_context(candidate, detail, step_key)
-    context["back_key"] = _prev_key(step_key) if step_key != "welcome" else None
+    context["back_key"] = _prev_key(step_key) if step_key != STEP_KEYS[0] else None
     context["next_key"] = _next_key(step_key) if step_key != "finalize" else None
     context.update(extra or {})
 
@@ -216,7 +240,7 @@ def _render_step(request, candidate, detail, step_key, extra=None):
                     "work_type_id": detail.work_type_id_id,
                     "employee_type_id": detail.employee_type_id_id,
                     "date_of_joining": candidate.joining_date,
-                    "probation_period": detail.probation_period,
+                    "probation_end": candidate.probation_end,
                 },
             )
         template = "onboarding/stepper/step_details.html"
@@ -229,15 +253,13 @@ def _render_step(request, candidate, detail, step_key, extra=None):
         context.update(_document_context(candidate))
         template = "onboarding/stepper/step_documents.html"
 
-    elif step_key == "finalize":
-        context.update(_finalize_context(candidate, detail))
-        template = "onboarding/stepper/step_finalize.html"
+    elif step_key == "roles":
+        context.setdefault("form", RolesResponsibilityForm(instance=detail))
+        template = "onboarding/stepper/step_roles.html"
 
     else:
-        step_key = "welcome"
-        context = _nav_context(candidate, detail, step_key)
-        context["form"] = WelcomeMessageForm(instance=detail)
-        template = "onboarding/stepper/step_welcome.html"
+        context.update(_finalize_context(candidate, detail))
+        template = "onboarding/stepper/step_finalize.html"
 
     return render(request, template, context)
 
@@ -256,13 +278,41 @@ def _finalize_context(candidate, detail):
 
 @login_required
 @permission_required("recruitment.change_candidate")
+def finalize_onboarding(request, pk):
+    """
+    Finalize's "Start Onboarding" action - deliberately does not touch the
+    shared email_send view (recruitment/onboarding/urls.py "email-send"),
+    which is also used by the recruitment pipeline and the candidate list's
+    own bulk "Send Portal" action. This just flips the status flag, with no
+    email and no portal token, matching the explicit "no mail" requirement.
+    """
+    candidate = get_object_or_404(Candidate, pk=pk)
+    if request.method == "POST":
+        Candidate.objects.filter(pk=candidate.pk).update(start_onboard=True)
+        try:
+            stage = candidate.recruitment_id.onboarding_stage.first()
+            CandidateStage.objects.get_or_create(
+                candidate_id=candidate, defaults={"onboarding_stage_id": stage}
+            )
+        except Exception:
+            pass
+        messages.success(request, _("Onboarding marked as started"))
+    next_url = request.POST.get("next") or reverse("candidates-view")
+    return redirect(next_url)
+
+
+@login_required
+@permission_required("recruitment.change_candidate")
 def onboarding_stepper_page(request, pk):
     candidate = get_object_or_404(Candidate, pk=pk)
     detail = _get_detail(candidate)
     return render(
         request,
         "onboarding/stepper/page.html",
-        {**_nav_context(candidate, detail, "welcome"), "landing_key": "welcome"},
+        {
+            **_nav_context(candidate, detail, STEP_KEYS[0]),
+            "landing_key": STEP_KEYS[0],
+        },
     )
 
 
@@ -273,7 +323,7 @@ def stepper_step(request, pk, step_key):
     candidate = get_object_or_404(Candidate, pk=pk)
     detail = _get_detail(candidate)
     if step_key not in STEP_KEYS:
-        step_key = "welcome"
+        step_key = STEP_KEYS[0]
 
     if request.method == "POST":
         error = _save_step(request, candidate, detail, step_key)
@@ -323,6 +373,7 @@ def _save_step(request, candidate, detail, step_key):
             else None
         )
         candidate.joining_date = data["date_of_joining"]
+        candidate.probation_end = data["probation_end"]
         candidate.save()
 
         detail.department_id = (
@@ -360,12 +411,18 @@ def _save_step(request, candidate, detail, step_key):
             if data["employee_type_id"]
             else None
         )
-        detail.probation_period = data["probation_period"]
         detail.save()
         return None
 
     if step_key in ("pre_joining", "post_joining"):
         return _save_checklist_tasks(request, candidate, step_key)
+
+    if step_key == "roles":
+        form = RolesResponsibilityForm(request.POST, instance=detail)
+        if not form.is_valid():
+            return _("Please check the roles & responsibilities.")
+        form.save()
+        return None
 
     return None
 
@@ -455,6 +512,43 @@ def document_request_modal(request, pk):
         request,
         "onboarding/stepper/document_request_modal.html",
         {"candidate": candidate, "form": form},
+    )
+
+
+@login_required
+@hx_request_required
+@permission_required("recruitment.change_candidate")
+def document_request_cancel(request, pk, req_id):
+    candidate = get_object_or_404(Candidate, pk=pk)
+    doc_request = get_object_or_404(
+        CandidateDocumentRequest, pk=req_id, candidate_id=candidate
+    )
+    if request.method == "POST":
+        # A CandidateDocument placeholder row (no file) is auto-created the
+        # moment a request is made, so a plain .delete() would always hit
+        # ProtectedError even when nothing was ever actually submitted -
+        # only block cancelling once a real file exists.
+        submitted = (
+            CandidateDocument.objects.filter(document_request_id=doc_request)
+            .exclude(document="")
+            .exclude(document__isnull=True)
+        )
+        if submitted.exists():
+            messages.error(
+                request,
+                _(
+                    "A document has already been submitted for this request - "
+                    "reject it instead of cancelling."
+                ),
+            )
+        else:
+            CandidateDocument.objects.filter(document_request_id=doc_request).delete()
+            doc_request.delete()
+            messages.success(request, _("Document request cancelled"))
+    return render(
+        request,
+        "onboarding/stepper/_document_list.html",
+        {"candidate": candidate, **_document_context(candidate)},
     )
 
 

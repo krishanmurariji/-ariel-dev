@@ -19,6 +19,7 @@ from django.views import View
 from horilla.decorators import login_required, permission_required
 from onboarding.forms import TaskTemplateForm, TaskTemplateTaskFormSet
 from onboarding.models import CandidateChecklistTask, TaskTemplate
+from onboarding.stepper import _maybe_mark_onboarding_complete
 
 
 @method_decorator(login_required, name="dispatch")
@@ -158,6 +159,8 @@ def checklist_task_self_update(request, pk):
                 elif task.completed_at:
                     task.completed_at = None
                 task.save()
+                if new_status == "done":
+                    _maybe_mark_onboarding_complete(task.candidate_id)
     return redirect("my-checklist-tasks")
 
 

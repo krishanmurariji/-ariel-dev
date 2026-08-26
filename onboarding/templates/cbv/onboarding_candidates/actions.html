@@ -114,25 +114,23 @@
 
 	{% if instance.onboarding_portal %}
 		<a
-			href="#"
+			href="{% url 'email-send' %}?ids={{instance.id}}"
 			class="oh-btn w-100"
 			style="background-color: yellowgreen; color: white"
 			title="{% trans 'Send Portal / Start Onboarding' %}"
-			onclick="$('select[name=ids]').val('{{instance.id}}');"
+			onclick="event.preventDefault(); $('select[name=ids]').val('{{instance.id}}');"
 			data-target="#addAttachments"
 			data-toggle="oh-modal-toggle"
-			href="{% url 'email-send' %}?ids={{instance.id}}"
 			><ion-icon name="link-outline"></ion-icon
 		></a>
 	{% else %}
 		<a
-			href="#"
+			href="{% url 'email-send' %}?ids={{instance.id}}"
 			class="oh-btn oh-btn--light-bkg w-100"
 			title="{% trans 'Send Portal / Start onboarding' %}"
-			onclick="$('select[name=ids]').val('{{instance.id}}');"
+			onclick="event.preventDefault(); $('select[name=ids]').val('{{instance.id}}');"
 			data-target="#addAttachments"
 			data-toggle="oh-modal-toggle"
-			href="{% url 'email-send' %}?ids={{instance.id}}"
 			><ion-icon name="link-outline"></ion-icon
 		></a>
 	{% endif %}
@@ -155,6 +153,56 @@
 	>
 		<ion-icon name="layers-outline"></ion-icon>
 	</button>
+
+	{% if perms.recruitment.change_candidate %}
+		{% if instance.probation_feedback_cycle %}
+			<a
+				class="oh-btn w-100"
+				title="{% trans 'Probation feedback cycle running' %}"
+				href="#"
+				onclick="
+					event.preventDefault();
+					Swal.fire({
+						icon: 'info',
+						title: `{% trans 'Already Running' %}`,
+						text: `{% trans 'A probation feedback cycle is already running for this candidate.' %}`,
+						confirmButtonText: `{% trans 'OK' %}`,
+					});
+				"
+				style="background-color: #2f9e44; color: white; pointer-events: auto; cursor: default;"
+			>
+				<ion-icon name="checkmark-circle-outline"></ion-icon>
+			</a>
+		{% elif instance.onboarding_detail.probation_period %}
+			<form
+				hx-post="{% url 'onboarding-start-feedback-cycle' instance.pk %}"
+				hx-target="#reloadMessages"
+			>
+				<a
+					class="oh-btn oh-btn--light-bkg w-100"
+					onclick="
+						event.preventDefault();
+						Swal.fire({
+							title: `{% trans 'Start probation feedback cycle?' %}`,
+							text: `{% trans 'Generates one review each month for' %} {{ instance.onboarding_detail.probation_period }} {% trans 'month(s) - month 1 goes to the Reporting Manager and Buddy, later months go to the Reporting Manager only.' %}`,
+							icon: 'question',
+							showCancelButton: true,
+							confirmButtonText: `{% trans 'Yes' %}`,
+							cancelButtonText: `{% trans 'Cancel' %}`,
+						}).then((result) => {
+							if (result.isConfirmed) {
+								$(this).closest('form').find('[type=submit]').click();
+							}
+						});
+					"
+					title="{% trans 'Start Probation Feedback Cycle' %}"
+				>
+					<ion-icon name="chatbox-ellipses-outline"></ion-icon>
+				</a>
+				<input type="submit" hidden />
+			</form>
+		{% endif %}
+	{% endif %}
 
 	<button
 		type="button"

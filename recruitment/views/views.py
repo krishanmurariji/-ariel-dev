@@ -112,6 +112,7 @@ from recruitment.forms import (
     StageNoteUpdateForm,
     ToSkillZoneForm,
 )
+from onboarding.models import CandidateChecklistTask
 from recruitment.methods import recruitment_manages
 from recruitment.models import (
     Candidate,
@@ -3633,6 +3634,17 @@ def candidate_logout(request):
     return redirect("candidate_login")
 
 
+def _candidate_feedback_tasks(candidate):
+    """
+    Onboarding checklist tasks a candidate should see on their self-tracking
+    page: only those the assignee has already marked Done, and only where a
+    candidate response was actually requested.
+    """
+    return candidate.checklist_tasks.filter(
+        requires_feedback=True, status="done"
+    ).order_by("-completed_at")
+
+
 @candidate_login_required
 def candidate_self_status_tracking(request):
     """
@@ -3671,9 +3683,48 @@ def candidate_self_status_tracking(request):
         return render(
             request,
             "candidate/candidate_self_tracking.html",
-            {"candidate": candidate, "interviews": interviews},
+            {
+                "candidate": candidate,
+                "interviews": interviews,
+                "checklist_tasks": _candidate_feedback_tasks(candidate),
+            },
         )
     return render(request, "404.html")
+
+
+@candidate_login_required
+def candidate_task_feedback(request, task_id):
+    """
+    Lets a candidate submit (or update) their response for a checklist task
+    - only reachable for a task that requires feedback, is already marked
+    Done by the assignee, and actually belongs to the logged-in candidate.
+    """
+    candidate_id = request.session.get("candidate_id")
+    if not candidate_id:
+        return redirect("candidate-login/")
+    candidate = Candidate.objects.get(pk=candidate_id)
+
+    task = CandidateChecklistTask.objects.filter(
+        pk=task_id,
+        candidate_id=candidate,
+        requires_feedback=True,
+        status="done",
+    ).first()
+    if task and request.method == "POST":
+        task.candidate_feedback = request.POST.get("candidate_feedback", "").strip()
+        task.candidate_satisfied = request.POST.get("candidate_satisfied") == "on"
+        task.candidate_feedback_at = timezone.now()
+        task.save()
+        messages.success(request, _("Your response has been submitted.."))
+
+    return render(
+        request,
+        "candidate/candidate_self_tracking.html",
+        {
+            "candidate": candidate,
+            "checklist_tasks": _candidate_feedback_tasks(candidate),
+        },
+    )
 
 
 @login_required
@@ -3712,7 +3763,11 @@ def candidate_self_status_tracking_managers_view(request, cand_id):
         return render(
             request,
             "candidate/candidate_self_tracking.html",
-            {"candidate": candidate, "interviews": interviews},
+            {
+                "candidate": candidate,
+                "interviews": interviews,
+                "checklist_tasks": _candidate_feedback_tasks(candidate),
+            },
         )
     return render(request, "404.html")
 

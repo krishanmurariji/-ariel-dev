@@ -211,7 +211,14 @@ class OnboardingCandidateCard(HorillaCardView):
             candidate.checklist_pct = int(done / total * 100) if total else 0
 
             detail = getattr(candidate, "onboarding_detail", None)
-            basic_fields = [candidate.job_position_id_id, candidate.joining_date]
+            candidate.onboarding_completed_at = (
+                detail.onboarding_completed_at if detail else None
+            )
+            basic_fields = [
+                candidate.job_position_id_id,
+                candidate.joining_date,
+                candidate.probation_end,
+            ]
             if detail:
                 basic_fields += [
                     detail.department_id_id,
@@ -221,7 +228,6 @@ class OnboardingCandidateCard(HorillaCardView):
                     detail.shift_id_id,
                     detail.work_type_id_id,
                     detail.employee_type_id_id,
-                    detail.probation_period,
                 ]
             basic_filled = len([f for f in basic_fields if f])
             candidate.basic_details_pct = (

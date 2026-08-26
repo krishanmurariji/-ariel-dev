@@ -344,6 +344,62 @@ class OnboardingViewStageForm(ModelForm):
         super().clean()
 
 
+class ProfileSetupForm(ModelForm):
+    """
+    Form for the onboarding portal's "Profile Setup" step - profile photo
+    plus a short personal write-up (about / what they love about the job /
+    hobbies) shown later on their employee profile.
+    """
+
+    about = forms.CharField(
+        required=False,
+        max_length=1000,
+        widget=forms.Textarea(attrs={"rows": 3}),
+        label=_("About"),
+    )
+    job_love = forms.CharField(
+        required=False,
+        max_length=1000,
+        widget=forms.Textarea(attrs={"rows": 3}),
+        label=_("What I Love About My Job"),
+    )
+    hobbies_interests = forms.CharField(
+        required=False,
+        max_length=1000,
+        widget=forms.Textarea(attrs={"rows": 3}),
+        label=_("My Interests And Hobbies"),
+    )
+
+    class Meta:
+        """
+        Meta class for additional options
+        """
+
+        model = Candidate
+        fields = ["profile", "about", "job_love", "hobbies_interests"]
+        widgets = {
+            # Plain FileInput instead of the ModelForm default
+            # ClearableFileInput - the latter renders "Currently: <url>" /
+            # "Change:" text nodes around the file input that the portal's
+            # JS-driven avatar preview can't hide (it only hides the actual
+            # <input>), leaking the raw avatar URL onto the page.
+            "profile": forms.FileInput(),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        placeholders = {
+            "about": _("A short introduction about yourself..."),
+            "job_love": _("What excites you about this role..."),
+            "hobbies_interests": _("Things you enjoy outside of work..."),
+        }
+        for field_name, placeholder in placeholders.items():
+            self.fields[field_name].widget.attrs.update(
+                {"rows": 4, "maxlength": 1000, "placeholder": placeholder}
+            )
+        self.fields["profile"].required = False
+
+
 class EmployeeCreationForm(ModelForm):
     """
     Form for Employee Model
@@ -656,6 +712,18 @@ class StageChangeForm(forms.ModelForm):
 # ── Start Onboarding stepper ─────────────────────────────────────────────
 
 
+class OhClearableFileInput(forms.ClearableFileInput):
+    """
+    Friendlier replacement for Django's default ClearableFileInput - its
+    "Currently: <path> / Clear [ ] / Change: No file chosen" layout reads
+    like raw form internals to a non-technical user. Renders a dropzone-
+    style upload control (with a plain "View current file" / "Remove"
+    pair when a file already exists) instead.
+    """
+
+    template_name = "onboarding/widgets/clearable_file_input.html"
+
+
 class WelcomeMessageForm(HorillaModelForm):
     """
     Step 1 - Welcome. Also carries the Offer Letter status + document, so
@@ -676,9 +744,29 @@ class WelcomeMessageForm(HorillaModelForm):
             "welcome_message": forms.Textarea(
                 attrs={"rows": 6, "placeholder": _("Write a welcome note...")}
             ),
+            "offer_letter": OhClearableFileInput(),
         }
         labels = {
             "offer_letter": _("Offer Letter Document"),
+        }
+
+
+class RolesResponsibilityForm(HorillaModelForm):
+    """
+    Roles & Responsibility step - a single rich-text field so HR can format
+    (bold, alignment, lists, ...) the same way already used across the app.
+    """
+
+    class Meta:
+        model = OnboardingCandidateDetail
+        fields = ["roles_responsibilities"]
+        widgets = {
+            "roles_responsibilities": forms.Textarea(
+                attrs={"data-summernote": "", "rows": 8}
+            ),
+        }
+        labels = {
+            "roles_responsibilities": _("Roles & Responsibilities"),
         }
 
 
@@ -724,11 +812,10 @@ class OnboardingDetailsForm(HorillaForm):
         label=_("Date of joining"),
         widget=forms.DateInput(attrs={"type": "date", "class": "oh-input w-100"}),
     )
-    probation_period = forms.IntegerField(
+    probation_end = forms.DateField(
         required=False,
-        min_value=0,
-        label=_("Probation period (months)"),
-        widget=forms.NumberInput(attrs={"class": "oh-input w-100"}),
+        label=_("Probation end"),
+        widget=forms.DateInput(attrs={"type": "date", "class": "oh-input w-100"}),
     )
     buddy_id = forms.ChoiceField(label=_("Buddy"), required=False)
 

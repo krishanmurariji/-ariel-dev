@@ -17,6 +17,7 @@ import logging
 import os
 import random
 import secrets
+from datetime import date
 from urllib.parse import parse_qs
 
 from django import template
@@ -28,7 +29,7 @@ from django.core.mail import EmailMessage, send_mail
 from django.core.paginator import Paginator
 from django.db.models import ProtectedError
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.translation import gettext as __
@@ -70,6 +71,7 @@ from onboarding.forms import (
     OnboardingTaskForm,
     OnboardingViewStageForm,
     OnboardingViewTaskForm,
+    ProfileSetupForm,
     UserCreationForm,
     build_employee_education_formset,
     build_employee_emergency_contact_formset,
@@ -94,6 +96,53 @@ from recruitment.models import (
 from recruitment.pipeline_grouper import group_by_queryset
 
 logger = logging.getLogger(__name__)
+
+
+@login_required
+@permission_required("recruitment.change_candidate")
+def start_feedback_cycle(request, pk):
+    """
+    Starts a monthly Probation Feedback Cycle for this candidate, using the
+    probation period and buddy already captured on OnboardingCandidateDetail
+    during the Job Profile step. Safe to call even before the candidate has
+    been converted to an employee - the actual Feedback records only start
+    appearing once conversion happens (see pms.scheduler.probation_feedback_creation).
+    """
+    from pms.models import ProbationFeedbackCycle, QuestionTemplate
+
+    candidate = get_object_or_404(Candidate, pk=pk)
+    if request.method == "POST":
+        detail = getattr(candidate, "onboarding_detail", None)
+        if not detail or not detail.probation_period:
+            messages.error(
+                request,
+                _(
+                    "Set a probation period for this candidate first "
+                    "(Job Profile step)."
+                ),
+            )
+        elif ProbationFeedbackCycle.objects.filter(candidate_id=candidate).exists():
+            messages.info(
+                request, _("A feedback cycle is already running for this candidate.")
+            )
+        else:
+            question_template = QuestionTemplate.objects.filter(
+                question_template="Probation Review"
+            ).first()
+            if not question_template:
+                messages.error(
+                    request, _("No 'Probation Review' question template found.")
+                )
+            else:
+                ProbationFeedbackCycle.objects.create(
+                    candidate_id=candidate,
+                    buddy_id=detail.buddy_id,
+                    question_template_id=question_template,
+                    start_date=candidate.joining_date or date.today(),
+                    total_months=detail.probation_period,
+                )
+                messages.success(request, _("Probation feedback cycle started."))
+    return HorillaRedirect(request)
 
 
 @login_required
@@ -1148,7 +1197,7 @@ def user_creation(request, token):
         onboarding_portal = OnboardingPortal.objects.get(token=token)
         if not onboarding_portal or onboarding_portal.used is True:
             return render(request, "404.html")
-        if onboarding_portal.count == 3:
+        if onboarding_portal.count == 5:
             return redirect("employee-bank-details", token)
         candidate = onboarding_portal.candidate_id
         user = HorillaUser.objects.filter(username=candidate.email).first()
@@ -1160,11 +1209,15 @@ def user_creation(request, token):
                     return user_save(form, onboarding_portal, request, token)
         except Exception:
             messages.error(request, _("User with email-id already exists.."))
+        onboarding_detail = getattr(candidate, "onboarding_detail", None)
+        welcome_message = onboarding_detail.welcome_message if onboarding_detail else None
         return render(
             request,
             "onboarding/user_creation.html",
             {
                 "form": form,
+                "candidate": candidate,
+                "welcome_message": welcome_message,
                 "company": onboarding_portal.candidate_id.recruitment_id.company_id,
             },
         )
@@ -1196,7 +1249,8 @@ def user_save(form, onboarding_portal, request, token):
 
 def profile_view(request, token):
     """
-    function used to view user profile.
+    function used to view/update the candidate's onboarding portal profile -
+    photo, about, what they love about the job and their hobbies/interests.
 
     Parameters:
     request (HttpRequest): The HTTP request object.
@@ -1204,27 +1258,150 @@ def profile_view(request, token):
 
     Returns:
     GET : return user profile template
-    POST : update profile image of the user
+    POST : validate and save the profile step, then move to the next step
+    """
+    onboarding_portal = OnboardingPortal.objects.filter(token=token).first()
+    if onboarding_portal is None:
+        return render(request, "404.html")
+    candidate = onboarding_portal.candidate_id
+    form = ProfileSetupForm(instance=candidate)
+    if request.method == "POST":
+        form = ProfileSetupForm(request.POST, request.FILES, instance=candidate)
+        if form.is_valid():
+            form.save()
+            onboarding_portal.profile = candidate.profile
+            onboarding_portal.count = 2
+            onboarding_portal.save()
+            messages.success(request, _("Profile updated successfully.."))
+            return redirect("roles-responsibility", token)
+    return render(
+        request,
+        "onboarding/profile_view.html",
+        {
+            "candidate": candidate,
+            "form": form,
+            "profile": candidate.profile,
+            "token": token,
+            "company": candidate.recruitment_id.company_id,
+        },
+    )
+
+
+def roles_responsibility(request, token):
+    """
+    function used to show the candidate their Roles & Responsibilities -
+    the write-up recorded during the staff-side Start Onboarding stepper.
+    Read-only step; just advances the portal on submit.
+
+    Parameters:
+    request (HttpRequest): The HTTP request object.
+    token : random generated onboarding portal token
+
+    Returns:
+    GET : return roles & responsibilities template
+    POST : advance to the next step
     """
     onboarding_portal = OnboardingPortal.objects.filter(token=token).first()
     if onboarding_portal is None:
         return render(request, "404.html")
     candidate = onboarding_portal.candidate_id
     if request.method == "POST":
-        profile = request.FILES.get("profile")
-        if profile is not None:
-            candidate.profile = profile
-            candidate.save()
-            onboarding_portal.profile = profile
-            onboarding_portal.count = 2
+        if request.POST.get("accept_roles"):
+            onboarding_portal.count = 3
             onboarding_portal.save()
-            messages.success(request, _("Profile picture updated successfully.."))
+            return redirect("document-upload", token)
+        messages.error(
+            request,
+            _("Please accept the Roles & Responsibilities before continuing."),
+        )
+    onboarding_detail = getattr(candidate, "onboarding_detail", None)
+    roles_responsibilities = (
+        onboarding_detail.roles_responsibilities if onboarding_detail else None
+    )
     return render(
         request,
-        "onboarding/profile_view.html",
+        "onboarding/roles_responsibility.html",
         {
             "candidate": candidate,
-            "profile": onboarding_portal.profile,
+            "roles_responsibilities": roles_responsibilities,
+            "token": token,
+            "company": candidate.recruitment_id.company_id,
+        },
+    )
+
+
+def document_upload(request, token):
+    """
+    function used to let the candidate view requested documents and upload
+    them before continuing. Advancing past this step is blocked until every
+    mandatory document has an uploaded file.
+
+    Parameters:
+    request (HttpRequest): The HTTP request object.
+    token : random generated onboarding portal token
+
+    Returns:
+    GET : return document upload template
+    POST : save uploaded files, then advance to the next step
+    """
+    onboarding_portal = OnboardingPortal.objects.filter(token=token).first()
+    if onboarding_portal is None:
+        return render(request, "404.html")
+    candidate = onboarding_portal.candidate_id
+    document_requests = list(candidate.candidatedocumentrequest_set.all())
+    # A CandidateDocumentRequest auto-creates a placeholder CandidateDocument
+    # row (status="requested") the moment it's created - that row existing is
+    # not the same as the candidate having actually uploaded something, so
+    # only count rows that carry a real uploaded file.
+    submitted_docs_by_request = {
+        doc.document_request_id_id: doc
+        for doc in CandidateDocument.objects.filter(candidate_id=candidate)
+        if doc.document_request_id_id and doc.document
+    }
+    if request.method == "POST":
+        for doc_request in document_requests:
+            uploaded = request.FILES.get(f"doc_request_{doc_request.pk}")
+            if not uploaded:
+                continue
+            existing_doc = submitted_docs_by_request.get(doc_request.pk)
+            if existing_doc:
+                existing_doc.document = uploaded
+                existing_doc.status = "submitted"
+                existing_doc.save()
+                submitted_docs_by_request[doc_request.pk] = existing_doc
+            else:
+                submitted_docs_by_request[doc_request.pk] = CandidateDocument.objects.create(
+                    title=doc_request.title,
+                    candidate_id=candidate,
+                    document_request_id=doc_request,
+                    document=uploaded,
+                    status="submitted",
+                )
+        missing_mandatory = [
+            req.title
+            for req in document_requests
+            if req.is_mandatory and req.pk not in submitted_docs_by_request
+        ]
+        if missing_mandatory:
+            messages.error(
+                request,
+                _("Please upload these required documents before continuing: %(docs)s")
+                % {"docs": ", ".join(missing_mandatory)},
+            )
+        else:
+            onboarding_portal.count = 4
+            onboarding_portal.save()
+            return redirect("employee-creation", token)
+    document_rows = [
+        (doc_request, submitted_docs_by_request.get(doc_request.pk))
+        for doc_request in document_requests
+    ]
+    return render(
+        request,
+        "onboarding/document_upload.html",
+        {
+            "candidate": candidate,
+            "document_rows": document_rows,
             "token": token,
             "company": candidate.recruitment_id.company_id,
         },
@@ -1357,22 +1534,6 @@ def employee_creation(request, token):
         instance=existing_employee, initial=experience_initial, prefix="experience"
     )
 
-    # Evaluated eagerly (not left as a lazy queryset) because the POST branch
-    # below calls login(request, user), which swaps the authenticated user
-    # mid-request; HorillaCompanyManager scopes querysets to the current
-    # user's company, so re-evaluating these after login() can silently
-    # return an empty set for the brand-new user/employee.
-    document_requests = list(candidate.candidatedocumentrequest_set.all())
-    # A CandidateDocumentRequest auto-creates a placeholder CandidateDocument
-    # row (status="requested") the moment it's created - that row existing is
-    # not the same as the candidate having actually uploaded something, so
-    # only count rows that carry a real uploaded file.
-    submitted_docs_by_request = {
-        doc.document_request_id_id: doc
-        for doc in CandidateDocument.objects.filter(candidate_id=candidate)
-        if doc.document_request_id_id and doc.document
-    }
-
     # form.errors.clear()
     if request.method == "POST":
         instance = employee_qs.first() if getattr(user, "pk", None) else None
@@ -1448,60 +1609,29 @@ def employee_creation(request, token):
                 },
             )
 
-            for doc_request in document_requests:
-                uploaded = request.FILES.get(f"doc_request_{doc_request.pk}")
-                if not uploaded:
-                    continue
-                existing_doc = submitted_docs_by_request.get(doc_request.pk)
-                if existing_doc:
-                    existing_doc.document = uploaded
-                    existing_doc.status = "submitted"
-                    existing_doc.save()
-                    submitted_docs_by_request[doc_request.pk] = existing_doc
-                else:
-                    submitted_docs_by_request[doc_request.pk] = CandidateDocument.objects.create(
-                        title=doc_request.title,
-                        candidate_id=candidate,
-                        document_request_id=doc_request,
-                        document=uploaded,
-                        status="submitted",
+            # Document requests are uploaded in their own earlier
+            # "Document" step, which already blocks the candidate from
+            # reaching here until every mandatory document is submitted -
+            # just copy whatever was uploaded there onto the new Employee.
+            Document.objects.bulk_create(
+                [
+                    Document(
+                        title=doc.title,
+                        employee_id=employee_personal_info,
+                        document=doc.document,
+                        status=doc.status,
+                        reject_reason=doc.reject_reason,
                     )
+                    for doc in candidate.candidatedocument_set.all()
+                ]
+            )
 
-            missing_mandatory = [
-                req.title
-                for req in document_requests
-                if req.is_mandatory and req.pk not in submitted_docs_by_request
-            ]
-            if missing_mandatory:
-                messages.error(
-                    request,
-                    _("Please upload these required documents before continuing: %(docs)s")
-                    % {"docs": ", ".join(missing_mandatory)},
-                )
-            else:
-                Document.objects.bulk_create(
-                    [
-                        Document(
-                            title=doc.title,
-                            employee_id=employee_personal_info,
-                            document=doc.document,
-                            status=doc.status,
-                            reject_reason=doc.reject_reason,
-                        )
-                        for doc in candidate.candidatedocument_set.all()
-                    ]
-                )
-
-                onboarding_portal.count = 3
-                onboarding_portal.save()
-                messages.success(
-                    request, _("Employee personal details created successfully..")
-                )
-                return redirect("employee-bank-details", token)
-    document_rows = [
-        (doc_request, submitted_docs_by_request.get(doc_request.pk))
-        for doc_request in document_requests
-    ]
+            onboarding_portal.count = 5
+            onboarding_portal.save()
+            messages.success(
+                request, _("Employee personal details created successfully..")
+            )
+            return redirect("employee-bank-details", token)
     return render(
         request,
         "onboarding/employee_creation.html",
@@ -1511,7 +1641,6 @@ def employee_creation(request, token):
             "emergency_contact_formset": emergency_contact_formset,
             "education_formset": education_formset,
             "experience_formset": experience_formset,
-            "document_rows": document_rows,
         },
     )
 
@@ -1575,7 +1704,7 @@ def employee_bank_details_save(form, request, onboarding_portal):
     candidate.converted_employee_id = employee
     candidate.save()
     employee_bank_detail.save()
-    onboarding_portal.count = 4
+    onboarding_portal.count = 6
     onboarding_portal.used = True
     onboarding_portal.save()
     messages.success(request, _("Employee bank details created successfully.."))

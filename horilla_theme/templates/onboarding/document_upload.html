@@ -1,0 +1,267 @@
+{% load static %}
+{% load i18n horillafilters %}
+{% get_company as theme_obj %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% trans "Employee Onboarding" %} - {{white_label_company_name}} {% trans "Dashboard" %}</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="{% if white_label_company.icon %}{{white_label_company.icon.url}} {% else %}{% static 'favicons/apple-touch-icon.png' %}{% endif %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% if white_label_company.icon %}{{white_label_company.icon.url}} {% else %}{% static 'favicons/favicon-32x32.png' %}{% endif %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% if white_label_company.icon %}{{white_label_company.icon.url}} {% else %}{% static 'favicons/favicon-16x16.png' %}{% endif %}">
+    <link rel="stylesheet" href="{% static 'build/css/style.min.css' %}" />
+    <style>
+        .oh-onboarding-card { max-width: 760px; }
+        .oh-onboarding-card__header { flex-wrap: wrap; row-gap: 10px; }
+        .oh-onboarding-card__steps { flex-wrap: wrap; row-gap: 8px; max-width: 100%; }
+        .oh-onboarding-card__step { margin-right: 0.85rem; margin-bottom: 2px; }
+
+        .oh-doc-card {
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 14px;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .oh-doc-card--done { border-color: rgba(62, 125, 79, 0.3); background: rgba(62, 125, 79, 0.03); }
+        .oh-doc-card__top { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+        .oh-doc-card__icon {
+            width: 38px; height: 38px; border-radius: 9px; flex: none;
+            display: flex; align-items: center; justify-content: center; font-size: 19px;
+        }
+        .oh-doc-card--done .oh-doc-card__icon { background: rgba(62, 125, 79, 0.12); color: #3e7d4f; }
+        .oh-doc-card__info { flex: 1; min-width: 0; }
+        .oh-doc-card__title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.92rem; flex-wrap: wrap; }
+        .oh-doc-card__meta { display: flex; gap: 14px; font-size: 0.74rem; color: #999; margin-top: 3px; }
+        .oh-doc-card__status {
+            flex: none; display: inline-flex; align-items: center; gap: 4px;
+            font-size: 0.72rem; font-weight: 600; color: #3e7d4f;
+            background: rgba(62, 125, 79, 0.1); padding: 4px 10px; border-radius: 20px;
+            white-space: nowrap;
+        }
+        .oh-doc-card__status ion-icon { font-size: 14px; }
+
+        .oh-badge-mandatory {
+            background: #f3ddd7; color: #b3402f; font-size: 0.6rem; padding: 2px 9px;
+            border-radius: 20px; text-transform: uppercase; letter-spacing: 0.02em;
+        }
+
+        .oh-dropzone {
+            display: flex; align-items: center; gap: 12px;
+            border: 1.5px dashed rgba(0, 0, 0, 0.16);
+            border-radius: 10px;
+            padding: 12px 14px;
+            cursor: pointer;
+            background: rgba(0, 0, 0, 0.015);
+            transition: border-color 0.15s ease, background 0.15s ease;
+        }
+        .oh-dropzone:hover, .oh-dropzone.is-dragover { background: rgba(0, 0, 0, 0.03); }
+        .oh-dropzone--done { border-style: solid; border-color: rgba(62, 125, 79, 0.35); background: rgba(62, 125, 79, 0.04); }
+        .oh-dropzone input[type="file"] { display: none; }
+        .oh-dropzone__icon { font-size: 22px; flex: none; }
+        .oh-dropzone--done .oh-dropzone__icon { color: #3e7d4f !important; }
+        .oh-dropzone__text { flex: 1; min-width: 0; font-size: 0.82rem; color: #666; }
+        .oh-dropzone__filename { font-weight: 600; color: #222; }
+        .oh-dropzone__hint { font-size: 0.72rem; color: #999; margin-top: 1px; }
+        .oh-dropzone__view {
+            flex: none; font-size: 0.78rem; font-weight: 600;
+            text-decoration: none; padding: 4px 10px; border-radius: 6px;
+        }
+
+        .oh-empty-hint {
+            display: flex; align-items: center; gap: 8px; color: #888; font-size: 0.85rem;
+            padding: 14px; border: 1px dashed rgba(0, 0, 0, 0.12); border-radius: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    {% if messages %}
+    <div class="oh-wrapper">
+        {% for message in messages %}
+        <div class="oh-alert-container">
+            <div class="oh-alert oh-alert--animated {{message.tags}}">
+                {{ message }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            {% for message in messages %}
+            if (window.Toast) {
+                Toast.fire({ icon: "{{ message.level_tag|default:'info'|escapejs }}", title: "{{ message|escapejs }}" });
+            }
+            {% endfor %}
+        });
+    </script>
+
+    <div id="main">
+        <main class="oh-onboarding">
+            <div class="oh-onboarding-card">
+                <div class="oh-onboarding-card__header">
+                    <span class="oh-onboarding-card__company-name">{{company}}</span>
+                    <ul class="oh-onboarding-card__steps">
+                        <li class="oh-onboarding-card__step">
+                            <div class="oh-onboarding-card__count" style="background-color:{{theme_obj.primary_100}}; color:{{theme_obj.primary_800}}">1</div>
+                            <span class="oh-onboarding-card__text">{% trans "Login" %}</span>
+                        </li>
+                        <li class="oh-onboarding-card__step">
+                            <div class="oh-onboarding-card__count" style="background-color:{{theme_obj.primary_100}}; color:{{theme_obj.primary_800}}">2</div>
+                            <span class="oh-onboarding-card__text">{% trans "Profile Setup" %}</span>
+                        </li>
+                        <li class="oh-onboarding-card__step">
+                            <div class="oh-onboarding-card__count" style="background-color:{{theme_obj.primary_100}}; color:{{theme_obj.primary_800}}">3</div>
+                            <span class="oh-onboarding-card__text">{% trans "Roles & Responsibility" %}</span>
+                        </li>
+                        <li class="oh-onboarding-card__step oh-onboarding-card__step--active">
+                            <div class="oh-onboarding-card__count" style="background-color:{{theme_obj.primary_100}}; color:{{theme_obj.primary_800}}">4</div>
+                            <span class="oh-onboarding-card__text">{% trans "Document" %}</span>
+                        </li>
+                        <li class="oh-onboarding-card__step">
+                            <div class="oh-onboarding-card__count" style="background-color:{{theme_obj.primary_100}}; color:{{theme_obj.primary_800}}">5</div>
+                            <span class="oh-onboarding-card__text">{% trans "Personal Details" %}</span>
+                        </li>
+                        <li class="oh-onboarding-card__step">
+                            <div class="oh-onboarding-card__count" style="background-color:{{theme_obj.primary_100}}; color:{{theme_obj.primary_800}}">6</div>
+                            <span class="oh-onboarding-card__text">{% trans "Bank Details" %}</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="oh-onboarding-card__container oh-onboarding-card__container--wide">
+                    <h2 class="oh-onboarding-card__section-title text-center mb-4">{% trans "Document" %}</h2>
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        {% if document_rows %}
+                        {% for doc_request, submitted_doc in document_rows %}
+                        <div class="oh-doc-card{% if submitted_doc %} oh-doc-card--done{% endif %}">
+                            <div class="oh-doc-card__top">
+                                <div class="oh-doc-card__icon" style="background-color:{{theme_obj.primary_100}}; color:{{theme_obj.primary_800}}">
+                                    <ion-icon name="document-attach-outline"></ion-icon>
+                                </div>
+                                <div class="oh-doc-card__info">
+                                    <div class="oh-doc-card__title">
+                                        {{ doc_request.title }}
+                                        {% if doc_request.is_mandatory %}<span class="oh-badge-mandatory">{% trans "Mandatory" %}</span>{% endif %}
+                                    </div>
+                                    <div class="oh-doc-card__meta">
+                                        <span>{% trans "Format" %}: {{ doc_request.get_format_display }}</span>
+                                        {% if doc_request.max_size %}<span>{% trans "Max size" %}: {{ doc_request.max_size }} MB</span>{% endif %}
+                                    </div>
+                                </div>
+                                {% if submitted_doc %}
+                                <span class="oh-doc-card__status"><ion-icon name="checkmark-circle"></ion-icon>{% trans "Uploaded" %}</span>
+                                {% endif %}
+                            </div>
+                            <label class="oh-dropzone{% if submitted_doc %} oh-dropzone--done{% endif %}" data-dropzone
+                                style="border-color:{% if not submitted_doc %}{{theme_obj.primary_200}}{% endif %};">
+                                <input type="file" name="doc_request_{{ doc_request.pk }}" data-dropzone-input>
+                                <ion-icon name="cloud-upload-outline" class="oh-dropzone__icon" style="color:{{theme_obj.primary_600}};"></ion-icon>
+                                <span class="oh-dropzone__text">
+                                    <span class="oh-dropzone__filename" data-dropzone-filename>
+                                        {% if submitted_doc %}{% trans "Replace file" %}{% else %}{% trans "Click to upload or drag & drop" %}{% endif %}
+                                    </span>
+                                    <div class="oh-dropzone__hint" data-dropzone-hint>
+                                        {% if not submitted_doc %}{% trans "PDF, image, or document file" %}{% endif %}
+                                    </div>
+                                </span>
+                                {% if submitted_doc %}
+                                <a href="{{ submitted_doc.document.url }}" target="_blank" class="oh-dropzone__view" style="color:{{theme_obj.primary_700}};" onclick="event.stopPropagation()">{% trans "View" %}</a>
+                                {% endif %}
+                            </label>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <div class="oh-empty-hint mb-3">
+                            <ion-icon name="folder-open-outline"></ion-icon>
+                            <span>{% trans "No documents have been requested yet." %}</span>
+                        </div>
+                        {% endif %}
+                        <button type="submit"
+                            style="background-color:{{theme_obj.primary_600}}; color:{{theme_obj.secondary_100}}"
+                            class="oh-btn oh-onboarding-card__button mt-4 oh-btn--shadow w-100 mb-4">
+                            {% trans "Next Step" %}
+                            <ion-icon class="ms-2" name="arrow-forward-outline"></ion-icon>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
+    <script>
+        var Toast = Swal.mixin({
+            toast: true,
+            icon: "success",
+            title: "General Title",
+            animation: true,
+            position: "top-right",
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            didOpen: function (toast) {
+                toast.addEventListener("mouseenter", Swal.stopTimer);
+                toast.addEventListener("mouseleave", Swal.resumeTimer);
+            },
+        });
+    </script>
+<script src="{% static 'build/js/web.frontend.min.js' %}"></script>
+    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+    <script>
+        (function () {
+            document.querySelectorAll('[data-dropzone]').forEach(function (zone) {
+                var input = zone.querySelector('[data-dropzone-input]');
+                var filenameEl = zone.querySelector('[data-dropzone-filename]');
+                var hintEl = zone.querySelector('[data-dropzone-hint]');
+
+                function showFile(file) {
+                    if (!file) { return; }
+                    filenameEl.textContent = file.name;
+                    if (hintEl) {
+                        hintEl.textContent = (file.size / 1024).toFixed(0) + ' KB';
+                    }
+                    zone.classList.add('oh-dropzone--done');
+                }
+
+                input.addEventListener('change', function () {
+                    if (input.files && input.files[0]) {
+                        showFile(input.files[0]);
+                    }
+                });
+
+                ['dragenter', 'dragover'].forEach(function (evt) {
+                    zone.addEventListener(evt, function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        zone.classList.add('is-dragover');
+                    });
+                });
+                ['dragleave', 'dragend'].forEach(function (evt) {
+                    zone.addEventListener(evt, function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        zone.classList.remove('is-dragover');
+                    });
+                });
+                zone.addEventListener('drop', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    zone.classList.remove('is-dragover');
+                    var files = e.dataTransfer && e.dataTransfer.files;
+                    if (files && files.length) {
+                        input.files = files;
+                        showFile(files[0]);
+                    }
+                });
+            });
+        })();
+    </script>
+</body>
+
+</html>

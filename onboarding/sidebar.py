@@ -23,11 +23,13 @@ SUBMENUS = [
         "menu": _("My Tasks"),
         "redirect": reverse("my-checklist-tasks"),
     },
-    {
-        "menu": _("Onboarding Tasks"),
-        "redirect": reverse("cbv-pipeline-onboarding") + "?closed=false",
-        "accessibility": "onboarding.sidebar.onboarding_view_accessibility",
-    },
+    # Retired from the menu - legacy Kanban pipeline, kept fully working
+    # (code/views/models untouched) but not offered to anyone anymore.
+    # {
+    #     "menu": _("Onboarding Tasks"),
+    #     "redirect": reverse("cbv-pipeline-onboarding") + "?closed=false",
+    #     "accessibility": "onboarding.sidebar.onboarding_view_accessibility",
+    # },
     {
         "menu": _("Candidates"),
         "redirect": reverse("candidates-view"),

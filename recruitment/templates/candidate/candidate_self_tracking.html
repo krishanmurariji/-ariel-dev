@@ -432,7 +432,7 @@
             </div>
 
             <div class="row">
-                <div class="col-12 col-md-6 col-lg-4 order-1 order-md-2">
+                <div class="col-12 col-md-6 col-lg-3 order-1 order-md-2">
                     <div class="tracking-card">
                         <h3 class="h5 mb-4 fw-bold">{% trans "Documents" %}</h3>
                         <div class="document-list">
@@ -497,7 +497,7 @@
                     </div>
                 </div>
 
-                <div class="col-12 col-md-6 col-lg-4 order-2 order-md-1">
+                <div class="col-12 col-md-6 col-lg-3 order-2 order-md-1">
                     <div class="tracking-card">
                         <h3 class="h5 mb-4 fw-bold">{% trans "Scheduled Interviews" %}</h3>
                         <div class="interview-list">
@@ -575,7 +575,7 @@
                     </div>
                 </div>
 
-                <div class="col-12 col-md-6 col-lg-4 order-3">
+                <div class="col-12 col-md-6 col-lg-3 order-3">
                     <div class="tracking-card" id="note">
                         {% if messages %}
                             <div class="oh-wrapper">
@@ -659,6 +659,79 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="col-12 col-md-6 col-lg-3 order-4">
+                    <div class="tracking-card" id="taskCard">
+                        {% if messages %}
+                            <div class="oh-wrapper">
+                                {% for message in messages %}
+                                    <div class="oh-alert-container">
+                                        <div class="oh-alert oh-alert--animated {{message.tags}}">
+                                        {{ message }}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <h3 class="h5 mb-4 fw-bold">{% trans "Tasks" %}</h3>
+                        <div class="notes-list">
+                            {% for task in checklist_tasks %}
+                                <div class="task-item mb-3 pb-3 border-bottom">
+                                    <h6 class="mb-1">{{ task.title }}</h6>
+                                    <small class="text-muted d-block mb-2">
+                                        {{ task.get_phase_display }}{% if task.completed_at %} &middot; {% trans "Completed" %} {{ task.completed_at|date:"M d, Y" }}{% endif %}
+                                    </small>
+
+                                    <div class="task-feedback-summary{% if not task.candidate_feedback %} d-none{% endif %}">
+                                        <span class="badge {% if task.candidate_satisfied %}text-success{% else %}text-warning{% endif %} p-2 mb-2 d-inline-block">
+                                            <i class="fas fa-thumbs-{% if task.candidate_satisfied %}up{% else %}down{% endif %} me-1"></i>
+                                            {% if task.candidate_satisfied %}{% trans "Satisfied" %}{% else %}{% trans "Not satisfied" %}{% endif %}
+                                        </span>
+                                        <p class="mb-2">{{ task.candidate_feedback }}</p>
+                                        <button type="button" class="btn btn-sm btn-link p-0 task-edit-btn">{% trans "Edit response" %}</button>
+                                    </div>
+
+                                    <form
+                                        class="task-feedback-form{% if task.candidate_feedback %} d-none{% endif %}"
+                                        hx-post="{% url 'candidate-task-feedback' task.id %}"
+                                        hx-target="#taskCard"
+                                        hx-select="#taskCard"
+                                        hx-swap="outerHTML"
+                                    >
+                                        {% csrf_token %}
+                                        <textarea
+                                            name="candidate_feedback"
+                                            class="form-control mb-2"
+                                            rows="2"
+                                            placeholder="{% trans 'Share your response about this task...' %}"
+                                            required
+                                        >{{ task.candidate_feedback|default:"" }}</textarea>
+                                        <div class="form-check mb-2">
+                                            <input
+                                                class="form-check-input"
+                                                type="checkbox"
+                                                name="candidate_satisfied"
+                                                id="satisfied{{ task.id }}"
+                                                {% if task.candidate_satisfied %}checked{% endif %}
+                                            >
+                                            <label class="form-check-label" for="satisfied{{ task.id }}">
+                                                {% trans "I'm satisfied with how this was handled" %}
+                                            </label>
+                                        </div>
+                                        <button type="submit" class="btn btn-sm oh-btn--secondary">{% trans "Submit Response" %}</button>
+                                    </form>
+                                </div>
+                                {% empty %}
+                                <div class="d-flex justify-content-center align-items-center" style="height: 40vh;">
+                                    <div class="text-center">
+                                        <i class="fas fa-clipboard-check fa-3x text-muted mb-3"></i>
+                                        <h5 class="oh-404__subtitle">{% trans "No tasks are waiting for your response." %}</h5>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -701,5 +774,12 @@
         <script src="{% static 'htmx/htmx.min.js' %}"></script>
         <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
         <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+        <script>
+            $(document).on("click", ".task-edit-btn", function () {
+                var item = $(this).closest(".task-item");
+                item.find(".task-feedback-summary").addClass("d-none");
+                item.find(".task-feedback-form").removeClass("d-none");
+            });
+        </script>
     </body>
 </html>

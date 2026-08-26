@@ -1,0 +1,22 @@
+{% load i18n %}
+<div class="oh-file-upload">
+  {% if widget.is_initial %}
+  <div class="oh-file-upload__current">
+    <ion-icon name="document-attach-outline" class="oh-file-upload__current-icon"></ion-icon>
+    <a href="{{ widget.value.url }}" target="_blank" class="oh-file-upload__current-link">{% trans "View current file" %}</a>
+    {% if not widget.required %}
+    <label class="oh-file-upload__remove">
+      <input type="checkbox" name="{{ widget.checkbox_name }}" id="{{ widget.checkbox_id }}"{% if widget.attrs.disabled %} disabled{% endif %}>
+      <ion-icon name="trash-outline"></ion-icon> {% trans "Remove" %}
+    </label>
+    {% endif %}
+  </div>
+  {% endif %}
+  <label class="oh-file-upload__dropzone" data-file-upload-zone>
+    <input type="{{ widget.type }}" name="{{ widget.name }}"{% include "django/forms/widgets/attrs.html" %} data-file-upload-input>
+    <ion-icon name="cloud-upload-outline" class="oh-file-upload__dropzone-icon"></ion-icon>
+    <span class="oh-file-upload__dropzone-text" data-file-upload-filename>
+      {% if widget.is_initial %}{% trans "Click to replace, or drag & drop" %}{% else %}{% trans "Click to upload, or drag & drop" %}{% endif %}
+    </span>
+  </label>
+</div>

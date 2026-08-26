@@ -29,9 +29,36 @@
             href="{% if white_label_company.icon %}{{ white_label_company.icon.url }} {% else %}{% static 'favicons/favicon-16x16.png' %}{% endif %}"
         >
         <link rel="stylesheet" href="{% static 'build/css/style.min.css' %}">
-    </head>
+        <style>
+
+    .oh-onboarding-card { max-width: 760px; }
+    .oh-onboarding-card__header { flex-wrap: wrap; row-gap: 10px; }
+    .oh-onboarding-card__steps { flex-wrap: wrap; row-gap: 8px; max-width: 100%; }
+    .oh-onboarding-card__step { margin-right: 0.85rem; margin-bottom: 2px; }
+    </style>
+</head>
 
     <body>
+    {% if messages %}
+    <div class="oh-wrapper">
+        {% for message in messages %}
+        <div class="oh-alert-container">
+            <div class="oh-alert oh-alert--animated {{message.tags}}">
+                {{ message }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            {% for message in messages %}
+            if (window.Toast) {
+                Toast.fire({ icon: "{{ message.level_tag|default:'info'|escapejs }}", title: "{{ message|escapejs }}" });
+            }
+            {% endfor %}
+        });
+    </script>
+    {% endif %}
         {% if form.errors %}
             <!-- form errors  -->
             <div class="oh-wrapper">
@@ -68,14 +95,14 @@
                                 </div>
                                 <span class="oh-onboarding-card__text">{% trans "Profile Setup" %}</span>
                             </li>
-                            <li class="oh-onboarding-card__step oh-onboarding-card__step--active">
+                            <li class="oh-onboarding-card__step">
                                 <div
                                     class="oh-onboarding-card__count"
                                     style="background-color: {{ theme_obj.primary_100 }}; color: {{ theme_obj.primary_800 }}"
                                 >
                                     3
                                 </div>
-                                <span class="oh-onboarding-card__text">{% trans "Personal Details" %}</span>
+                                <span class="oh-onboarding-card__text">{% trans "Roles & Responsibility" %}</span>
                             </li>
                             <li class="oh-onboarding-card__step">
                                 <div
@@ -84,8 +111,27 @@
                                 >
                                     4
                                 </div>
+                                <span class="oh-onboarding-card__text">{% trans "Document" %}</span>
+                            </li>
+                            <li class="oh-onboarding-card__step oh-onboarding-card__step--active">
+                                <div
+                                    class="oh-onboarding-card__count"
+                                    style="background-color: {{ theme_obj.primary_100 }}; color: {{ theme_obj.primary_800 }}"
+                                >
+                                    5
+                                </div>
+                                <span class="oh-onboarding-card__text">{% trans "Personal Details" %}</span>
+                            </li>
+                            <li class="oh-onboarding-card__step">
+                                <div
+                                    class="oh-onboarding-card__count"
+                                    style="background-color: {{ theme_obj.primary_100 }}; color: {{ theme_obj.primary_800 }}"
+                                >
+                                    6
+                                </div>
                                 <span class="oh-onboarding-card__text">{% trans "Bank Details" %}</span>
                             </li>
+
                         </ul>
                     </div>
                     <form method="post" enctype="multipart/form-data">
@@ -372,40 +418,6 @@
                             </div>
                         </div>
 
-                        {% if document_requests %}
-                        <div class="oh-onboarding-card__address-group mt-3">
-                            <h2 class="oh-onboarding-card__section-title">{% trans "Documents" %}</h2>
-                            <p style="color:#888; font-size:0.85rem; margin-top:-8px;">
-                                {% trans "Upload the documents requested by HR. Documents marked Required must be uploaded before you can continue." %}
-                            </p>
-                            <div class="row">
-                                {% for doc_request, submitted_doc in document_rows %}
-                                <div class="col-sm-12 col-md-6 col-lg-6">
-                                    <div class="oh-input-group" style="border:1px solid #e5e5e5; border-radius:8px; padding:12px; margin-bottom:12px;">
-                                        <label class="oh-label d-flex align-items-center gap-1">
-                                            <ion-icon name="document-text-outline"></ion-icon>
-                                            {{ doc_request.title }}
-                                            {% if doc_request.is_mandatory %}
-                                            <span style="background:#f3ddd7; color:#b3402f; font-size:0.62rem; padding:2px 8px; border-radius:20px; text-transform:uppercase;">{% trans "Required" %}</span>
-                                            {% endif %}
-                                        </label>
-                                        {% if doc_request.description %}
-                                        <p style="color:#888; font-size:0.78rem;">{{ doc_request.description }}</p>
-                                        {% endif %}
-                                        <input type="file" name="doc_request_{{ doc_request.pk }}" class="oh-input w-100">
-                                        {% if submitted_doc %}
-                                        <p style="color:#3e7d4f; font-size:0.78rem; margin-top:6px; margin-bottom:4px;">
-                                            <ion-icon name="checkmark-circle-outline"></ion-icon> {% trans "Uploaded" %}
-                                        </p>
-                                        <iframe src="{{ submitted_doc.document.url }}" style="width:100%; height:220px; border:1px solid #e5e5e5; border-radius:6px;"></iframe>
-                                        <a href="{{ submitted_doc.document.url }}" target="_blank" style="font-size:0.75rem;">{% trans "Open full preview" %}</a>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        {% endif %}
 
                         <button
                             href="#"
@@ -420,7 +432,24 @@
                 </div>
             </main>
         </div>
-        <script src="{% static 'build/js/web.frontend.min.js' %}"></script>
+            <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
+    <script>
+        var Toast = Swal.mixin({
+            toast: true,
+            icon: "success",
+            title: "General Title",
+            animation: true,
+            position: "top-right",
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            didOpen: function (toast) {
+                toast.addEventListener("mouseenter", Swal.stopTimer);
+                toast.addEventListener("mouseleave", Swal.resumeTimer);
+            },
+        });
+    </script>
+<script src="{% static 'build/js/web.frontend.min.js' %}"></script>
         <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
         <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
         <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>

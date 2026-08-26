@@ -31,8 +31,60 @@
       </div>
     </div>
     <div class="oh-step__footer">
+      {% if back_key %}
+      <button type="button" class="oh-btn oh-btn--light"
+        hx-get="{% url 'onboarding-stepper-step' candidate.pk back_key %}"
+        hx-target="#stepperContent" hx-swap="innerHTML">
+        <ion-icon name="arrow-back-outline"></ion-icon> {% trans "Back" %}
+      </button>
+      {% else %}
       <span></span>
+      {% endif %}
       <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Next" %} <ion-icon name="arrow-forward-outline"></ion-icon></button>
     </div>
   </form>
 </div>
+<script>
+  (function () {
+    document.querySelectorAll("[data-file-upload-zone]").forEach(function (zone) {
+      var input = zone.querySelector("[data-file-upload-input]");
+      var filenameEl = zone.querySelector("[data-file-upload-filename]");
+      if (!input || !filenameEl) { return; }
+      var defaultText = filenameEl.textContent;
+
+      function showFile(file) {
+        if (!file) { return; }
+        filenameEl.textContent = file.name;
+        var removeBox = zone.closest(".oh-file-upload").querySelector(".oh-file-upload__remove input[type=checkbox]");
+        if (removeBox) { removeBox.checked = false; }
+      }
+
+      input.addEventListener("change", function () {
+        if (input.files && input.files[0]) { showFile(input.files[0]); }
+        else { filenameEl.textContent = defaultText; }
+      });
+
+      ["dragenter", "dragover"].forEach(function (evt) {
+        zone.addEventListener(evt, function (e) {
+          e.preventDefault(); e.stopPropagation();
+          zone.classList.add("is-dragover");
+        });
+      });
+      ["dragleave", "dragend"].forEach(function (evt) {
+        zone.addEventListener(evt, function (e) {
+          e.preventDefault(); e.stopPropagation();
+          zone.classList.remove("is-dragover");
+        });
+      });
+      zone.addEventListener("drop", function (e) {
+        e.preventDefault(); e.stopPropagation();
+        zone.classList.remove("is-dragover");
+        var files = e.dataTransfer && e.dataTransfer.files;
+        if (files && files.length) {
+          input.files = files;
+          showFile(files[0]);
+        }
+      });
+    });
+  })();
+</script>

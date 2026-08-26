@@ -1,0 +1,35 @@
+{% load i18n %}
+{% include "onboarding/stepper/_nav.html" %}
+{% include "onboarding/stepper/_messages.html" %}
+<div class="oh-step">
+  <div class="oh-step__header">
+    <ion-icon name="list-outline" class="oh-step__icon"></ion-icon>
+    <div>
+      <h4 class="m-0">{% trans "Roles & Responsibility" %}</h4>
+    </div>
+  </div>
+  <form
+    hx-post="{% url 'onboarding-stepper-step' candidate.pk 'roles' %}"
+    hx-target="#stepperContent"
+    hx-swap="innerHTML">
+    {% csrf_token %}
+    <div class="oh-step__body">
+      <div class="oh-field">
+        <label>{% trans "Roles & Responsibilities" %}</label>
+        {{ form.roles_responsibilities }}
+      </div>
+    </div>
+    <div class="oh-step__footer">
+      {% if back_key %}
+      <button type="button" class="oh-btn oh-btn--light"
+        hx-get="{% url 'onboarding-stepper-step' candidate.pk back_key %}"
+        hx-target="#stepperContent" hx-swap="innerHTML">
+        <ion-icon name="arrow-back-outline"></ion-icon> {% trans "Back" %}
+      </button>
+      {% else %}
+      <span></span>
+      {% endif %}
+      <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Next" %} <ion-icon name="arrow-forward-outline"></ion-icon></button>
+    </div>
+  </form>
+</div>

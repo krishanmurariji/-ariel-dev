@@ -708,6 +708,21 @@ class Candidate(HorillaModel):
     name = models.CharField(max_length=100, null=True, verbose_name=_("Name"))
     profile = models.ImageField(upload_to=upload_path, null=True)  # 853
     portfolio = models.URLField(max_length=200, blank=True, verbose_name=_("Portfolio"))
+    about = models.TextField(
+        blank=True, null=True, max_length=1000, verbose_name=_("About")
+    )
+    job_love = models.TextField(
+        blank=True,
+        null=True,
+        max_length=1000,
+        verbose_name=_("What I Love About My Job"),
+    )
+    hobbies_interests = models.TextField(
+        blank=True,
+        null=True,
+        max_length=1000,
+        verbose_name=_("My Interests And Hobbies"),
+    )
     recruitment_id = models.ForeignKey(
         Recruitment,
         on_delete=models.PROTECT,

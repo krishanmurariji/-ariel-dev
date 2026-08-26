@@ -35,11 +35,15 @@
       </div>
     </div>
     <div class="oh-step__footer">
+      {% if back_key %}
       <button type="button" class="oh-btn oh-btn--light"
         hx-get="{% url 'onboarding-stepper-step' candidate.pk back_key %}"
         hx-target="#stepperContent" hx-swap="innerHTML">
         <ion-icon name="arrow-back-outline"></ion-icon> {% trans "Back" %}
       </button>
+      {% else %}
+      <span></span>
+      {% endif %}
       <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Next" %} <ion-icon name="arrow-forward-outline"></ion-icon></button>
     </div>
   </form>

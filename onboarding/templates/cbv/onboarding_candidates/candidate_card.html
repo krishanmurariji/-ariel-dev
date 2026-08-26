@@ -18,6 +18,9 @@
         {% if candidate.stage_id %}
         <span class="oh-status-pill oh-status-pill--info">{{ candidate.stage_id.stage_title }}</span>
         {% endif %}
+        {% if candidate.onboarding_completed_at %}
+        <span class="oh-status-pill oh-status-pill--approved">{% trans "Onboarding Completed" %}</span>
+        {% endif %}
         <div class="oh-candidate-card--vertical__meta">
           <div><ion-icon name="mail-outline"></ion-icon> {{ candidate.email }}</div>
           <div><ion-icon name="calendar-outline"></ion-icon> {% trans "Joining" %}: {{ candidate.joining_date|default:"-" }}</div>
@@ -50,6 +53,15 @@
         title="{% trans 'Start Onboarding' %}"
         href="{% url 'onboarding-stepper-page' candidate.pk %}">
         <ion-icon name="rocket-outline"></ion-icon>
+      </a>
+      <a
+        href="{% url 'email-send' %}?ids={{candidate.id}}"
+        class="oh-candidate-card--vertical__action-btn{% if candidate.onboarding_portal %} oh-candidate-card--vertical__action-btn--positive{% endif %}"
+        title="{% trans 'Send Portal / Start Onboarding' %}"
+        onclick="event.preventDefault(); $('select[name=ids]').val('{{candidate.id}}');"
+        data-target="#addAttachments"
+        data-toggle="oh-modal-toggle">
+        <ion-icon name="link-outline"></ion-icon>
       </a>
       <button
         type="button"
@@ -106,6 +118,25 @@
         data-toggle="oh-modal-toggle"
         data-target="#genericModal">
         <ion-icon name="thumbs-down-outline"></ion-icon>
+      </button>
+      {% endif %}
+      {% if candidate.probation_feedback_cycle %}
+      <span
+        class="oh-candidate-card--vertical__action-btn oh-candidate-card--vertical__action-btn--positive"
+        title="{% trans 'Probation feedback cycle running' %}">
+        <ion-icon name="checkmark-circle-outline"></ion-icon>
+      </span>
+      {% elif candidate.onboarding_detail.probation_period %}
+      <button
+        type="button"
+        class="oh-candidate-card--vertical__action-btn"
+        title="{% trans 'Start Probation Feedback Cycle' %}"
+        hx-post="{% url 'onboarding-start-feedback-cycle' candidate.pk %}"
+        hx-target="#messages"
+        hx-swap="innerHTML"
+        hx-confirm="{% trans 'Start a monthly probation feedback cycle for this candidate? Month 1 goes to the Reporting Manager and Buddy, later months go to the Reporting Manager only.' %}"
+        hx-on:htmx:after-request="if(event.detail.successful){htmx.ajax('GET', '{{ search_url }}', {target: '#{{ view_id }}', swap: 'outerHTML'});$('#reloadMessagesButton').click();}">
+        <ion-icon name="chatbox-ellipses-outline"></ion-icon>
       </button>
       {% endif %}
       {% endif %}

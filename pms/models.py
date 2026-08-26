@@ -1232,6 +1232,53 @@ class Feedback(HorillaModel):
         )
 
 
+class ProbationFeedbackCycle(HorillaModel):
+    """
+    Tracks a candidate's month-by-month probation review schedule, started
+    manually from the Onboarding candidate list/card (onboarding/views.py:
+    start_feedback_cycle) using the probation period + buddy already
+    captured on OnboardingCandidateDetail. A daily background job
+    (pms/scheduler.py: probation_feedback_creation) walks active rows here,
+    resolves the actual Employee once conversion has happened, and
+    generates one Feedback per elapsed month - buddy only on month 1, the
+    employee's current reporting manager every month.
+    """
+
+    candidate_id = models.OneToOneField(
+        "recruitment.Candidate",
+        on_delete=models.CASCADE,
+        related_name="probation_feedback_cycle",
+        verbose_name=_("Candidate"),
+    )
+    buddy_id = models.ForeignKey(
+        Employee,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="probation_feedback_buddy_for",
+        verbose_name=_("Buddy"),
+        help_text=_(
+            "Captured at cycle start; only added as a reviewer for month 1."
+        ),
+    )
+    question_template_id = models.ForeignKey(
+        QuestionTemplate,
+        on_delete=models.PROTECT,
+        related_name="probation_feedback_cycles",
+        verbose_name=_("Question Template"),
+    )
+    start_date = models.DateField(verbose_name=_("Probation Start Date"))
+    total_months = models.PositiveIntegerField(
+        verbose_name=_("Total Probation Months")
+    )
+    months_completed = models.PositiveIntegerField(
+        default=0, verbose_name=_("Months Completed")
+    )
+
+    def __str__(self):
+        return f"{self.candidate_id} - month {self.months_completed}/{self.total_months}"
+
+
 class AnonymousFeedback(models.Model):
     """feedback model for creating feedback"""
 

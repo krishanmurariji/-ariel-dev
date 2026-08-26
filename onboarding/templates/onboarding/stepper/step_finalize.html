@@ -9,9 +9,8 @@
     </div>
   </div>
 
-  <form method="post" action="{% url 'email-send' %}">
+  <form method="post" action="{% url 'onboarding-stepper-finalize' candidate.pk %}">
     {% csrf_token %}
-    <input type="hidden" name="ids" value="{{ candidate.pk }}">
     <input type="hidden" name="next" value="{% url 'candidates-view' %}">
     <div class="oh-step__body">
       <div class="oh-finalize-preview">
@@ -41,12 +40,20 @@
           <p class="oh-text-light m-0">{% trans "No mandatory documents requested." %}</p>
           {% endif %}
         </div>
+        <div class="oh-finalize-card oh-finalize-card--wide">
+          <div class="oh-finalize-card__title"><ion-icon name="list-outline"></ion-icon> {% trans "Roles & Responsibility" %}</div>
+          {% if detail.roles_responsibilities %}
+          <div class="oh-finalize-card__scroll">{{ detail.roles_responsibilities|safe }}</div>
+          {% else %}
+          <p class="oh-text-light m-0">{% trans "No roles & responsibilities written yet." %}</p>
+          {% endif %}
+        </div>
       </div>
 
       {% if portal_sent %}
       <div class="oh-alert oh-alert--success mb-3">
         <ion-icon name="checkmark-circle-outline"></ion-icon>
-        {% trans "Onboarding invite sent. The candidate can now set their password and complete their portal." %}
+        {% trans "Onboarding marked as started." %}
       </div>
       {% endif %}
     </div>

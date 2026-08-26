@@ -128,6 +128,16 @@ urlpatterns = [
     path("user-creation/<str:token>/", views.user_creation, name="user-creation"),
     path("profile-view/<str:token>/", views.profile_view, name="profile-view"),
     path(
+        "roles-responsibility/<str:token>/",
+        views.roles_responsibility,
+        name="roles-responsibility",
+    ),
+    path(
+        "document-upload/<str:token>/",
+        views.document_upload,
+        name="document-upload",
+    ),
+    path(
         "employee-creation/<str:token>/",
         views.employee_creation,
         name="employee-creation",
@@ -199,6 +209,11 @@ urlpatterns = [
         "undo-rejected-candidate/<int:candidate_id>/",
         views.undo_rejected_candidate,
         name="undo-rejected-candidate",
+    ),
+    path(
+        "candidate/<int:pk>/start-feedback-cycle/",
+        views.start_feedback_cycle,
+        name="onboarding-start-feedback-cycle",
     ),
     path(
         "candidate-select-filter-onboarding/",
@@ -363,6 +378,16 @@ urlpatterns = [
         "candidate/<int:pk>/onboard-document-request/",
         stepper.document_request_modal,
         name="onboarding-stepper-document-request",
+    ),
+    path(
+        "candidate/<int:pk>/onboard-document-request/<int:req_id>/cancel/",
+        stepper.document_request_cancel,
+        name="onboarding-stepper-document-request-cancel",
+    ),
+    path(
+        "candidate/<int:pk>/onboard-finalize-start/",
+        stepper.finalize_onboarding,
+        name="onboarding-stepper-finalize",
     ),
     path(
         "candidate/<int:pk>/onboard-document-upload/",
