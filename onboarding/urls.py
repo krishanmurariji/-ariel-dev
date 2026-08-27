@@ -358,7 +358,7 @@ urlpatterns = [
         onboarding_candidates.OnboardingCandidateCard.as_view(),
         name="onboarding-candidate-card-view",
     ),
-    # ── Start Onboarding stepper (full page) ─────────────────────────────────
+    # ── Configure Onboarding stepper (full page) ─────────────────────────────
     path(
         "candidate/<int:pk>/onboard/",
         stepper.onboarding_stepper_page,

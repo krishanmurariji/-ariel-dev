@@ -49,7 +49,9 @@ class RecruitmentFilter(rec_filter):
         """
 
         model = Recruitment
-        fields = "__all__"
+        # linkedin_post_ids is a JSONField - django-filter can't build a
+        # default filter for it, so it can't be included via "__all__".
+        exclude = ["linkedin_post_ids"]
 
     def filter_by_name(self, queryset, _, value):
         """

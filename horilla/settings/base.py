@@ -434,8 +434,6 @@ NO_PERMISSION_MODALS = [
     "rejectreason",
     "historicalrejectedcandidate",
     "rejectedcandidate",
-    "stagefiles",
-    "stagenote",
     "questionordering",
     "recruitmentsurveyordering",
     "recruitmentsurveyanswer",

@@ -106,8 +106,8 @@
                               <span class="oh-permission-table__user">
                                 <div class="d-flex" style="align-items: center;">
                                   <div>{{ rec }}</div>
-                                  {% if rec.linkedin_account_id %}
-                                    <div style="margin-left: 8px;" title="{{ rec }} {% trans 'posted on' %} {{ rec.linkedin_account_id }} {% trans 'LinkedIn account' %}.">
+                                  {% if rec.linkedin_accounts.exists %}
+                                    <div style="margin-left: 8px;" title="{{ rec }} {% trans 'posted on' %} {% for account in rec.linkedin_accounts.all %}{{ account }}{% if not forloop.last %}, {% endif %}{% endfor %} {% trans 'LinkedIn account' %}{{ rec.linkedin_accounts.count|pluralize }}.">
                                       <ion-icon name="logo-linkedin"></ion-icon>
                                     </div>
                                   {% endif %}

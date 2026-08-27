@@ -709,7 +709,7 @@ class StageChangeForm(forms.ModelForm):
         return cleaned_data
 
 
-# ── Start Onboarding stepper ─────────────────────────────────────────────
+# ── Configure Onboarding stepper ─────────────────────────────────────────
 
 
 class OhClearableFileInput(forms.ClearableFileInput):
@@ -875,9 +875,32 @@ class TaskTemplateForm(HorillaModelForm):
         }
 
 
+class TaskTemplateTaskForm(forms.ModelForm):
+    """
+    The formset's trailing "extra" row is always present in the DOM, and
+    both the drag-reorder script (which stamps a fresh `sequence` number
+    into every row, including that empty one) and the "Mandatory" switch's
+    checked-by-default state make an untouched row look "changed" to the
+    formset - which would otherwise force its Title to be required just to
+    save an edit that didn't add a new task. Only `title`/`description` are
+    actual user-entered content, so those are what decide whether the row
+    counts as having data at all.
+    """
+
+    class Meta:
+        model = TaskTemplateTask
+        fields = ["title", "description", "is_mandatory", "requires_proof", "sequence"]
+
+    def has_changed(self):
+        title = (self["title"].value() or "").strip()
+        description = (self["description"].value() or "").strip()
+        return bool(title or description)
+
+
 TaskTemplateTaskFormSet = forms.inlineformset_factory(
     TaskTemplate,
     TaskTemplateTask,
+    form=TaskTemplateTaskForm,
     fields=["title", "description", "is_mandatory", "requires_proof", "sequence"],
     widgets={
         "title": forms.TextInput(

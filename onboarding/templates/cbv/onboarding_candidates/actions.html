@@ -85,7 +85,7 @@
 					});
 				"
 				{% comment %}style="background-color: yellowgreen; color: white"{% endcomment %}
-				title="{% trans 'Start Onboarding' %}"
+				title="{% trans 'Add to Onboarding' %}"
 			>
 				<ion-icon name="add-outline"></ion-icon>
 			</a>
@@ -117,7 +117,7 @@
 			href="{% url 'email-send' %}?ids={{instance.id}}"
 			class="oh-btn w-100"
 			style="background-color: yellowgreen; color: white"
-			title="{% trans 'Send Portal / Start Onboarding' %}"
+			title="{% trans 'Send Onboarding Portal' %}"
 			onclick="event.preventDefault(); $('select[name=ids]').val('{{instance.id}}');"
 			data-target="#addAttachments"
 			data-toggle="oh-modal-toggle"
@@ -127,7 +127,7 @@
 		<a
 			href="{% url 'email-send' %}?ids={{instance.id}}"
 			class="oh-btn oh-btn--light-bkg w-100"
-			title="{% trans 'Send Portal / Start onboarding' %}"
+			title="{% trans 'Send Onboarding Portal' %}"
 			onclick="event.preventDefault(); $('select[name=ids]').val('{{instance.id}}');"
 			data-target="#addAttachments"
 			data-toggle="oh-modal-toggle"
@@ -137,7 +137,7 @@
 
 	<a
 		class="oh-btn oh-btn--light-bkg w-100"
-		title="{% trans 'Start Onboarding' %}"
+		title="{% trans 'Configure Onboarding' %}"
 		href="{% url 'onboarding-stepper-page' instance.pk %}"
 		><ion-icon name="rocket-outline"></ion-icon
 	></a>

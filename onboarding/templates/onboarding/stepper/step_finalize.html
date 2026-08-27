@@ -26,7 +26,7 @@
         </div>
         <div class="oh-finalize-card">
           <div class="oh-finalize-card__title"><ion-icon name="checkbox-outline"></ion-icon> {% trans "Checklists" %}</div>
-          <p class="m-0">{{ pre_joining_count }} {% trans "pre-joining tasks" %} &middot; {{ post_joining_count }} {% trans "post-joining tasks" %}</p>
+          <p class="m-0">{{ pre_joining_count }} {% trans "pre-joining tasks" %} &middot; {{ post_joining_count }} {% trans "post-joining tasks" %} &middot; {{ employee_checklist_count }} {% trans "employee checklist tasks" %}</p>
         </div>
         <div class="oh-finalize-card">
           <div class="oh-finalize-card__title"><ion-icon name="document-attach-outline"></ion-icon> {% trans "Documents" %}</div>
@@ -53,7 +53,7 @@
       {% if portal_sent %}
       <div class="oh-alert oh-alert--success mb-3">
         <ion-icon name="checkmark-circle-outline"></ion-icon>
-        {% trans "Onboarding marked as started." %}
+        {% trans "Onboarding configuration completed." %}
       </div>
       {% endif %}
     </div>
@@ -64,7 +64,7 @@
         <ion-icon name="arrow-back-outline"></ion-icon> {% trans "Back" %}
       </button>
       <button type="submit" class="oh-btn oh-btn--secondary">
-        <ion-icon name="paper-plane-outline"></ion-icon> {% trans "Start Onboarding" %}
+        <ion-icon name="paper-plane-outline"></ion-icon> {% trans "Finish Configuration" %}
       </button>
     </div>
   </form>

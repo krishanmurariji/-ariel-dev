@@ -31,8 +31,52 @@
 
             .tracking-container {
                 padding: 1rem;
-                width: 80%;
+                width: 94%;
+                max-width: 1600px;
                 margin: 0 auto;
+            }
+
+            .profile-header__main {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 1.5rem;
+                flex-wrap: wrap;
+            }
+
+            .profile-header__identity {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+            }
+
+            .profile-header__identity .profile-image {
+                margin: 0;
+            }
+
+            .profile-header__meta {
+                flex: 1;
+                min-width: 220px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 1rem;
+                flex-wrap: wrap;
+            }
+
+            .profile-header__status {
+                flex: none;
+            }
+
+            @media (max-width: 767.98px) {
+                .profile-header__main {
+                    flex-direction: column;
+                    align-items: flex-start;
+                }
+                .profile-header__meta {
+                    flex-direction: column;
+                    align-items: flex-start;
+                }
             }
 
             @media (min-width: 768px) {
@@ -358,81 +402,85 @@
         ></button>
 
         <div class="tracking-container">
-            <div class="row justify-content-center mb-4">
-                <div class="col-12 col-md-10 col-lg-6">
+            <div class="row mb-4">
+                <div class="col-12">
                     <div class="tracking-card">
                         {% if candidate.converted %}
                             <div class="banner-container fw-bold">
                                 <span>{% trans "Converted" %}</span>
                             </div>
                         {% endif %}
-                        <div class="d-flex align-items-center mb-3 flex-wrap">
-                            <img
-                                src="{{ candidate.get_avatar }}"
-                                alt="Profile"
-                                width="50px"
-                                class="profile-image me-3 mb-2"
-                            />
-                            <div>
-                                <h2 class="h4 mb-1">
-                                    {{candidate.get_full_name|title}}
-                                </h2>
-                                {% if check_candidate_self_tracking_rating %}
-                                <div class="d-block mb-0">
-                                    <div
-                                        class="oh-rate"
-                                    >
-                                        {% for i in "54321" %}
-                                        <input
-                                            type="radio"
-                                            id="star{{i}}{{candidate.id}}"
-                                            name="rating" class="rating-radio"
-                                            value="{{i}}" disabled
-                                            {% if candidate.candidate_rating.all|avg_rating:candidate == i %}
-                                            checked
-                                            {% endif %}
-                                        />
-                                        <label for="star{{i}}{{candidate.id}}"
-                                            >5</label
+                        <div class="profile-header__main">
+                            <div class="profile-header__identity">
+                                <img
+                                    src="{{ candidate.get_avatar }}"
+                                    alt="Profile"
+                                    width="50px"
+                                    class="profile-image"
+                                />
+                                <div>
+                                    <h2 class="h4 mb-1">
+                                        {{candidate.get_full_name|title}}
+                                    </h2>
+                                    {% if check_candidate_self_tracking_rating %}
+                                    <div class="d-block mb-0">
+                                        <div
+                                            class="oh-rate"
                                         >
-                                        {% endfor %}
+                                            {% for i in "54321" %}
+                                            <input
+                                                type="radio"
+                                                id="star{{i}}{{candidate.id}}"
+                                                name="rating" class="rating-radio"
+                                                value="{{i}}" disabled
+                                                {% if candidate.candidate_rating.all|avg_rating:candidate == i %}
+                                                checked
+                                                {% endif %}
+                                            />
+                                            <label for="star{{i}}{{candidate.id}}"
+                                                >5</label
+                                            >
+                                            {% endfor %}
+                                        </div>
+                                        <span id="rating-radio-error"></span>
                                     </div>
-                                    <span id="rating-radio-error"></span>
+                                    {% endif %}
                                 </div>
+                            </div>
+                            <div class="profile-header__meta">
+                                <h5 class="text-secondary m-0">
+                                    {{ candidate.recruitment_id.title }} /
+                                    {{ candidate.stage_id.stage }}
+                                </h5>
+                                <div class="oh-recuritment_tag">
+                                    {{ candidate.get_job_position }}
+                                </div>
+                            </div>
+                            <div class="profile-header__status">
+                                {% if candidate.hired or candidate.converted %}
+                                    <span class="status-badge success m-0">
+                                        <i class="fas fa-check-circle me-2"></i>
+                                        {% trans "Congratulation on your selection" %}
+                                    </span>
+                                {% elif candidate.canceled %}
+                                    <span class="status-badge danger m-0">
+                                        <i class="fas fa-times-circle me-2"></i>
+                                        {% trans "You not selected" %}
+                                    </span>
+                                {% else %}
+                                    <span class="status-badge pending m-0">
+                                        <i class="fas fa-clock me-2"></i>
+                                        {% trans "Application under review" %}
+                                    </span>
                                 {% endif %}
                             </div>
                         </div>
-                        <div class="mb-3 d-flex justify-content-between">
-                            <h5 class="text-secondary">
-                                {{ candidate.recruitment_id.title }} /
-                                {{ candidate.stage_id.stage }}
-                            </h5>
-                            <div class="oh-recuritment_tag">
-                                {{ candidate.get_job_position }}
-                            </div>
-                        </div>
-                        {% if candidate.hired or candidate.converted %}
-                            <span class="status-badge success">
-                                <i class="fas fa-check-circle me-2"></i>
-                                {% trans "Congratulation on your selection" %}
-                            </span>
-                        {% elif candidate.canceled %}
-                            <span class="status-badge danger">
-                                <i class="fas fa-times-circle me-2"></i>
-                                {% trans "You not selected" %}
-                            </span>
-                        {% else %}
-                            <span class="status-badge pending">
-                                <i class="fas fa-clock me-2"></i>
-                                {% trans "Application under review" %}
-                            </span>
-                        {% endif %}
                     </div>
                 </div>
             </div>
 
             <div class="row">
-                <div class="col-12 col-md-6 col-lg-3 order-1 order-md-2">
+                <div class="col-12 col-md-6 col-lg-4 order-1 order-md-2">
                     <div class="tracking-card">
                         <h3 class="h5 mb-4 fw-bold">{% trans "Documents" %}</h3>
                         <div class="document-list">
@@ -497,7 +545,7 @@
                     </div>
                 </div>
 
-                <div class="col-12 col-md-6 col-lg-3 order-2 order-md-1">
+                <div class="col-12 col-md-6 col-lg-4 order-2 order-md-1">
                     <div class="tracking-card">
                         <h3 class="h5 mb-4 fw-bold">{% trans "Scheduled Interviews" %}</h3>
                         <div class="interview-list">
@@ -575,7 +623,7 @@
                     </div>
                 </div>
 
-                <div class="col-12 col-md-6 col-lg-3 order-3">
+                <div class="col-12 col-md-6 col-lg-4 order-3">
                     <div class="tracking-card" id="note">
                         {% if messages %}
                             <div class="oh-wrapper">
@@ -659,8 +707,10 @@
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <div class="col-12 col-md-6 col-lg-3 order-4">
+            <div class="row">
+                <div class="col-12">
                     <div class="tracking-card" id="taskCard">
                         {% if messages %}
                             <div class="oh-wrapper">
@@ -674,62 +724,206 @@
                             </div>
                         {% endif %}
                         <h3 class="h5 mb-4 fw-bold">{% trans "Tasks" %}</h3>
-                        <div class="notes-list">
-                            {% for task in checklist_tasks %}
-                                <div class="task-item mb-3 pb-3 border-bottom">
-                                    <h6 class="mb-1">{{ task.title }}</h6>
-                                    <small class="text-muted d-block mb-2">
-                                        {{ task.get_phase_display }}{% if task.completed_at %} &middot; {% trans "Completed" %} {{ task.completed_at|date:"M d, Y" }}{% endif %}
-                                    </small>
 
-                                    <div class="task-feedback-summary{% if not task.candidate_feedback %} d-none{% endif %}">
-                                        <span class="badge {% if task.candidate_satisfied %}text-success{% else %}text-warning{% endif %} p-2 mb-2 d-inline-block">
-                                            <i class="fas fa-thumbs-{% if task.candidate_satisfied %}up{% else %}down{% endif %} me-1"></i>
-                                            {% if task.candidate_satisfied %}{% trans "Satisfied" %}{% else %}{% trans "Not satisfied" %}{% endif %}
-                                        </span>
-                                        <p class="mb-2">{{ task.candidate_feedback }}</p>
-                                        <button type="button" class="btn btn-sm btn-link p-0 task-edit-btn">{% trans "Edit response" %}</button>
-                                    </div>
+                        <div class="task-tabs mb-3">
+                            <button type="button" class="task-tab{% if default_task_tab != 'feedback-task' %} active{% endif %}" data-task-tab="my-task">
+                                {% trans "My Task" %}<span class="task-tab-count">{{ all_tasks|length }}</span>
+                            </button>
+                            <button type="button" class="task-tab{% if default_task_tab == 'feedback-task' %} active{% endif %}" data-task-tab="feedback-task">
+                                {% trans "Feedback Required Task" %}<span class="task-tab-count">{{ checklist_tasks|length }}</span>
+                            </button>
+                        </div>
 
-                                    <form
-                                        class="task-feedback-form{% if task.candidate_feedback %} d-none{% endif %}"
-                                        hx-post="{% url 'candidate-task-feedback' task.id %}"
-                                        hx-target="#taskCard"
-                                        hx-select="#taskCard"
-                                        hx-swap="outerHTML"
-                                    >
-                                        {% csrf_token %}
-                                        <textarea
-                                            name="candidate_feedback"
-                                            class="form-control mb-2"
-                                            rows="2"
-                                            placeholder="{% trans 'Share your response about this task...' %}"
-                                            required
-                                        >{{ task.candidate_feedback|default:"" }}</textarea>
-                                        <div class="form-check mb-2">
-                                            <input
-                                                class="form-check-input"
-                                                type="checkbox"
-                                                name="candidate_satisfied"
-                                                id="satisfied{{ task.id }}"
-                                                {% if task.candidate_satisfied %}checked{% endif %}
-                                            >
-                                            <label class="form-check-label" for="satisfied{{ task.id }}">
-                                                {% trans "I'm satisfied with how this was handled" %}
-                                            </label>
-                                        </div>
-                                        <button type="submit" class="btn btn-sm oh-btn--secondary">{% trans "Submit Response" %}</button>
-                                    </form>
-                                </div>
-                                {% empty %}
+                        <div class="task-tab-panel{% if default_task_tab != 'feedback-task' %} active{% endif %}" data-task-panel="my-task">
+                            {% if not my_task_groups %}
+                            <div class="notes-list">
                                 <div class="d-flex justify-content-center align-items-center" style="height: 40vh;">
                                     <div class="text-center">
-                                        <i class="fas fa-clipboard-check fa-3x text-muted mb-3"></i>
-                                        <h5 class="oh-404__subtitle">{% trans "No tasks are waiting for your response." %}</h5>
+                                        <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                                        <h5 class="oh-404__subtitle">{% trans "No tasks are assigned to you yet." %}</h5>
                                     </div>
                                 </div>
+                            </div>
+                            {% else %}
+                            {% if my_task_groups|length > 1 %}
+                            <div class="task-group-tabs mb-3">
+                                {% for group in my_task_groups %}
+                                <button type="button" class="task-group-tab{% if forloop.first %} active{% endif %}" data-task-group-tab="{{ forloop.counter0 }}">
+                                    {{ group.title }}<span class="task-tab-count">{{ group.tasks|length }}</span>
+                                </button>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            {% for group in my_task_groups %}
+                            <div class="notes-list task-group-panel{% if forloop.first %} active{% endif %}" data-task-group-panel="{{ forloop.counter0 }}">
+                                {% for task in group.tasks %}
+                                    <div class="task-item mb-3 pb-3 border-bottom">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <h6 class="mb-1">{{ task.title }}</h6>
+                                            <span class="badge task-status-badge task-status-badge--{{ task.status }}">{{ task.get_status_display }}</span>
+                                        </div>
+                                        <small class="text-muted d-block mb-2">
+                                            {% if task.is_mandatory %}{% trans "Mandatory" %}{% endif %}
+                                            {% if task.completed_at %} &middot; {% trans "Completed" %} {{ task.completed_at|date:"M d, Y" }}{% endif %}
+                                        </small>
+
+                                        {% if task.proof_file %}
+                                        <a href="{{ task.proof_file.url }}" target="_blank" class="d-inline-flex align-items-center gap-1 small text-muted mb-2">
+                                            <i class="fas fa-paperclip"></i> {% trans "View submitted proof" %}
+                                        </a>
+                                        {% endif %}
+
+                                        <form
+                                            class="task-status-form d-flex align-items-center gap-2 flex-wrap mb-2"
+                                            hx-post="{% url 'candidate-task-self-update' task.id %}"
+                                            hx-target="#taskCard"
+                                            hx-select="#taskCard"
+                                            hx-swap="outerHTML"
+                                            hx-encoding="multipart/form-data"
+                                            data-initial-status="{{ task.status }}"
+                                        >
+                                            {% csrf_token %}
+                                            <select name="status" class="form-select form-select-sm task-status-select w-auto">
+                                                {% for value, label in status_choices %}
+                                                <option value="{{ value }}" {% if value == task.status %}selected{% endif %}>{{ label }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            {% if task.requires_proof and not task.proof_file %}
+                                            <input type="file" name="proof_file" class="form-control form-control-sm task-status-proof w-auto">
+                                            {% endif %}
+                                            <button type="submit" class="btn btn-sm oh-btn--secondary task-status-submit" disabled>{% trans "Update" %}</button>
+                                        </form>
+
+                                        <div class="task-feedback-summary{% if not task.candidate_feedback %} d-none{% endif %}">
+                                            <p class="mb-1 small text-muted">{{ task.candidate_feedback }}</p>
+                                            <button type="button" class="btn btn-sm btn-link p-0 task-edit-btn">{% trans "Edit update" %}</button>
+                                        </div>
+                                        <form
+                                            class="task-feedback-form{% if task.candidate_feedback %} d-none{% endif %}"
+                                            hx-post="{% url 'candidate-task-feedback' task.id %}"
+                                            hx-target="#taskCard"
+                                            hx-select="#taskCard"
+                                            hx-swap="outerHTML"
+                                        >
+                                            {% csrf_token %}
+                                            <textarea
+                                                name="candidate_feedback"
+                                                class="form-control form-control-sm mb-1"
+                                                rows="2"
+                                                placeholder="{% trans 'Write an update about this task...' %}"
+                                            >{{ task.candidate_feedback|default:"" }}</textarea>
+                                            <button type="submit" class="btn btn-sm btn-link p-0">{% trans "Save update" %}</button>
+                                        </form>
+                                    </div>
+                                {% endfor %}
+                            </div>
                             {% endfor %}
+                            {% endif %}
                         </div>
+
+                        <div class="task-tab-panel{% if default_task_tab == 'feedback-task' %} active{% endif %}" data-task-panel="feedback-task">
+                            <div class="notes-list">
+                                {% for task in checklist_tasks %}
+                                    <div class="task-item mb-3 pb-3 border-bottom">
+                                        <h6 class="mb-1">{{ task.title }}</h6>
+                                        <small class="text-muted d-block mb-2">
+                                            {{ task.get_phase_display }}{% if task.completed_at %} &middot; {% trans "Completed" %} {{ task.completed_at|date:"M d, Y" }}{% endif %}
+                                        </small>
+
+                                        <div class="task-feedback-summary{% if not task.candidate_feedback %} d-none{% endif %}">
+                                            <span
+                                                class="badge {% if task.candidate_satisfied %}text-success{% else %}text-warning{% endif %} p-2 mb-2 d-inline-block"
+                                                title="{% if task.candidate_satisfied %}{% trans 'Satisfied' %}{% else %}{% trans 'Not satisfied' %}{% endif %}"
+                                            >
+                                                <i class="fas fa-thumbs-{% if task.candidate_satisfied %}up{% else %}down{% endif %}"></i>
+                                            </span>
+                                            <p class="mb-2">{{ task.candidate_feedback }}</p>
+                                            <button type="button" class="btn btn-sm btn-link p-0 task-edit-btn">{% trans "Edit response" %}</button>
+                                        </div>
+
+                                        <form
+                                            class="task-feedback-form{% if task.candidate_feedback %} d-none{% endif %}"
+                                            hx-post="{% url 'candidate-task-feedback' task.id %}"
+                                            hx-target="#taskCard"
+                                            hx-select="#taskCard"
+                                            hx-swap="outerHTML"
+                                        >
+                                            {% csrf_token %}
+                                            <textarea
+                                                name="candidate_feedback"
+                                                class="form-control mb-2"
+                                                rows="2"
+                                                placeholder="{% trans 'Share your response about this task...' %}"
+                                                required
+                                            >{{ task.candidate_feedback|default:"" }}</textarea>
+                                            <div class="form-check mb-2">
+                                                <input
+                                                    class="form-check-input"
+                                                    type="checkbox"
+                                                    name="candidate_satisfied"
+                                                    id="satisfied{{ task.id }}"
+                                                    {% if task.candidate_satisfied %}checked{% endif %}
+                                                >
+                                                <label class="form-check-label" for="satisfied{{ task.id }}">
+                                                    {% trans "I'm satisfied with how this was handled" %}
+                                                </label>
+                                            </div>
+                                            <button type="submit" class="btn btn-sm oh-btn--secondary">{% trans "Submit Response" %}</button>
+                                        </form>
+                                    </div>
+                                    {% empty %}
+                                    <div class="d-flex justify-content-center align-items-center" style="height: 40vh;">
+                                        <div class="text-center">
+                                            <i class="fas fa-clipboard-check fa-3x text-muted mb-3"></i>
+                                            <h5 class="oh-404__subtitle">{% trans "No tasks are waiting for your response." %}</h5>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <style>
+                            .task-tabs { display: flex; gap: 4px; border-bottom: 1px solid #e4e6ef; }
+                            .task-tab {
+                                background: none; border: none; cursor: pointer;
+                                font-size: 0.82rem; font-weight: 600; color: #888;
+                                padding: 6px 4px 10px; margin-right: 14px; position: relative;
+                                display: inline-flex; align-items: center; gap: 6px;
+                            }
+                            .task-tab-count {
+                                font-size: 0.68rem; font-weight: 600; color: #888;
+                                background: #eceeee; border-radius: 20px; padding: 1px 7px;
+                            }
+                            .task-tab::after {
+                                content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+                                background: transparent; border-radius: 2px 2px 0 0;
+                            }
+                            .task-tab.active { color: #212529; }
+                            .task-tab.active::after { background: #4f5bd9; }
+                            .task-tab.active .task-tab-count { background: #e2e3fb; color: #4f5bd9; }
+                            .task-tab-panel { display: none; }
+                            .task-tab-panel.active { display: block; }
+                            .task-status-badge { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; flex: none; }
+                            .task-status-badge--stuck { background: #f3ddd7; color: #b3402f; }
+                            .task-status-badge--todo { background: #eceeee; color: #6c757d; }
+                            .task-status-badge--scheduled { background: #e3ecf7; color: #3e6b99; }
+                            .task-status-badge--ongoing { background: #f3e6cc; color: #a6672e; }
+                            .task-status-badge--done { background: #dcedde; color: #3e7d4f; }
+
+                            .task-group-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+                            .task-group-tab {
+                                display: inline-flex; align-items: center; gap: 6px;
+                                padding: 5px 12px; border-radius: 20px;
+                                background: #f1f2f6; color: #6c757d;
+                                border: none; font-size: 0.76rem; font-weight: 600;
+                                cursor: pointer;
+                            }
+                            .task-group-tab .task-tab-count { background: rgba(0,0,0,0.06); }
+                            .task-group-tab.active { background: #4f5bd9; color: #fff; }
+                            .task-group-tab.active .task-tab-count { background: rgba(255,255,255,0.25); color: #fff; }
+                            .task-group-panel { display: none; }
+                            .task-group-panel.active { display: block; }
+                        </style>
                     </div>
                 </div>
             </div>
@@ -779,6 +973,31 @@
                 var item = $(this).closest(".task-item");
                 item.find(".task-feedback-summary").addClass("d-none");
                 item.find(".task-feedback-form").removeClass("d-none");
+            });
+
+            $(document).on("click", ".task-tab", function () {
+                var tab = $(this).data("task-tab");
+                $(this).siblings(".task-tab").addBack().removeClass("active");
+                $(this).addClass("active");
+                $("#taskCard .task-tab-panel").removeClass("active");
+                $("#taskCard .task-tab-panel[data-task-panel='" + tab + "']").addClass("active");
+            });
+
+            $(document).on("click", ".task-group-tab", function () {
+                var group = $(this).data("task-group-tab");
+                var wrap = $(this).closest(".task-tab-panel");
+                wrap.find(".task-group-tab").removeClass("active");
+                $(this).addClass("active");
+                wrap.find(".task-group-panel").removeClass("active");
+                wrap.find(".task-group-panel[data-task-group-panel='" + group + "']").addClass("active");
+            });
+
+            $(document).on("change", ".task-status-select, .task-status-proof", function () {
+                var form = $(this).closest(".task-status-form");
+                var initial = form.data("initial-status");
+                var changed = form.find(".task-status-select").val() !== initial
+                    || form.find(".task-status-proof")[0]?.files.length > 0;
+                form.find(".task-status-submit").prop("disabled", !changed);
             });
         </script>
     </body>

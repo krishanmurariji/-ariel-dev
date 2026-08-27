@@ -5,46 +5,84 @@
     <ion-icon name="list-outline"></ion-icon>
     <span>{% trans "Select one or more task groups above to see their tasks here." %}</span>
   </div>
-  {% endif %}
-  {% for group in groups %}
-  <div class="oh-task-group">
-    <div class="oh-task-group__title">
-      <ion-icon name="folder-outline"></ion-icon>
-      {{ group.template.title }}
-    </div>
-    {% for row in group.rows %}
-    <div class="oh-checklist-row">
-      <input type="hidden" name="task_id" value="{{ row.task.id }}">
-      <div class="oh-checklist-row__title">
-        <strong>{{ row.task.title }}</strong>
-        {% if row.task.description %}<span class="oh-text-light small">{{ row.task.description }}</span>{% endif %}
-      </div>
-      <div class="oh-checklist-row__controls">
-        <div class="oh-checklist-row__chips">
-          <label class="oh-check-chip">
-            <input type="checkbox" name="mandatory_{{ row.task.id }}" {% if row.is_mandatory %}checked{% endif %}>
-            {% trans "Mandatory" %}
-          </label>
-          <label class="oh-check-chip">
-            <input type="checkbox" name="proof_{{ row.task.id }}" {% if row.requires_proof %}checked{% endif %}>
-            {% trans "Proof Required" %}
-          </label>
-          <label class="oh-check-chip">
-            <input type="checkbox" name="feedback_{{ row.task.id }}" {% if row.requires_feedback %}checked{% endif %}>
-            {% trans "Response Required" %}
-          </label>
-        </div>
-        <div class="oh-checklist-row__assignee-wrap">
-          <select name="assignee_{{ row.task.id }}" class="oh-select oh-select-2 oh-checklist-row__assignee">
-            <option value="">{% trans "---Choose Assignee---" %}</option>
-            {% for emp in employees %}
-            <option value="{{ emp.id }}" {% if emp.id == row.assignee_id %}selected{% endif %}>{{ emp.get_full_name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
+  {% else %}
+  <div class="oh-taskgroup-tabs">
+    {% for group in groups %}
+    <div class="oh-taskgroup-tab{% if forloop.first %} active{% endif %}" data-group-tab="{{ group.template.id }}">
+      <span>{{ group.template.title }}</span>
+      <button type="button" class="oh-taskgroup-tab__cancel" data-uncheck-template="{{ group.template.id }}" title="{% trans 'Remove this task group' %}">
+        <ion-icon name="close-outline"></ion-icon>
+      </button>
     </div>
     {% endfor %}
   </div>
+  {% endif %}
+  {% for group in groups %}
+  <div class="oh-task-group-panel{% if forloop.first %} active{% endif %}" data-group-panel="{{ group.template.id }}">
+    <div class="oh-task-group">
+      {% for row in group.rows %}
+      <div class="oh-checklist-row">
+        <input type="hidden" name="task_id" value="{{ row.task.id }}">
+        <div class="oh-checklist-row__title">
+          <strong>{{ row.task.title }}</strong>
+          {% if row.task.description %}<span class="oh-text-light small">{{ row.task.description }}</span>{% endif %}
+        </div>
+        <div class="oh-checklist-row__controls">
+          <div class="oh-checklist-row__chips">
+            <label class="oh-check-chip">
+              <input type="checkbox" name="mandatory_{{ row.task.id }}" {% if row.is_mandatory %}checked{% endif %}>
+              {% trans "Mandatory" %}
+            </label>
+            <label class="oh-check-chip">
+              <input type="checkbox" name="proof_{{ row.task.id }}" {% if row.requires_proof %}checked{% endif %}>
+              {% trans "Proof Required" %}
+            </label>
+            <label class="oh-check-chip">
+              <input type="checkbox" name="feedback_{{ row.task.id }}" {% if row.requires_feedback %}checked{% endif %}>
+              {% trans "Response Required" %}
+            </label>
+          </div>
+          {% if phase != "employee_checklist" %}
+          <div class="oh-checklist-row__assignee-wrap">
+            <select name="assignee_{{ row.task.id }}" class="oh-select oh-select-2 oh-checklist-row__assignee">
+              <option value="">{% trans "---Choose Assignee---" %}</option>
+              {% for emp in employees %}
+              <option value="{{ emp.id }}" {% if emp.id == row.assignee_id %}selected{% endif %}>{{ emp.get_full_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
   {% endfor %}
 </div>
+<script>
+  (function () {
+    var container = document.getElementById("taskRowsContainer");
+    if (!container) { return; }
+    container.querySelectorAll("[data-group-tab]").forEach(function (tab) {
+      tab.addEventListener("click", function (e) {
+        if (e.target.closest("[data-uncheck-template]")) { return; }
+        container.querySelectorAll("[data-group-tab]").forEach(function (t) { t.classList.remove("active"); });
+        container.querySelectorAll("[data-group-panel]").forEach(function (p) { p.classList.remove("active"); });
+        tab.classList.add("active");
+        var panel = container.querySelector('[data-group-panel="' + tab.dataset.groupTab + '"]');
+        if (panel) { panel.classList.add("active"); }
+      });
+    });
+    container.querySelectorAll("[data-uncheck-template]").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var input = document.querySelector('input[name="templates"][value="' + btn.dataset.uncheckTemplate + '"]');
+        if (input) {
+          input.checked = false;
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      });
+    });
+  })();
+</script>

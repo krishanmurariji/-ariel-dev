@@ -1,10 +1,15 @@
 """
 stepper.py
 
-Full-page "Start Onboarding" stepper for a candidate: Pre-Joining
-Checklist -> Document Verification -> Offer Letter -> Job Profile ->
-Post-Joining Checklist -> Roles & Responsibility -> Finalize. Steps
-always run in this fixed order (no per-step skipping). Steps render as
+Full-page "Configure Onboarding" stepper for a candidate: Pre-Joining
+Checklist -> Document Verification -> Job Profile -> Post-Joining Checklist
+-> Roles & Responsibility -> Employee Checklist -> Offer Letter -> Finalize.
+Steps always run in this fixed order (no per-step skipping). Offer Letter
+sits right before Finalize since Finalize isn't a step of its own - just a
+recap of everything already filled in.
+Employee Checklist tasks are always done by the candidate themself (no
+assignee to pick), unlike pre_joining/post_joining tasks which are done by
+someone else about the candidate. Steps render as
 htmx fragments swapped into the page's right-hand content column; the
 left column (step list) persists across navigation, and any step can be
 jumped to directly, up to the furthest one actually reached.
@@ -39,10 +44,11 @@ from recruitment.views.views import notify_candidate_of_document_rejection
 STEPS = [
     ("pre_joining", _("Pre-Joining Checklist")),
     ("documents", _("Document Verification")),
-    ("welcome", _("Offer Letter")),
     ("details", _("Job Profile")),
     ("post_joining", _("Post-Joining Checklist")),
     ("roles", _("Roles & Responsibility")),
+    ("employee_checklist", _("Employee Checklist")),
+    ("welcome", _("Offer Letter")),
     ("finalize", _("Finalize")),
 ]
 STEP_KEYS = [key for key, _label in STEPS]
@@ -50,7 +56,12 @@ STEP_LABELS = dict(STEPS)
 PHASE_STEP_LABELS = {
     "pre_joining": _("Pre-Joining Checklist"),
     "post_joining": _("Post-Joining Checklist"),
+    "employee_checklist": _("Employee Checklist"),
 }
+# Phases whose tasks the candidate is the one who does the work, so the
+# stepper never asks for an employee assignee - unlike pre_joining/
+# post_joining, which are always done by someone else about the candidate.
+CANDIDATE_ASSIGNED_PHASES = {"employee_checklist"}
 
 
 def _get_detail(candidate):
@@ -245,7 +256,7 @@ def _render_step(request, candidate, detail, step_key, extra=None):
             )
         template = "onboarding/stepper/step_details.html"
 
-    elif step_key in ("pre_joining", "post_joining"):
+    elif step_key in ("pre_joining", "post_joining", "employee_checklist"):
         context.update(_checklist_context(candidate, step_key))
         template = "onboarding/stepper/step_checklist.html"
 
@@ -272,6 +283,9 @@ def _finalize_context(candidate, detail):
         "total_requests": doc_requests.count(),
         "pre_joining_count": candidate.checklist_tasks.filter(phase="pre_joining").count(),
         "post_joining_count": candidate.checklist_tasks.filter(phase="post_joining").count(),
+        "employee_checklist_count": candidate.checklist_tasks.filter(
+            phase="employee_checklist"
+        ).count(),
         "portal_sent": candidate.start_onboard,
     }
 
@@ -280,8 +294,8 @@ def _finalize_context(candidate, detail):
 @permission_required("recruitment.change_candidate")
 def finalize_onboarding(request, pk):
     """
-    Finalize's "Start Onboarding" action - deliberately does not touch the
-    shared email_send view (recruitment/onboarding/urls.py "email-send"),
+    Finalize's "Finish Configuration" action - deliberately does not touch
+    the shared email_send view (recruitment/onboarding/urls.py "email-send"),
     which is also used by the recruitment pipeline and the candidate list's
     own bulk "Send Portal" action. This just flips the status flag, with no
     email and no portal token, matching the explicit "no mail" requirement.
@@ -296,7 +310,7 @@ def finalize_onboarding(request, pk):
             )
         except Exception:
             pass
-        messages.success(request, _("Onboarding marked as started"))
+        messages.success(request, _("Onboarding configuration completed"))
     next_url = request.POST.get("next") or reverse("candidates-view")
     return redirect(next_url)
 
@@ -414,7 +428,7 @@ def _save_step(request, candidate, detail, step_key):
         detail.save()
         return None
 
-    if step_key in ("pre_joining", "post_joining"):
+    if step_key in ("pre_joining", "post_joining", "employee_checklist"):
         return _save_checklist_tasks(request, candidate, step_key)
 
     if step_key == "roles":
@@ -428,19 +442,23 @@ def _save_step(request, candidate, detail, step_key):
 
 
 def _save_checklist_tasks(request, candidate, phase):
+    candidate_assigned = phase in CANDIDATE_ASSIGNED_PHASES
     task_ids = request.POST.getlist("task_id")
     unassigned = []
     for task_id in task_ids:
         template_task = TaskTemplateTask.objects.filter(pk=task_id).first()
         if not template_task:
             continue
-        assignee_raw = request.POST.get(f"assignee_{task_id}") or None
-        assignee = Employee.objects.filter(pk=assignee_raw).first() if assignee_raw else None
         requires_feedback = bool(request.POST.get(f"feedback_{task_id}"))
         is_mandatory = bool(request.POST.get(f"mandatory_{task_id}"))
         requires_proof = bool(request.POST.get(f"proof_{task_id}"))
-        if not assignee:
-            unassigned.append(template_task.title)
+        if candidate_assigned:
+            assignee = None
+        else:
+            assignee_raw = request.POST.get(f"assignee_{task_id}") or None
+            assignee = Employee.objects.filter(pk=assignee_raw).first() if assignee_raw else None
+            if not assignee:
+                unassigned.append(template_task.title)
         _task_obj, created = CandidateChecklistTask.objects.update_or_create(
             candidate_id=candidate,
             template_task_id=template_task,
@@ -524,27 +542,12 @@ def document_request_cancel(request, pk, req_id):
         CandidateDocumentRequest, pk=req_id, candidate_id=candidate
     )
     if request.method == "POST":
-        # A CandidateDocument placeholder row (no file) is auto-created the
-        # moment a request is made, so a plain .delete() would always hit
-        # ProtectedError even when nothing was ever actually submitted -
-        # only block cancelling once a real file exists.
-        submitted = (
-            CandidateDocument.objects.filter(document_request_id=doc_request)
-            .exclude(document="")
-            .exclude(document__isnull=True)
-        )
-        if submitted.exists():
-            messages.error(
-                request,
-                _(
-                    "A document has already been submitted for this request - "
-                    "reject it instead of cancelling."
-                ),
-            )
-        else:
-            CandidateDocument.objects.filter(document_request_id=doc_request).delete()
-            doc_request.delete()
-            messages.success(request, _("Document request cancelled"))
+        # The CandidateDocument placeholder row (no file) is auto-created the
+        # moment a request is made and protected against deletion, so it has
+        # to go first regardless of whether a file was ever submitted.
+        CandidateDocument.objects.filter(document_request_id=doc_request).delete()
+        doc_request.delete()
+        messages.success(request, _("Document request removed"))
     return render(
         request,
         "onboarding/stepper/_document_list.html",
@@ -581,7 +584,11 @@ def _candidate_tasks_context(candidate):
             "phase", "id"
         )
     )
-    return {"candidate": candidate, "tasks": tasks}
+    phase_groups = [
+        {"key": key, "label": label, "tasks": [task for task in tasks if task.phase == key]}
+        for key, label in CandidateChecklistTask.PHASE_CHOICES
+    ]
+    return {"candidate": candidate, "tasks": tasks, "phase_groups": phase_groups}
 
 
 @login_required

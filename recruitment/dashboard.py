@@ -7,7 +7,7 @@ Accessible at /recruitment/dashboard/modern/ alongside the existing dashboard.
 from datetime import date, timedelta
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Q
+from django.db.models import Avg, Count, Q
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils.translation import gettext_lazy as _
@@ -72,6 +72,17 @@ def _candidates_in_period(request):
         created_at__date__gte=from_date,
         created_at__date__lte=to_date,
     )
+
+
+def _company_scope_kwargs(request):
+    """Filter kwargs for models with a plain (non-company-scoped) manager,
+    matching what the rest of this dashboard already gets for free from
+    HorillaCompanyManager - e.g. CandidateAIScore/CandidateJobSuggestion,
+    which carry a company_id but don't auto-filter by it."""
+    selected_company = request.session.get("selected_company")
+    if selected_company and selected_company != "all":
+        return {"company_id_id": selected_company}
+    return {}
 
 
 @login_required
@@ -705,5 +716,79 @@ def recruitment_response_status(request):
             "not_assisted": len(pending),
             "total": assisted_count + len(pending),
             "pending": pending[:50],
+        }
+    )
+
+
+@login_required
+def recruitment_ai_effectiveness(request):
+    """
+    How well the AI-assisted recruitment features are actually working,
+    not just how often they ran: email intake conversion, AI score
+    coverage, low-confidence flags needing manual review, and whether
+    recruiters act on AI job-match suggestions.
+    """
+    if not _has_recruitment_permission(request):
+        return JsonResponse({"no_permission": True})
+
+    from recruitment.models import CandidateAIScore, CandidateIntakeLog, CandidateJobSuggestion
+
+    from_date, to_date = _parse_period(request)
+    company_scope = _company_scope_kwargs(request)
+
+    intake_logs = CandidateIntakeLog.objects.filter(
+        received_at__date__gte=from_date, received_at__date__lte=to_date
+    )
+    intake_total = intake_logs.count()
+    intake_created = intake_logs.filter(status="created").count()
+
+    status_labels = dict(CandidateIntakeLog.statuses)
+    intake_breakdown = list(
+        intake_logs.exclude(status="created")
+        .values("status")
+        .annotate(count=Count("id"))
+        .order_by("-count")
+    )
+    for row in intake_breakdown:
+        row["label"] = str(status_labels.get(row["status"], row["status"]))
+
+    scored = CandidateAIScore.objects.filter(
+        created_at__date__gte=from_date,
+        created_at__date__lte=to_date,
+        status="scored",
+        **company_scope,
+    )
+    scored_count = scored.count()
+    avg_score = scored.aggregate(avg=Avg("score"))["avg"]
+    low_confidence_count = scored.filter(confidence="low").count()
+
+    suggestions = CandidateJobSuggestion.objects.filter(
+        created_at__date__gte=from_date,
+        created_at__date__lte=to_date,
+        status="suggested",
+        **company_scope,
+    )
+    suggested_count = suggestions.count()
+    acted_on_count = suggestions.filter(acted_on=True).count()
+
+    return JsonResponse(
+        {
+            "intake_total": intake_total,
+            "intake_created": intake_created,
+            "intake_conversion_pct": (
+                round(intake_created / intake_total * 100) if intake_total else None
+            ),
+            "intake_breakdown": intake_breakdown,
+            "scored_count": scored_count,
+            "avg_score": round(avg_score) if avg_score is not None else None,
+            "low_confidence_count": low_confidence_count,
+            "low_confidence_pct": (
+                round(low_confidence_count / scored_count * 100) if scored_count else None
+            ),
+            "suggested_count": suggested_count,
+            "acted_on_count": acted_on_count,
+            "acted_on_pct": (
+                round(acted_on_count / suggested_count * 100) if suggested_count else None
+            ),
         }
     )

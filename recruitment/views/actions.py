@@ -74,7 +74,12 @@ def recruitment_delete(request, rec_id):
                         candidate_permission.id
                     )
         try:
-            if delete_post(recruitment_obj):
+            linkedin_delete_results = [
+                delete_post(recruitment_obj, account)
+                for account in recruitment_obj.linkedin_accounts.all()
+            ]
+            linkedin_delete_ok = all(linkedin_delete_results)
+            if linkedin_delete_ok:
                 messages.success(request, _("Recruitment deleted successfully."))
             else:
                 messages.info(

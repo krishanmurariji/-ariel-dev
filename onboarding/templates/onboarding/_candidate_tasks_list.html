@@ -5,48 +5,84 @@
     <ion-icon name="list-outline"></ion-icon>
     <span>{% trans "No checklist tasks assigned for this candidate yet." %}</span>
   </div>
-  {% endif %}
-  {% for task in tasks %}
-  <div class="oh-ctask-row">
-    {% if task.status == "done" %}
-    <ion-icon name="checkmark-circle-outline" class="oh-ctask-row__status-icon oh-ctask-row__status-icon--done" title="{% trans 'Done' %}"></ion-icon>
-    {% else %}
-    <ion-icon name="time-outline" class="oh-ctask-row__status-icon oh-ctask-row__status-icon--pending" title="{{ task.get_status_display }}"></ion-icon>
+  {% else %}
+  <div class="oh-ctask-phase-tabs">
+    {% for group in phase_groups %}
+    <button type="button" class="oh-ctask-phase-tab{% if forloop.first %} active{% endif %}" data-ctask-phase-tab="{{ group.key }}">
+      {{ group.label }}<span class="oh-ctask-phase-tab__count">{{ group.tasks|length }}</span>
+    </button>
+    {% endfor %}
+  </div>
+  {% for group in phase_groups %}
+  <div class="oh-ctask-phase-panel{% if forloop.first %} active{% endif %}" data-ctask-phase-panel="{{ group.key }}">
+    {% if not group.tasks %}
+    <div class="oh-empty-hint">
+      <ion-icon name="list-outline"></ion-icon>
+      <span>{% trans "No tasks in this checklist yet." %}</span>
+    </div>
     {% endif %}
-    <div class="oh-ctask-row__main">
-      <div class="oh-ctask-row__title">{{ task.title }}</div>
-      {% if task.template_task_id.description %}
-      <div class="oh-ctask-row__desc">{{ task.template_task_id.description }}</div>
+    {% for task in group.tasks %}
+    <div class="oh-ctask-row">
+      {% if task.status == "done" %}
+      <ion-icon name="checkmark-circle-outline" class="oh-ctask-row__status-icon oh-ctask-row__status-icon--done" title="{% trans 'Done' %}"></ion-icon>
+      {% else %}
+      <ion-icon name="time-outline" class="oh-ctask-row__status-icon oh-ctask-row__status-icon--pending" title="{{ task.get_status_display }}"></ion-icon>
       {% endif %}
-      <div class="oh-ctask-row__meta">
-        <span class="oh-status-pill oh-status-pill--phase">{{ task.get_phase_display }}</span>
-        {% if task.assignee_id %}
-        <span class="oh-ctask-row__assignee">
-          <img src="{{ task.assignee_id.get_avatar }}" alt="{{ task.assignee_id.get_full_name }}">
-          {{ task.assignee_id.get_full_name }}
-        </span>
-        {% else %}
-        <span class="oh-ctask-row__assignee oh-text-light">{% trans "Unassigned" %}</span>
+      <div class="oh-ctask-row__main">
+        <div class="oh-ctask-row__title">{{ task.title }}</div>
+        {% if task.template_task_id.description %}
+        <div class="oh-ctask-row__desc">{{ task.template_task_id.description }}</div>
+        {% endif %}
+        {% if task.phase != "employee_checklist" %}
+        <div class="oh-ctask-row__meta">
+          {% if task.assignee_id %}
+          <span class="oh-ctask-row__assignee">
+            <img src="{{ task.assignee_id.get_avatar }}" alt="{{ task.assignee_id.get_full_name }}">
+            {{ task.assignee_id.get_full_name }}
+          </span>
+          {% else %}
+          <span class="oh-ctask-row__assignee oh-text-light">{% trans "Unassigned" %}</span>
+          {% endif %}
+        </div>
+        {% endif %}
+        {% if task.candidate_feedback %}
+        <div class="oh-ctask-row__feedback">{{ task.candidate_feedback }}</div>
         {% endif %}
       </div>
+      {% if task.requires_feedback %}
+      <div class="oh-ctask-row__side">
+        <button
+          type="button"
+          class="oh-ctask-row__thumb {% if task.candidate_satisfied %}oh-ctask-row__thumb--filled{% endif %} {% if task.status != 'done' %}oh-ctask-row__thumb--disabled{% endif %}"
+          title="{% if task.status != 'done' %}{% trans 'Available once this task is Done' %}{% elif task.candidate_satisfied %}{% trans 'Candidate satisfied - click to undo' %}{% else %}{% trans 'Mark candidate satisfied' %}{% endif %}"
+          {% if task.status == "done" %}
+          hx-post="{% url 'candidate-task-toggle-satisfaction' task.pk %}"
+          hx-target="#candidateTasksList"
+          hx-swap="outerHTML"
+          {% endif %}
+        >
+          <ion-icon name="thumbs-up-outline"></ion-icon>
+        </button>
+      </div>
+      {% endif %}
     </div>
-    {% if task.requires_feedback %}
-    <div class="oh-ctask-row__side">
-      <button
-        type="button"
-        class="oh-ctask-row__thumb {% if task.candidate_satisfied %}oh-ctask-row__thumb--filled{% endif %} {% if task.status != 'done' %}oh-ctask-row__thumb--disabled{% endif %}"
-        title="{% if task.status != 'done' %}{% trans 'Available once this task is Done' %}{% elif task.candidate_satisfied %}{% trans 'Candidate satisfied - click to undo' %}{% else %}{% trans 'Mark candidate satisfied' %}{% endif %}"
-        {% if task.status == "done" %}
-        hx-post="{% url 'candidate-task-toggle-satisfaction' task.pk %}"
-        hx-target="#candidateTasksList"
-        hx-swap="outerHTML"
-        {% endif %}
-      >
-        <ion-icon name="thumbs-up-outline"></ion-icon>
-      </button>
-      <span class="oh-ctask-row__thumb-label">{% trans "Satisfied" %}</span>
-    </div>
-    {% endif %}
+    {% endfor %}
   </div>
   {% endfor %}
+  {% endif %}
 </div>
+<script>
+  (function () {
+    var list = document.getElementById("candidateTasksList");
+    if (!list) { return; }
+    list.querySelectorAll("[data-ctask-phase-tab]").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        list.querySelectorAll("[data-ctask-phase-tab]").forEach(function (t) { t.classList.remove("active"); });
+        list.querySelectorAll("[data-ctask-phase-panel]").forEach(function (p) { p.classList.remove("active"); });
+        tab.classList.add("active");
+        var panel = list.querySelector('[data-ctask-phase-panel="' + tab.dataset.ctaskPhaseTab + '"]');
+        if (panel) { panel.classList.add("active"); }
+      });
+    });
+  })();
+</script>

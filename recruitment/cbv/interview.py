@@ -215,7 +215,6 @@ class InterviewForm(HorillaFormView):
             HttpResponse: Redirect response or HTTP response.
         """
         if form.is_valid():
-            is_new_interview = not form.instance.pk
             emp_ids = self.form.cleaned_data["employee_id"]
             cand_id = self.form.cleaned_data["candidate_id"]
             interview_date = self.form.cleaned_data["interview_date"]
@@ -238,39 +237,45 @@ class InterviewForm(HorillaFormView):
                 messages.success(self.request, _("Interview Scheduled successfully."))
             form.save()
 
-            if is_new_interview:
-                # Best-effort: a candidate/interviewer without the meeting
-                # provider connected yet (needs_auth) or a provider-side
-                # error must not undo the interview that was just
-                # scheduled - they can still generate it later via the
-                # existing "Send Meeting Link" action.
-                from recruitment.views.views import generate_interview_meeting
+            # Best-effort: a candidate/interviewer without the meeting
+            # provider connected yet (needs_auth) or a provider-side
+            # error must not undo the interview that was just scheduled
+            # or updated - they can still generate/refresh it later via
+            # the existing "Send Meeting Link" action. This also runs on
+            # every edit (not just creation) so that adding/removing
+            # interviewers or changing the date/time pushes an updated
+            # attendee list to the provider, which is what triggers the
+            # add/cancellation emails for changed attendees.
+            from recruitment.views.views import generate_interview_meeting
 
-                meeting_result = generate_interview_meeting(
-                    form.instance, self.request
-                )
-                if meeting_result.get("success"):
+            meeting_result = generate_interview_meeting(form.instance, self.request)
+            if meeting_result.get("success"):
+                if meeting_result.get("created"):
                     messages.success(self.request, _("Meeting link generated."))
-                elif meeting_result.get("needs_auth"):
-                    messages.warning(
-                        self.request,
-                        meeting_result.get("message")
-                        or _(
-                            "Interview scheduled, but the meeting link could "
-                            "not be generated: the meeting provider isn't "
-                            "connected yet. Use 'Send Meeting Link' from the "
-                            "interview once it's connected."
-                        ),
+                else:
+                    messages.success(
+                        self.request, _("Meeting updated and invitees notified.")
                     )
-                elif meeting_result.get("error"):
-                    messages.warning(
-                        self.request,
-                        _(
-                            "Interview scheduled, but the meeting link could "
-                            "not be generated: %(error)s"
-                        )
-                        % {"error": meeting_result["error"]},
+            elif meeting_result.get("needs_auth"):
+                messages.warning(
+                    self.request,
+                    meeting_result.get("message")
+                    or _(
+                        "Interview saved, but the meeting link could "
+                        "not be generated: the meeting provider isn't "
+                        "connected yet. Use 'Send Meeting Link' from the "
+                        "interview once it's connected."
+                    ),
+                )
+            elif meeting_result.get("error"):
+                messages.warning(
+                    self.request,
+                    _(
+                        "Interview saved, but the meeting link could "
+                        "not be generated: %(error)s"
                     )
+                    % {"error": meeting_result["error"]},
+                )
 
             return HttpResponse(
                 "<script>"

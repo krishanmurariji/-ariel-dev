@@ -36,6 +36,21 @@ class TaskTemplateListView(View):
         )
 
 
+def _lock_saved_task_forms(formset):
+    """
+    A TaskTemplateTask row that's already saved may already be referenced
+    by in-progress onboarding checklists, so its content is frozen once
+    created - only new rows are editable/removable. Disabling the fields
+    (rather than just hiding them in the template) makes Django fall back
+    to each field's stored value during validation, so a locked row can't
+    be changed by editing the submitted form data either.
+    """
+    for form in formset.forms:
+        if form.instance.pk:
+            for name in ("title", "description", "is_mandatory", "requires_proof"):
+                form.fields[name].disabled = True
+
+
 @method_decorator(login_required, name="dispatch")
 @method_decorator(permission_required("onboarding.add_tasktemplate"), name="dispatch")
 class TaskTemplateFormView(View):
@@ -49,6 +64,7 @@ class TaskTemplateFormView(View):
         instance = TaskTemplate.objects.filter(pk=pk).first() if pk else None
         form = TaskTemplateForm(instance=instance)
         formset = TaskTemplateTaskFormSet(instance=instance, prefix="tasks")
+        _lock_saved_task_forms(formset)
         return render(
             request,
             "onboarding/task_templates/form.html",
@@ -59,12 +75,14 @@ class TaskTemplateFormView(View):
         instance = TaskTemplate.objects.filter(pk=pk).first() if pk else None
         form = TaskTemplateForm(request.POST, instance=instance)
         formset = TaskTemplateTaskFormSet(request.POST, instance=instance, prefix="tasks")
+        _lock_saved_task_forms(formset)
         if form.is_valid():
             with transaction.atomic():
                 template = form.save()
                 formset = TaskTemplateTaskFormSet(
                     request.POST, instance=template, prefix="tasks"
                 )
+                _lock_saved_task_forms(formset)
                 if formset.is_valid():
                     formset.save()
                     messages.success(request, _("Task group saved"))

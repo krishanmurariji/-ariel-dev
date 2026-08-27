@@ -1290,7 +1290,7 @@ def profile_view(request, token):
 def roles_responsibility(request, token):
     """
     function used to show the candidate their Roles & Responsibilities -
-    the write-up recorded during the staff-side Start Onboarding stepper.
+    the write-up recorded during the staff-side Configure Onboarding stepper.
     Read-only step; just advances the portal on submit.
 
     Parameters:

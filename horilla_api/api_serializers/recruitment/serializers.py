@@ -101,10 +101,11 @@ class RecruitmentSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False,
     )
-    linkedin_account_id = serializers.SerializerMethodField()
-    linkedin_account_id_write = serializers.PrimaryKeyRelatedField(
+    linkedin_accounts = serializers.SerializerMethodField()
+    linkedin_accounts_ids = serializers.PrimaryKeyRelatedField(
         queryset=LinkedInAccount.objects.all(),
-        source="linkedin_account_id",
+        many=True,
+        source="linkedin_accounts",
         write_only=True,
         required=False,
     )
@@ -117,6 +118,7 @@ class RecruitmentSerializer(serializers.ModelSerializer):
             "open_positions": {"read_only": True},
             "skills": {"read_only": True},
             "survey_templates": {"read_only": True},
+            "linkedin_accounts": {"read_only": True},
         }
 
     def get_recruitment_managers(self, obj):
@@ -181,13 +183,11 @@ class RecruitmentSerializer(serializers.ModelSerializer):
             ]
         return []
 
-    def get_linkedin_account_id(self, obj):
-        if obj.linkedin_account_id:
-            return {
-                "id": obj.linkedin_account_id.id,
-                "username": obj.linkedin_account_id.username,
-            }
-        return None
+    def get_linkedin_accounts(self, obj):
+        return [
+            {"id": account.id, "username": account.username}
+            for account in obj.linkedin_accounts.all()
+        ]
 
 
 class StageSerializer(serializers.ModelSerializer):

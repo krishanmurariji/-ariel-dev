@@ -374,7 +374,7 @@ class TaskTemplateTask(HorillaModel):
 class CandidateChecklistTask(HorillaModel):
     """
     A per-candidate instance of a TaskTemplateTask, created when a Task
-    Group is assigned from the Start Onboarding stepper's Pre-Joining or
+    Group is assigned from the Configure Onboarding stepper's Pre-Joining or
     Post-Joining checklist step.
 
     Every task has exactly one assignee - the person who does the work and
@@ -387,6 +387,7 @@ class CandidateChecklistTask(HorillaModel):
     PHASE_CHOICES = [
         ("pre_joining", _("Pre-Joining")),
         ("post_joining", _("Post-Joining")),
+        ("employee_checklist", _("Employee Checklist")),
     ]
     STATUS_CHOICES = [
         ("todo", _("Todo")),
@@ -411,7 +412,7 @@ class CandidateChecklistTask(HorillaModel):
     )
     title = models.CharField(max_length=200, verbose_name=_("Task"))
     phase = models.CharField(
-        max_length=15, choices=PHASE_CHOICES, verbose_name=_("Phase")
+        max_length=20, choices=PHASE_CHOICES, verbose_name=_("Phase")
     )
     assignee_id = models.ForeignKey(
         Employee,
@@ -481,7 +482,7 @@ class CandidateChecklistTask(HorillaModel):
 
 class OnboardingCandidateDetail(HorillaModel):
     """
-    Staging area for the "Onboarding Details" step of the Start Onboarding
+    Staging area for the "Onboarding Details" step of the Configure Onboarding
     stepper - only fields that don't already exist on `Candidate`. Kept as
     its own OneToOne rather than added onto `recruitment.Candidate` directly,
     so this feature's data stays self-contained in the `onboarding` app.

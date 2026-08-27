@@ -270,13 +270,11 @@ def recruitment(request):
             recruitment_obj.open_positions.set(
                 JobPosition.objects.filter(id__in=form.data.getlist("open_positions"))
             )
-            if (
-                recruitment_obj.publish_in_linkedin
-                and recruitment_obj.linkedin_account_id
-            ):
-                post_recruitment_in_linkedin(
-                    request, recruitment_obj, recruitment_obj.linkedin_account_id
-                )
+            if recruitment_obj.publish_in_linkedin:
+                for linkedin_account in recruitment_obj.linkedin_accounts.all():
+                    post_recruitment_in_linkedin(
+                        request, recruitment_obj, linkedin_account
+                    )
             for survey in form.cleaned_data["survey_templates"]:
                 for sur in survey.recruitmentsurvey_set.all():
                     sur.recruitment_ids.add(recruitment_obj)
@@ -470,14 +468,12 @@ def recruitment_update(request, rec_id):
                     sur.recruitment_ids.add(recruitment_obj)
             recruitment_obj.save()
             if len(form.changed_data) > 0:
-                if (
-                    recruitment_obj.publish_in_linkedin
-                    and recruitment_obj.linkedin_account_id
-                ):
-                    delete_post(recruitment_obj)
-                    post_recruitment_in_linkedin(
-                        request, recruitment_obj, recruitment_obj.linkedin_account_id
-                    )
+                if recruitment_obj.publish_in_linkedin:
+                    for linkedin_account in recruitment_obj.linkedin_accounts.all():
+                        delete_post(recruitment_obj, linkedin_account)
+                        post_recruitment_in_linkedin(
+                            request, recruitment_obj, linkedin_account
+                        )
             messages.success(request, _("Recruitment Updated."))
             response = render(
                 request, "recruitment/recruitment_form.html", {"form": form}
@@ -993,31 +989,6 @@ def recruitment_reopen_pipeline(request, rec_id):
     recruitment_obj.save()
     messages.success(request, "Recruitment reopend successfully")
     return HorillaRedirect(request)
-
-
-@login_required
-@recruitment_manager_can_enter(perm="recruitment.change_recruitment")
-def update_recruitment_closed(request, obj_id):
-    """
-    htmx toggle used by the Recruitment grid's Status column (see
-    Recruitment.closed_toggle) - the switch reads "on" when the
-    recruitment is open, so checking it reopens and unchecking closes.
-    """
-    recruitment_obj = Recruitment.find(obj_id)
-    if not recruitment_obj:
-        return HorillaRedirect(
-            request, message=_("No Recruitment found matching the query.")
-        )
-
-    if request.POST.get("open") == "on":
-        recruitment_obj.closed = False
-        messages.success(request, _("Recruitment reopened successfully"))
-    else:
-        recruitment_obj.closed = True
-        messages.success(request, _("Recruitment closed successfully"))
-    recruitment_obj.save()
-
-    return HttpResponse("<script>$('#reloadMessagesButton').click();</script>")
 
 
 @login_required
@@ -3634,11 +3605,47 @@ def candidate_logout(request):
     return redirect("candidate_login")
 
 
+def _candidate_all_tasks(candidate):
+    """
+    Onboarding checklist tasks for the "My Task" tab on the self-tracking
+    page - only the Employee Checklist step's tasks, since those are the
+    only ones the candidate does themself. pre_joining/post_joining tasks
+    are done by someone else about the candidate, so they don't belong
+    here (they still show up in the "Feedback Required Task" tab, and on
+    the internal candidate profile's Task tab, regardless of phase).
+    """
+    return candidate.checklist_tasks.filter(
+        phase="employee_checklist"
+    ).select_related("template_task_id__template_id").order_by("-id")
+
+
+def _group_tasks_by_template(tasks):
+    """
+    Buckets tasks under the Task Group (TaskTemplate) they were assigned
+    from, preserving first-seen order - lets the "My Task" tab show one tab
+    per group instead of every task in one long scroll. A task whose
+    template link was cleared (template_task_id SET_NULL on delete) falls
+    into a shared "Other" bucket rather than being dropped.
+    """
+    groups = []
+    groups_by_key = {}
+    for task in tasks:
+        template = task.template_task_id.template_id if task.template_task_id else None
+        key = template.id if template else 0
+        group = groups_by_key.get(key)
+        if group is None:
+            group = {"title": template.title if template else _("Other"), "tasks": []}
+            groups_by_key[key] = group
+            groups.append(group)
+        group["tasks"].append(task)
+    return groups
+
+
 def _candidate_feedback_tasks(candidate):
     """
-    Onboarding checklist tasks a candidate should see on their self-tracking
-    page: only those the assignee has already marked Done, and only where a
-    candidate response was actually requested.
+    Onboarding checklist tasks a candidate should see on the "Feedback
+    Required Task" tab: only those the assignee has already marked Done,
+    and only where a candidate response was actually requested.
     """
     return candidate.checklist_tasks.filter(
         requires_feedback=True, status="done"
@@ -3680,13 +3687,17 @@ def candidate_self_status_tracking(request):
                 output_field=IntegerField(),
             )
         ).order_by("is_today", "-interview_date", "interview_time")
+        all_tasks = _candidate_all_tasks(candidate)
         return render(
             request,
             "candidate/candidate_self_tracking.html",
             {
                 "candidate": candidate,
                 "interviews": interviews,
+                "all_tasks": all_tasks,
+                "my_task_groups": _group_tasks_by_template(all_tasks),
                 "checklist_tasks": _candidate_feedback_tasks(candidate),
+                "status_choices": CandidateChecklistTask.STATUS_CHOICES,
             },
         )
     return render(request, "404.html")
@@ -3695,9 +3706,12 @@ def candidate_self_status_tracking(request):
 @candidate_login_required
 def candidate_task_feedback(request, task_id):
     """
-    Lets a candidate submit (or update) their response for a checklist task
-    - only reachable for a task that requires feedback, is already marked
-    Done by the assignee, and actually belongs to the logged-in candidate.
+    Lets a candidate submit (or update) a comment on one of their own
+    checklist tasks - either a required response (task.requires_feedback,
+    only once the assignee has marked it Done) from the "Feedback Required
+    Task" tab, or a plain free-form update from the "My Task" tab. The
+    "satisfied" declaration only ever applies to the former, so it's left
+    untouched when the task doesn't require feedback.
     """
     candidate_id = request.session.get("candidate_id")
     if not candidate_id:
@@ -3705,24 +3719,87 @@ def candidate_task_feedback(request, task_id):
     candidate = Candidate.objects.get(pk=candidate_id)
 
     task = CandidateChecklistTask.objects.filter(
-        pk=task_id,
-        candidate_id=candidate,
-        requires_feedback=True,
-        status="done",
+        pk=task_id, candidate_id=candidate
     ).first()
     if task and request.method == "POST":
         task.candidate_feedback = request.POST.get("candidate_feedback", "").strip()
-        task.candidate_satisfied = request.POST.get("candidate_satisfied") == "on"
+        if task.requires_feedback and task.status == "done":
+            task.candidate_satisfied = request.POST.get("candidate_satisfied") == "on"
         task.candidate_feedback_at = timezone.now()
         task.save()
         messages.success(request, _("Your response has been submitted.."))
 
+    all_tasks = _candidate_all_tasks(candidate)
     return render(
         request,
         "candidate/candidate_self_tracking.html",
         {
             "candidate": candidate,
+            "all_tasks": all_tasks,
+            "my_task_groups": _group_tasks_by_template(all_tasks),
             "checklist_tasks": _candidate_feedback_tasks(candidate),
+            "status_choices": CandidateChecklistTask.STATUS_CHOICES,
+            "default_task_tab": "feedback-task",
+        },
+    )
+
+
+@candidate_login_required
+def candidate_task_self_update(request, task_id):
+    """
+    Lets a candidate mark one of their own Employee Checklist tasks Done
+    (or reopen it) from the "My Task" tab - only reachable for a task on
+    the employee_checklist phase (the only phase with no employee
+    assignee, so completing it is the candidate's own job) that actually
+    belongs to the logged-in candidate.
+    """
+    from onboarding.stepper import _maybe_mark_onboarding_complete
+
+    candidate_id = request.session.get("candidate_id")
+    if not candidate_id:
+        return redirect("candidate-login/")
+    candidate = Candidate.objects.get(pk=candidate_id)
+
+    task = CandidateChecklistTask.objects.filter(
+        pk=task_id, candidate_id=candidate, phase="employee_checklist"
+    ).first()
+    if task and request.method == "POST":
+        new_status = request.POST.get("status")
+        if new_status in dict(CandidateChecklistTask.STATUS_CHOICES):
+            if new_status == "done" and task.requires_proof and not (
+                request.FILES.get("proof_file") or task.proof_file
+            ):
+                messages.error(
+                    request,
+                    _(
+                        "This task requires proof of completion before it can be marked done."
+                    ),
+                )
+            else:
+                if new_status != task.status:
+                    task.status_updated_at = timezone.now()
+                task.status = new_status
+                if request.FILES.get("proof_file"):
+                    task.proof_file = request.FILES["proof_file"]
+                if new_status == "done":
+                    task.completed_at = timezone.now()
+                elif task.completed_at:
+                    task.completed_at = None
+                task.save()
+                if new_status == "done":
+                    _maybe_mark_onboarding_complete(candidate)
+
+    all_tasks = _candidate_all_tasks(candidate)
+    return render(
+        request,
+        "candidate/candidate_self_tracking.html",
+        {
+            "candidate": candidate,
+            "all_tasks": all_tasks,
+            "my_task_groups": _group_tasks_by_template(all_tasks),
+            "checklist_tasks": _candidate_feedback_tasks(candidate),
+            "status_choices": CandidateChecklistTask.STATUS_CHOICES,
+            "default_task_tab": "my-task",
         },
     )
 
@@ -3760,13 +3837,17 @@ def candidate_self_status_tracking_managers_view(request, cand_id):
             )
         ).order_by("is_today", "-interview_date", "interview_time")
 
+        all_tasks = _candidate_all_tasks(candidate)
         return render(
             request,
             "candidate/candidate_self_tracking.html",
             {
                 "candidate": candidate,
                 "interviews": interviews,
+                "all_tasks": all_tasks,
+                "my_task_groups": _group_tasks_by_template(all_tasks),
                 "checklist_tasks": _candidate_feedback_tasks(candidate),
+                "status_choices": CandidateChecklistTask.STATUS_CHOICES,
             },
         )
     return render(request, "404.html")

@@ -3,7 +3,7 @@ Modern onboarding dashboard views — KPI summary + ApexCharts.
 
 Accessible at /onboarding/dashboard/modern/ alongside the existing dashboard.
 
-All data here is driven by the "Start Onboarding" stepper system
+All data here is driven by the "Configure Onboarding" stepper system
 (CandidateChecklistTask / OnboardingCandidateDetail / CandidateDocumentRequest
 / CandidateDocument), not the older Kanban pipeline (CandidateStage /
 CandidateTask / OnboardingStage / OnboardingTask), which is still fully

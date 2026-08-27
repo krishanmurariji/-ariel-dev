@@ -1,133 +1,98 @@
 {% load i18n %}
 <div id="documentListContainer">
-  <div class="oh-doc-tabs">
-    <button type="button" class="oh-doc-tab active" data-doc-tab="verify">
-      {% trans "Verify & Reject" %} <span class="tab-count">{{ documents|length }}</span>
-    </button>
-    <button type="button" class="oh-doc-tab" data-doc-tab="requested">
-      {% trans "Request Created" %} <span class="tab-count">{{ requests|length }}</span>
-    </button>
-  </div>
-
-  <div class="oh-doc-tab-panel" data-doc-panel="requested">
-    {% if requests %}
-    <div class="oh-doc-request-list">
-      {% for req in requests %}
-      <div class="oh-doc-request-row">
-        <div class="oh-doc-request-row__icon">
-          {% if req.format == "pdf" %}
-          <ion-icon name="document-text-outline"></ion-icon>
-          {% elif req.format == "jpg" or req.format == "png" or req.format == "jpeg" %}
-          <ion-icon name="image-outline"></ion-icon>
-          {% elif req.format == "xlsx" %}
-          <ion-icon name="grid-outline"></ion-icon>
-          {% elif req.format == "docx" or req.format == "txt" %}
-          <ion-icon name="document-outline"></ion-icon>
-          {% else %}
-          <ion-icon name="attach-outline"></ion-icon>
-          {% endif %}
+  {% if documents %}
+  <div class="oh-doc-request-list">
+    {% for document in documents %}
+    {% with req=document.document_request_id %}
+    <div class="oh-doc-verify-row">
+      <div class="oh-doc-request-row__icon">
+        {% if req.format == "pdf" %}
+        <ion-icon name="document-text-outline"></ion-icon>
+        {% elif req.format == "jpg" or req.format == "png" or req.format == "jpeg" %}
+        <ion-icon name="image-outline"></ion-icon>
+        {% elif req.format == "xlsx" %}
+        <ion-icon name="grid-outline"></ion-icon>
+        {% elif req.format == "docx" or req.format == "txt" %}
+        <ion-icon name="document-outline"></ion-icon>
+        {% else %}
+        <ion-icon name="attach-outline"></ion-icon>
+        {% endif %}
+      </div>
+      <div class="oh-doc-verify-row__body">
+        <div class="oh-doc-request-row__title">
+          <span class="oh-doc-request-row__title-text">{{ req.title|default:document.title }}</span>
+          {% if req.is_mandatory %}<span class="oh-status-pill oh-status-pill--rejected">{% trans "Mandatory" %}</span>{% endif %}
         </div>
-        <div class="oh-doc-request-row__body">
-          <div class="oh-doc-request-row__title">
-            <span class="oh-doc-request-row__title-text">{{ req.title }}</span>
-            {% if req.is_mandatory %}<span class="oh-status-pill oh-status-pill--rejected">{% trans "Mandatory" %}</span>{% endif %}
-          </div>
-          {% if req.description and req.description != req.title %}
-          <div class="oh-doc-request-row__desc">{{ req.description }}</div>
-          {% endif %}
-          <div class="oh-doc-request-row__meta">
-            <span>{% trans "Format" %}: {{ req.get_format_display }}</span>
-            {% if req.max_size %}<span>{% trans "Max size" %}: {{ req.max_size }} MB</span>{% endif %}
-          </div>
+        {% if req.description and req.description != req.title %}
+        <div class="oh-doc-request-row__desc">{{ req.description }}</div>
+        {% endif %}
+        {% if req %}
+        <div class="oh-doc-request-row__meta">
+          <span>{% trans "Format" %}: {{ req.get_format_display }}</span>
+          {% if req.max_size %}<span>{% trans "Max size" %}: {{ req.max_size }} MB</span>{% endif %}
         </div>
+        {% endif %}
+        {% if document.document %}
+        <a href="{{ document.document.url }}" target="_blank" class="oh-proof-view">
+          <ion-icon name="attach-outline"></ion-icon> {% trans "View submitted file" %}
+        </a>
+        {% endif %}
+        {% if document.reject_reason %}
+        <div class="oh-text-light small">{% trans "Reject reason" %}: {{ document.reject_reason }}</div>
+        {% endif %}
+      </div>
+      <div class="oh-doc-verify-row__actions">
+        {% if document.status == "approved" %}
+        <span class="oh-status-pill oh-status-pill--approved">{% trans "Approved" %}</span>
+        {% elif document.status == "rejected" %}
+        <span class="oh-status-pill oh-status-pill--rejected">{% trans "Rejected" %}</span>
+        {% elif document.document %}
+        <form
+          hx-post="{% url 'onboarding-stepper-document-status' candidate.pk document.pk 'verified' %}"
+          hx-target="#documentListContainer"
+          hx-swap="outerHTML">
+          {% csrf_token %}
+          <button type="submit" class="oh-btn oh-btn--secondary oh-btn--sm">{% trans "Approve" %}</button>
+        </form>
+        <button
+          type="button"
+          class="oh-btn oh-btn--danger-outline oh-btn--sm"
+          onclick="this.closest('.oh-doc-verify-row__actions').querySelector('.oh-doc-reject-form').classList.toggle('d-none')">
+          {% trans "Reject" %}
+        </button>
+        <form
+          class="oh-doc-reject-form d-none"
+          hx-post="{% url 'onboarding-stepper-document-status' candidate.pk document.pk 'rejected' %}"
+          hx-target="#documentListContainer"
+          hx-swap="outerHTML">
+          {% csrf_token %}
+          <input type="text" name="reject_reason" class="oh-input oh-input--sm" placeholder="{% trans 'Reason for rejection' %}" required>
+          <button type="submit" class="oh-btn oh-btn--danger oh-btn--sm">{% trans "Confirm" %}</button>
+        </form>
+        {% else %}
+        <span class="oh-status-pill oh-status-pill--candidate">
+          <ion-icon name="person-outline"></ion-icon> {% trans "Candidate" %}
+        </span>
+        {% endif %}
         <button
           type="button"
           class="oh-doc-request-row__cancel"
-          title="{% trans 'Cancel this request' %}"
+          title="{% trans 'Remove this document request' %}"
           hx-post="{% url 'onboarding-stepper-document-request-cancel' candidate.pk req.pk %}"
           hx-target="#documentListContainer"
           hx-swap="outerHTML"
-          hx-confirm="{% trans 'Cancel this document request?' %}">
-          <ion-icon name="close-outline"></ion-icon>
+          hx-confirm="{% trans 'Remove this document request?' %}">
+          <ion-icon name="trash-outline"></ion-icon>
         </button>
       </div>
-      {% endfor %}
     </div>
-    {% else %}
-    <div class="oh-empty-hint">
-      <ion-icon name="folder-open-outline"></ion-icon>
-      <span>{% trans "No document requests yet." %}</span>
-    </div>
-    {% endif %}
+    {% endwith %}
+    {% endfor %}
   </div>
-
-  <div class="oh-doc-tab-panel active" data-doc-panel="verify">
-    {% if documents %}
-    <div class="oh-doc-request-list">
-      {% for document in documents %}
-      <div class="oh-doc-verify-row">
-        <div class="oh-doc-verify-row__body">
-          <div class="oh-doc-request-row__title">
-            {{ document.title }}
-            <span class="oh-status-pill oh-status-pill--{{ document.status }}">{{ document.get_status_display }}</span>
-          </div>
-          {% if document.document %}
-          <a href="{{ document.document.url }}" target="_blank" class="oh-proof-view">
-            <ion-icon name="attach-outline"></ion-icon> {% trans "View submitted file" %}
-          </a>
-          {% endif %}
-          {% if document.reject_reason %}
-          <div class="oh-text-light small">{% trans "Reject reason" %}: {{ document.reject_reason }}</div>
-          {% endif %}
-        </div>
-        {% if document.status == "submitted" or document.status == "under_verification" %}
-        <div class="oh-doc-verify-row__actions">
-          <form
-            hx-post="{% url 'onboarding-stepper-document-status' candidate.pk document.pk 'verified' %}"
-            hx-target="#documentListContainer"
-            hx-swap="outerHTML">
-            {% csrf_token %}
-            <button type="submit" class="oh-btn oh-btn--secondary oh-btn--sm">{% trans "Verify" %}</button>
-          </form>
-          <button
-            type="button"
-            class="oh-btn oh-btn--danger-outline oh-btn--sm"
-            onclick="this.closest('.oh-doc-verify-row__actions').querySelector('.oh-doc-reject-form').classList.toggle('d-none')">
-            {% trans "Reject" %}
-          </button>
-          <form
-            class="oh-doc-reject-form d-none"
-            hx-post="{% url 'onboarding-stepper-document-status' candidate.pk document.pk 'rejected' %}"
-            hx-target="#documentListContainer"
-            hx-swap="outerHTML">
-            {% csrf_token %}
-            <input type="text" name="reject_reason" class="oh-input oh-input--sm" placeholder="{% trans 'Reason for rejection' %}" required>
-            <button type="submit" class="oh-btn oh-btn--danger oh-btn--sm">{% trans "Confirm" %}</button>
-          </form>
-        </div>
-        {% endif %}
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="oh-empty-hint">
-      <ion-icon name="shield-checkmark-outline"></ion-icon>
-      <span>{% trans "No submitted documents yet." %}</span>
-    </div>
-    {% endif %}
+  {% else %}
+  <div class="oh-empty-hint">
+    <ion-icon name="folder-open-outline"></ion-icon>
+    <span>{% trans "No document requests yet." %}</span>
   </div>
+  {% endif %}
 </div>
-
-<script>
-  (function () {
-    document.querySelectorAll('#documentListContainer .oh-doc-tab').forEach(function (tab) {
-      tab.addEventListener('click', function () {
-        document.querySelectorAll('#documentListContainer .oh-doc-tab').forEach(function (t) { t.classList.remove('active'); });
-        document.querySelectorAll('#documentListContainer .oh-doc-tab-panel').forEach(function (p) { p.classList.remove('active'); });
-        tab.classList.add('active');
-        var panel = document.querySelector('#documentListContainer .oh-doc-tab-panel[data-doc-panel="' + tab.dataset.docTab + '"]');
-        if (panel) { panel.classList.add('active'); }
-      });
-    });
-  })();
-</script>

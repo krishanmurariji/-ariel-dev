@@ -2,6 +2,7 @@
 recruitment
 """
 
+import time
 from typing import Any
 from urllib.parse import quote
 
@@ -26,7 +27,7 @@ from horilla_views.generic.cbv.views import (
 )
 from recruitment.filters import RecruitmentFilter
 from recruitment.forms import AddCandidateForm, RecruitmentCreationForm, SkillsForm
-from recruitment.models import Candidate, Platform, Recruitment, Skill
+from recruitment.models import Candidate, LinkedInAccount, Platform, Recruitment, Skill
 from recruitment.views.linkedin import delete_post, post_recruitment_in_linkedin
 
 
@@ -146,7 +147,7 @@ class RecruitmentList(HorillaListView):
         (_("Total Hires"), "tot_hires"),
         (_("Start Date"), "start_date"),
         (_("End date"), "end_date"),
-        (_("Status"), "closed_toggle"),
+        (_("Status"), "status_col"),
     ]
     action_method = "rec_actions"
 
@@ -234,6 +235,7 @@ class RecruitmentCreationFormExtended(RecruitmentCreationForm):
         "title": 12,
         "description": 12,
         "is_published": 4,
+        "closed": 4,
         "optional_profile_image": 4,
         "optional_resume": 4,
     }
@@ -257,10 +259,11 @@ class RecruitmentCreationFormExtended(RecruitmentCreationForm):
             "survey_templates",
             "skills",
             "is_published",
+            "closed",
             "optional_profile_image",
             "optional_resume",
             "publish_in_linkedin",
-            "linkedin_account_id",
+            "linkedin_accounts",
         ]
         exclude = ["is_active"]
         widgets = {
@@ -274,12 +277,14 @@ class RecruitmentCreationFormExtended(RecruitmentCreationForm):
             "end_date": _("End Date"),
             "survey_templates": _("Survey Templates"),
             "is_published": _("Is Published?"),
+            "closed": _("Closed"),
             "vacancy": _("Vacancy"),
             "open_positions": _("Job Position"),
             "recruitment_managers": _("Interviewers"),
             "recruitment_heads": _("Recruitment Heads"),
             "optional_profile_image": _("Optional Profile Image?"),
             "optional_resume": _("Optional Resume?"),
+            "linkedin_accounts": _("LinkedIn Accounts"),
         }
 
     def __init__(self, *args, **kwargs):
@@ -289,7 +294,7 @@ class RecruitmentCreationFormExtended(RecruitmentCreationForm):
         ).exists():
             self.fields["publish_in_linkedin"].initial = False
             self.fields["publish_in_linkedin"].widget = forms.HiddenInput()
-            self.fields["linkedin_account_id"].widget = forms.HiddenInput()
+            self.fields["linkedin_accounts"].widget = forms.MultipleHiddenInput()
 
 
 @method_decorator(login_required, name="dispatch")
@@ -367,6 +372,61 @@ class RecruitmentForm(HorillaFormView):
             skill_ids,
         )
 
+    @staticmethod
+    def _sync_linkedin_posts(
+        request, recruitment, previous_account_ids, previous_post_ids, content_changed
+    ):
+        """
+        Publishes/refreshes/removes this recruitment's LinkedIn posts so
+        they match the just-saved publish_in_linkedin flag and
+        linkedin_accounts selection - must run after form.save(), since
+        that's what commits the new M2M selection recruitment.linkedin_accounts
+        reads here.
+
+        An account newly added to the selection always gets a fresh post
+        (it's never been posted for this recruitment before). An account
+        that was already selected only gets re-published if the content a
+        LinkedIn post actually shows (title/description/company/vacancy/
+        skills) changed - otherwise every unrelated save (interviewers,
+        dates, ...) would burn a delete+publish round trip and risk
+        LinkedIn's rate limiting. An account removed from the selection
+        gets its post deleted.
+        """
+        if not recruitment.publish_in_linkedin:
+            return
+        current_account_ids = set(
+            recruitment.linkedin_accounts.values_list("id", flat=True)
+        )
+
+        removed_ids = previous_account_ids - current_account_ids
+        for account in LinkedInAccount.objects.filter(id__in=removed_ids):
+            delete_post(
+                recruitment, account, post_id=previous_post_ids.get(str(account.id))
+            )
+
+        accounts_to_publish_ids = current_account_ids - previous_account_ids
+        if content_changed:
+            accounts_to_publish_ids |= current_account_ids & previous_account_ids
+
+        for index, account in enumerate(
+            LinkedInAccount.objects.filter(id__in=accounts_to_publish_ids)
+        ):
+            if index:
+                # LinkedIn's abuse/velocity checks can reject a post fired
+                # immediately after a previous one from the same app - seen
+                # in practice as the first selected account posting fine
+                # and every other one failing on the very next call. A
+                # short gap between accounts avoids tripping that.
+                time.sleep(2)
+            # Publish the refreshed post first and only remove the old one
+            # once that succeeds - if LinkedIn rate-limits or otherwise
+            # rejects the new post, the job keeps showing its last-
+            # published (still valid) post instead of ending up with none.
+            old_post_id = previous_post_ids.get(str(account.id))
+            published = post_recruitment_in_linkedin(request, recruitment, account)
+            if published and old_post_id:
+                delete_post(recruitment, account, post_id=old_post_id)
+
     def form_valid(self, form: RecruitmentCreationFormExtended) -> HttpResponse:
         """
         Process form submission to save or update a Recruitment object and display success message.
@@ -375,30 +435,26 @@ class RecruitmentForm(HorillaFormView):
 
         if form.instance.pk:
             previous_signature = self._linkedin_content_signature(form.instance.pk)
+            previous_account_ids = set(
+                form.instance.linkedin_accounts.values_list("id", flat=True)
+            )
+            previous_post_ids = dict(form.instance.linkedin_post_ids or {})
             recruitment = form.save()
             recruitment_managers = self.request.POST.getlist("recruitment_managers")
             if recruitment_managers:
                 recruitment.recruitment_managers.set(recruitment_managers)
             recruitment_heads = self.request.POST.getlist("recruitment_heads")
             recruitment.recruitment_heads.set(recruitment_heads)
-            if recruitment.publish_in_linkedin and recruitment.linkedin_account_id:
-                never_posted = not recruitment.linkedin_post_id
-                content_changed = never_posted or (
-                    self._linkedin_content_signature(recruitment.pk)
-                    != previous_signature
-                )
-                if content_changed:
-                    # Publish the refreshed post first and only remove the
-                    # old one once that succeeds - if LinkedIn rate-limits
-                    # or otherwise rejects the new post, the job keeps
-                    # showing its last-published (still valid) post instead
-                    # of ending up with none.
-                    old_post_id = recruitment.linkedin_post_id
-                    published = post_recruitment_in_linkedin(
-                        self.request, recruitment, recruitment.linkedin_account_id
-                    )
-                    if published and old_post_id:
-                        delete_post(recruitment, post_id=old_post_id)
+            content_changed = (
+                self._linkedin_content_signature(recruitment.pk) != previous_signature
+            )
+            self._sync_linkedin_posts(
+                self.request,
+                recruitment,
+                previous_account_ids,
+                previous_post_ids,
+                content_changed,
+            )
             message = _("Recruitment Updated Successfully")
         else:
             recruitment = form.save()
@@ -407,10 +463,9 @@ class RecruitmentForm(HorillaFormView):
                 recruitment.recruitment_managers.set(recruitment_managers)
             recruitment_heads = self.request.POST.getlist("recruitment_heads")
             recruitment.recruitment_heads.set(recruitment_heads)
-            if recruitment.publish_in_linkedin and recruitment.linkedin_account_id:
-                post_recruitment_in_linkedin(
-                    self.request, recruitment, recruitment.linkedin_account_id
-                )
+            self._sync_linkedin_posts(
+                self.request, recruitment, set(), {}, content_changed=True
+            )
             message = _("Recruitment Created Successfully")
         messages.success(self.request, message)
         if self.request.GET.get("pipeline") == "true" or (

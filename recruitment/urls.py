@@ -138,11 +138,6 @@ urlpatterns = [
         views.recruitment_reopen_pipeline,
         name="recruitment-reopen-pipeline",
     ),
-    path(
-        "update-recruitment-closed/<int:obj_id>/",
-        views.update_recruitment_closed,
-        name="update-recruitment-closed",
-    ),
     path("pipeline/", views.recruitment_pipeline, name="pipeline"),
     path("pipeline-search/", views.filter_pipeline, name="pipeline-search"),
     path(
@@ -780,6 +775,11 @@ urlpatterns = [
         name="candidate-task-feedback",
     ),
     path(
+        "candidate-task-self-update/<int:task_id>/",
+        views.candidate_task_self_update,
+        name="candidate-task-self-update",
+    ),
+    path(
         "candidate-login/",
         views.candidate_login,
         name="candidate-login",
@@ -1308,5 +1308,10 @@ urlpatterns = [
         "dashboard/api/response-status/",
         rec_dashboard.recruitment_response_status,
         name="recruitment-dashboard-response-status",
+    ),
+    path(
+        "dashboard/api/ai-effectiveness/",
+        rec_dashboard.recruitment_ai_effectiveness,
+        name="recruitment-dashboard-ai-effectiveness",
     ),
 ]

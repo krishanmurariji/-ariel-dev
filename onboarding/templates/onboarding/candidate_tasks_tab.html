@@ -22,8 +22,6 @@
   .oh-ctask-row__meta { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
   .oh-ctask-row__assignee { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--oh-text-muted, #888); }
   .oh-ctask-row__assignee img { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
-  .oh-status-pill { display: inline-flex; align-items: center; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding: 3px 9px; border-radius: 20px; }
-  .oh-status-pill--phase { background: rgba(47,111,99,0.1); color: #2f6f63; }
   .oh-ctask-row__side { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; }
   .oh-ctask-row__thumb {
     width: 34px; height: 34px; border-radius: 50%;
@@ -37,7 +35,10 @@
   .oh-ctask-row__thumb:hover { border-color: #3e7d4f; color: #3e7d4f; }
   .oh-ctask-row__thumb--filled { background: #dcedde; border-color: #3e7d4f; color: #3e7d4f; }
   .oh-ctask-row__thumb--disabled { cursor: not-allowed; opacity: 0.4; pointer-events: none; }
-  .oh-ctask-row__thumb-label { font-size: 0.6rem; color: var(--oh-text-muted, #888); }
+  .oh-ctask-row__feedback {
+    margin-top: 8px; padding: 8px 10px; border-radius: 8px;
+    background: rgba(0,0,0,0.03); font-size: 0.8rem; color: var(--oh-text-muted, #555);
+  }
 
   .oh-empty-hint {
     display: flex; align-items: center; gap: 8px;
@@ -45,4 +46,24 @@
     padding: 14px; border: 1px dashed var(--oh-border-color, #e4e6ef); border-radius: 8px;
   }
   .oh-empty-hint ion-icon { font-size: 20px; }
+
+  .oh-ctask-phase-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; border-bottom: 1px solid var(--oh-border-color, #e4e6ef); }
+  .oh-ctask-phase-tab {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-weight: 600; font-size: 0.85rem; color: var(--oh-text-muted, #666);
+    background: none; border: none; padding: 10px 6px 12px; cursor: pointer; position: relative;
+  }
+  .oh-ctask-phase-tab__count {
+    font-size: 0.68rem; font-weight: 600; color: var(--oh-text-muted, #888);
+    background: #eceeee; border-radius: 20px; padding: 1px 7px;
+  }
+  .oh-ctask-phase-tab::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+    background: transparent; border-radius: 2px 2px 0 0;
+  }
+  .oh-ctask-phase-tab.active { color: #2f6f63; }
+  .oh-ctask-phase-tab.active::after { background: #2f6f63; }
+  .oh-ctask-phase-tab.active .oh-ctask-phase-tab__count { background: rgba(47,111,99,0.12); color: #2f6f63; }
+  .oh-ctask-phase-panel { display: none; }
+  .oh-ctask-phase-panel.active { display: block; }
 </style>

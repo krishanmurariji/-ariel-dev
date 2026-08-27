@@ -2,175 +2,276 @@
 {% load i18n %}
 {% block content %}
 <div class="oh-wrapper">
-  <h3>{% if instance %}{% trans "Edit Task Group" %}{% else %}{% trans "New Task Group" %}{% endif %}</h3>
-  <form method="post">
-    {% csrf_token %}
-    <div class="oh-input__group">
-      <label class="oh-input__label">{{ form.title.label }}</label>
-      {{ form.title }}
-      {{ form.title.errors }}
+  <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+    <div>
+      <h3 class="text-lg font-semibold m-0">{% trans "Task Group" %}</h3>
+      <!-- <p class="text-xs text-[#565E6C] m-0 mt-1">{% trans "Reusable Task Groups for the onboarding checklist steps." %}</p> -->
     </div>
-    <div class="oh-input__group">
-      <label class="oh-input__label">{{ form.description.label }}</label>
-      {{ form.description }}
-    </div>
-
-    {{ formset.management_form }}
-    <div class="d-flex justify-content-between align-items-center mt-4 mb-1">
-      <h5 class="m-0">{% trans "Tasks" %}</h5>
-      <span class="oh-text-light small">
-        {% trans "Drag the handle to set priority order." %}
-        {% if instance %}{% trans "Saved tasks can't be removed, only new ones can be added." %}{% endif %}
+    <a href="{% url 'task-template-list' %}" class="px-4 py-2 bg-primary-600 text-white rounded-md text-xs flex items-center gap-2 hover:bg-primary-800 transition duration-300">
+      <i class="fa-solid fa-arrow-left"></i> {% trans "Back" %}
+    </a>
+  </div>
+  <div class="bg-white rounded-md shadow-card">
+    <!-- <div class="flex items-center gap-3 px-5 py-4 border-b border-[#f0f0f0]">
+      <span class="w-9 h-9 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center flex-none">
+        <i class="fa-solid fa-clipboard-list text-sm"></i>
       </span>
-    </div>
-    <div id="taskFormsetRows">
-      {% for f in formset %}
-      <div class="oh-task-row formset-row" data-id="{{ f.instance.pk|default:'' }}">
-        {{ f.id }}
-        {{ f.sequence }}
-        <span class="oh-task-row__handle" title="{% trans 'Drag to reorder' %}">
-          <ion-icon name="reorder-two-outline"></ion-icon>
-        </span>
-        <div class="oh-task-row__fields">
-          {{ f.title }}
-          {{ f.description }}
-        </div>
-        <div class="oh-task-row__switches">
-          <label class="oh-task-row__switch-label">
-            <div class="oh-switch">{{ f.is_mandatory }}</div>
-            {% trans "Mandatory" %}
-          </label>
-          <label class="oh-task-row__switch-label">
-            <div class="oh-switch">{{ f.requires_proof }}</div>
-            {% trans "Requires Proof" %}
-          </label>
-        </div>
-        {{ f.title.errors }}
-      </div>
-      {% endfor %}
-    </div>
-    <button type="button" id="addTaskRow" class="oh-btn oh-btn--light oh-btn--sm mt-2">
-      <ion-icon name="add-outline"></ion-icon> {% trans "Add Task" %}
-    </button>
+      <h3 class="text-base font-semibold m-0">{% trans "Task Group" %}</h3>
+    </div> -->
 
-    <div class="mt-4 d-flex gap-2">
-      <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Save" %}</button>
-      <a href="{% url 'task-template-list' %}" class="oh-btn oh-btn--light">{% trans "Cancel" %}</a>
-    </div>
-  </form>
+    <form method="post" class="p-5">
+      {% csrf_token %}
+
+      <div class="mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-[#333] mb-1">{{ form.title.label }} <span class="text-red-600">*</span></label>
+            {{ form.title }}
+            {{ form.title.errors }}
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-[#333] mb-1">{{ form.description.label }}</label>
+            {{ form.description }}
+          </div>
+        </div>
+      </div>
+
+      {{ formset.management_form }}
+
+      <div>
+        <div class="mb-3">
+          <button type="button" id="addTaskRow" class="px-3 py-2 border border-dashed border-primary-600 text-primary-600 rounded-md text-xs flex items-center gap-2 hover:bg-[#FFF5F1] transition duration-300">
+            <i class="fa-solid fa-plus"></i> {% trans "Add Task" %}
+          </button>
+        </div>
+
+        <div id="taskTabsStrip" class="flex flex-wrap gap-2 mb-3"></div>
+
+        <div id="taskFormsetPanels">
+          {% for f in formset %}
+          <div class="oh-task-panel {% if not forloop.first %}hidden{% endif %} {% if f.instance.pk %}oh-task-panel--locked{% endif %} border border-[#ebebeb] rounded-md p-4"
+            data-index="{{ forloop.counter0 }}" data-locked="{% if f.instance.pk %}1{% else %}0{% endif %}">
+            {{ f.id }}
+            {{ f.sequence }}
+            <div>
+              <label class="block text-xs font-medium text-[#333] mb-1">{% trans "Task Title" %} <span class="text-red-600">*</span></label>
+              {{ f.title }}
+              {{ f.title.errors }}
+            </div>
+            <div class="mt-3">
+              <label class="block text-xs font-medium text-[#333] mb-1">{% trans "Description" %}</label>
+              {{ f.description }}
+            </div>
+            <div class="mt-3 flex gap-6">
+              <label class="oh-task-panel__switch-label">
+                <div class="oh-switch">{{ f.is_mandatory }}</div>
+                {% trans "Mandatory" %}
+              </label>
+              <label class="oh-task-panel__switch-label">
+                <div class="oh-switch">{{ f.requires_proof }}</div>
+                {% trans "Requires Proof" %}
+              </label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="mt-6 pt-4 border-t border-[#f0f0f0] flex justify-end gap-2">
+        <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md text-xs hover:bg-primary-800 transition duration-300">{% trans "Save" %}</button>
+      </div>
+    </form>
+  </div>
 </div>
 
-<template id="taskRowTemplate">
-  <div class="oh-task-row formset-row" data-id="">
-    <input type="hidden" name="tasks-__prefix__-sequence" value="0" class="task-sequence-input">
-    <span class="oh-task-row__handle" title="{% trans 'Drag to reorder' %}">
-      <ion-icon name="reorder-two-outline"></ion-icon>
-    </span>
-    <div class="oh-task-row__fields">
-      <input type="text" name="tasks-__prefix__-title" class="oh-input w-100" placeholder="{% trans 'Task title' %}">
+<template id="taskPanelTemplate">
+  <div class="oh-task-panel border border-[#ebebeb] rounded-md p-4" data-index="__index__" data-locked="0">
+    <input type="hidden" name="tasks-__prefix__-sequence" value="0">
+    <div>
+      <label class="block text-xs font-medium text-[#333] mb-1">{% trans "Task Title" %} <span class="text-red-600">*</span></label>
+      <input type="text" name="tasks-__prefix__-title" class="oh-input w-100 oh-task-panel__title-input" placeholder="{% trans 'Task title' %}">
+    </div>
+    <div class="mt-3">
+      <label class="block text-xs font-medium text-[#333] mb-1">{% trans "Description" %}</label>
       <input type="text" name="tasks-__prefix__-description" class="oh-input w-100" placeholder="{% trans 'Description (optional)' %}">
     </div>
-    <div class="oh-task-row__switches">
-      <label class="oh-task-row__switch-label">
+    <div class="mt-3 flex gap-6">
+      <label class="oh-task-panel__switch-label">
         <div class="oh-switch"><input type="checkbox" name="tasks-__prefix__-is_mandatory" class="oh-switch__checkbox" checked></div>
         {% trans "Mandatory" %}
       </label>
-      <label class="oh-task-row__switch-label">
+      <label class="oh-task-panel__switch-label">
         <div class="oh-switch"><input type="checkbox" name="tasks-__prefix__-requires_proof" class="oh-switch__checkbox"></div>
         {% trans "Requires Proof" %}
       </label>
-      <button type="button" class="oh-task-row__remove" title="{% trans 'Remove' %}">
-        <ion-icon name="close-outline"></ion-icon>
-      </button>
     </div>
   </div>
 </template>
 
 <style>
-  .oh-task-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    border: 1px solid var(--oh-border-color, #e4e6ef);
-    border-radius: 8px;
-    padding: 10px 12px;
-    margin-bottom: 8px;
-    background: var(--oh-body-bg, #fff);
+  .oh-task-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid #f6f6f6;
+    border-radius: 6px;
+    padding: 2px 4px 2px 2px;
   }
-  .oh-task-row__handle {
-    cursor: grab;
-    color: var(--oh-text-muted, #999);
-    font-size: 18px;
-    padding-top: 6px;
-  }
-  .oh-task-row.ui-sortable-helper { box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
-  .oh-task-row__fields { flex: 1; display: flex; gap: 8px; flex-wrap: wrap; }
-  .oh-task-row__fields input { flex: 1; min-width: 160px; }
-  .oh-task-row__switches { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-  .oh-task-row__switch-label { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; white-space: nowrap; }
-  .oh-task-row__remove {
+  .oh-task-tab__select {
     border: none;
     background: none;
-    color: var(--oh-text-muted, #999);
-    font-size: 18px;
+    padding: 4px 6px;
+    font-size: 0.75rem;
+    color: #1f2937;
+    cursor: pointer;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .oh-task-tab--active {
+    background: #fcedeb;
+    border-color: #E54F38;
+  }
+  .oh-task-tab--active .oh-task-tab__select { color: #E54F38; font-weight: 600; }
+  .oh-task-tab__remove {
+    border: none;
+    background: none;
+    color: #9AA1AC;
+    font-size: 11px;
     cursor: pointer;
     display: flex;
     align-items: center;
+    padding: 4px;
   }
-  .oh-task-row__remove:hover { color: #b3402f; }
+  .oh-task-tab__remove:hover { color: #ef4444; }
+  .oh-task-tab__lock {
+    color: #9AA1AC;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    padding: 4px;
+    cursor: help;
+  }
+
+  .oh-task-panel.hidden { display: none; }
+  .oh-task-panel__switch-label { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: #565E6C; }
+
+  /* Saved tasks are read-only: fields are HTML-disabled server-side
+     (see _lock_saved_task_forms) - this gives that state a clear
+     "frozen" look instead of looking like a normal editable panel. */
+  .oh-task-panel--locked { background: #fafafa; }
+  .oh-task-panel--locked input:disabled {
+    background: #f6f6f6;
+    color: #9AA1AC;
+    cursor: not-allowed;
+  }
+  .oh-task-panel--locked .oh-task-panel__switch-label { color: #b7bcc4; }
 </style>
 
+{% trans "New Task" as new_task_label %}
+{% trans "Remove" as remove_label %}
+{% trans "Task already added, can't be edited" as lock_tooltip %}
 <script>
 (function () {
+  var NEW_TASK_LABEL = "{{ new_task_label|escapejs }}";
+  var REMOVE_LABEL = "{{ remove_label|escapejs }}";
+  var LOCK_TOOLTIP = "{{ lock_tooltip|escapejs }}";
+
   var addBtn = document.getElementById("addTaskRow");
-  var rowsContainer = document.getElementById("taskFormsetRows");
+  var tabsStrip = document.getElementById("taskTabsStrip");
+  var panelsContainer = document.getElementById("taskFormsetPanels");
   var totalForms = document.getElementById("id_tasks-TOTAL_FORMS");
-  var rowTemplate = document.getElementById("taskRowTemplate");
+  var panelTemplate = document.getElementById("taskPanelTemplate");
 
-  addBtn.addEventListener("click", function () {
-    var index = parseInt(totalForms.value, 10);
-    var html = rowTemplate.innerHTML.replace(/__prefix__/g, index);
-    var wrapper = document.createElement("div");
-    wrapper.innerHTML = html.trim();
-    rowsContainer.appendChild(wrapper.firstChild);
-    totalForms.value = index + 1;
-    refreshSequence();
-    bindRemoveButtons();
-  });
+  function panelLabel(panel) {
+    var titleInput = panel.querySelector("[name$='-title']");
+    var value = titleInput ? titleInput.value.trim() : "";
+    return value || NEW_TASK_LABEL;
+  }
 
-  function bindRemoveButtons() {
-    rowsContainer.querySelectorAll(".oh-task-row__remove").forEach(function (btn) {
-      if (btn.dataset.bound) return;
-      btn.dataset.bound = "1";
+  function buildTabsFromPanels() {
+    tabsStrip.innerHTML = "";
+    panelsContainer.querySelectorAll(".oh-task-panel").forEach(function (panel, index) {
+      var locked = panel.dataset.locked === "1";
+      var tab = document.createElement("div");
+      tab.className = "oh-task-tab";
+      tab.dataset.index = index;
+      tab.dataset.locked = locked ? "1" : "0";
+      tab.innerHTML =
+        '<button type="button" class="oh-task-tab__select"><span class="oh-task-tab__label"></span></button>' +
+        (locked
+          ? '<span class="oh-task-tab__lock"><i class="fa-solid fa-lock"></i></span>'
+          : '<button type="button" class="oh-task-tab__remove"><i class="fa-solid fa-xmark"></i></button>');
+      tab.querySelector(".oh-task-tab__label").textContent = panelLabel(panel);
+      var lockOrRemove = tab.querySelector(".oh-task-tab__lock, .oh-task-tab__remove");
+      lockOrRemove.title = locked ? LOCK_TOOLTIP : REMOVE_LABEL;
+      tabsStrip.appendChild(tab);
+    });
+    bindTabEvents();
+    activateIndex(0);
+  }
+
+  function activateIndex(index) {
+    tabsStrip.querySelectorAll(".oh-task-tab").forEach(function (tab) {
+      tab.classList.toggle("oh-task-tab--active", tab.dataset.index === String(index));
+    });
+    panelsContainer.querySelectorAll(".oh-task-panel").forEach(function (panel) {
+      panel.classList.toggle("hidden", panel.dataset.index !== String(index));
+    });
+  }
+
+  function bindTabEvents() {
+    tabsStrip.querySelectorAll(".oh-task-tab__select").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var row = btn.closest(".formset-row");
-        var rows = rowsContainer.querySelectorAll(".formset-row");
-        if (row === rows[rows.length - 1]) {
-          row.remove();
-          totalForms.value = parseInt(totalForms.value, 10) - 1;
-          refreshSequence();
-        }
+        activateIndex(btn.closest(".oh-task-tab").dataset.index);
+      });
+    });
+    tabsStrip.querySelectorAll(".oh-task-tab__remove").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var index = btn.closest(".oh-task-tab").dataset.index;
+        var panel = panelsContainer.querySelector('.oh-task-panel[data-index="' + index + '"]');
+        if (panel) { panel.remove(); }
+        reindex();
       });
     });
   }
 
-  function refreshSequence() {
-    var rows = rowsContainer.querySelectorAll(".formset-row");
-    rows.forEach(function (row, index) {
-      var seqInput = row.querySelector(".task-sequence-input");
-      if (seqInput) {
-        seqInput.value = index + 1;
-      }
+  function reindex() {
+    var panels = panelsContainer.querySelectorAll(".oh-task-panel");
+    panels.forEach(function (panel, index) {
+      panel.dataset.index = index;
+      panel.querySelectorAll("[name]").forEach(function (el) {
+        el.name = el.name.replace(/tasks-\d+-/, "tasks-" + index + "-");
+      });
     });
+    totalForms.value = panels.length;
+    buildTabsFromPanels();
   }
 
-  if (window.$ && $.fn && $.fn.sortable) {
-    $(rowsContainer).sortable({
-      handle: ".oh-task-row__handle",
-      stop: refreshSequence,
-    });
-  }
-  refreshSequence();
+  addBtn.addEventListener("click", function () {
+    var index = panelsContainer.querySelectorAll(".oh-task-panel").length;
+    var html = panelTemplate.innerHTML.replace(/__prefix__/g, index).replace(/__index__/g, index);
+    var wrapper = document.createElement("div");
+    wrapper.innerHTML = html.trim();
+    var panel = wrapper.firstElementChild;
+    panel.classList.add("hidden");
+    panelsContainer.appendChild(panel);
+    reindex();
+    activateIndex(index);
+    var titleInput = panel.querySelector("[name$='-title']");
+    if (titleInput) { titleInput.focus(); }
+  });
+
+  panelsContainer.addEventListener("input", function (e) {
+    if (!e.target.name || e.target.name.indexOf("-title") === -1) { return; }
+    var panel = e.target.closest(".oh-task-panel");
+    var tab = tabsStrip.querySelector('.oh-task-tab[data-index="' + panel.dataset.index + '"]');
+    if (tab) { tab.querySelector(".oh-task-tab__label").textContent = panelLabel(panel); }
+  });
+
+  buildTabsFromPanels();
 })();
 </script>
 {% endblock content %}

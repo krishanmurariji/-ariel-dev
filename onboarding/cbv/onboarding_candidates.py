@@ -173,7 +173,7 @@ class OnboardingCandidatesList(HorillaListView):
 )
 class OnboardingCandidateCard(HorillaCardView):
     """
-    Long vertical candidate card view - profile photo + Start Onboarding
+    Long vertical candidate card view - profile photo + Configure Onboarding
     arrow button on the left, details on the right.
     """
 

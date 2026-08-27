@@ -1,6 +1,7 @@
 import ipaddress
 import json
 import secrets
+import time
 from urllib.parse import quote, urlencode, urlparse
 
 import requests
@@ -228,6 +229,23 @@ LINKEDIN_API_VERSION = "202608"  # YYYYMM — LinkedIn's REST Posts API requires
 # and rejects stale values with 426 Upgrade Required. Bump periodically.
 
 
+def _linkedin_error_reason(response):
+    """
+    Best-effort short human-readable reason from a failed LinkedIn REST API
+    response, so a recruiter can tell e.g. "this account isn't authorized
+    to post via this app" apart from a generic failure without needing
+    server log access. Falls back to the raw status code if the body
+    isn't the usual {"message": "..."} shape.
+    """
+    try:
+        message = response.json().get("message")
+    except ValueError:
+        message = None
+    if message:
+        return message[:200]
+    return _("HTTP %(status)s") % {"status": response.status_code}
+
+
 def _linkedin_rest_headers(api_token):
     return {
         "Authorization": f"Bearer {api_token}",
@@ -336,9 +354,19 @@ def post_recruitment_in_linkedin(
     # utm_source field on the application form template actually read to
     # tag the resulting Candidate's Platform. Anything else is silently
     # ignored and applicants from this post won't show up as "linkedin".
+    #
+    # utm_content is added so two accounts posting about the same job don't
+    # submit link previews for the byte-identical URL - LinkedIn's backend
+    # intermittently 500s the second of two posts pointing at the same
+    # article URL published within a few seconds of each other, most likely
+    # its own link-preview/crawl step colliding with itself. Giving each
+    # account's post a distinct URL sidesteps that; application_form() only
+    # reads recruitmentId/utm_source, so this is otherwise inert (and is a
+    # free per-account attribution tag if it's ever wanted later).
     recruitment_url = (
         f"{site_url}/recruitment/application-form"
         f"?recruitmentId={recruitment.id}&utm_source=linkedin"
+        f"&utm_content={linkedin_acc.id}"
     )
     description_text = html_to_text(recruitment.description)
     skill_titles = list(recruitment.skills.values_list("title", flat=True))
@@ -383,8 +411,30 @@ def post_recruitment_in_linkedin(
     url = "https://api.linkedin.com/rest/posts"
     payload = json.dumps(payload_dict)
     headers = _linkedin_rest_headers(linkedin_acc.api_token)
+    # Retry backoff (seconds) for a 5xx from LinkedIn's own backend - seen
+    # in practice when two accounts post about the same job within a short
+    # window of each other, most likely their link-preview/crawl step
+    # tripping over itself rather than a real per-account problem. The
+    # utm_content differentiation above should mostly prevent this, but
+    # these retries are the safety net: a manual re-save (which reliably
+    # succeeds) is really just "try again after enough time has passed",
+    # so this automates that instead of making the recruiter do it by hand.
+    RETRY_BACKOFF_SECONDS = (5, 15)
     try:
         response = requests.post(url, headers=headers, data=payload, timeout=30)
+        for wait_seconds in RETRY_BACKOFF_SECONDS:
+            if response.status_code < 500:
+                break
+            logger.warning(
+                "LinkedIn post got a %s for recruitment %s on account %s - "
+                "retrying in %ss.",
+                response.status_code,
+                recruitment.id,
+                linkedin_acc.id,
+                wait_seconds,
+            )
+            time.sleep(wait_seconds)
+            response = requests.post(url, headers=headers, data=payload, timeout=30)
     except requests.RequestException as exc:
         logger.error(
             "LinkedIn post request failed for recruitment %s: %s", recruitment.id, exc
@@ -397,83 +447,98 @@ def post_recruitment_in_linkedin(
 
     if response.status_code == 201:
         # The new API returns the post's URN in this response header, not the body.
-        recruitment.linkedin_post_id = response.headers.get("x-restli-id")
+        post_ids = dict(recruitment.linkedin_post_ids or {})
+        post_ids[str(linkedin_acc.id)] = response.headers.get("x-restli-id")
+        recruitment.linkedin_post_ids = post_ids
         recruitment.save()
         return True
 
     logger.error(
-        "LinkedIn post failed for recruitment %s: %s %s",
+        "LinkedIn post failed for recruitment %s on account %s: %s %s",
         recruitment.id,
+        linkedin_acc.id,
         response.status_code,
         response.text,
     )
 
     if response.status_code == 429:
         # Rate limiting is temporary — LinkedIn caps how many posts an app
-        # can publish in a stretch of time. Leaving publish_in_linkedin
-        # untouched (unlike the branch below) means the very next save that
-        # actually changes the job's content will simply try again, instead
-        # of the recruiter having to notice the feature got silently turned
-        # off and switch it back on themselves.
+        # can publish in a stretch of time. Leaving the account linked
+        # (unlike the branch below) means the very next save that actually
+        # changes the job's content will simply try again, instead of the
+        # recruiter having to notice the account got silently dropped and
+        # add it back themselves.
         messages.error(
             request,
             _(
                 "LinkedIn is asking us to slow down — too many posts were "
-                "published in a short time. This job will try posting again "
-                "automatically the next time it's saved; please wait a few "
-                "minutes before saving it again."
-            ),
+                "published in a short time on the %(account)s account. This "
+                "job will try posting again automatically the next time "
+                "it's saved; please wait a few minutes before saving it "
+                "again."
+            )
+            % {"account": linkedin_acc},
         )
         return False
 
+    # Only drop this one account from the selection - other accounts this
+    # job is posting to (successfully or not) are untouched, and turning
+    # off publish_in_linkedin entirely here would wipe every account's
+    # linked post via Recruitment.save()'s own cleanup.
     messages.error(
         request,
         _(
-            "This job couldn't be published to LinkedIn, so LinkedIn "
-            "posting has been turned off for it. Check the LinkedIn "
-            "account connection in Settings, then turn it back on."
-        ),
+            "This job couldn't be published to LinkedIn via the "
+            "%(account)s account (%(reason)s), so that account has been "
+            "removed from this job's LinkedIn accounts. Check the account "
+            "connection in Settings, then add it back."
+        )
+        % {"account": linkedin_acc, "reason": _linkedin_error_reason(response)},
     )
-    recruitment.publish_in_linkedin = False
-    recruitment.save()
+    recruitment.linkedin_accounts.remove(linkedin_acc)
     return False
 
 
-def delete_post(recruitment, post_id=None):
+def delete_post(recruitment, linkedin_account, post_id=None):
     """
-    Deletes a LinkedIn post — by default the recruitment's current
-    linkedin_post_id, or an explicit post_id when deleting one that's no
-    longer current (see RecruitmentForm.form_valid, which publishes a
-    replacement post first and only deletes the old id once that succeeds,
-    so a failed re-publish never leaves the job with no live LinkedIn post
-    at all).
+    Deletes a LinkedIn post published via the given LinkedInAccount — by
+    default the post currently recorded for that account in
+    recruitment.linkedin_post_ids, or an explicit post_id when deleting one
+    that's no longer current (see RecruitmentForm._sync_linkedin_posts,
+    which publishes a replacement post first and only deletes the old id
+    once that succeeds, so a failed re-publish never leaves the job with no
+    live LinkedIn post at all).
     """
-    target_post_id = post_id or recruitment.linkedin_post_id
+    post_ids = dict(recruitment.linkedin_post_ids or {})
+    target_post_id = post_id or post_ids.get(str(linkedin_account.id))
     if not target_post_id:
-        return True  # 787
+        return True
 
     url = f"https://api.linkedin.com/rest/posts/{quote(target_post_id, safe='')}"
-    headers = _linkedin_rest_headers(recruitment.linkedin_account_id.api_token)
+    headers = _linkedin_rest_headers(linkedin_account.api_token)
 
     try:
         response = requests.delete(url, headers=headers, timeout=30)
     except requests.RequestException as exc:
         logger.error(
-            "LinkedIn delete request failed for recruitment %s: %s",
+            "LinkedIn delete request failed for recruitment %s on account %s: %s",
             recruitment.id,
+            linkedin_account.id,
             exc,
         )
         return False
 
     if response.status_code == 204:
-        if target_post_id == recruitment.linkedin_post_id:
-            recruitment.linkedin_post_id = None
+        if post_ids.get(str(linkedin_account.id)) == target_post_id:
+            del post_ids[str(linkedin_account.id)]
+            recruitment.linkedin_post_ids = post_ids
             recruitment.save()
         return True
 
     logger.error(
-        "LinkedIn delete failed for recruitment %s (post %s): %s %s",
+        "LinkedIn delete failed for recruitment %s on account %s (post %s): %s %s",
         recruitment.id,
+        linkedin_account.id,
         target_post_id,
         response.status_code,
         response.text,

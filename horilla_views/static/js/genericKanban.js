@@ -280,7 +280,13 @@ function initializeKanbanSortable(sectionSelector, stageSelector) {
 			ui.item.data("origin-index", ui.item.index());
 		},
 
+		sort: function (event, ui) {
+			kanbanAutoScrollOnDrag(event, ui);
+		},
+
 		stop: function (event, ui) {
+			kanbanStopAutoScroll();
+
 			var self = this;
 			var row = $(ui.item);
 			var candidateId = row.data("instanceId");
@@ -364,6 +370,51 @@ function initializeKanbanSortable(sectionSelector, stageSelector) {
 			proceedWithMove();
 		}
 	});
+}
+
+// While dragging a kanban card, auto-scroll the board horizontally once
+// the cursor nears the left/right edge of the (potentially wider-than-
+// screen) stage row - otherwise a stage that's currently off-screen is
+// unreachable by drag alone.
+var KANBAN_EDGE_SCROLL_ZONE = 60; // px from the container's edge that triggers scrolling
+var KANBAN_EDGE_SCROLL_SPEED = 15; // px scrolled per tick
+var kanbanEdgeScrollTimer = null;
+var kanbanEdgeScrollDirection = 0;
+
+function kanbanAutoScrollOnDrag(event, ui) {
+	var container = $(ui.item).closest(".groupContainer")[0];
+	if (!container) {
+		return;
+	}
+
+	var rect = container.getBoundingClientRect();
+	var x = event.clientX;
+	var direction = 0;
+
+	if (x <= rect.left + KANBAN_EDGE_SCROLL_ZONE) {
+		direction = -1;
+	} else if (x >= rect.right - KANBAN_EDGE_SCROLL_ZONE) {
+		direction = 1;
+	}
+
+	if (direction === kanbanEdgeScrollDirection) {
+		return;
+	}
+
+	kanbanStopAutoScroll();
+	kanbanEdgeScrollDirection = direction;
+
+	if (direction !== 0) {
+		kanbanEdgeScrollTimer = setInterval(function () {
+			container.scrollLeft += direction * KANBAN_EDGE_SCROLL_SPEED;
+		}, 16);
+	}
+}
+
+function kanbanStopAutoScroll() {
+	clearInterval(kanbanEdgeScrollTimer);
+	kanbanEdgeScrollTimer = null;
+	kanbanEdgeScrollDirection = 0;
 }
 
 function revertItemPosition(ui) {

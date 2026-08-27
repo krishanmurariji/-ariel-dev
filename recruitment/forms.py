@@ -298,7 +298,7 @@ class RecruitmentCreationForm(BaseModelForm):
 
         model = Recruitment
         fields = "__all__"
-        exclude = ["is_active", "linkedin_post_id"]
+        exclude = ["is_active", "linkedin_post_ids"]
         widgets = {
             "start_date": forms.DateInput(attrs={"type": "date"}),
             "end_date": forms.DateInput(attrs={"type": "date"}),
@@ -361,7 +361,7 @@ class RecruitmentCreationForm(BaseModelForm):
         )
         self.fields["skills"].choices = skill_choices
         self.fields["skills"].choices += [("create", _("Create new skill "))]
-        self.fields["linkedin_account_id"].queryset = LinkedInAccount.objects.filter(
+        self.fields["linkedin_accounts"].queryset = LinkedInAccount.objects.filter(
             is_active=True
         )
         self.fields["publish_in_linkedin"].widget.attrs.update(
@@ -386,14 +386,13 @@ class RecruitmentCreationForm(BaseModelForm):
             raise forms.ValidationError(
                 _("Job position is required if the recruitment is publishing.")
             )
-        if (
-            self.cleaned_data.get("publish_in_linkedin")
-            and not self.cleaned_data["linkedin_account_id"]
+        if self.cleaned_data.get("publish_in_linkedin") and not self.cleaned_data.get(
+            "linkedin_accounts"
         ):
             raise forms.ValidationError(
                 {
-                    "linkedin_account_id": _(
-                        "LinkedIn account is required for publishing."
+                    "linkedin_accounts": _(
+                        "At least one LinkedIn account is required for publishing."
                     )
                 }
             )

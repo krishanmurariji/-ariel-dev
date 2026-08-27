@@ -276,14 +276,19 @@ class Recruitment(HorillaModel):
         ),
     )
     skills = models.ManyToManyField(Skill, blank=True, verbose_name=_("Skills"))
-    linkedin_account_id = models.ForeignKey(
+    linkedin_accounts = models.ManyToManyField(
         "recruitment.LinkedInAccount",
-        on_delete=models.PROTECT,
-        null=True,
         blank=True,
         verbose_name=_("LinkedIn Account"),
     )
-    linkedin_post_id = models.CharField(max_length=150, null=True, blank=True)
+    linkedin_post_ids = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=_(
+            "Maps each connected LinkedIn account's id to the post URN "
+            "published on that account for this recruitment."
+        ),
+    )
     publish_in_linkedin = models.BooleanField(
         default=True,
         help_text=_(
@@ -366,8 +371,7 @@ class Recruitment(HorillaModel):
 
     def save(self, *args, **kwargs):
         if not self.publish_in_linkedin:
-            self.linkedin_account_id = None
-            self.linkedin_post_id = None
+            self.linkedin_post_ids = {}
         if self.pk:
             previous_end_date = (
                 Recruitment.objects.filter(pk=self.pk)
@@ -380,6 +384,11 @@ class Recruitment(HorillaModel):
             if previous_end_date != self.end_date:
                 self.end_date_reminder_sent = False
         super().save(*args, **kwargs)  # Save the Recruitment instance first
+        if not self.publish_in_linkedin:
+            # Only reachable with an existing pk - the M2M can't be touched
+            # before the instance has one, and a brand-new unpublished
+            # recruitment never had accounts linked in the first place.
+            self.linkedin_accounts.clear()
         if self.is_event_based and self.open_positions is None:
             raise ValidationError({"open_positions": _("This field is required")})
 
@@ -484,17 +493,6 @@ class Recruitment(HorillaModel):
             return "Closed"
         else:
             return "Open"
-
-    def closed_toggle(self):
-        """
-        For toggle the closed field from the Recruitment grid - checked
-        means the recruitment is open.
-        """
-        url = f"update-recruitment-closed/{self.id}"
-        return render_template(
-            path="cbv/recruitment/closed_toggle.html",
-            context={"instance": self, "url": url},
-        )
 
     def rec_actions(self):
         """

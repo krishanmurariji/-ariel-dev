@@ -1552,8 +1552,14 @@ def feedback_creation(request):
     """
     form = FeedbackForm()
     form.fields["manager_id"].required = False
+    # Also checked on POST via a hidden field on the form itself, since a
+    # validation-error resubmit posts back to a plain URL with no query
+    # string - the ?modal=1 the initial GET arrived with would otherwise be
+    # lost, and the modal would regain its redundant section heading.
+    hide_title = request.GET.get("modal") == "1" or request.POST.get("is_modal") == "1"
     context = {
         "feedback_form": form,
+        "hide_title": hide_title,
     }
     is_htmx = request.headers.get("HX-Request") is not None
     if request.method == "POST":
