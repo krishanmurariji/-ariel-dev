@@ -2414,32 +2414,70 @@ def _cancel_interview_meeting(interview, request):
     exists, so Outlook/Google send attendees their own "Canceled:" notice -
     mirrors generate_interview_meeting's provider dispatch, but a failure
     here must never block deleting the local InterviewSchedule.
+
+    Pushes one last update with a "cancelled" body right before deleting -
+    without it, the delete-triggered notice reuses whatever body was last
+    saved ("Scheduled"/"Re-scheduled"), which reads wrong for a
+    cancellation. This means attendees get two emails (an update, then the
+    provider's own cancellation notice), which is the accepted trade-off
+    for the cancellation notice actually saying "Cancelled".
     """
     from django.apps import apps as django_apps
 
     if django_apps.is_installed("outlook_auth"):
-        from outlook_auth.methods import delete_teams_calendar_event, get_azure_api
+        from outlook_auth.methods import (
+            delete_teams_calendar_event,
+            get_azure_api,
+            update_teams_calendar_event,
+        )
         from outlook_auth.models import InterviewOutlookMeetingLink
 
         link = InterviewOutlookMeetingLink.objects.filter(interview=interview).first()
         if link:
             api = get_azure_api(request)
             if api and api.token:
+                meeting = link.meeting
                 try:
-                    delete_teams_calendar_event(api, link.meeting.event_id)
+                    update_teams_calendar_event(
+                        api,
+                        {
+                            "title": meeting.title,
+                            "description": _interview_meeting_description(
+                                interview, status="cancelled"
+                            ),
+                            "start_time": meeting.start_time,
+                            "duration": meeting.duration,
+                            "attendees": meeting.attendees,
+                        },
+                        meeting.event_id,
+                    )
+                    delete_teams_calendar_event(api, meeting.event_id)
                 except Exception as e:
                     logger.error(f"Error cancelling Teams Meeting: {e}")
 
     if django_apps.is_installed("horilla_meet"):
-        from horilla_meet.methods import delete_calendar_event
+        from horilla_meet.methods import delete_calendar_event, update_calendar_event
         from horilla_meet.models import GoogleCredential, InterviewMeetingLink
 
         link = InterviewMeetingLink.objects.filter(interview=interview).first()
         if link and GoogleCredential.objects.filter(
             employee_id=request.user.employee_get
         ).exists():
+            meeting = link.meeting
             try:
-                delete_calendar_event(request, link.meeting.event_id)
+                update_calendar_event(
+                    request,
+                    {
+                        "title": meeting.title,
+                        "description": _interview_meeting_description(
+                            interview, status="cancelled"
+                        ),
+                        "start_time": meeting.start_time,
+                        "duration": meeting.duration,
+                    },
+                    meeting.event_id,
+                )
+                delete_calendar_event(request, meeting.event_id)
             except Exception as e:
                 logger.error(f"Error cancelling Google Meeting: {e}")
 
@@ -2449,13 +2487,18 @@ def _cancel_interview_meeting(interview, request):
 @manager_can_enter(perm="recruitment.delete_interviewschedule")
 def interview_delete(request, interview_id):
     """
-    Deletes an interview schedule.
+    Deletes an interview schedule. Cancels its meeting first (notifying the
+    candidate and panel) unless the interview is already completed or its
+    date has passed - a completed/expired interview already happened (or
+    was never going to), so there's nothing to notify anyone about.
     Args:
         interview_id: InterviewSchedule instance ID
     """
     try:
         interview = InterviewSchedule.objects.get(id=interview_id)
-        _cancel_interview_meeting(interview, request)
+        is_expired = interview.interview_date < timezone.localdate()
+        if not interview.completed and not is_expired:
+            _cancel_interview_meeting(interview, request)
         interview.delete()
         messages.success(request, _("Interview deleted successfully."))
     except InterviewSchedule.DoesNotExist:
@@ -3455,23 +3498,36 @@ def _interview_meeting_title(interview):
     return f"{stage_name} - {candidate.name}"
 
 
-def _interview_meeting_description(interview, is_new):
+_INTERVIEW_MEETING_HEADINGS = {
+    "scheduled": _("Online Interview Scheduled"),
+    "rescheduled": _("Online Interview Re-scheduled"),
+    "cancelled": _("Online Interview Cancelled"),
+}
+
+
+def _interview_meeting_description(interview, status):
     """
     Builds the HTML shown in the Teams/Google Meet invite body - a table of
     the details a panel member (or the candidate, who is also an attendee)
-    needs at a glance, matching the "Scheduled" vs "Re-scheduled" heading to
-    whether this is the interview's first invite or an edit of an existing
-    one. Cancellation doesn't need a variant here: deleting the event is
-    what makes Outlook/Google send their own "Canceled" notice (see
-    interview_delete), using whatever body was last saved.
+    needs at a glance. `status` is one of "scheduled", "rescheduled" or
+    "cancelled" and picks the heading - cancelled is used by
+    _cancel_interview_meeting to overwrite the body right before deleting
+    the event, so the "Canceled" notice Outlook/Google send on delete
+    doesn't show whatever heading ("Scheduled"/"Re-scheduled") happened to
+    be last saved.
     """
     candidate = interview.candidate_id
-    heading = _("Online Interview Scheduled") if is_new else _("Online Interview Re-scheduled")
+    heading = _INTERVIEW_MEETING_HEADINGS[status]
     when = (
         f"{interview.interview_date.strftime('%b %d, %Y')} "
         f"{interview.interview_time.strftime('%I:%M %p')}"
     )
-    panel = escape(", ".join(str(emp) for emp in interview.employee_id.all())) or "-"
+    # get_full_name(), not str(emp) - the latter appends the employee's
+    # badge id in parentheses, which has no place in a candidate-facing
+    # meeting invite.
+    panel = escape(
+        ", ".join(emp.get_full_name() for emp in interview.employee_id.all())
+    ) or "-"
     rows = [
         (_("Candidate"), escape(candidate.name)),
         (
@@ -3565,7 +3621,9 @@ def generate_interview_meeting(interview, request):
 
         link = InterviewOutlookMeetingLink.objects.filter(interview=interview).first()
         meeting_id = link.meeting.id if link else None
-        description = _interview_meeting_description(interview, is_new=meeting_id is None)
+        description = _interview_meeting_description(
+            interview, status="scheduled" if meeting_id is None else "rescheduled"
+        )
         try:
             meeting, created = OutlookMeeting.objects.update_or_create(
                 id=meeting_id,
@@ -3606,7 +3664,9 @@ def generate_interview_meeting(interview, request):
 
     link = InterviewMeetingLink.objects.filter(interview=interview).first()
     meeting_id = link.meeting.id if link else None
-    description = _interview_meeting_description(interview, is_new=meeting_id is None)
+    description = _interview_meeting_description(
+        interview, status="scheduled" if meeting_id is None else "rescheduled"
+    )
     try:
         meeting, created = GoogleMeeting.objects.update_or_create(
             id=meeting_id,
