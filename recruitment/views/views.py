@@ -2408,9 +2408,6 @@ def create_interview_schedule(request):
     return render(request, template, {"form": form})
 
 
-@login_required
-@hx_request_required
-@manager_can_enter(perm="recruitment.delete_interviewschedule")
 def _cancel_interview_meeting(interview, request):
     """
     Best-effort: cancels the interview's Teams/Google Meet event, if one
@@ -2447,6 +2444,9 @@ def _cancel_interview_meeting(interview, request):
                 logger.error(f"Error cancelling Google Meeting: {e}")
 
 
+@login_required
+@hx_request_required
+@manager_can_enter(perm="recruitment.delete_interviewschedule")
 def interview_delete(request, interview_id):
     """
     Deletes an interview schedule.
@@ -2458,7 +2458,7 @@ def interview_delete(request, interview_id):
         _cancel_interview_meeting(interview, request)
         interview.delete()
         messages.success(request, _("Interview deleted successfully."))
-    except:
+    except InterviewSchedule.DoesNotExist:
         messages.error(request, _("Scheduled Interview not found"))
     if request.META.get("HTTP_HX_REQUEST") == "true":
         return HttpResponse(
