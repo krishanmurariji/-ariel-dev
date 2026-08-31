@@ -49,7 +49,6 @@ from horilla_views.cbv_methods import (  # update_initial_cache,
     get_short_uuid,
     get_verbose_name_from_field_path,
     hx_request_required,
-    login_required,
     paginator_qry,
     sortby,
     split_by_import_reference,
@@ -1832,11 +1831,19 @@ class HorillaCardView(ListView):
         return view
 
 
-@method_decorator(login_required, name="dispatch")
 @method_decorator(hx_request_required, name="dispatch")
 class ReloadMessages(TemplateView):
     """
     Reload messages
+
+    Deliberately not gated by login_required: it only re-renders whatever
+    Django messages are already queued on the current session (same as
+    the messages framework itself, which works for anonymous sessions
+    too) - candidate-facing pages (e.g. candidate_self_tracking.html)
+    trigger this same reload after actions like deleting a note, and
+    those visitors aren't Django-authenticated. Gating it used to send
+    them into a redirect to the staff login page, which htmx would then
+    splice into the DOM via hx-swap="afterend".
     """
 
     template_name = "generic/messages.html"

@@ -130,3 +130,25 @@ def update_calendar_event(request, data, event_id=None):
         raise Exception(f"Failed to update calendar event: {e}")
 
     return updated_event
+
+
+def delete_calendar_event(request, event_id):
+    """
+    Cancels an existing Google Calendar event. `sendUpdates="all"` is what
+    makes Google Calendar mail attendees its own cancellation notice -
+    there's no separate cancellation email to compose.
+    """
+    if not event_id:
+        raise Exception("Cannot cancel event: event_id is missing.")
+
+    credentials = get_google_credentials(request)
+    service = build("calendar", "v3", credentials=credentials)
+
+    try:
+        service.events().delete(
+            calendarId="primary", eventId=event_id, sendUpdates="all"
+        ).execute()
+    except Exception as e:
+        # Already gone (deleted directly in Google Calendar, etc.) - nothing to do.
+        if "410" not in str(e) and "404" not in str(e):
+            raise Exception(f"Failed to cancel calendar event: {e}")

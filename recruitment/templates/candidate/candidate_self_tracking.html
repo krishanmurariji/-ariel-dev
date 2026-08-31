@@ -1,7 +1,6 @@
 {% load static i18n recruitmentfilters %}
 <!DOCTYPE html>
 <html lang="en">
-    <!-- Previous head section remains the same -->
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -36,6 +35,41 @@
                 margin: 0 auto;
             }
 
+            @media (min-width: 768px) {
+                .tracking-container {
+                    padding: 2rem;
+                }
+            }
+
+            /* ---------- 70 / 30 layout ---------- */
+            .tracking-columns {
+                display: grid;
+                grid-template-columns: 7fr 3fr;
+                align-items: stretch;
+                gap: 1.5rem;
+            }
+            .tracking-col-left,
+            .tracking-col-right {
+                min-width: 0;
+            }
+            @media (max-width: 991.98px) {
+                .tracking-columns {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            .tracking-card {
+                position: relative;
+                padding: 1rem;
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+            @media (min-width: 768px) {
+                .tracking-card { padding: 1.5rem; }
+            }
+
+            /* ---------- Candidate profile card ---------- */
             .profile-header__main {
                 display: flex;
                 align-items: center;
@@ -43,17 +77,12 @@
                 gap: 1.5rem;
                 flex-wrap: wrap;
             }
-
             .profile-header__identity {
                 display: flex;
                 align-items: center;
                 gap: 1rem;
             }
-
-            .profile-header__identity .profile-image {
-                margin: 0;
-            }
-
+            .profile-header__identity .profile-image { margin: 0; }
             .profile-header__meta {
                 flex: 1;
                 min-width: 220px;
@@ -63,36 +92,11 @@
                 gap: 1rem;
                 flex-wrap: wrap;
             }
-
-            .profile-header__status {
-                flex: none;
-            }
+            .profile-header__status { flex: none; }
 
             @media (max-width: 767.98px) {
-                .profile-header__main {
-                    flex-direction: column;
-                    align-items: flex-start;
-                }
-                .profile-header__meta {
-                    flex-direction: column;
-                    align-items: flex-start;
-                }
-            }
-
-            @media (min-width: 768px) {
-                .tracking-container {
-                    padding: 2rem;
-                }
-            }
-
-            .tracking-card {
-                position:relative;
-                padding:1rem;
-                background: white;
-                border-radius: 8px;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-                height: 100%;
-                margin-bottom: 1rem;
+                .profile-header__main { flex-direction: column; align-items: flex-start; }
+                .profile-header__meta { flex-direction: column; align-items: flex-start; }
             }
 
             .profile-image {
@@ -110,251 +114,10 @@
                 white-space: nowrap;
                 margin: 0.5rem 0;
             }
-
-            .status-badge.pending {
-                background-color: #fff3cd;
-                color: #856404;
-            }
-
-            .status-badge.success {
-                background-color: #d4edda;
-                color: #155724;
-            }
-
-            .status-badge.danger {
-                background-color: #f8d7da;
-                color: #721c24;
-            }
-
-            .status-badge i {
-                margin-right: 0.5rem;
-            }
-
-            .interview-item {
-                border-bottom: 1px solid #e9ecef;
-                padding: 1rem 0;
-            }
-
-            .interview-item:last-child {
-                border-bottom: none;
-            }
-
-            .interview-date,
-            .interview-time,
-            .interview-interviewer {
-                font-size: 0.875rem;
-                color: #6c757d;
-                margin-bottom: 0.5rem;
-            }
-
-            .interview-description {
-                font-size: 0.875rem;
-                color: #6c757d;
-                margin-top: 0.5rem;
-                padding-left: 0.75rem;
-                border-left: 3px solid #e9ecef;
-            }
-
-            .interviewer-chip {
-                display: inline-block;
-                padding: 0.25rem 0.5rem;
-                background-color: #e9ecef;
-                border-radius: 12px;
-                margin-right: 0.25rem;
-                margin-bottom: 0.25rem;
-                font-size: 0.8125rem;
-                white-space: nowrap;
-            }
-
-            .document-card {
-                transition: all 0.3s ease;
-                margin-bottom: 1rem;
-            }
-
-            .document-card:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            }
-
-            .note-card {
-                border-left: 4px solid #007bff;
-                margin-bottom: 1rem;
-                position: relative;
-            }
-
-            .note-close-btn {
-                position: absolute;
-                top: 0.5rem;
-                right: 0.5rem;
-                width: 28px;
-                height: 28px;
-                border-radius: 50%;
-                background-color: #fff;
-                border: none;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                transition: all 0.2s ease;
-                padding: 0;
-                font-size: 14px;
-                color: #dc3545;
-            }
-
-            .note-close-btn:hover {
-                background: #e9ecef;
-                color: #dc3545;
-            }
-
-            .note-card .card-body {
-                padding-right: 2.5rem;
-            }
-
-            @media (max-width: 768px) {
-                .note-close-btn {
-                    width: 32px;
-                    height: 32px;
-                    font-size: 16px;
-                }
-            }
-
-            .document-list, .notes-list,.interview-list {
-                height: 400px;
-                overflow-y : auto;
-            }
-
-            .notes-list {
-                height: 340px;
-            }
-
-            .status-completed {
-                color: #28a745;
-            }
-
-            .status-expired {
-                color: #dc3545;
-            }
-
-            .status-upcoming {
-                color: #ffc107;
-            }
-
-            .status-today {
-                color: #007bff;
-            }
-
-            @media (max-width: 576px) {
-                h2.h4 {
-                    font-size: 1.25rem;
-                }
-                h3.h5 {
-                    font-size: 1.125rem;
-                }
-                .interview-description {
-                    font-size: 0.8125rem;
-                }
-                .status-badge {
-                    font-size: 0.8125rem;
-                }
-            }
-
-            .row {
-                --bs-gutter-x: 1rem;
-                --bs-gutter-y: 1rem;
-            }
-
-            @media (min-width: 768px) {
-                .row {
-                    --bs-gutter-x: 1.5rem;
-                    --bs-gutter-y: 1.5rem;
-                }
-            }
-
-            .oh-rate:not(:checked) > label:hover,
-            .oh-rate:not(:checked) > label:hover ~ label {
-                color: #ccc;
-            }
-
-            .tracking-card {
-                padding: 1rem;
-            }
-
-            @media (min-width: 768px) {
-                .tracking-card {
-                    padding: 1.5rem;
-                }
-            }
-
-            .btn,
-            .form-control {
-                padding: 0.375rem 0.75rem;
-            }
-
-            .bg-orange {
-                background-color: #e54f38;
-            }
-
-            @media (max-width: 576px) {
-                .btn,
-                .form-control {
-                    padding: 0.25rem 0.5rem;
-                    font-size: 0.875rem;
-                }
-            }
-
-            .d-flex {
-                gap: 0.5rem;
-            }
-
-            @media (max-width: 576px) {
-                .btn,
-                .form-control {
-                    min-height: 44px;
-                }
-
-                .document-card .card-body {
-                    padding: 0.75rem;
-                }
-            }
-
-            @media (max-width: 767.98px) {
-                .mobile-section-gap {
-                    margin-bottom: 1.5rem;
-                }
-            }
-
-            .tracking-card {
-                margin-bottom: 1.5rem;
-            }
-
-            @media (min-width: 768px) {
-                .tracking-card {
-                    margin-bottom: 0;
-                }
-            }
-
-            .custom-dialog {
-                max-width: 1000px;
-                max-height: 800px;
-            }
-
-            .oh-not-found {
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                flex-direction: column;
-                height: 50vh;
-                opacity: 0.5;
-            }
-
-            .file-validation {
-                color: #4f5bd9;
-                background-color: #d8e7f0;
-                border-color: #d6e9c6;
-                padding: 15px;
-                border: 1px solid transparent;
-                border-radius: 4px;
-            }
+            .status-badge.pending { background-color: #fff3cd; color: #856404; }
+            .status-badge.success { background-color: #d4edda; color: #155724; }
+            .status-badge.danger { background-color: #f8d7da; color: #721c24; }
+            .status-badge i { margin-right: 0.5rem; }
 
             .banner-container {
                 position: absolute;
@@ -369,25 +132,392 @@
                 clip-path: polygon(26% 0, 81% 0, 91% 94%, 0 115%);
                 text-align: center;
             }
-
             @media (max-width: 768px) {
-                .banner-container {
-                    top: 20px;
-                    right: -33px;
-                    font-size: 10px;
-                    padding: 6px 56px;
-                }
+                .banner-container { top: 20px; right: -33px; font-size: 10px; padding: 6px 56px; }
             }
-
             @media (max-width: 480px) {
-                .banner-container {
-                    top: 17px;
-                    right: -29px;
-                    font-size: 8px;
-                    padding: 5px 50px;
-                }
+                .banner-container { top: 17px; right: -29px; font-size: 8px; padding: 5px 50px; }
             }
 
+            .oh-rate:not(:checked) > label:hover,
+            .oh-rate:not(:checked) > label:hover ~ label { color: #ccc; }
+
+            /* ---------- Main tabs (Schedule Interview / Documents / My Task / Feedback Task) ---------- */
+            .oh-main-tabs {
+                display: flex;
+                gap: 4px;
+                border-bottom: 1px solid #e4e6ef;
+                margin-bottom: 1.25rem;
+                overflow-x: auto;
+            }
+            .oh-main-tab {
+                background: none;
+                border: none;
+                cursor: pointer;
+                font-size: 0.84rem;
+                font-weight: 600;
+                color: #888;
+                padding: 8px 4px 12px;
+                margin-right: 20px;
+                position: relative;
+                display: inline-flex;
+                align-items: center;
+                gap: 7px;
+                white-space: nowrap;
+            }
+            .oh-main-tab i { font-size: 0.8rem; }
+            .oh-main-tab-count {
+                font-size: 0.68rem;
+                font-weight: 600;
+                color: #888;
+                background: #eceeee;
+                border-radius: 20px;
+                padding: 1px 7px;
+            }
+            .oh-main-tab::after {
+                content: "";
+                position: absolute;
+                left: 0; right: 0; bottom: -1px;
+                height: 2px;
+                background: transparent;
+                border-radius: 2px 2px 0 0;
+            }
+            .oh-main-tab.active { color: #212529; }
+            .oh-main-tab.active::after { background: #E54F38; }
+            .oh-main-tab.active .oh-main-tab-count { background: #fcedeb; color: #E54F38; }
+
+            .oh-main-panel { display: none; }
+            .oh-main-panel.active { display: block; }
+
+            .document-list, .notes-list, .interview-list {
+                height: 420px;
+                overflow-y: auto;
+            }
+
+            /* ---------- Interviews ---------- */
+            .interview-item { border-bottom: 1px solid #e9ecef; padding: 1rem 0; }
+            .interview-item:first-child { padding-top: 0; }
+            .interview-item:last-child { border-bottom: none; }
+            .interview-date, .interview-time, .interview-interviewer {
+                font-size: 0.875rem; color: #6c757d; margin-bottom: 0.5rem;
+            }
+            .interview-description {
+                font-size: 0.875rem; color: #6c757d; margin-top: 0.5rem;
+                padding-left: 0.75rem; border-left: 3px solid #e9ecef;
+            }
+            .interviewer-chip {
+                display: inline-block; padding: 0.25rem 0.5rem;
+                background-color: #e9ecef; border-radius: 12px;
+                margin-right: 0.25rem; margin-bottom: 0.25rem;
+                font-size: 0.8125rem; white-space: nowrap;
+            }
+            .status-completed { color: #28a745; }
+            .status-expired { color: #dc3545; }
+            .status-upcoming { color: #ffc107; }
+            .status-today { color: #007bff; }
+
+            /* ---------- Documents ---------- */
+            .document-card { transition: all 0.3s ease; margin-bottom: 1rem; }
+            .document-card:first-child { margin-top: 0; }
+            .document-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
+
+            /* ---------- Tasks ---------- */
+            .task-status-badge { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; flex: none; }
+            .task-status-badge--stuck { background: #f3ddd7; color: #b3402f; }
+            .task-status-badge--todo { background: #eceeee; color: #6c757d; }
+            .task-status-badge--scheduled { background: #e3ecf7; color: #3e6b99; }
+            .task-status-badge--ongoing { background: #f3e6cc; color: #a6672e; }
+            .task-status-badge--done { background: #dcedde; color: #3e7d4f; }
+
+            .task-group-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1rem; }
+            .task-group-tab {
+                display: inline-flex; align-items: center; gap: 6px;
+                padding: 5px 12px; border-radius: 20px;
+                background: #f1f2f6; color: #6c757d;
+                border: none; font-size: 0.76rem; font-weight: 600;
+                cursor: pointer;
+            }
+            .task-group-tab .task-tab-count { background: rgba(0,0,0,0.06); font-size: 0.66rem; border-radius: 20px; padding: 1px 6px; }
+            .task-group-tab.active { background: #E54F38; color: #fff; }
+            .task-group-tab.active .task-tab-count { background: rgba(255,255,255,0.25); color: #fff; }
+            .task-group-panel { display: none; }
+            .task-group-panel.active { display: block; }
+
+            .task-item { }
+            .task-item:last-child { border-bottom: none !important; margin-bottom: 0 !important; padding-bottom: 0 !important; }
+
+            /* ---------- My Task card ---------- */
+            .oh-task-card {
+                border: 1px solid #ebebeb;
+                border-radius: 8px;
+                padding: 0.9rem 1rem;
+            }
+            .oh-task-card:last-child { margin-bottom: 0 !important; }
+            .oh-task-card__top {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: 8px;
+            }
+            .oh-task-card__title {
+                margin: 0;
+                font-size: 0.88rem;
+                font-weight: 600;
+                color: #212529;
+            }
+            .oh-task-card__edit {
+                flex: none;
+                width: 28px;
+                height: 28px;
+                border-radius: 6px;
+                border: none;
+                background: transparent;
+                color: #6c757d;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: background .15s ease, color .15s ease;
+            }
+            .oh-task-card__edit:hover { background: #fcedeb; color: #E54F38; }
+            .oh-task-card__desc {
+                margin: 6px 0 0;
+                font-size: 0.8rem;
+                color: #6c757d;
+                line-height: 1.5;
+            }
+
+            /* ---------- Task edit modal ---------- */
+            .oh-task-edit-dialog { max-width: 480px; }
+            .oh-task-modal__label {
+                display: block;
+                font-size: 0.72rem;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: .02em;
+                color: #565E6C;
+                margin-bottom: 8px;
+            }
+            .oh-task-modal__textarea {
+                width: 100%;
+                border: 1px solid #ebebeb;
+                border-radius: 8px;
+                padding: 10px 12px;
+                font-size: 0.83rem;
+                color: #333;
+                resize: vertical;
+                transition: border-color .15s ease;
+            }
+            .oh-task-modal__textarea:focus { outline: none; border-color: #E54F38; }
+
+            .oh-status-picker { display: flex; flex-wrap: wrap; gap: 8px; }
+            .oh-status-pill {
+                position: relative;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 7px 12px;
+                border-radius: 999px;
+                font-size: 0.76rem;
+                font-weight: 500;
+                background: var(--pill-bg, #f1f2f4);
+                color: var(--pill-color, #565E6C);
+                border: 1.5px solid transparent;
+                cursor: pointer;
+                transition: all .15s ease;
+            }
+            .oh-status-pill input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+            .oh-status-pill__dot { width: 7px; height: 7px; border-radius: 999px; background: var(--pill-color, #565E6C); }
+            .oh-status-pill:has(input:checked) {
+                background: var(--pill-color, #565E6C);
+                color: #fff;
+            }
+            .oh-status-pill:has(input:checked) .oh-status-pill__dot { background: #fff; }
+            .oh-status-pill[data-status="stuck"]     { --pill-color: #ef4444; --pill-bg: #fee2e2; }
+            .oh-status-pill[data-status="todo"]      { --pill-color: #6c757d; --pill-bg: #f1f2f4; }
+            .oh-status-pill[data-status="scheduled"] { --pill-color: #3b82f6; --pill-bg: #dbeafe; }
+            .oh-status-pill[data-status="ongoing"]   { --pill-color: #f59e0b; --pill-bg: #fef3c7; }
+            .oh-status-pill[data-status="done"]      { --pill-color: #22c55e; --pill-bg: #dcfce7; }
+
+            .oh-task-edit-footer {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                padding: 14px 20px;
+                border-top: 1px solid #ebebeb;
+            }
+            .oh-btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 8px 16px;
+                border-radius: 8px;
+                font-size: 0.78rem;
+                font-weight: 600;
+                border: 1px solid transparent;
+                cursor: pointer;
+                transition: all .15s ease;
+            }
+            .oh-btn--ghost { background: #fff; color: #565E6C; border-color: #ebebeb; }
+            .oh-btn--ghost:hover { background: #f6f6f6; }
+            .oh-btn--primary { background: #E54F38; color: #fff; }
+            .oh-btn--primary:hover { background: #cf4530; }
+
+            .oh-not-found {
+                display: flex; justify-content: center; align-items: center;
+                flex-direction: column; height: 50vh; opacity: 0.5;
+            }
+
+            .custom-dialog { max-width: 1000px; max-height: 800px; }
+
+            .btn, .form-control { padding: 0.375rem 0.75rem; }
+            .bg-orange { background-color: #e54f38; }
+            @media (max-width: 576px) {
+                .btn, .form-control { padding: 0.25rem 0.5rem; font-size: 0.875rem; min-height: 44px; }
+                .document-card .card-body { padding: 0.75rem; }
+                h2.h4 { font-size: 1.25rem; }
+                h3.h5 { font-size: 1.125rem; }
+                .interview-description { font-size: 0.8125rem; }
+                .status-badge { font-size: 0.8125rem; }
+            }
+            .d-flex { gap: 0.5rem; }
+
+            .row {
+                --bs-gutter-x: 1rem;
+                --bs-gutter-y: 1rem;
+            }
+            @media (min-width: 768px) {
+                .row { --bs-gutter-x: 1.5rem; --bs-gutter-y: 1.5rem; }
+            }
+
+            /* ---------- Notes as a Chat panel ---------- */
+            .oh-chat-card {
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                min-height: 560px;
+                padding: 0;
+                overflow: hidden;
+            }
+            .oh-chat-header {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 1rem 1.25rem;
+                border-bottom: 1px solid #ebebeb;
+                flex: none;
+            }
+            .oh-chat-header i { color: #E54F38; }
+            .oh-chat-header h3 { margin: 0; font-size: 1rem; font-weight: 700; }
+            .oh-chat-header span { font-size: 0.72rem; color: #6c757d; }
+
+            .oh-chat-body {
+                flex: 1 1 auto;
+                overflow-y: auto;
+                padding: 1rem 1.1rem;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                background: #fbfbfb;
+            }
+
+            .oh-chat-bubble-row { display: flex; flex-direction: column; max-width: 80%; }
+            .oh-chat-bubble-row--me { align-self: flex-end; align-items: flex-end; }
+            .oh-chat-bubble-row--other { align-self: flex-start; align-items: flex-start; }
+
+            .oh-chat-bubble {
+                position: relative;
+                padding: 0.55rem 0.8rem;
+                border-radius: 14px;
+                font-size: 0.83rem;
+                line-height: 1.4;
+                word-break: break-word;
+            }
+            .oh-chat-bubble-row--me .oh-chat-bubble {
+                background: #E54F38;
+                color: #fff;
+                border-bottom-right-radius: 4px;
+            }
+            .oh-chat-bubble-row--other .oh-chat-bubble {
+                background: #eef0f2;
+                color: #222;
+                border-bottom-left-radius: 4px;
+            }
+
+            .oh-chat-meta {
+                font-size: 0.68rem;
+                color: #9aa0a6;
+                margin-top: 3px;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+            }
+
+            .oh-chat-delete {
+                border: none;
+                background: transparent;
+                color: inherit;
+                opacity: 0.55;
+                font-size: 0.68rem;
+                cursor: pointer;
+                padding: 0;
+                display: inline-flex;
+                align-items: center;
+            }
+            .oh-chat-delete:hover { opacity: 1; color: #dc3545; }
+
+            .oh-chat-empty {
+                margin: auto;
+                text-align: center;
+                opacity: 0.6;
+            }
+            .oh-chat-empty img { width: 130px; margin-bottom: 0.75rem; }
+            .oh-chat-empty h6 { font-size: 0.82rem; color: #6c757d; }
+
+            .oh-chat-input {
+                flex: none;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 0.85rem 1rem;
+                border-top: 1px solid #ebebeb;
+                background: #fff;
+            }
+            .oh-chat-input input[type="text"] {
+                flex: 1;
+                border: 1px solid #e4e6ef;
+                border-radius: 999px;
+                padding: 0.55rem 1rem;
+                font-size: 0.83rem;
+                outline: none;
+                transition: border-color .15s ease;
+            }
+            .oh-chat-input input[type="text"]:focus { border-color: #E54F38; }
+            .oh-chat-send {
+                flex: none;
+                width: 38px;
+                height: 38px;
+                border-radius: 50%;
+                border: none;
+                background: #E54F38;
+                color: #fff;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: background .15s ease;
+            }
+            .oh-chat-send:hover { background: #cf4530; }
+
+            .file-validation {
+                color: #4f5bd9;
+                background-color: #d8e7f0;
+                border-color: #d6e9c6;
+                padding: 15px;
+                border: 1px solid transparent;
+                border-radius: 4px;
+            }
         </style>
     </head>
     <body>
@@ -402,6 +532,8 @@
         ></button>
 
         <div class="tracking-container">
+
+            <!-- Candidate profile card -->
             <div class="row mb-4">
                 <div class="col-12">
                     <div class="tracking-card">
@@ -424,9 +556,7 @@
                                     </h2>
                                     {% if check_candidate_self_tracking_rating %}
                                     <div class="d-block mb-0">
-                                        <div
-                                            class="oh-rate"
-                                        >
+                                        <div class="oh-rate">
                                             {% for i in "54321" %}
                                             <input
                                                 type="radio"
@@ -437,9 +567,7 @@
                                                 checked
                                                 {% endif %}
                                             />
-                                            <label for="star{{i}}{{candidate.id}}"
-                                                >5</label
-                                            >
+                                            <label for="star{{i}}{{candidate.id}}">5</label>
                                             {% endfor %}
                                         </div>
                                         <span id="rating-radio-error"></span>
@@ -479,238 +607,11 @@
                 </div>
             </div>
 
-            <div class="row">
-                <div class="col-12 col-md-6 col-lg-4 order-1 order-md-2">
-                    <div class="tracking-card">
-                        <h3 class="h5 mb-4 fw-bold">{% trans "Documents" %}</h3>
-                        <div class="document-list">
-                        {% for document in candidate.candidatedocument_set.all %}
-                            <div class="document-card card">
-                                <div class="card-body"
-                                    hx-get="{% url 'candidate-view-file' document.id %}"
-                                    hx-target="#viewFile"
-                                    data-toggle="oh-modal-toggle"
-                                    data-target="#viewFileModal"
-                                >
-                                    <div
-                                        class="d-flex justify-content-between align-items-center flex-wrap gap-2"
-                                    >
-                                        <div>
-                                            <h6 class="mb-1">{{document.title}}</h6>
-                                            <small class="text-muted" title="{{document.document_request_id.description}}"
-                                                >{{document.document_request_id.description|truncatechars:50}}</small
-                                            >
-                                        </div>
-                                        {% if document.document %}
-                                            {% if document.status == "approved" %}
-                                                <span class="badge text-success p-2"
-                                                    >{% trans "Approved" %}</span
-                                                >
-                                            {% elif document.status == "rejected" %}
-                                                <span class="badge text-danger p-2"
-                                                    >{% trans "Rejected" %}</span
-                                                >
-                                            {% else %}
-                                                <span class="badge text-info p-2"
-                                                    >{% trans "Uploaded" %}</span
-                                                >
-                                            {% endif %}
-                                        {% else %}
-                                             <button
-                                                class="btn oh-btn--secondary border-0 px-3 py-1 small"
-                                                hx-get="{% url 'candidate-file-upload' document.id %}"
-                                                hx-target="#objectCreateModalTarget"
-                                                data-document-id="{{ document.id }}"
-                                                data-toggle="oh-modal-toggle"
-                                                data-target="#objectCreateModal"
-                                                onclick="event.stopPropagation()"
-                                            >
-                                                {% trans "Add" %}
-                                            </button>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                            {% empty %}
-                            <div class="d-flex justify-content-center align-items-center" style="height: 40vh;">
-                                <div class="text-center">
-                                    <div style="width:30%; margin:10% auto;">
-                                        <img class="oh-404__image mb-3" style="width: 100%;" src="{% static 'images/ui/joiningchart.png' %}" alt="No documents">
-                                    </div>
-                                    <h5 class="oh-404__subtitle">{% trans "No document requests found." %}</h5>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
+            <!-- 70 / 30 split -->
+            <div class="tracking-columns">
 
-                <div class="col-12 col-md-6 col-lg-4 order-2 order-md-1">
-                    <div class="tracking-card">
-                        <h3 class="h5 mb-4 fw-bold">{% trans "Scheduled Interviews" %}</h3>
-                        <div class="interview-list">
-                            {% for interview in interviews %}
-                                <div class="interview-item">
-                                    <div class="interview-date">
-                                        {% trans "Date" %}: {{ interview.interview_date }}
-                                    </div>
-                                    <div class="interview-time">{% trans "Time" %}: {{ interview.interview_time }}</div>
-                                    <div class="interview-interviewer">
-                                        {% trans "Interviewer" %}:
-                                        <div class="mt-1">
-                                            {% for interviewer in  interview.employee_id.all %}
-                                                <span class="interviewer-chip">
-                                                    <i
-                                                        class="fas fa-user-circle me-1"
-                                                    ></i>
-                                                    {{ interviewer }}
-                                                </span>
-                                            {% endfor %}
-                                        </div>
-                                    </div>
-                                    <div class="interview-description">
-                                        {{ interview.description }}
-                                    </div>
-                                    {% if interview.completed %}
-                                        <div
-                                            class="d-flex align-items-center mt-2 status-completed"
-                                        >
-                                            <i
-                                                class="fas fa-check-circle interview-status-icon"
-                                            ></i>
-                                            {% trans "Interview Completed" %}
-                                        </div>
-                                    {% elif interview.interview_date|date:"Y-m-d" < now %}
-                                        <div
-                                            class="d-flex align-items-center mt-2 status-completed text-danger"
-                                        >
-                                            <i
-                                                class="fas fa-close interview-status-icon"
-                                            ></i>
-                                            {% trans "Expired Interview" %}
-                                        </div>
-                                    {% elif interview.interview_date|date:"Y-m-d" > now %}
-                                        <div
-                                            class="d-flex align-items-center mt-2 status-upcoming"
-                                        >
-                                            <i
-                                                class="fas fa-clock interview-status-icon"
-                                            ></i>
-                                            {% trans "Upcoming Interview" %}
-                                        </div>
-                                    {% elif interview.interview_date|date:"Y-m-d" == now and not interview.completed %}
-                                        <div
-                                            class="d-flex align-items-center mt-2 status-today"
-                                        >
-                                            <i
-                                                class="fas fa-calendar-day interview-status-icon"
-                                            ></i>
-                                            {% trans "Interview Today" %}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                                {% empty %}
-                                    <div class="d-flex justify-content-center align-items-center" style="height: 40vh;">
-                                        <div>
-                                            <div style="width:30%; margin:10% auto;" class="oh-tracking-card">
-                                                <img style="width:100% " src="{% static 'images/ui/interview.png' %}"/>
-                                            </div>
-                                            <h5 class="oh-404__subtitle mt-4 ml-2">{% trans "No interviews are scheduled for this candidate" %}</h5>
-                                        </div>
-                                    </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-12 col-md-6 col-lg-4 order-3">
-                    <div class="tracking-card" id="note">
-                        {% if messages %}
-                            <div class="oh-wrapper">
-                                {% for message in messages %}
-                                    <div class="oh-alert-container">
-                                        <div class="oh-alert oh-alert--animated {{message.tags}}">
-                                        {{ message }}
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                                <script>
-                                    setTimeout(function () {
-                                    $(".oh-modal__close").click();
-                                    }, 1000);
-                                </script>
-                            </div>
-                        {% endif %}
-                        <h3 class="h5 mb-4 fw-bold">{% trans "Notes" %}</h3>
-                        <div class="mb-4">
-                            <div class="form-group">
-                                <form
-                                    hx-post="{% url 'candidate-add-notes' candidate.id %}"
-                                    hx-target="#note"
-                                    hx-select ="#note"
-                                    hx-swap = "outerHTML"
-                                     id="commentForm"
-                                >
-                                    {% csrf_token %}
-                                        <input
-                                            type="text"
-                                            name="description"
-                                            class="form-control mb-2"
-                                            placeholder="Add notes"
-                                        />
-                                        <button type="submit" id="commentButton" hidden class="btn btn-primary w-100">
-                                            {% trans "Add Note" %}
-                                        </button>
-                                </form>
-                            </div>
-                        </div>
-                        <div class="notes-list">
-                            {% for note in candidate.stagenote_set.all reversed %}
-                                {% if note.candidate_can_view %}
-                                    <div class="note-card card">
-                                        {% if request.user.is_authenticated or note.updated_user == candidate %}
-                                            <button class="note-close-btn"
-                                                aria-label="Close note"
-                                                hx-get="{% url 'note-delete-individual' note.id %}"
-                                                title="{% trans 'delete' %}" hx-swap="delete"
-                                                hx-target="closest .card"
-                                                hx-on:click="setTimeout(() => {reloadMessage(this);},250);"
-                                            >
-                                                <ion-icon name="close-outline" style="font-size: 24px;color:red;" role="img" class="md hydrated" aria-label="close outline"></ion-icon>
-                                            </button>
-                                        {% endif %}
-                                        <div class="card-body">
-                                            <p class="mb-1">
-                                                {{ note.description }}
-                                            </p>
-                                            <small
-                                                class="text-muted d-flex align-items-center flex-wrap"
-                                            >
-                                                <i class="far fa-user me-1"></i>
-                                                {{ note.updated_user }}
-                                                <span>@</span>
-                                                {{note.stage_id }}
-                                            </small>
-                                        </div>
-                                    </div>
-                                {% endif %}
-                            {% empty %}
-                                <div class="d-flex justify-content-center" style="height: 40vh;">
-                                    <div class="text-center">
-                                        <div style="width:25%; margin:10% auto;">
-                                            <img class="oh-404__image mb-3" style="width: 100%;" src="{% static 'images/ui/no_documents.png' %}" alt="No documents">
-                                        </div>
-                                        <h5 class="oh-404__subtitle">{% trans "No notes have been added for this candidate." %}</h5>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="col-12">
+                <!-- LEFT 70%: tabs (Scheduled Interviews / Documents / My Task / Feedback Task) -->
+                <div class="tracking-col-left">
                     <div class="tracking-card" id="taskCard">
                         {% if messages %}
                             <div class="oh-wrapper">
@@ -723,21 +624,140 @@
                                 {% endfor %}
                             </div>
                         {% endif %}
-                        <h3 class="h5 mb-4 fw-bold">{% trans "Tasks" %}</h3>
 
-                        <div class="task-tabs mb-3">
-                            <button type="button" class="task-tab{% if default_task_tab != 'feedback-task' %} active{% endif %}" data-task-tab="my-task">
-                                {% trans "My Task" %}<span class="task-tab-count">{{ all_tasks|length }}</span>
+                        <div class="oh-main-tabs">
+                            <button type="button" class="oh-main-tab{% if default_task_tab != 'feedback-task' %} active{% endif %}" data-main-tab="schedule-interview">
+                                <i class="fas fa-calendar-alt"></i>{% trans "Scheduled Interviews" %}<span class="oh-main-tab-count">{{ interviews|length }}</span>
                             </button>
-                            <button type="button" class="task-tab{% if default_task_tab == 'feedback-task' %} active{% endif %}" data-task-tab="feedback-task">
-                                {% trans "Feedback Required Task" %}<span class="task-tab-count">{{ checklist_tasks|length }}</span>
+                            <button type="button" class="oh-main-tab" data-main-tab="documents">
+                                <i class="fas fa-file-alt"></i>{% trans "Documents" %}<span class="oh-main-tab-count">{{ candidate.candidatedocument_set.all|length }}</span>
+                            </button>
+                            <button type="button" class="oh-main-tab" data-main-tab="my-task">
+                                <i class="fas fa-clipboard-list"></i>{% trans "My Task" %}<span class="oh-main-tab-count">{{ all_tasks|length }}</span>
+                            </button>
+                            <button type="button" class="oh-main-tab{% if default_task_tab == 'feedback-task' %} active{% endif %}" data-main-tab="feedback-task">
+                                <i class="fas fa-comment-dots"></i>{% trans "Feedback Tasks" %}<span class="oh-main-tab-count">{{ checklist_tasks|length }}</span>
                             </button>
                         </div>
 
-                        <div class="task-tab-panel{% if default_task_tab != 'feedback-task' %} active{% endif %}" data-task-panel="my-task">
+                        <!-- Scheduled Interviews -->
+                        <div class="oh-main-panel{% if default_task_tab != 'feedback-task' %} active{% endif %}" data-main-panel="schedule-interview">
+                            <div class="interview-list">
+                                {% for interview in interviews %}
+                                    <div class="interview-item">
+                                        <div class="interview-date">
+                                            {% trans "Date" %}: {{ interview.interview_date }}
+                                        </div>
+                                        <div class="interview-time">{% trans "Time" %}: {{ interview.interview_time }}</div>
+                                        <div class="interview-interviewer">
+                                            {% trans "Interviewer" %}:
+                                            <div class="mt-1">
+                                                {% for interviewer in interview.employee_id.all %}
+                                                    <span class="interviewer-chip">
+                                                        <i class="fas fa-user-circle me-1"></i>
+                                                        {{ interviewer }}
+                                                    </span>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                        <div class="interview-description">
+                                            {{ interview.description }}
+                                        </div>
+                                        {% if interview.completed %}
+                                            <div class="d-flex align-items-center mt-2 status-completed">
+                                                <i class="fas fa-check-circle interview-status-icon"></i>
+                                                {% trans "Interview Completed" %}
+                                            </div>
+                                        {% elif interview.interview_date|date:"Y-m-d" < now %}
+                                            <div class="d-flex align-items-center mt-2 status-completed text-danger">
+                                                <i class="fas fa-close interview-status-icon"></i>
+                                                {% trans "Expired Interview" %}
+                                            </div>
+                                        {% elif interview.interview_date|date:"Y-m-d" > now %}
+                                            <div class="d-flex align-items-center mt-2 status-upcoming">
+                                                <i class="fas fa-clock interview-status-icon"></i>
+                                                {% trans "Upcoming Interview" %}
+                                            </div>
+                                        {% elif interview.interview_date|date:"Y-m-d" == now and not interview.completed %}
+                                            <div class="d-flex align-items-center mt-2 status-today">
+                                                <i class="fas fa-calendar-day interview-status-icon"></i>
+                                                {% trans "Interview Today" %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    {% empty %}
+                                    <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
+                                        <div>
+                                            <div style="width:30%; margin:10% auto;" class="oh-tracking-card">
+                                                <img style="width:100%" src="{% static 'images/ui/interview.png' %}"/>
+                                            </div>
+                                            <h5 class="oh-404__subtitle mt-4 ml-2">{% trans "No interviews are scheduled for this candidate" %}</h5>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Documents -->
+                        <div class="oh-main-panel" data-main-panel="documents">
+                            <div class="document-list">
+                                {% for document in candidate.candidatedocument_set.all %}
+                                    <div class="document-card card">
+                                        <div class="card-body"
+                                            hx-get="{% url 'candidate-view-file' document.id %}"
+                                            hx-target="#viewFile"
+                                            data-toggle="oh-modal-toggle"
+                                            data-target="#viewFileModal"
+                                        >
+                                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                                <div>
+                                                    <h6 class="mb-1">{{document.title}}</h6>
+                                                    <small class="text-muted" title="{{document.document_request_id.description}}"
+                                                        >{{document.document_request_id.description|truncatechars:50}}</small
+                                                    >
+                                                </div>
+                                                {% if document.document %}
+                                                    {% if document.status == "approved" %}
+                                                        <span class="badge text-success p-2">{% trans "Approved" %}</span>
+                                                    {% elif document.status == "rejected" %}
+                                                        <span class="badge text-danger p-2">{% trans "Rejected" %}</span>
+                                                    {% else %}
+                                                        <span class="badge text-info p-2">{% trans "Uploaded" %}</span>
+                                                    {% endif %}
+                                                {% else %}
+                                                     <button
+                                                        class="btn oh-btn--secondary border-0 px-3 py-1 small"
+                                                        hx-get="{% url 'candidate-file-upload' document.id %}"
+                                                        hx-target="#objectCreateModalTarget"
+                                                        data-document-id="{{ document.id }}"
+                                                        data-toggle="oh-modal-toggle"
+                                                        data-target="#objectCreateModal"
+                                                        onclick="event.stopPropagation()"
+                                                    >
+                                                        {% trans "Add" %}
+                                                    </button>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% empty %}
+                                    <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
+                                        <div class="text-center">
+                                            <div style="width:30%; margin:10% auto;">
+                                                <img class="oh-404__image mb-3" style="width: 100%;" src="{% static 'images/ui/joiningchart.png' %}" alt="No documents">
+                                            </div>
+                                            <h5 class="oh-404__subtitle">{% trans "No document requests found." %}</h5>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- My Task -->
+                        <div class="oh-main-panel" data-main-panel="my-task">
                             {% if not my_task_groups %}
                             <div class="notes-list">
-                                <div class="d-flex justify-content-center align-items-center" style="height: 40vh;">
+                                <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
                                     <div class="text-center">
                                         <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
                                         <h5 class="oh-404__subtitle">{% trans "No tasks are assigned to you yet." %}</h5>
@@ -746,7 +766,7 @@
                             </div>
                             {% else %}
                             {% if my_task_groups|length > 1 %}
-                            <div class="task-group-tabs mb-3">
+                            <div class="task-group-tabs">
                                 {% for group in my_task_groups %}
                                 <button type="button" class="task-group-tab{% if forloop.first %} active{% endif %}" data-task-group-tab="{{ forloop.counter0 }}">
                                     {{ group.title }}<span class="task-tab-count">{{ group.tasks|length }}</span>
@@ -757,63 +777,23 @@
                             {% for group in my_task_groups %}
                             <div class="notes-list task-group-panel{% if forloop.first %} active{% endif %}" data-task-group-panel="{{ forloop.counter0 }}">
                                 {% for task in group.tasks %}
-                                    <div class="task-item mb-3 pb-3 border-bottom">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <h6 class="mb-1">{{ task.title }}</h6>
-                                            <span class="badge task-status-badge task-status-badge--{{ task.status }}">{{ task.get_status_display }}</span>
+                                    <div class="oh-task-card mb-3">
+                                        <div class="oh-task-card__top">
+                                            <h6 class="oh-task-card__title">{{ task.title }}</h6>
+                                            <button
+                                                type="button"
+                                                class="oh-task-card__edit"
+                                                data-toggle="oh-modal-toggle"
+                                                data-target="#taskEditModal{{ task.id }}"
+                                                aria-label="{% trans 'Edit task' %}"
+                                                title="{% trans 'Edit' %}"
+                                            >
+                                                <i class="fas fa-pen"></i>
+                                            </button>
                                         </div>
-                                        <small class="text-muted d-block mb-2">
-                                            {% if task.is_mandatory %}{% trans "Mandatory" %}{% endif %}
-                                            {% if task.completed_at %} &middot; {% trans "Completed" %} {{ task.completed_at|date:"M d, Y" }}{% endif %}
-                                        </small>
-
-                                        {% if task.proof_file %}
-                                        <a href="{{ task.proof_file.url }}" target="_blank" class="d-inline-flex align-items-center gap-1 small text-muted mb-2">
-                                            <i class="fas fa-paperclip"></i> {% trans "View submitted proof" %}
-                                        </a>
-                                        {% endif %}
-
-                                        <form
-                                            class="task-status-form d-flex align-items-center gap-2 flex-wrap mb-2"
-                                            hx-post="{% url 'candidate-task-self-update' task.id %}"
-                                            hx-target="#taskCard"
-                                            hx-select="#taskCard"
-                                            hx-swap="outerHTML"
-                                            hx-encoding="multipart/form-data"
-                                            data-initial-status="{{ task.status }}"
-                                        >
-                                            {% csrf_token %}
-                                            <select name="status" class="form-select form-select-sm task-status-select w-auto">
-                                                {% for value, label in status_choices %}
-                                                <option value="{{ value }}" {% if value == task.status %}selected{% endif %}>{{ label }}</option>
-                                                {% endfor %}
-                                            </select>
-                                            {% if task.requires_proof and not task.proof_file %}
-                                            <input type="file" name="proof_file" class="form-control form-control-sm task-status-proof w-auto">
-                                            {% endif %}
-                                            <button type="submit" class="btn btn-sm oh-btn--secondary task-status-submit" disabled>{% trans "Update" %}</button>
-                                        </form>
-
-                                        <div class="task-feedback-summary{% if not task.candidate_feedback %} d-none{% endif %}">
-                                            <p class="mb-1 small text-muted">{{ task.candidate_feedback }}</p>
-                                            <button type="button" class="btn btn-sm btn-link p-0 task-edit-btn">{% trans "Edit update" %}</button>
-                                        </div>
-                                        <form
-                                            class="task-feedback-form{% if task.candidate_feedback %} d-none{% endif %}"
-                                            hx-post="{% url 'candidate-task-feedback' task.id %}"
-                                            hx-target="#taskCard"
-                                            hx-select="#taskCard"
-                                            hx-swap="outerHTML"
-                                        >
-                                            {% csrf_token %}
-                                            <textarea
-                                                name="candidate_feedback"
-                                                class="form-control form-control-sm mb-1"
-                                                rows="2"
-                                                placeholder="{% trans 'Write an update about this task...' %}"
-                                            >{{ task.candidate_feedback|default:"" }}</textarea>
-                                            <button type="submit" class="btn btn-sm btn-link p-0">{% trans "Save update" %}</button>
-                                        </form>
+                                        <p class="oh-task-card__desc">
+                                            {% if task.candidate_feedback %}{{ task.candidate_feedback }}{% else %}{% trans "No update added yet." %}{% endif %}
+                                        </p>
                                     </div>
                                 {% endfor %}
                             </div>
@@ -821,7 +801,8 @@
                             {% endif %}
                         </div>
 
-                        <div class="task-tab-panel{% if default_task_tab == 'feedback-task' %} active{% endif %}" data-task-panel="feedback-task">
+                        <!-- Feedback Task -->
+                        <div class="oh-main-panel{% if default_task_tab == 'feedback-task' %} active{% endif %}" data-main-panel="feedback-task">
                             <div class="notes-list">
                                 {% for task in checklist_tasks %}
                                     <div class="task-item mb-3 pb-3 border-bottom">
@@ -872,7 +853,7 @@
                                         </form>
                                     </div>
                                     {% empty %}
-                                    <div class="d-flex justify-content-center align-items-center" style="height: 40vh;">
+                                    <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
                                         <div class="text-center">
                                             <i class="fas fa-clipboard-check fa-3x text-muted mb-3"></i>
                                             <h5 class="oh-404__subtitle">{% trans "No tasks are waiting for your response." %}</h5>
@@ -881,49 +862,170 @@
                                 {% endfor %}
                             </div>
                         </div>
+                    </div>
 
-                        <style>
-                            .task-tabs { display: flex; gap: 4px; border-bottom: 1px solid #e4e6ef; }
-                            .task-tab {
-                                background: none; border: none; cursor: pointer;
-                                font-size: 0.82rem; font-weight: 600; color: #888;
-                                padding: 6px 4px 10px; margin-right: 14px; position: relative;
-                                display: inline-flex; align-items: center; gap: 6px;
-                            }
-                            .task-tab-count {
-                                font-size: 0.68rem; font-weight: 600; color: #888;
-                                background: #eceeee; border-radius: 20px; padding: 1px 7px;
-                            }
-                            .task-tab::after {
-                                content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
-                                background: transparent; border-radius: 2px 2px 0 0;
-                            }
-                            .task-tab.active { color: #212529; }
-                            .task-tab.active::after { background: #4f5bd9; }
-                            .task-tab.active .task-tab-count { background: #e2e3fb; color: #4f5bd9; }
-                            .task-tab-panel { display: none; }
-                            .task-tab-panel.active { display: block; }
-                            .task-status-badge { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; flex: none; }
-                            .task-status-badge--stuck { background: #f3ddd7; color: #b3402f; }
-                            .task-status-badge--todo { background: #eceeee; color: #6c757d; }
-                            .task-status-badge--scheduled { background: #e3ecf7; color: #3e6b99; }
-                            .task-status-badge--ongoing { background: #f3e6cc; color: #a6672e; }
-                            .task-status-badge--done { background: #dcedde; color: #3e7d4f; }
+                    <!-- Task edit modals, kept outside #taskCard so they survive its htmx swaps -->
+                    {% for group in my_task_groups %}
+                    {% for task in group.tasks %}
+                    <div class="oh-modal oh-task-edit-modal" id="taskEditModal{{ task.id }}" role="dialog" aria-hidden="true">
+                        <div class="oh-modal__dialog oh-task-edit-dialog">
+                            <div class="oh-modal__dialog-header">
+                                <span class="oh-modal__dialog-title">{{ task.title }}</span>
+                                <button class="oh-modal__close" data-toggle="oh-modal-toggle" data-target="#taskEditModal{{ task.id }}" aria-label="{% trans 'Close' %}">
+                                    <ion-icon name="close-outline" role="img" class="md hydrated" aria-label="close outline"></ion-icon>
+                                </button>
+                            </div>
+                            <div class="oh-modal__dialog-body">
+                                <form
+                                    class="oh-task-edit-feedback-form"
+                                    hx-post="{% url 'candidate-task-feedback' task.id %}"
+                                    hx-target="#taskCard"
+                                    hx-select="#taskCard"
+                                    hx-swap="outerHTML"
+                                >
+                                    {% csrf_token %}
+                                    <label class="oh-task-modal__label" for="id_feedback_{{ task.id }}">{% trans "Write about task" %}</label>
+                                    <textarea
+                                        name="candidate_feedback"
+                                        id="id_feedback_{{ task.id }}"
+                                        class="oh-task-modal__textarea"
+                                        rows="4"
+                                        placeholder="{% trans 'Write an update about this task...' %}"
+                                    >{{ task.candidate_feedback|default:"" }}</textarea>
+                                </form>
 
-                            .task-group-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
-                            .task-group-tab {
-                                display: inline-flex; align-items: center; gap: 6px;
-                                padding: 5px 12px; border-radius: 20px;
-                                background: #f1f2f6; color: #6c757d;
-                                border: none; font-size: 0.76rem; font-weight: 600;
-                                cursor: pointer;
-                            }
-                            .task-group-tab .task-tab-count { background: rgba(0,0,0,0.06); }
-                            .task-group-tab.active { background: #4f5bd9; color: #fff; }
-                            .task-group-tab.active .task-tab-count { background: rgba(255,255,255,0.25); color: #fff; }
-                            .task-group-panel { display: none; }
-                            .task-group-panel.active { display: block; }
-                        </style>
+                                <form
+                                    class="oh-task-edit-status-form mt-4"
+                                    hx-post="{% url 'candidate-task-self-update' task.id %}"
+                                    hx-target="#taskCard"
+                                    hx-select="#taskCard"
+                                    hx-swap="outerHTML"
+                                    hx-encoding="multipart/form-data"
+                                >
+                                    {% csrf_token %}
+                                    <label class="oh-task-modal__label">{% trans "Status" %}</label>
+                                    <div class="oh-status-picker" role="radiogroup">
+                                        {% for value, label in status_choices %}
+                                        <label class="oh-status-pill" data-status="{{ value }}">
+                                            <input type="radio" name="status" value="{{ value }}" {% if task.status == value %}checked{% endif %}>
+                                            <span class="oh-status-pill__dot"></span>
+                                            <span>{{ label }}</span>
+                                        </label>
+                                        {% endfor %}
+                                    </div>
+
+                                    {% if task.requires_proof %}
+                                    <div class="mt-3">
+                                        <label class="oh-task-modal__label" for="id_proof_{{ task.id }}">{% trans "Proof of completion" %}</label>
+                                        <input type="file" name="proof_file" id="id_proof_{{ task.id }}" class="form-control form-control-sm">
+                                        {% if task.proof_file %}
+                                        <a href="{{ task.proof_file.url }}" target="_blank" class="oh-proof-view mt-2">
+                                            <i class="fas fa-paperclip"></i> {% trans "View current proof" %}
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                </form>
+                            </div>
+                            <div class="oh-modal__dialog-footer oh-task-edit-footer">
+                                <button type="button" class="oh-btn oh-btn--ghost" data-toggle="oh-modal-toggle" data-target="#taskEditModal{{ task.id }}">
+                                    {% trans "Cancel" %}
+                                </button>
+                                <button type="button" class="oh-btn oh-btn--primary oh-task-edit-save" data-task-id="{{ task.id }}">
+                                    {% trans "Save" %}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% endfor %}
+                </div>
+
+                <!-- RIGHT 30%: Notes as a chat panel -->
+                <div class="tracking-col-right">
+                    <div class="tracking-card oh-chat-card" id="note">
+                        {% if messages %}
+                            <div class="oh-wrapper">
+                                {% for message in messages %}
+                                    <div class="oh-alert-container">
+                                        <div class="oh-alert oh-alert--animated {{message.tags}}">
+                                        {{ message }}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                                <script>
+                                    setTimeout(function () {
+                                    $(".oh-modal__close").click();
+                                    }, 1000);
+                                </script>
+                            </div>
+                        {% endif %}
+
+                        <div class="oh-chat-header">
+                            <i class="fas fa-comments"></i>
+                            <div>
+                                <h3>{% trans "Notes" %}</h3>
+                            </div>
+                        </div>
+
+                        <div class="oh-chat-body" id="chatBody"
+                            hx-get="{% url 'candidate-add-notes' candidate.id %}"
+                            hx-trigger="every 10s"
+                            hx-select="#chatMessages"
+                            hx-target="#chatMessages"
+                            hx-swap="outerHTML"
+                        >
+                            <div id="chatMessages">
+                            {% for note in candidate.stagenote_set.all %}
+                                {% if note.candidate_can_view %}
+                                    <div class="oh-chat-bubble-row{% if note.updated_user == candidate %} oh-chat-bubble-row--me{% else %} oh-chat-bubble-row--other{% endif %}">
+                                        <div class="oh-chat-bubble">
+                                            {{ note.description }}
+                                        </div>
+                                        <div class="oh-chat-meta">
+                                            <span>{{ note.updated_user }}{% if note.created_at %} &middot; {{ note.created_at|date:"M d, Y, h:i A" }}{% endif %}</span>
+                                            {% if request.user.is_authenticated or note.updated_user == candidate %}
+                                                <button class="oh-chat-delete"
+                                                    aria-label="{% trans 'Delete note' %}"
+                                                    hx-get="{% url 'note-delete-individual' note.id %}"
+                                                    title="{% trans 'delete' %}" hx-swap="delete"
+                                                    hx-target="closest .oh-chat-bubble-row"
+                                                    hx-on:click="setTimeout(() => {reloadMessage(this);},250);"
+                                                >
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% empty %}
+                                <div class="oh-chat-empty">
+                                    <img src="{% static 'images/ui/no_documents.png' %}" alt="No notes">
+                                    <h6>{% trans "No notes have been added for this candidate." %}</h6>
+                                </div>
+                            {% endfor %}
+                            </div>
+                        </div>
+
+                        <form
+                            class="oh-chat-input"
+                            hx-post="{% url 'candidate-add-notes' candidate.id %}"
+                            hx-target="#note"
+                            hx-select="#note"
+                            hx-swap="outerHTML"
+                            id="commentForm"
+                        >
+                            {% csrf_token %}
+                            <input
+                                type="text"
+                                name="description"
+                                autocomplete="off"
+                                placeholder="{% trans 'Type a message...' %}"
+                            />
+                            <button type="submit" class="oh-chat-send" id="commentButton" aria-label="{% trans 'Send' %}">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -963,9 +1065,15 @@
             <div class="oh-modal__dialog" id="objectCreateModalTarget"></div>
         </div>
 
-        <script src="{% static '/index/index.js' %}"></script>
+        <script src="{% url 'javascript-catalog' %}"></script>
         <script src="{% static 'build/js/web.frontend.min.js' %}"></script>
         <script src="{% static 'htmx/htmx.min.js' %}"></script>
+        <script>
+            document.body.addEventListener('htmx:configRequest', (event) => {
+                event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+            })
+        </script>
+        <script src="{% static '/index/index.js' %}"></script>
         <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
         <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
         <script>
@@ -975,17 +1083,89 @@
                 item.find(".task-feedback-form").removeClass("d-none");
             });
 
-            $(document).on("click", ".task-tab", function () {
-                var tab = $(this).data("task-tab");
-                $(this).siblings(".task-tab").addBack().removeClass("active");
+            // ModalDialog (the shared "oh-modal-toggle" opener) binds its
+            // click handler once, directly on whatever matches
+            // [data-toggle='oh-modal-toggle'] at page load - not delegated.
+            // The "Edit" pencil buttons live inside #taskCard, which gets
+            // replaced wholesale (hx-swap="outerHTML") after every save, so
+            // the freshly-swapped-in pencil button was never part of that
+            // original binding and does nothing when clicked. This delegated
+            // handler re-implements the same "show the modal" behavior,
+            // scoped to just .oh-task-card__edit (not every
+            // [data-toggle='oh-modal-toggle'] generally) - the modal's own
+            // close button also happens to carry that same data-toggle
+            // attribute pointing at itself, and a broader selector here
+            // would re-open the modal immediately after every close.
+            $(document).on("click", ".oh-task-card__edit", function () {
+                var target = $(this).data("target");
+                if (target) { $(target).addClass("oh-modal--show"); }
+            });
+
+            // Task edit modals live outside #taskCard so they survive its
+            // htmx swaps - which also means they're never recreated, so if
+            // the Save button below is ever left disabled (see the timeout
+            // note further down), it would stay stuck that way until a full
+            // page refresh. Opening the modal is a natural point to make
+            // sure its Save button is always usable, regardless of how the
+            // previous edit cycle ended.
+            $(document).on("click", "[data-target^='#taskEditModal']", function () {
+                var modal = document.querySelector($(this).data("target"));
+                var saveBtn = modal && modal.querySelector(".oh-task-edit-save");
+                if (saveBtn) { saveBtn.disabled = false; }
+            });
+
+            // My Task edit modal: one Save button saves the write-up, then the
+            // status/proof, then closes the modal. Both forms live outside
+            // #taskCard, so they survive its htmx swap between the two saves.
+            $(document).on("click", ".oh-task-edit-save", function () {
+                var saveBtn = this;
+                var modal = saveBtn.closest(".oh-task-edit-modal");
+                var feedbackForm = modal.querySelector(".oh-task-edit-feedback-form");
+                var statusForm = modal.querySelector(".oh-task-edit-status-form");
+                if (!feedbackForm || !statusForm) { return; }
+
+                saveBtn.disabled = true;
+                // Safety net: if either htmx:afterRequest below never fires
+                // for some reason, don't leave the button stuck disabled
+                // forever - the modal isn't re-rendered on later opens, so
+                // that state would otherwise persist until a page refresh.
+                var safetyTimer = setTimeout(function () {
+                    feedbackForm.removeEventListener("htmx:afterRequest", onFeedbackDone);
+                    statusForm.removeEventListener("htmx:afterRequest", onStatusDone);
+                    saveBtn.disabled = false;
+                }, 8000);
+
+                var onFeedbackDone = function (evt) {
+                    if (evt.target !== feedbackForm) { return; }
+                    feedbackForm.removeEventListener("htmx:afterRequest", onFeedbackDone);
+                    htmx.trigger(statusForm, "submit");
+                };
+                var onStatusDone = function (evt) {
+                    if (evt.target !== statusForm) { return; }
+                    statusForm.removeEventListener("htmx:afterRequest", onStatusDone);
+                    clearTimeout(safetyTimer);
+                    saveBtn.disabled = false;
+                    var closeBtn = modal.querySelector(".oh-modal__close");
+                    if (closeBtn) { closeBtn.click(); }
+                };
+
+                feedbackForm.addEventListener("htmx:afterRequest", onFeedbackDone);
+                statusForm.addEventListener("htmx:afterRequest", onStatusDone);
+                htmx.trigger(feedbackForm, "submit");
+            });
+
+            // Main tabs: Scheduled Interviews / Documents / My Task / Feedback Task
+            $(document).on("click", ".oh-main-tab", function () {
+                var tab = $(this).data("main-tab");
+                $(this).siblings(".oh-main-tab").addBack().removeClass("active");
                 $(this).addClass("active");
-                $("#taskCard .task-tab-panel").removeClass("active");
-                $("#taskCard .task-tab-panel[data-task-panel='" + tab + "']").addClass("active");
+                $("#taskCard .oh-main-panel").removeClass("active");
+                $("#taskCard .oh-main-panel[data-main-panel='" + tab + "']").addClass("active");
             });
 
             $(document).on("click", ".task-group-tab", function () {
                 var group = $(this).data("task-group-tab");
-                var wrap = $(this).closest(".task-tab-panel");
+                var wrap = $(this).closest(".oh-main-panel");
                 wrap.find(".task-group-tab").removeClass("active");
                 $(this).addClass("active");
                 wrap.find(".task-group-panel").removeClass("active");
@@ -998,6 +1178,41 @@
                 var changed = form.find(".task-status-select").val() !== initial
                     || form.find(".task-status-proof")[0]?.files.length > 0;
                 form.find(".task-status-submit").prop("disabled", !changed);
+            });
+
+            // Keep chat scrolled to the latest note, including after htmx swaps
+            function scrollChatToBottom() {
+                var chatBody = document.getElementById("chatBody");
+                if (chatBody) { chatBody.scrollTop = chatBody.scrollHeight; }
+            }
+            document.addEventListener("DOMContentLoaded", scrollChatToBottom);
+            document.body.addEventListener("htmx:afterSwap", function (evt) {
+                if (evt.target && evt.target.id === "note") { scrollChatToBottom(); }
+            });
+
+            // #chatBody polls every 10s for notes added by someone else (an
+            // HR user typing in the internal pipeline, for instance) - only
+            // #chatMessages inside it gets swapped, so #chatBody itself (and
+            // its scrollTop) is never recreated. Auto-scroll on that refresh
+            // only if the candidate was already at the bottom, so it doesn't
+            // yank their position while they're scrolled up reading older
+            // notes.
+            document.body.addEventListener("htmx:beforeRequest", function (evt) {
+                var chatBody = document.getElementById("chatBody");
+                if (evt.target === chatBody) {
+                    chatBody.dataset.wasAtBottom =
+                        chatBody.scrollHeight - chatBody.scrollTop - chatBody.clientHeight < 40
+                            ? "1"
+                            : "0";
+                }
+            });
+            document.body.addEventListener("htmx:afterSwap", function (evt) {
+                if (evt.target && evt.target.id === "chatMessages") {
+                    var chatBody = document.getElementById("chatBody");
+                    if (chatBody && chatBody.dataset.wasAtBottom !== "0") {
+                        scrollChatToBottom();
+                    }
+                }
             });
         </script>
     </body>

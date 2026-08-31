@@ -91,3 +91,22 @@ def update_teams_calendar_event(api, data, event_id=None):
     )
     response.raise_for_status()
     return response.json()
+
+
+def delete_teams_calendar_event(api, event_id):
+    """
+    Cancels an existing Teams calendar event. Deleting an event you
+    organized is what makes Outlook send attendees its own "Canceled:"
+    notification - there's no separate cancellation email to compose.
+    """
+    if not event_id:
+        raise Exception("Cannot cancel event: event_id is missing.")
+
+    from outlook_auth.views import get_valid_oauth_session
+
+    oauth = get_valid_oauth_session(api)
+    response = oauth.delete(f"{api.outlook_api_endpoint}/me/events/{event_id}")
+    if response.status_code == 404:
+        # Already gone (deleted directly in Outlook, etc.) - nothing to do.
+        return
+    response.raise_for_status()

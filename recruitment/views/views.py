@@ -39,7 +39,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.html import strip_tags
+from django.utils.html import escape, strip_tags
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_http_methods
 
@@ -2411,6 +2411,42 @@ def create_interview_schedule(request):
 @login_required
 @hx_request_required
 @manager_can_enter(perm="recruitment.delete_interviewschedule")
+def _cancel_interview_meeting(interview, request):
+    """
+    Best-effort: cancels the interview's Teams/Google Meet event, if one
+    exists, so Outlook/Google send attendees their own "Canceled:" notice -
+    mirrors generate_interview_meeting's provider dispatch, but a failure
+    here must never block deleting the local InterviewSchedule.
+    """
+    from django.apps import apps as django_apps
+
+    if django_apps.is_installed("outlook_auth"):
+        from outlook_auth.methods import delete_teams_calendar_event, get_azure_api
+        from outlook_auth.models import InterviewOutlookMeetingLink
+
+        link = InterviewOutlookMeetingLink.objects.filter(interview=interview).first()
+        if link:
+            api = get_azure_api(request)
+            if api and api.token:
+                try:
+                    delete_teams_calendar_event(api, link.meeting.event_id)
+                except Exception as e:
+                    logger.error(f"Error cancelling Teams Meeting: {e}")
+
+    if django_apps.is_installed("horilla_meet"):
+        from horilla_meet.methods import delete_calendar_event
+        from horilla_meet.models import GoogleCredential, InterviewMeetingLink
+
+        link = InterviewMeetingLink.objects.filter(interview=interview).first()
+        if link and GoogleCredential.objects.filter(
+            employee_id=request.user.employee_get
+        ).exists():
+            try:
+                delete_calendar_event(request, link.meeting.event_id)
+            except Exception as e:
+                logger.error(f"Error cancelling Google Meeting: {e}")
+
+
 def interview_delete(request, interview_id):
     """
     Deletes an interview schedule.
@@ -2418,7 +2454,9 @@ def interview_delete(request, interview_id):
         interview_id: InterviewSchedule instance ID
     """
     try:
-        InterviewSchedule.objects.get(id=interview_id).delete()
+        interview = InterviewSchedule.objects.get(id=interview_id)
+        _cancel_interview_meeting(interview, request)
+        interview.delete()
         messages.success(request, _("Interview deleted successfully."))
     except:
         messages.error(request, _("Scheduled Interview not found"))
@@ -3402,6 +3440,72 @@ def default_meeting_provider(request):
     return HttpResponse("<script>$('#reloadMessagesButton').click()</script>")
 
 
+def _interview_meeting_title(interview):
+    """
+    "{Stage} - {Candidate} at {Company}" - e.g. "Interview - Avantika Thakur
+    at Ariel Software Solutions Pvt Ltd".
+    """
+    candidate = interview.candidate_id
+    stage_name = candidate.stage_id.stage if candidate.stage_id else _("Interview")
+    company = (
+        candidate.recruitment_id.company_id if candidate.recruitment_id else None
+    )
+    if company:
+        return f"{stage_name} - {candidate.name} at {company}"
+    return f"{stage_name} - {candidate.name}"
+
+
+def _interview_meeting_description(interview, is_new):
+    """
+    Builds the HTML shown in the Teams/Google Meet invite body - a table of
+    the details a panel member (or the candidate, who is also an attendee)
+    needs at a glance, matching the "Scheduled" vs "Re-scheduled" heading to
+    whether this is the interview's first invite or an edit of an existing
+    one. Cancellation doesn't need a variant here: deleting the event is
+    what makes Outlook/Google send their own "Canceled" notice (see
+    interview_delete), using whatever body was last saved.
+    """
+    candidate = interview.candidate_id
+    heading = _("Online Interview Scheduled") if is_new else _("Online Interview Re-scheduled")
+    when = (
+        f"{interview.interview_date.strftime('%b %d, %Y')} "
+        f"{interview.interview_time.strftime('%I:%M %p')}"
+    )
+    panel = escape(", ".join(str(emp) for emp in interview.employee_id.all())) or "-"
+    rows = [
+        (_("Candidate"), escape(candidate.name)),
+        (
+            _("Job"),
+            escape(str(candidate.job_position_id)) if candidate.job_position_id else "-",
+        ),
+        (_("Interview Date & Time"), when),
+        (_("Panel Members"), panel),
+    ]
+    # Google Calendar/Gmail strip `style` attributes from an invite's
+    # description, which is why an inline-CSS table renders as plain,
+    # borderless text there (Outlook keeps the CSS fine either way) -
+    # legacy HTML attributes (border/bgcolor/cellpadding) survive that
+    # sanitizing pass on both providers, so those are used instead of CSS.
+    row_html = "".join(
+        f"<tr><td bgcolor=\"#f5f5f5\"><b>{label}</b></td><td>{value}</td></tr>"
+        for label, value in rows
+    )
+    extra_note = f"<p>{escape(interview.description)}</p>" if interview.description else ""
+    company = escape(
+        str(candidate.recruitment_id.company_id) if candidate.recruitment_id else ""
+    )
+    return (
+        f"<div>"
+        f"<h2>{heading}</h2>"
+        f"<p>{_('Greetings,')}</p>"
+        f"<p>{_('Please check the interview details below:')}</p>"
+        f'<table border="1" cellpadding="8" cellspacing="0">{row_html}</table>'
+        f"{extra_note}"
+        f"<p>{_('Regards,')}<br>{company} {_('Hiring Team')}</p>"
+        f"</div>"
+    )
+
+
 def generate_interview_meeting(interview, request):
     """
     Creates/updates the interview's meeting link using whichever platform
@@ -3433,8 +3537,7 @@ def generate_interview_meeting(interview, request):
     setting = RecruitmentGeneralSetting.objects.filter(company_id_id=company_id).first()
     provider = setting.default_meeting_provider if setting else "google_meet"
 
-    title = f"Interview for {interview.candidate_id}"
-    description = interview.description or f"Interview for {interview.candidate_id}"
+    title = _interview_meeting_title(interview)
     start_time = datetime.combine(interview.interview_date, interview.interview_time)
     attendees = [employee.get_mail() for employee in interview.employee_id.all()]
     attendees.append(interview.candidate_id.get_email())
@@ -3462,6 +3565,7 @@ def generate_interview_meeting(interview, request):
 
         link = InterviewOutlookMeetingLink.objects.filter(interview=interview).first()
         meeting_id = link.meeting.id if link else None
+        description = _interview_meeting_description(interview, is_new=meeting_id is None)
         try:
             meeting, created = OutlookMeeting.objects.update_or_create(
                 id=meeting_id,
@@ -3502,6 +3606,7 @@ def generate_interview_meeting(interview, request):
 
     link = InterviewMeetingLink.objects.filter(interview=interview).first()
     meeting_id = link.meeting.id if link else None
+    description = _interview_meeting_description(interview, is_new=meeting_id is None)
     try:
         meeting, created = GoogleMeeting.objects.update_or_create(
             id=meeting_id,
