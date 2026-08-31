@@ -42,32 +42,23 @@ class LocalBackup(models.Model):
 
 
 class GoogleDriveBackup(models.Model):
-    oauth_credentials_file = models.FileField(
-        upload_to="gdrive_oauth_credentials_file",
-        verbose_name=_("OAuth Credentials File"),
+    service_account_file = models.FileField(
+        upload_to="gdrive_service_account_file",
+        verbose_name=_("Service Account File"),
         blank=True,
         null=True,
         help_text=_(
-            "Make sure your file is in JSON format and contains your Google OAuth 2.0 client credentials (web application type)"
+            "Make sure your file is in JSON format and contains your Google Service Account credentials"
         ),
     )
     gdrive_folder_id = models.CharField(
         max_length=255,
         verbose_name=_("Gdrive Folder ID"),
         help_text=_(
-            "Google Drive folder ID where backups will be stored. The authenticated user must have write access to this folder."
+            "Google Drive folder ID where backups will be stored. The service "
+            "account's email (from the JSON file) must have write access to "
+            "this folder - share the folder with it like any other collaborator."
         ),
-    )
-    access_token = models.TextField(
-        blank=True, null=True, help_text=_("OAuth access token (automatically managed)")
-    )
-    refresh_token = models.TextField(
-        blank=True,
-        null=True,
-        help_text=_("OAuth refresh token (automatically managed)"),
-    )
-    token_expiry = models.DateTimeField(
-        blank=True, null=True, help_text=_("Token expiry time (automatically managed)")
     )
     backup_media = models.BooleanField(blank=True, null=True)
     backup_db = models.BooleanField(blank=True, null=True)

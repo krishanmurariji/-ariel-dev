@@ -118,17 +118,16 @@ class GdriveBackupSetupForm(ModelForm):
         seconds = cleaned_data.get("seconds")
         hour = cleaned_data.get("hour")
         minute = cleaned_data.get("minute")
-        oauth_credentials_file = cleaned_data.get("oauth_credentials_file")
+        service_account_file = cleaned_data.get("service_account_file")
 
         # Get instance if updating
         instance = self.instance if hasattr(self, "instance") else None
 
         # Only validate file if it's provided (new file upload) or if creating new instance
-        if oauth_credentials_file:
+        if service_account_file:
             try:
                 # Read file content from InMemoryUploadedFile
-                file_data = oauth_credentials_file.read()
-                file_name = oauth_credentials_file.name
+                file_data = service_account_file.read()
 
                 # Always write to temp file for validation (because .path isn't supported)
                 with tempfile.NamedTemporaryFile(
@@ -138,26 +137,29 @@ class GdriveBackupSetupForm(ModelForm):
                     tmp_file.flush()
                     temp_path = tmp_file.name
 
-                # Validate OAuth credentials file format
+                # Validate service account credentials file format
                 import json
 
                 with open(temp_path, "r") as f:
-                    oauth_config = json.load(f)
+                    service_account_config = json.load(f)
 
-                # Check if it's a valid OAuth 2.0 web application credentials file
-                if "web" not in oauth_config:
+                # Check it's a valid Google service account key file - these
+                # always have "type": "service_account" plus these two, at
+                # minimum, per Google's own key format.
+                if service_account_config.get("type") != "service_account":
                     raise ValueError(
-                        "OAuth credentials file must contain 'web' key for web application type."
+                        "File must be a Google service account key "
+                        "(missing/incorrect 'type': 'service_account')."
                     )
 
-                if "client_id" not in oauth_config.get("web", {}):
+                if "client_email" not in service_account_config:
                     raise ValueError(
-                        "OAuth credentials file must contain 'client_id' in 'web' section."
+                        "Service account file must contain 'client_email'."
                     )
 
-                if "client_secret" not in oauth_config.get("web", {}):
+                if "private_key" not in service_account_config:
                     raise ValueError(
-                        "OAuth credentials file must contain 'client_secret' in 'web' section."
+                        "Service account file must contain 'private_key'."
                     )
 
                 # Clean up temp file
@@ -165,16 +167,16 @@ class GdriveBackupSetupForm(ModelForm):
 
             except json.JSONDecodeError:
                 raise forms.ValidationError(
-                    "Please provide a valid OAuth credentials file (must be valid JSON)."
+                    "Please provide a valid service account file (must be valid JSON)."
                 )
             except Exception as e:
                 raise forms.ValidationError(
-                    f"Please provide a valid OAuth credentials file. Error: {str(e)}"
+                    f"Please provide a valid service account file. Error: {str(e)}"
                 )
         elif not instance or not instance.pk:
             # If creating new instance and no file provided, raise error
             raise forms.ValidationError(
-                "Please provide a valid OAuth credentials file."
+                "Please provide a valid service account file."
             )
         if backup_db == False and backup_media == False:
             raise forms.ValidationError("Please select any backup option.")
