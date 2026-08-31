@@ -1339,8 +1339,10 @@ exclude_fields = [
 
 class CandidateMovePipelineForm(ModelForm):
     """
-    Form to move a candidate from their current recruitment pipeline to a
-    different open job (and a specific stage within it) in the same company.
+    Form to move a candidate to a different open job (and a specific stage
+    within it) in the same company - or, by picking their current job
+    opening again, just change their stage within the pipeline they're
+    already in.
     """
 
     # Full width, stacked - side-by-side (the "col" filter's default half
@@ -1359,12 +1361,13 @@ class CandidateMovePipelineForm(ModelForm):
         self.fields["recruitment_id"].widget = forms.Select(
             attrs={"class": "oh-select w-100", "id": "id_recruitment_id"}
         )
+        # Includes the candidate's current job opening - picking it again
+        # is how this same modal is used to just change their stage
+        # without moving them to a different pipeline.
         current_recruitment = self.instance.recruitment_id
         queryset = Recruitment.objects.filter(closed=False)
         if current_recruitment:
-            queryset = queryset.filter(
-                company_id=current_recruitment.company_id
-            ).exclude(pk=current_recruitment.pk)
+            queryset = queryset.filter(company_id=current_recruitment.company_id)
         self.fields["recruitment_id"].queryset = queryset
 
         self.fields["stage_id"].label = _("Stage")

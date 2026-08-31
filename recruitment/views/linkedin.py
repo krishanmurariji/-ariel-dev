@@ -72,7 +72,13 @@ def linkedin_callback(request):
     an access token, verifies it, and stores it on the LinkedInAccount that
     started the flow (matched via the one-time `state` value).
     """
-    setting_list_url = reverse("linkedin-setting-list")
+    # The full-page section view, not "linkedin-setting-list" - that view is
+    # a HorillaListView gated by hx_request_required and only ever meant to
+    # be loaded as an htmx partial, so redirecting a plain browser GET (what
+    # LinkedIn's OAuth redirect actually is) there renders Horilla's 405
+    # page instead of the settings page, even though the message queued
+    # just above still shows up correctly on whatever page comes next.
+    setting_list_url = reverse("linkedin-integration-setting")
 
     if request.GET.get("error"):
         messages.error(request, _("LinkedIn authorization was cancelled or denied."))

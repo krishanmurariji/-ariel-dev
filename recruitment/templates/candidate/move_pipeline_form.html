@@ -25,8 +25,19 @@
             reloadStages(null);
         });
 
+    // On the very first load the recruitment dropdown defaults to the
+    // candidate's current job opening (it's a ModelForm field, so Django
+    // pre-selects their current recruitment_id). If that's what's shown,
+    // preselect their actual current stage instead of the recruitment's
+    // generic "initial" stage - otherwise just opening this modal to bump
+    // a candidate one stage forward would silently default back to
+    // "Applied" the moment Save is clicked without touching the stage field.
+    var currentRecruitmentId = '{{ form.instance.recruitment_id_id|default_if_none:"" }}';
+    var currentStageId = '{{ form.instance.stage_id_id|default_if_none:"" }}';
     if ($('#id_recruitment_id').val()) {
-        reloadStages(null);
+        var isCurrentJobOpening = currentRecruitmentId
+            && String($('#id_recruitment_id').val()) === currentRecruitmentId;
+        reloadStages(isCurrentJobOpening ? currentStageId : null);
     }
 
     // HorillaFormView's own close-on-success script depends on a
