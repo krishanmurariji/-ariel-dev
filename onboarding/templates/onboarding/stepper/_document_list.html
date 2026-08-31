@@ -52,26 +52,26 @@
           hx-target="#documentListContainer"
           hx-swap="outerHTML">
           {% csrf_token %}
-          <button type="submit" class="oh-btn oh-btn--secondary oh-btn--sm">{% trans "Approve" %}</button>
+          <button type="submit" class="oh-btn oh-btn--secondary oh-btn--small">{% trans "Approve" %}</button>
         </form>
         <button
           type="button"
-          class="oh-btn oh-btn--danger-outline oh-btn--sm"
-          onclick="this.closest('.oh-doc-verify-row__actions').querySelector('.oh-doc-reject-form').classList.toggle('d-none')">
+          class="oh-btn oh-btn--danger-outline oh-btn--small"
+          onclick="this.closest('.oh-doc-verify-row__actions').querySelector('.oh-doc-reject-form').classList.toggle('is-open')">
           {% trans "Reject" %}
         </button>
         <form
-          class="oh-doc-reject-form d-none"
+          class="oh-doc-reject-form"
           hx-post="{% url 'onboarding-stepper-document-status' candidate.pk document.pk 'rejected' %}"
           hx-target="#documentListContainer"
           hx-swap="outerHTML">
           {% csrf_token %}
-          <input type="text" name="reject_reason" class="oh-input oh-input--sm" placeholder="{% trans 'Reason for rejection' %}" required>
-          <button type="submit" class="oh-btn oh-btn--danger oh-btn--sm">{% trans "Confirm" %}</button>
+          <input type="text" name="reject_reason" class="oh-input oh-input--small" placeholder="{% trans 'Reason for rejection' %}" required>
+          <button type="submit" class="oh-btn oh-btn--danger oh-btn--small">{% trans "Confirm" %}</button>
         </form>
         {% else %}
-        <span class="oh-status-pill oh-status-pill--candidate">
-          <ion-icon name="person-outline"></ion-icon> {% trans "Candidate" %}
+        <span class="oh-status-pill oh-status-pill--pending">
+          <ion-icon name="hourglass-outline"></ion-icon> {% trans "Pending Upload" %}
         </span>
         {% endif %}
         <button

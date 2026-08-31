@@ -61,6 +61,8 @@ sidebar_urls = [
     "view-onboarding-dashboard",
     "onboarding-view",
     "candidates-view",
+    "task-templates",
+    "my-checklist-tasks",
     "employee-profile",
     "employee-view",
     "shift-request-view",

@@ -30,7 +30,7 @@ from django.contrib import messages
 from django.core import serializers
 from django.core.cache import cache as CACHE
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.core.mail import EmailMessage, EmailMultiAlternatives
+from django.core.mail import EmailMessage
 from django.core.paginator import Paginator
 from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
@@ -4835,6 +4835,29 @@ def document_reject(request, id):
     )
 
 
+DOCUMENT_REJECTION_MAIL_BODY = """<div style="font-family:'Segoe UI',Arial,sans-serif;background-color:#f4f6f9;padding:40px 20px;">
+  <div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,0.08);border:1px solid #eaeaea;">
+    <div style="background-color:#e54f38;padding:24px 32px;">
+      <p style="margin:0 0 4px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#ffffff;opacity:0.85;">Onboarding</p>
+      <h1 style="margin:0;font-size:21px;line-height:1.3;color:#ffffff;font-weight:600;">Action Needed: Document Not Accepted</h1>
+    </div>
+    <div style="padding:32px;">
+      <p style="margin:0 0 16px;font-size:15px;color:#2d2d2d;">Hi <strong>%(name)s</strong>,</p>
+      <p style="margin:0 0 16px;font-size:14px;color:#444444;line-height:1.7;">Your submitted document could not be accepted:</p>
+      <div style="margin:24px 0;padding:20px;background:#fff6f4;border-left:4px solid #e54f38;border-radius:8px;">
+        <p style="margin:0 0 8px;font-size:14px;color:#2d2d2d;"><strong>%(title)s</strong></p>
+        <p style="margin:0;font-size:13px;color:#555555;"><strong>Reason:</strong> %(reason)s</p>
+      </div>
+      <p style="margin:0;font-size:13px;color:#888888;">Please resubmit the document at your earliest convenience.</p>
+    </div>
+    <div style="padding:20px 32px;border-top:1px solid #eeeeee;background:#fafafa;">
+      <p style="margin:0 0 4px;font-size:13px;color:#777777;text-align:center;">Ariel Software Solutions Pvt Ltd<br><strong style="color:#555555;">Recruitment Team</strong></p>
+      <p style="margin:0;font-size:11px;color:#aaaaaa;text-align:center;">This is an automated message. Please do not reply directly to this email.</p>
+    </div>
+  </div>
+</div>"""
+
+
 def notify_candidate_of_document_rejection(document_obj):
     """
     Emails the candidate that one of their submitted documents was rejected,
@@ -4846,24 +4869,20 @@ def notify_candidate_of_document_rejection(document_obj):
     email_backend = ConfiguredEmailBackend()
     display_email_name = email_backend.dynamic_from_email_with_display_name
     try:
-        email = EmailMultiAlternatives(
+        email = EmailMessage(
             subject=_("Action needed: %(title)s was not accepted")
             % {"title": document_obj.title},
-            body=_(
-                "Hi %(name)s,\n\n"
-                "Your submitted document \"%(title)s\" could not be accepted.\n\n"
-                "Reason: %(reason)s\n\n"
-                "Please resubmit the document at your earliest convenience."
-            )
+            body=DOCUMENT_REJECTION_MAIL_BODY
             % {
-                "name": candidate.name,
-                "title": document_obj.title,
-                "reason": document_obj.reject_reason or _("Not specified"),
+                "name": escape(candidate.name),
+                "title": escape(document_obj.title),
+                "reason": escape(document_obj.reject_reason or _("Not specified")),
             },
             from_email=display_email_name,
             to=[candidate.email],
             reply_to=[display_email_name],
         )
+        email.content_subtype = "html"
         email.send()
     except Exception as e:
         logger.error(f"Document rejection mail not sent to {candidate.email}: {e}")

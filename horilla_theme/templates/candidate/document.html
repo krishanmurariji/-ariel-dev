@@ -135,28 +135,9 @@
                     <div class="flex gap-1 w-full">
                         {% if document.document %}
                             {% if perms.recruitment.change_candidatedocument %}
-                                {% if document.status == "requested" %}
+                                {% if document.status == "approved" %}
                                     <button
-                                        class="oh-btn flex-1 text-base bg-primary-300 text-dark-700 hover:bg-success hover:text-white hover:scale-105"
-                                        hx-get="{% url 'candidate-document-approve' document.id %}"
-                                        title="{% trans 'Approve' %}"
-                                        onclick="event.stopPropagation()"
-                                    >
-                                        <ion-icon class="me-1" name="checkmark-outline"></ion-icon>
-                                    </button>
-                                    <button
-                                        class="oh-btn flex-1 text-base bg-primary-300 text-dark-700 hover:bg-danger hover:text-white hover:scale-105 transition"
-                                        hx-get="{% url 'candidate-document-reject' document.id %}"
-                                        hx-target="#rejectFileForm"
-                                        title="{% trans 'Reject' %}"
-                                        onclick="event.stopPropagation()"
-                                        hx-on-htmx-after-request="$('#rejectFileModal').toggleClass('oh-modal--show');"
-                                    >
-                                        <ion-icon class="me-1" name="close-outline"></ion-icon>
-                                    </button>
-                                {% elif document.status == "approved" %}
-                                    <button
-                                        class="oh-btn flex-1 text-base bg-primary-300 text-dark-700 hover:bg-success hover:text-white hover:scale-105 opacity-50 cursor-not-allowed"
+                                        class="oh-btn flex-1 text-base bg-primary-300 text-dark-700 opacity-50 cursor-not-allowed"
                                         title="{% trans 'Approve' %}"
                                         onclick="event.stopPropagation()"
                                     >
@@ -173,7 +154,7 @@
                                     >
                                         <ion-icon class="me-1" name="close-outline"></ion-icon>
                                     </button>
-                                {% else %}
+                                {% elif document.status == "rejected" %}
                                     <button
                                         class="oh-btn flex-1 text-base bg-primary-300 text-dark-700 hover:bg-success hover:text-white hover:scale-105"
                                         hx-get="{% url 'candidate-document-approve' document.id %}"
@@ -183,9 +164,38 @@
                                         <ion-icon class="me-1" name="checkmark-outline"></ion-icon>
                                     </button>
                                     <button
-                                        class="oh-btn flex-1 text-base bg-primary-300 text-dark-700 hover:bg-danger hover:text-white hover:scale-105 transition opacity-50 cursor-not-allowed"
+                                        class="oh-btn flex-1 text-base bg-primary-300 text-dark-700 opacity-50 cursor-not-allowed"
                                         title="{% trans 'Reject' %}"
                                         onclick="event.stopPropagation()"
+                                    >
+                                        <ion-icon class="me-1" name="close-outline"></ion-icon>
+                                    </button>
+                                {% else %}
+                                    <!-- "requested" (uploaded by HR on the candidate's behalf),
+                                         "submitted" (uploaded by the candidate - document_form.html
+                                         hardcodes this status) and "under_verification" all mean the
+                                         same thing here: a file exists and hasn't been decided on yet,
+                                         so both actions must be live. Only "submitted" showed up in
+                                         practice (candidate self-uploads), but this used to be an
+                                         unconditional "requested" check that silently fell through to
+                                         a disabled Reject button for every other pre-decision status -
+                                         disabled only visually (opacity/cursor, no hx-get), so it still
+                                         showed hover feedback and looked clickable. -->
+                                    <button
+                                        class="oh-btn flex-1 text-base bg-primary-300 text-dark-700 hover:bg-success hover:text-white hover:scale-105"
+                                        hx-get="{% url 'candidate-document-approve' document.id %}"
+                                        title="{% trans 'Approve' %}"
+                                        onclick="event.stopPropagation()"
+                                    >
+                                        <ion-icon class="me-1" name="checkmark-outline"></ion-icon>
+                                    </button>
+                                    <button
+                                        class="oh-btn flex-1 text-base bg-primary-300 text-dark-700 hover:bg-danger hover:text-white hover:scale-105 transition"
+                                        hx-get="{% url 'candidate-document-reject' document.id %}"
+                                        hx-target="#rejectFileForm"
+                                        title="{% trans 'Reject' %}"
+                                        onclick="event.stopPropagation()"
+                                        hx-on-htmx-after-request="$('#rejectFileModal').toggleClass('oh-modal--show');"
                                     >
                                         <ion-icon class="me-1" name="close-outline"></ion-icon>
                                     </button>

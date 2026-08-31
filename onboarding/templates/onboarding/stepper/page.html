@@ -38,6 +38,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    position: relative;
     padding: 28px 32px 0;
   }
   .oh-stepper-page__loading { display: flex; justify-content: center; padding: 60px; }
@@ -241,8 +242,8 @@
   .oh-status-pill--under_verification { background: #f3e6cc; color: #a6672e; }
   .oh-status-pill--approved { background: #dcedde; color: #3e7d4f; }
   .oh-status-pill--rejected { background: #f3ddd7; color: #b3402f; }
-  .oh-status-pill--candidate { display: inline-flex; align-items: center; gap: 4px; background: #f3e6cc; color: #a6672e; }
-  .oh-status-pill--candidate ion-icon { font-size: 12px; }
+  .oh-status-pill--pending { display: inline-flex; align-items: center; gap: 4px; background: #eef1f6; color: #5b6472; }
+  .oh-status-pill--pending ion-icon { font-size: 12px; }
 
   .oh-doc-pill {
     display: inline-flex; align-items: center; gap: 6px;
@@ -270,18 +271,40 @@
   }
   .oh-doc-request-row__meta { display: flex; gap: 14px; font-size: 0.72rem; color: var(--oh-text-muted, #aaa); margin-top: 3px; }
   .oh-doc-request-row__cancel {
-    flex: none; border: none; background: none; color: var(--oh-text-muted, #999);
-    font-size: 16px; cursor: pointer; padding: 4px;
+    flex: none; display: flex; align-items: center; justify-content: center;
+    width: 40.94px; height: 40.94px; border-radius: 6px;
+    border: 1px solid var(--oh-border-color, #e4e6ef); background: none; color: var(--oh-text-muted, #999);
+    font-size: 16px; cursor: pointer; padding: 0;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
   }
-  .oh-doc-request-row__cancel:hover { color: #b3402f; }
+  .oh-doc-request-row__cancel:hover { color: #b3402f; border-color: #f3ddd7; background: #fdf6f5; }
 
   .oh-doc-verify-row {
     display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;
     border: 1px solid var(--oh-border-color, #e4e6ef); border-radius: 10px; padding: 14px;
   }
   .oh-doc-verify-row__body { flex: 1; min-width: 200px; }
-  .oh-doc-verify-row__actions { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; flex: none; }
-  .oh-doc-verify-row__actions form { display: flex; gap: 6px; align-items: center; }
+  /* align-items: center keeps the pill/button/icon-button mix vertically
+     centered against each other - real height parity comes from actually
+     using .oh-btn--small (the buttons here were previously typo'd as
+     "oh-btn--sm", a class that doesn't exist, so they silently rendered at
+     full .oh-btn size while the cancel icon button had its own tiny
+     4px-padding size - that mismatch, not the alignment mode, was what
+     made the row look staggered). */
+  .oh-doc-verify-row__actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; flex: none; }
+  .oh-doc-verify-row__actions form { display: flex; align-items: center; gap: 6px; margin: 0; }
+  /* The reject-reason form is hidden via its own dedicated .is-open toggle
+     instead of Bootstrap's .d-none - that utility class collided with the
+     flex rule above (both matched .oh-doc-verify-row__actions form, and
+     the flex one won on specificity), so the reason input was always
+     visible regardless of whether "Reject" had been clicked. */
+  .oh-doc-verify-row__actions form.oh-doc-reject-form { display: none; }
+  .oh-doc-verify-row__actions form.oh-doc-reject-form.is-open { display: flex; }
+  /* .oh-input--small is noticeably shorter than .oh-btn--small (the
+     "Confirm" button right next to it), so match it explicitly. */
+  .oh-doc-reject-form input.oh-input--small {
+    height: 40.94px; box-sizing: border-box;
+  }
 
   .oh-finalize-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
   @media (max-width: 640px) { .oh-finalize-preview { grid-template-columns: 1fr; } }
@@ -302,9 +325,25 @@
   .oh-finalize-card__scroll p { margin: 0 0 0.6em; }
   .oh-finalize-card__scroll p:last-child { margin-bottom: 0; }
 
-  .oh-stepper-messages { margin-bottom: 16px; flex: none; }
+  /* Positioned over the step content (not in normal flow) so a message
+     appearing/disappearing never pushes .oh-step down - it used to sit
+     in-flow above .oh-step inside this fixed-height column, so every
+     save shifted the whole step visibly for the few seconds the message
+     was up. .oh-stepper-page__content carries the position:relative this
+     anchors to. */
+  .oh-stepper-messages {
+    position: absolute; top: 16px; right: 16px; left: 16px; z-index: 30;
+    pointer-events: none;
+  }
   .oh-stepper-messages .oh-alert {
     padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 8px;
+    box-shadow: 0 6px 20px -6px rgba(18, 21, 28, 0.25);
+    pointer-events: auto;
+    animation: oh-toast-in 0.2s ease-out;
+  }
+  @keyframes oh-toast-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
   }
   .oh-stepper-messages .oh-alert--error, .oh-stepper-messages .oh-alert--danger { background: #f3ddd7; color: #b3402f; }
   .oh-stepper-messages .oh-alert--success { background: #dcedde; color: #3e7d4f; }

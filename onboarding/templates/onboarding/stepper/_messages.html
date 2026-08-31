@@ -1,10 +1,20 @@
 {% if messages %}
-<div class="oh-stepper-messages">
+<div class="oh-stepper-messages" id="stepperMessages">
   {% for message in messages %}
   <div class="oh-alert {{ message.tags|default:'oh-alert--info' }}">{{ message }}</div>
   {% endfor %}
 </div>
 <script>
+  (function () {
+    var el = document.getElementById("stepperMessages");
+    if (el) {
+      setTimeout(function () {
+        el.style.transition = "opacity 0.3s ease";
+        el.style.opacity = "0";
+        setTimeout(function () { el.remove(); }, 300);
+      }, 4000);
+    }
+  })();
   {% for message in messages %}
   if (window.Toast) {
     Toast.fire({ icon: "{{ message.level_tag|default:'info'|escapejs }}", title: "{{ message|escapejs }}" });
