@@ -6,7 +6,7 @@
   </button>
 </div>
 
-<form method="post" action="{% url 'checklist-task-self-update' task.pk %}" enctype="multipart/form-data" id="taskEditForm" data-initial-status="{{ task.status }}">
+<form method="post" action="{% url 'checklist-task-self-update' task.pk %}" id="taskEditForm" data-initial-status="{{ task.status }}">
   {% csrf_token %}
   <div class="oh-modal__dialog-body">
     <div class="oh-input__group">
@@ -17,50 +17,11 @@
         {% endfor %}
       </select>
     </div>
-    {% if task.requires_proof %}
-    <div class="oh-input__group">
-      <label class="oh-input__label">{% trans "Proof of Completion" %}</label>
-      {% if task.proof_file %}
-      <div class="oh-proof-attached">
-        <a href="{{ task.proof_file.url }}" target="_blank" class="oh-proof-view">
-          <ion-icon name="attach-outline"></ion-icon> {% trans "View attached proof" %}
-        </a>
-        <button type="submit" form="removeProofForm" class="oh-btn oh-btn--danger-outline oh-btn--sm">
-          <ion-icon name="trash-outline"></ion-icon> {% trans "Remove" %}
-        </button>
-      </div>
-      {% else %}
-      <label class="oh-file-picker" id="taskEditFilePicker">
-        <input type="file" name="proof_file" id="taskEditFile" onchange="
-          var t = this.closest('.oh-file-picker').querySelector('.oh-file-picker__text');
-          var p = this.closest('.oh-file-picker');
-          if (this.files.length) { t.textContent = this.files[0].name; p.classList.add('has-file'); }
-          else { t.textContent = '{% trans "Attach proof file" %}'; p.classList.remove('has-file'); }
-        ">
-        <ion-icon name="cloud-upload-outline"></ion-icon>
-        <span class="oh-file-picker__text">{% trans "Attach proof file" %}</span>
-      </label>
-      {% endif %}
-    </div>
-    {% endif %}
   </div>
   <div class="oh-modal__dialog-footer">
     <button type="submit" id="taskEditSubmit" class="oh-btn oh-btn--secondary" disabled>{% trans "Update" %}</button>
   </div>
 </form>
-
-{% if task.proof_file %}
-<form method="post" action="{% url 'checklist-task-remove-proof' task.pk %}" id="removeProofForm">{% csrf_token %}</form>
-{% endif %}
-
-<style>
-  .oh-proof-attached {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    border: 1px solid var(--oh-border-color, #e4e6ef);
-    border-radius: 8px;
-    padding: 8px 12px;
-  }
-</style>
 
 <script>
   (function () {
@@ -68,13 +29,9 @@
     if (!form) { return; }
     var initialStatus = form.dataset.initialStatus;
     var statusSelect = document.getElementById("taskEditStatus");
-    var fileInput = document.getElementById("taskEditFile");
     var submitBtn = document.getElementById("taskEditSubmit");
-    function refresh() {
-      var changed = statusSelect.value !== initialStatus || (fileInput && fileInput.files.length > 0);
-      submitBtn.disabled = !changed;
-    }
-    statusSelect.addEventListener("change", refresh);
-    if (fileInput) { fileInput.addEventListener("change", refresh); }
+    statusSelect.addEventListener("change", function () {
+      submitBtn.disabled = statusSelect.value === initialStatus;
+    });
   })();
 </script>

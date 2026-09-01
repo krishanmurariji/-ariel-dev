@@ -30,8 +30,16 @@
             {{ form.title.errors }}
           </div>
           <div>
-            <label class="block text-xs font-medium text-[#333] mb-1">{{ form.description.label }}</label>
-            {{ form.description }}
+            <label class="block text-xs font-medium text-[#333] mb-1">{{ form.phase.label }} <span class="text-red-600">*</span></label>
+            {{ form.phase }}
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-[#333] mb-1">{{ form.default_assignee_id.label }}</label>
+            {{ form.default_assignee_id }}
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-[#333] mb-1">{{ form.default_due_offset.label }}</label>
+            {{ form.default_due_offset }}
           </div>
         </div>
       </div>
@@ -62,16 +70,6 @@
               <label class="block text-xs font-medium text-[#333] mb-1">{% trans "Description" %}</label>
               {{ f.description }}
             </div>
-            <div class="mt-3 flex gap-6">
-              <label class="oh-task-panel__switch-label">
-                <div class="oh-switch">{{ f.is_mandatory }}</div>
-                {% trans "Mandatory" %}
-              </label>
-              <label class="oh-task-panel__switch-label">
-                <div class="oh-switch">{{ f.requires_proof }}</div>
-                {% trans "Requires Proof" %}
-              </label>
-            </div>
           </div>
           {% endfor %}
         </div>
@@ -93,17 +91,7 @@
     </div>
     <div class="mt-3">
       <label class="block text-xs font-medium text-[#333] mb-1">{% trans "Description" %}</label>
-      <input type="text" name="tasks-__prefix__-description" class="oh-input w-100" placeholder="{% trans 'Description (optional)' %}">
-    </div>
-    <div class="mt-3 flex gap-6">
-      <label class="oh-task-panel__switch-label">
-        <div class="oh-switch"><input type="checkbox" name="tasks-__prefix__-is_mandatory" class="oh-switch__checkbox" checked></div>
-        {% trans "Mandatory" %}
-      </label>
-      <label class="oh-task-panel__switch-label">
-        <div class="oh-switch"><input type="checkbox" name="tasks-__prefix__-requires_proof" class="oh-switch__checkbox"></div>
-        {% trans "Requires Proof" %}
-      </label>
+      <textarea name="tasks-__prefix__-description" class="oh-input w-100 oh-autogrow" rows="1" placeholder="{% trans 'Description (optional)' %}"></textarea>
     </div>
   </div>
 </template>
@@ -184,6 +172,11 @@
   var totalForms = document.getElementById("id_tasks-TOTAL_FORMS");
   var panelTemplate = document.getElementById("taskPanelTemplate");
 
+  function autogrow(el) {
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }
+
   function panelLabel(panel) {
     var titleInput = panel.querySelector("[name$='-title']");
     var value = titleInput ? titleInput.value.trim() : "";
@@ -217,7 +210,11 @@
       tab.classList.toggle("oh-task-tab--active", tab.dataset.index === String(index));
     });
     panelsContainer.querySelectorAll(".oh-task-panel").forEach(function (panel) {
-      panel.classList.toggle("hidden", panel.dataset.index !== String(index));
+      var isActive = panel.dataset.index === String(index);
+      panel.classList.toggle("hidden", !isActive);
+      // A hidden (display:none) textarea reports scrollHeight 0, so sizing
+      // has to happen once the panel is actually visible, not eagerly on load.
+      if (isActive) { panel.querySelectorAll(".oh-autogrow").forEach(autogrow); }
     });
   }
 
@@ -265,6 +262,7 @@
   });
 
   panelsContainer.addEventListener("input", function (e) {
+    if (e.target.classList.contains("oh-autogrow")) { autogrow(e.target); }
     if (!e.target.name || e.target.name.indexOf("-title") === -1) { return; }
     var panel = e.target.closest(".oh-task-panel");
     var tab = tabsStrip.querySelector('.oh-task-tab[data-index="' + panel.dataset.index + '"]');

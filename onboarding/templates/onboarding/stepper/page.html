@@ -212,25 +212,10 @@
   .oh-checklist-row__controls {
     display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap;
   }
-  .oh-checklist-row__chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .oh-checklist-row__assignee-wrap { width: 190px; flex: none; }
   .oh-checklist-row__assignee-wrap .select2-container { width: 100% !important; }
   .oh-checklist-row__assignee-wrap .select2-selection { min-height: 30px; font-size: 0.78rem; }
   .oh-checklist-row__assignee { font-size: 0.78rem; padding: 4px 10px; }
-  .oh-check-chip {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 4px 11px; border-radius: 20px;
-    border: 1px solid var(--oh-border-color, #e4e6ef);
-    background: var(--oh-body-bg, #fff);
-    font-size: 0.72rem; font-weight: 600; color: var(--oh-text-muted, #777);
-    cursor: pointer; user-select: none; white-space: nowrap;
-    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-  }
-  .oh-check-chip input[type="checkbox"] {
-    position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none;
-  }
-  .oh-check-chip:hover { border-color: #2f6f63; }
-  .oh-check-chip:has(input:checked) { background: #2f6f63; border-color: #2f6f63; color: #fff; }
   .oh-doc-icon { font-size: 18px; color: #2f6f63; }
 
   .oh-status-pill {

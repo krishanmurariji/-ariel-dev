@@ -12,6 +12,7 @@ from base.models import Company
 from employee.models import Employee
 from horilla.filters import HorillaFilterSet
 from onboarding.models import (
+    CandidateChecklistTask,
     CandidateStage,
     CandidateTask,
     OnboardingCandidate,
@@ -34,6 +35,54 @@ class CandidateTaskFilter(HorillaFilterSet):
 
         model = CandidateTask
         fields = "__all__"
+
+
+class CandidateChecklistTaskFilter(HorillaFilterSet):
+    """
+    Filter set backing the My Tasks Kanban and List views.
+    """
+
+    search = django_filters.CharFilter(method="search_by_title")
+    candidate = django_filters.ModelChoiceFilter(
+        field_name="candidate_id", queryset=Candidate.objects.all()
+    )
+    status = django_filters.ChoiceFilter(
+        field_name="status", choices=CandidateChecklistTask.STATUS_CHOICES
+    )
+    phase = django_filters.ChoiceFilter(
+        field_name="phase", choices=CandidateChecklistTask.PHASE_CHOICES
+    )
+    assignee = django_filters.ModelChoiceFilter(
+        field_name="assignee_id", queryset=Employee.objects.all()
+    )
+
+    class Meta:
+        """
+        Meta
+        """
+
+        model = CandidateChecklistTask
+        fields = ["candidate", "status", "phase", "assignee"]
+
+    def search_by_title(self, queryset, name, value):
+        """
+        Search by task title
+        """
+        return queryset.filter(title__icontains=value)
+
+    def __init__(self, data=None, queryset=None, *, request=None, prefix=None):
+        super().__init__(data, queryset, request=request, prefix=prefix)
+        from onboarding.checklist_access import visible_candidates_queryset
+
+        if request:
+            candidates = visible_candidates_queryset(request)
+            self.filters["candidate"].queryset = candidates
+            self.form.fields["candidate"].queryset = candidates
+            if not request.user.has_perm("onboarding.view_candidatechecklisttask"):
+                # Assignee is meaningless (and a visibility leak) for
+                # someone who can only ever see their own tasks.
+                self.filters.pop("assignee", None)
+                self.form.fields.pop("assignee", None)
 
 
 class RecruitmentFilter(rec_filter):

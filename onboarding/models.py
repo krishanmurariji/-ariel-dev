@@ -295,9 +295,12 @@ class OnboardingPortal(HorillaModel):
 
 def validate_proof_file(value):
     """
-    Proof-of-completion uploads accept documents, images, or short clips -
-    nothing else exists in the codebase for this combined allowlist, so this
-    mirrors recruitment.models.validate_pdf's extension-check style.
+    Retired: CandidateChecklistTask.proof_file (which used this validator)
+    has been removed, but historical migrations (0004_...) still reference
+    this function by import path, so it must stay importable indefinitely -
+    Django replays the full migration history from disk, and that replay
+    literally does `from onboarding.models import validate_proof_file`.
+    Safe to delete only after squashing/removing those old migrations.
     """
     allowed = {".pdf", ".jpg", ".jpeg", ".png", ".mp4", ".mov", ".mkv"}
     ext = os.path.splitext(value.name)[1].lower()
@@ -307,17 +310,58 @@ def validate_proof_file(value):
         )
 
 
+PHASE_CHOICES = [
+    ("pre_joining", _("Pre-Joining")),
+    ("post_joining", _("Post-Joining")),
+    ("employee_checklist", _("Employee Checklist")),
+]
+
+DUE_OFFSET_CHOICES = [
+    (1, _("1 Day")),
+    (7, _("1 Week")),
+    (15, _("15 Days")),
+    (30, _("1 Month")),
+]
+
+
 class TaskTemplate(HorillaModel):
     """
     A Task Group: a reusable, named set of onboarding tasks (e.g.
-    "Recruitment Survey"), assignable to candidates from both the
-    Pre-Joining and Post-Joining checklist steps.
+    "Recruitment Survey"), assigned to candidates from the matching
+    checklist step (Pre-Joining, Post-Joining, or Employee Checklist).
     """
 
     title = models.CharField(
         max_length=100, unique=True, verbose_name=_("Group Name")
     )
-    description = models.TextField(blank=True, null=True, verbose_name=_("Description"))
+    phase = models.CharField(
+        max_length=20,
+        choices=PHASE_CHOICES,
+        default="pre_joining",
+        verbose_name=_("Phase"),
+    )
+    default_assignee_id = models.ForeignKey(
+        Employee,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="default_assignee_for_task_templates",
+        verbose_name=_("Default Assigner"),
+        help_text=_(
+            "Pre-fills every task's assignee when this group is picked in "
+            "the Configure Onboarding stepper - still editable per task."
+        ),
+    )
+    default_due_offset = models.PositiveIntegerField(
+        choices=DUE_OFFSET_CHOICES,
+        null=True,
+        blank=True,
+        verbose_name=_("Default Due Date"),
+        help_text=_(
+            "Days after the candidate's joining date that each task in "
+            "this group is due, once assigned."
+        ),
+    )
     company_id = models.ForeignKey(
         Company,
         on_delete=models.CASCADE,
@@ -352,11 +396,7 @@ class TaskTemplateTask(HorillaModel):
     )
     title = models.CharField(max_length=200, verbose_name=_("Task Title"))
     description = models.TextField(blank=True, null=True, verbose_name=_("Description"))
-    is_mandatory = models.BooleanField(default=True, verbose_name=_("Mandatory"))
-    requires_proof = models.BooleanField(
-        default=False, verbose_name=_("Requires Proof of Completion")
-    )
-    sequence = models.IntegerField(default=0, verbose_name=_("Priority"))
+    sequence = models.IntegerField(default=0, verbose_name=_("Sequence"))
 
     def __str__(self):
         return self.title
@@ -378,17 +418,12 @@ class CandidateChecklistTask(HorillaModel):
     Post-Joining checklist step.
 
     Every task has exactly one assignee - the person who does the work and
-    updates its status - plus an optional "ask candidate for feedback"
-    switch. There is no second/verifying person: the only other party who
-    could ever be involved is the candidate themself, and that's handled by
-    the feedback switch, not a second assignee dropdown.
+    updates its status. There is no second/verifying person.
     """
 
-    PHASE_CHOICES = [
-        ("pre_joining", _("Pre-Joining")),
-        ("post_joining", _("Post-Joining")),
-        ("employee_checklist", _("Employee Checklist")),
-    ]
+    # Re-exposes the module-level PHASE_CHOICES (shared with TaskTemplate.phase)
+    # as a class attribute, since callers reference CandidateChecklistTask.PHASE_CHOICES.
+    PHASE_CHOICES = PHASE_CHOICES
     STATUS_CHOICES = [
         ("todo", _("Todo")),
         ("scheduled", _("Scheduled")),
@@ -422,54 +457,54 @@ class CandidateChecklistTask(HorillaModel):
         related_name="checklist_tasks",
         verbose_name=_("Assigned To"),
     )
-    requires_feedback = models.BooleanField(
-        default=False, verbose_name=_("Response Required")
-    )
-    is_mandatory = models.BooleanField(
-        default=True,
-        verbose_name=_("Mandatory"),
-        help_text=_(
-            "Copied from the Task Group's task when assigned, then editable "
-            "per candidate without changing the shared template."
-        ),
-    )
-    requires_proof = models.BooleanField(
-        default=False, verbose_name=_("Requires Proof of Completion")
-    )
-    candidate_feedback = models.TextField(
-        null=True, blank=True, verbose_name=_("Candidate Feedback")
-    )
-    candidate_feedback_at = models.DateTimeField(null=True, blank=True)
-    candidate_satisfied = models.BooleanField(
-        default=False,
-        verbose_name=_("Candidate Satisfied"),
-        help_text=_(
-            "Only meaningful once the task is Done and Response Required is "
-            "on - whether the candidate confirmed they're satisfied with "
-            "how this task was handled."
-        ),
-    )
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
         default="todo",
         verbose_name=_("Status"),
     )
-    status_updated_at = models.DateTimeField(
-        null=True, blank=True, verbose_name=_("Status Last Updated")
-    )
-    proof_file = models.FileField(
-        upload_to="onboarding/task_proof",
+    due_date = models.DateField(
         null=True,
         blank=True,
-        validators=[validate_proof_file],
-        verbose_name=_("Proof of Completion"),
+        verbose_name=_("Due Date"),
+        help_text=_(
+            "Computed from the Task Group's Default Due Date offset plus "
+            "the candidate's joining date, when the task is assigned."
+        ),
+    )
+    status_updated_at = models.DateTimeField(
+        null=True, blank=True, verbose_name=_("Status Last Updated")
     )
     completed_at = models.DateTimeField(null=True, blank=True)
     objects = HorillaCompanyManager("candidate_id__recruitment_id__company_id")
 
     def __str__(self):
         return f"{self.candidate_id} | {self.title}"
+
+    def get_edit_modal_url(self):
+        """
+        Used by the My Tasks Kanban/List views to open the same edit
+        modal on card/row click.
+        """
+        return reverse("checklist-task-edit-modal", kwargs={"pk": self.pk})
+
+    def due_date_display(self):
+        """
+        The Kanban card's {format} templating auto-invokes any bound
+        method it references, but str.format() would otherwise render a
+        None due_date literally as the text "None" - this renders it as
+        a plain, human date or an em dash instead.
+        """
+        return self.due_date.strftime("%b %d, %Y") if self.due_date else "—"
+
+    def status_col(self):
+        """
+        Custom column renderer for the My Tasks List view.
+        """
+        return render_template(
+            path="onboarding/task_templates/_status_pill.html",
+            context={"instance": self},
+        )
 
     class Meta:
         """
@@ -557,7 +592,7 @@ class OnboardingCandidateDetail(HorillaModel):
     )
     furthest_step_key = models.CharField(
         max_length=20,
-        default="pre_joining",
+        default="documents",
         verbose_name=_("Furthest Reached Step"),
         help_text=_(
             "The furthest stepper step this candidate has actually reached. "

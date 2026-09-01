@@ -11,15 +11,19 @@ from django.contrib import messages
 from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 from django.views import View
 
 from horilla.decorators import login_required, permission_required
+from onboarding.checklist_access import (
+    apply_status_change,
+    can_manage_task,
+    visible_candidates_queryset,
+)
+from onboarding.filters import CandidateChecklistTaskFilter
 from onboarding.forms import TaskTemplateForm, TaskTemplateTaskFormSet
 from onboarding.models import CandidateChecklistTask, TaskTemplate
-from onboarding.stepper import _maybe_mark_onboarding_complete
 
 
 @method_decorator(login_required, name="dispatch")
@@ -47,8 +51,25 @@ def _lock_saved_task_forms(formset):
     """
     for form in formset.forms:
         if form.instance.pk:
-            for name in ("title", "description", "is_mandatory", "requires_proof"):
+            for name in ("title", "description"):
                 form.fields[name].disabled = True
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(permission_required("onboarding.view_tasktemplate"), name="dispatch")
+class TaskTemplateViewModal(View):
+    """
+    Read-only modal listing every task in a Task Group - reached by
+    clicking a card on the Task Templates list.
+    """
+
+    def get(self, request, pk):
+        template = get_object_or_404(TaskTemplate, pk=pk)
+        return render(
+            request,
+            "onboarding/task_templates/_view_modal.html",
+            {"template": template, "tasks": template.tasks.all()},
+        )
 
 
 @method_decorator(login_required, name="dispatch")
@@ -103,114 +124,73 @@ def task_template_delete(request, pk):
     return redirect("task-template-list")
 
 
-STATUS_TAB_ORDER = ["stuck", "todo", "scheduled", "ongoing", "done"]
+MY_TASKS_VIEW_COOKIE = "onboarding_my_tasks_view"
 
 
 @login_required
 def my_checklist_tasks(request):
     """
-    Where an assignee acts on the tasks the stepper created for them.
-    Organized as tabs - Priority opens by default (mandatory tasks that are
-    Stuck or Todo, since those are the ones actually blocking someone's
-    onboarding), then the plain status tabs in Stuck/Todo-first order.
+    Page shell for My Tasks: a Kanban/List board loaded via htmx
+    (my_checklist_tasks_board). The last-chosen view (Kanban vs List) is
+    remembered via a small first-party cookie, read here to seed the
+    board container's initial URL - simpler and race-free versus
+    localStorage plus a DOM-rewrite before htmx's own "load" trigger fires.
     """
-    employee = getattr(request.user, "employee_get", None)
-    tasks = []
-    if employee:
-        tasks = list(
-            CandidateChecklistTask.objects.filter(assignee_id=employee)
-            .select_related("candidate_id", "template_task_id")
-            .order_by("-id")
-        )
-
-    status_labels = dict(CandidateChecklistTask.STATUS_CHOICES)
-    tasks_by_status = {status: [] for status in STATUS_TAB_ORDER}
-    for task in tasks:
-        tasks_by_status.setdefault(task.status, []).append(task)
-
-    priority_tasks = sorted(
-        (task for task in tasks if task.is_mandatory and task.status in ("stuck", "todo")),
-        key=lambda task: STATUS_TAB_ORDER.index(task.status),
-    )
-
-    status_tabs = [{"key": "priority", "label": _("Priority"), "tasks": priority_tasks}]
-    status_tabs += [
-        {"key": status, "label": status_labels.get(status, status), "tasks": tasks_by_status[status]}
-        for status in STATUS_TAB_ORDER
-    ]
-
+    initial_view = request.GET.get("view") or request.COOKIES.get(MY_TASKS_VIEW_COOKIE, "kanban")
+    initial_query = request.GET.copy()
+    initial_query["view"] = initial_view
     return render(
         request,
         "onboarding/task_templates/my_tasks.html",
         {
-            "employee": employee,
-            "status_tabs": status_tabs,
-            "default_status": "priority",
-            "status_choices": CandidateChecklistTask.STATUS_CHOICES,
-            "total_count": len(tasks),
+            "filter_form": CandidateChecklistTaskFilter(request.GET, request=request).form,
+            "initial_view": initial_view,
+            "initial_board_query": initial_query.urlencode(),
         },
     )
 
 
 @login_required
+def my_checklist_tasks_board(request):
+    """
+    Single stable htmx target for the My Tasks filter form / view toggle,
+    so switching between Kanban and List never requires juggling different
+    target URLs - query-string filters simply carry over untouched.
+
+    Kanban mode delegates to MyTasksCandidateTabsView - one pill-tab per
+    visible candidate (mirroring the Recruitment Pipeline's own tab strip),
+    each lazily loading that candidate's Kanban board on click.
+    """
+    from onboarding.cbv.checklist_tasks import (
+        CandidateChecklistTaskListView,
+        MyTasksCandidateTabsView,
+    )
+
+    if request.GET.get("view") == "list":
+        return CandidateChecklistTaskListView.as_view()(request)
+
+    if not visible_candidates_queryset(request).exists():
+        return render(request, "onboarding/task_templates/_no_candidates.html")
+    return MyTasksCandidateTabsView.as_view()(request)
+
+
+@login_required
 def checklist_task_self_update(request, pk):
     task = get_object_or_404(CandidateChecklistTask, pk=pk)
-    employee = getattr(request.user, "employee_get", None)
-    if request.method == "POST" and employee and task.assignee_id_id == employee.pk:
-        new_status = request.POST.get("status")
-        if new_status in dict(CandidateChecklistTask.STATUS_CHOICES):
-            if new_status == "done" and task.requires_proof and not (
-                request.FILES.get("proof_file") or task.proof_file
-            ):
-                messages.error(
-                    request,
-                    _("This task requires proof of completion before it can be marked done."),
-                )
-            else:
-                if new_status != task.status:
-                    task.status_updated_at = timezone.now()
-                task.status = new_status
-                if request.FILES.get("proof_file"):
-                    task.proof_file = request.FILES["proof_file"]
-                if new_status == "done":
-                    task.completed_at = timezone.now()
-                elif task.completed_at:
-                    task.completed_at = None
-                task.save()
-                if new_status == "done":
-                    _maybe_mark_onboarding_complete(task.candidate_id)
+    if request.method == "POST" and can_manage_task(request, task):
+        ok, error = apply_status_change(task, request.POST.get("status"))
+        if not ok:
+            messages.error(request, error)
     return redirect("my-checklist-tasks")
 
 
 @login_required
 def checklist_task_edit_modal(request, pk):
     task = get_object_or_404(CandidateChecklistTask, pk=pk)
-    employee = getattr(request.user, "employee_get", None)
-    if not employee or task.assignee_id_id != employee.pk:
+    if not can_manage_task(request, task):
         return HttpResponse("")
     return render(
         request,
         "onboarding/task_templates/_checklist_task_edit_modal.html",
         {"task": task, "status_choices": CandidateChecklistTask.STATUS_CHOICES},
     )
-
-
-@login_required
-def checklist_task_remove_proof(request, pk):
-    """
-    Removes an already-attached proof file. If the task's status is
-    currently "done" and it still requires proof, dropping the file would
-    leave it in an inconsistent state, so the task is reverted to "todo" too.
-    """
-    task = get_object_or_404(CandidateChecklistTask, pk=pk)
-    employee = getattr(request.user, "employee_get", None)
-    if request.method == "POST" and employee and task.assignee_id_id == employee.pk:
-        if task.proof_file:
-            task.proof_file.delete(save=False)
-            task.proof_file = None
-            if task.status == "done" and task.requires_proof:
-                task.status = "todo"
-                task.completed_at = None
-            task.save()
-            messages.success(request, _("Proof removed"))
-    return redirect("my-checklist-tasks")

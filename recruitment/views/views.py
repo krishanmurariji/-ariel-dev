@@ -3776,8 +3776,8 @@ def _candidate_all_tasks(candidate):
     page - only the Employee Checklist step's tasks, since those are the
     only ones the candidate does themself. pre_joining/post_joining tasks
     are done by someone else about the candidate, so they don't belong
-    here (they still show up in the "Feedback Required Task" tab, and on
-    the internal candidate profile's Task tab, regardless of phase).
+    here - a candidate has no self-tracking-portal view of those at all;
+    HR can still see them on the internal candidate profile's Task tab.
     """
     return candidate.checklist_tasks.filter(
         phase="employee_checklist"
@@ -3804,17 +3804,6 @@ def _group_tasks_by_template(tasks):
             groups.append(group)
         group["tasks"].append(task)
     return groups
-
-
-def _candidate_feedback_tasks(candidate):
-    """
-    Onboarding checklist tasks a candidate should see on the "Feedback
-    Required Task" tab: only those the assignee has already marked Done,
-    and only where a candidate response was actually requested.
-    """
-    return candidate.checklist_tasks.filter(
-        requires_feedback=True, status="done"
-    ).order_by("-completed_at")
 
 
 @candidate_login_required
@@ -3861,52 +3850,10 @@ def candidate_self_status_tracking(request):
                 "interviews": interviews,
                 "all_tasks": all_tasks,
                 "my_task_groups": _group_tasks_by_template(all_tasks),
-                "checklist_tasks": _candidate_feedback_tasks(candidate),
                 "status_choices": CandidateChecklistTask.STATUS_CHOICES,
             },
         )
     return render(request, "404.html")
-
-
-@candidate_login_required
-def candidate_task_feedback(request, task_id):
-    """
-    Lets a candidate submit (or update) a comment on one of their own
-    checklist tasks - either a required response (task.requires_feedback,
-    only once the assignee has marked it Done) from the "Feedback Required
-    Task" tab, or a plain free-form update from the "My Task" tab. The
-    "satisfied" declaration only ever applies to the former, so it's left
-    untouched when the task doesn't require feedback.
-    """
-    candidate_id = request.session.get("candidate_id")
-    if not candidate_id:
-        return redirect("candidate-login/")
-    candidate = Candidate.objects.get(pk=candidate_id)
-
-    task = CandidateChecklistTask.objects.filter(
-        pk=task_id, candidate_id=candidate
-    ).first()
-    if task and request.method == "POST":
-        task.candidate_feedback = request.POST.get("candidate_feedback", "").strip()
-        if task.requires_feedback and task.status == "done":
-            task.candidate_satisfied = request.POST.get("candidate_satisfied") == "on"
-        task.candidate_feedback_at = timezone.now()
-        task.save()
-        messages.success(request, _("Your response has been submitted.."))
-
-    all_tasks = _candidate_all_tasks(candidate)
-    return render(
-        request,
-        "candidate/candidate_self_tracking.html",
-        {
-            "candidate": candidate,
-            "all_tasks": all_tasks,
-            "my_task_groups": _group_tasks_by_template(all_tasks),
-            "checklist_tasks": _candidate_feedback_tasks(candidate),
-            "status_choices": CandidateChecklistTask.STATUS_CHOICES,
-            "default_task_tab": "feedback-task",
-        },
-    )
 
 
 @candidate_login_required
@@ -3931,28 +3878,16 @@ def candidate_task_self_update(request, task_id):
     if task and request.method == "POST":
         new_status = request.POST.get("status")
         if new_status in dict(CandidateChecklistTask.STATUS_CHOICES):
-            if new_status == "done" and task.requires_proof and not (
-                request.FILES.get("proof_file") or task.proof_file
-            ):
-                messages.error(
-                    request,
-                    _(
-                        "This task requires proof of completion before it can be marked done."
-                    ),
-                )
-            else:
-                if new_status != task.status:
-                    task.status_updated_at = timezone.now()
-                task.status = new_status
-                if request.FILES.get("proof_file"):
-                    task.proof_file = request.FILES["proof_file"]
-                if new_status == "done":
-                    task.completed_at = timezone.now()
-                elif task.completed_at:
-                    task.completed_at = None
-                task.save()
-                if new_status == "done":
-                    _maybe_mark_onboarding_complete(candidate)
+            if new_status != task.status:
+                task.status_updated_at = timezone.now()
+            task.status = new_status
+            if new_status == "done":
+                task.completed_at = timezone.now()
+            elif task.completed_at:
+                task.completed_at = None
+            task.save()
+            if new_status == "done":
+                _maybe_mark_onboarding_complete(candidate)
 
     all_tasks = _candidate_all_tasks(candidate)
     return render(
@@ -3962,7 +3897,6 @@ def candidate_task_self_update(request, task_id):
             "candidate": candidate,
             "all_tasks": all_tasks,
             "my_task_groups": _group_tasks_by_template(all_tasks),
-            "checklist_tasks": _candidate_feedback_tasks(candidate),
             "status_choices": CandidateChecklistTask.STATUS_CHOICES,
             "default_task_tab": "my-task",
         },
@@ -4011,7 +3945,6 @@ def candidate_self_status_tracking_managers_view(request, cand_id):
                 "interviews": interviews,
                 "all_tasks": all_tasks,
                 "my_task_groups": _group_tasks_by_template(all_tasks),
-                "checklist_tasks": _candidate_feedback_tasks(candidate),
                 "status_choices": CandidateChecklistTask.STATUS_CHOICES,
             },
         )

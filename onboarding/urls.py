@@ -9,6 +9,7 @@ from django.utils.translation import gettext_lazy as _
 
 from onboarding import dashboard as on_dashboard
 from onboarding import stepper, task_templates, views
+from onboarding.cbv import checklist_tasks as cbv_checklist_tasks
 from onboarding.cbv import dashboard, onboarding_candidates, onboarding_view, pipeline
 from recruitment.cbv import candidates
 from recruitment.models import Candidate
@@ -406,6 +407,11 @@ urlpatterns = [
         name="task-template-list",
     ),
     path(
+        "task-templates/<int:pk>/view/",
+        task_templates.TaskTemplateViewModal.as_view(),
+        name="task-template-view-modal",
+    ),
+    path(
         "task-templates/create/",
         task_templates.TaskTemplateFormView.as_view(),
         name="task-template-create",
@@ -427,6 +433,26 @@ urlpatterns = [
         name="my-checklist-tasks",
     ),
     path(
+        "my-checklist-tasks/board/",
+        task_templates.my_checklist_tasks_board,
+        name="my-checklist-tasks-board",
+    ),
+    path(
+        "my-checklist-tasks/board/candidate/<int:pk>/",
+        cbv_checklist_tasks.CandidateChecklistTaskKanbanView.as_view(),
+        name="my-checklist-tasks-kanban",
+    ),
+    path(
+        "my-checklist-tasks/board/list/",
+        cbv_checklist_tasks.CandidateChecklistTaskListView.as_view(),
+        name="my-checklist-tasks-list",
+    ),
+    path(
+        "my-checklist-tasks/kanban-move-check/",
+        cbv_checklist_tasks.ChecklistTaskKanbanMoveCheck.as_view(),
+        name="onboarding-checklist-task-kanban-move",
+    ),
+    path(
         "my-checklist-tasks/<int:pk>/update/",
         task_templates.checklist_task_self_update,
         name="checklist-task-self-update",
@@ -435,16 +461,6 @@ urlpatterns = [
         "my-checklist-tasks/<int:pk>/edit-modal/",
         task_templates.checklist_task_edit_modal,
         name="checklist-task-edit-modal",
-    ),
-    path(
-        "my-checklist-tasks/<int:pk>/remove-proof/",
-        task_templates.checklist_task_remove_proof,
-        name="checklist-task-remove-proof",
-    ),
-    path(
-        "candidate-task/<int:pk>/toggle-satisfaction/",
-        stepper.candidate_task_toggle_satisfaction,
-        name="candidate-task-toggle-satisfaction",
     ),
 ]
 

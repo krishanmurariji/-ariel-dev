@@ -1,12 +1,12 @@
 """
 stepper.py
 
-Full-page "Configure Onboarding" stepper for a candidate: Pre-Joining
-Checklist -> Document Verification -> Job Profile -> Post-Joining Checklist
--> Roles & Responsibility -> Employee Checklist -> Offer Letter -> Finalize.
-Steps always run in this fixed order (no per-step skipping). Offer Letter
-sits right before Finalize since Finalize isn't a step of its own - just a
-recap of everything already filled in.
+Full-page "Configure Onboarding" stepper for a candidate: Document
+Verification -> Pre-Joining Checklist -> Job Profile -> Post-Joining
+Checklist -> Roles & Responsibility -> Employee Checklist -> Offer Letter
+-> Finalize. Steps always run in this fixed order (no per-step skipping).
+Offer Letter sits right before Finalize since Finalize isn't a step of its
+own - just a recap of everything already filled in.
 Employee Checklist tasks are always done by the candidate themself (no
 assignee to pick), unlike pre_joining/post_joining tasks which are done by
 someone else about the candidate. Steps render as
@@ -14,6 +14,8 @@ htmx fragments swapped into the page's right-hand content column; the
 left column (step list) persists across navigation, and any step can be
 jumped to directly, up to the furthest one actually reached.
 """
+
+from datetime import timedelta
 
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
@@ -42,8 +44,8 @@ from recruitment.models import Candidate, CandidateDocument, CandidateDocumentRe
 from recruitment.views.views import notify_candidate_of_document_rejection
 
 STEPS = [
-    ("pre_joining", _("Pre-Joining Checklist")),
     ("documents", _("Document Verification")),
+    ("pre_joining", _("Pre-Joining Checklist")),
     ("details", _("Job Profile")),
     ("post_joining", _("Post-Joining Checklist")),
     ("roles", _("Roles & Responsibility")),
@@ -188,13 +190,10 @@ def _task_groups(candidate, phase, template_ids):
         group["rows"].append(
             {
                 "task": task,
-                "assignee_id": existing_row.assignee_id_id if existing_row else None,
-                "requires_feedback": existing_row.requires_feedback if existing_row else False,
-                "is_mandatory": (
-                    existing_row.is_mandatory if existing_row else task.is_mandatory
-                ),
-                "requires_proof": (
-                    existing_row.requires_proof if existing_row else task.requires_proof
+                "assignee_id": (
+                    existing_row.assignee_id_id
+                    if existing_row
+                    else template.default_assignee_id_id
                 ),
             }
         )
@@ -208,7 +207,9 @@ def _checklist_context(candidate, phase):
         .values_list("template_task_id__template_id", flat=True)
         .distinct()
     )
-    form = ChecklistTemplateSelectForm(initial={"templates": existing_template_ids})
+    form = ChecklistTemplateSelectForm(
+        phase=phase, initial={"templates": existing_template_ids}
+    )
     return {
         "form": form,
         "phase": phase,
@@ -444,21 +445,40 @@ def _save_step(request, candidate, detail, step_key):
 def _save_checklist_tasks(request, candidate, phase):
     candidate_assigned = phase in CANDIDATE_ASSIGNED_PHASES
     task_ids = request.POST.getlist("task_id")
+    template_tasks = {
+        str(task.pk): task
+        for task in TaskTemplateTask.objects.filter(pk__in=task_ids).select_related(
+            "template_id"
+        )
+    }
+    assignee_ids = {
+        request.POST.get(f"assignee_{task_id}")
+        for task_id in task_ids
+        if request.POST.get(f"assignee_{task_id}")
+    }
+    employees = {
+        str(employee.pk): employee
+        for employee in Employee.objects.filter(pk__in=assignee_ids)
+    }
+
     unassigned = []
     for task_id in task_ids:
-        template_task = TaskTemplateTask.objects.filter(pk=task_id).first()
+        template_task = template_tasks.get(task_id)
         if not template_task:
             continue
-        requires_feedback = bool(request.POST.get(f"feedback_{task_id}"))
-        is_mandatory = bool(request.POST.get(f"mandatory_{task_id}"))
-        requires_proof = bool(request.POST.get(f"proof_{task_id}"))
         if candidate_assigned:
             assignee = None
         else:
             assignee_raw = request.POST.get(f"assignee_{task_id}") or None
-            assignee = Employee.objects.filter(pk=assignee_raw).first() if assignee_raw else None
+            assignee = employees.get(assignee_raw) if assignee_raw else None
             if not assignee:
                 unassigned.append(template_task.title)
+        due_offset = template_task.template_id.default_due_offset
+        due_date = (
+            candidate.joining_date + timedelta(days=due_offset)
+            if due_offset and candidate.joining_date
+            else None
+        )
         _task_obj, created = CandidateChecklistTask.objects.update_or_create(
             candidate_id=candidate,
             template_task_id=template_task,
@@ -466,9 +486,7 @@ def _save_checklist_tasks(request, candidate, phase):
             defaults={
                 "title": template_task.title,
                 "assignee_id": assignee,
-                "requires_feedback": requires_feedback,
-                "is_mandatory": is_mandatory,
-                "requires_proof": requires_proof,
+                "due_date": due_date,
             },
         )
         if created:
@@ -596,29 +614,11 @@ def _candidate_tasks_context(candidate):
 def candidate_tasks_tab(request, pk, **kwargs):
     """
     Candidate profile tab listing every CandidateChecklistTask for this
-    candidate - task, assignee, completion state, and (once Done, only when
-    Response Required is on) a toggle for whether the candidate confirmed
-    they're satisfied with how the task was handled.
+    candidate - task, assignee, and completion state.
     """
     candidate = get_object_or_404(Candidate, pk=pk)
     return render(
         request, "onboarding/candidate_tasks_tab.html", _candidate_tasks_context(candidate)
-    )
-
-
-@login_required
-@hx_request_required
-@permission_required("recruitment.change_candidate")
-def candidate_task_toggle_satisfaction(request, pk):
-    task = get_object_or_404(CandidateChecklistTask, pk=pk)
-    if request.method == "POST" and task.status == "done":
-        task.candidate_satisfied = not task.candidate_satisfied
-        task.candidate_feedback_at = timezone.now() if task.candidate_satisfied else None
-        task.save()
-    return render(
-        request,
-        "onboarding/_candidate_tasks_list.html",
-        _candidate_tasks_context(task.candidate_id),
     )
 
 

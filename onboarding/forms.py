@@ -864,32 +864,43 @@ class OnboardingDetailsForm(HorillaForm):
 class TaskTemplateForm(HorillaModelForm):
     """
     Task Group header - the tasks within it are managed via
-    TaskTemplateTaskFormSet on the same page.
+    TaskTemplateTaskFormSet on the same page. `phase` decides which
+    checklist step (Pre-Joining/Post-Joining/Employee Checklist) offers
+    this group for selection in the Configure Onboarding stepper.
+    `default_assignee_id`/`default_due_offset` pre-fill (but don't lock)
+    each task's assignee/due date once the group is picked there.
     """
 
     class Meta:
         model = TaskTemplate
-        fields = ["title", "description"]
+        fields = ["title", "phase", "default_assignee_id", "default_due_offset"]
         widgets = {
-            "description": forms.Textarea(attrs={"rows": 2}),
+            "phase": forms.Select(attrs={"class": "oh-select oh-select-2 w-100"}),
+            "default_assignee_id": forms.Select(attrs={"class": "oh-select oh-select-2 w-100"}),
+            "default_due_offset": forms.Select(attrs={"class": "oh-select oh-select-2 w-100"}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["default_assignee_id"].queryset = Employee.objects.filter(is_active=True)
+        self.fields["default_assignee_id"].required = False
+        self.fields["default_due_offset"].required = False
 
 
 class TaskTemplateTaskForm(forms.ModelForm):
     """
     The formset's trailing "extra" row is always present in the DOM, and
-    both the drag-reorder script (which stamps a fresh `sequence` number
-    into every row, including that empty one) and the "Mandatory" switch's
-    checked-by-default state make an untouched row look "changed" to the
-    formset - which would otherwise force its Title to be required just to
-    save an edit that didn't add a new task. Only `title`/`description` are
-    actual user-entered content, so those are what decide whether the row
-    counts as having data at all.
+    the drag-reorder script (which stamps a fresh `sequence` number into
+    every row, including that empty one) makes an untouched row look
+    "changed" to the formset - which would otherwise force its Title to
+    be required just to save an edit that didn't add a new task. Only
+    `title`/`description` are actual user-entered content, so those are
+    what decide whether the row counts as having data at all.
     """
 
     class Meta:
         model = TaskTemplateTask
-        fields = ["title", "description", "is_mandatory", "requires_proof", "sequence"]
+        fields = ["title", "description", "sequence"]
 
     def has_changed(self):
         title = (self["title"].value() or "").strip()
@@ -901,16 +912,18 @@ TaskTemplateTaskFormSet = forms.inlineformset_factory(
     TaskTemplate,
     TaskTemplateTask,
     form=TaskTemplateTaskForm,
-    fields=["title", "description", "is_mandatory", "requires_proof", "sequence"],
+    fields=["title", "description", "sequence"],
     widgets={
         "title": forms.TextInput(
             attrs={"class": "oh-input w-100", "placeholder": _("Task title")}
         ),
-        "description": forms.TextInput(
-            attrs={"class": "oh-input w-100", "placeholder": _("Description (optional)")}
+        "description": forms.Textarea(
+            attrs={
+                "class": "oh-input w-100 oh-autogrow",
+                "placeholder": _("Description (optional)"),
+                "rows": 1,
+            }
         ),
-        "is_mandatory": forms.CheckboxInput(attrs={"class": "oh-switch__checkbox"}),
-        "requires_proof": forms.CheckboxInput(attrs={"class": "oh-switch__checkbox"}),
         "sequence": forms.HiddenInput(attrs={"class": "task-sequence-input"}),
     },
     extra=1,
@@ -920,9 +933,10 @@ TaskTemplateTaskFormSet = forms.inlineformset_factory(
 
 class ChecklistTemplateSelectForm(HorillaForm):
     """
-    Shared by both the Pre-Joining and Post-Joining checklist steps -
+    Shared by the Pre-Joining, Post-Joining, and Employee Checklist steps -
     picking template(s) here drives which TaskTemplateTask rows get shown
-    for assignment.
+    for assignment. Only offers Task Groups whose own `phase` matches the
+    step it's rendered under.
     """
 
     templates = forms.ModelMultipleChoiceField(
@@ -931,6 +945,11 @@ class ChecklistTemplateSelectForm(HorillaForm):
         required=False,
         widget=forms.CheckboxSelectMultiple,
     )
+
+    def __init__(self, *args, phase=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if phase:
+            self.fields["templates"].queryset = TaskTemplate.objects.filter(phase=phase)
 
 
 class OnboardingDocumentRequestForm(HorillaForm):

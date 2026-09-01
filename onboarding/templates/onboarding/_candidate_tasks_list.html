@@ -45,26 +45,7 @@
           {% endif %}
         </div>
         {% endif %}
-        {% if task.candidate_feedback %}
-        <div class="oh-ctask-row__feedback">{{ task.candidate_feedback }}</div>
-        {% endif %}
       </div>
-      {% if task.requires_feedback %}
-      <div class="oh-ctask-row__side">
-        <button
-          type="button"
-          class="oh-ctask-row__thumb {% if task.candidate_satisfied %}oh-ctask-row__thumb--filled{% endif %} {% if task.status != 'done' %}oh-ctask-row__thumb--disabled{% endif %}"
-          title="{% if task.status != 'done' %}{% trans 'Available once this task is Done' %}{% elif task.candidate_satisfied %}{% trans 'Candidate satisfied - click to undo' %}{% else %}{% trans 'Mark candidate satisfied' %}{% endif %}"
-          {% if task.status == "done" %}
-          hx-post="{% url 'candidate-task-toggle-satisfaction' task.pk %}"
-          hx-target="#candidateTasksList"
-          hx-swap="outerHTML"
-          {% endif %}
-        >
-          <ion-icon name="thumbs-up-outline"></ion-icon>
-        </button>
-      </div>
-      {% endif %}
     </div>
     {% endfor %}
   </div>
