@@ -48,11 +48,11 @@ from horilla_views.generic.cbv.views import HorillaListView, HorillaTabView
 from onboarding.checklist_access import (
     apply_status_change,
     can_manage_task,
-    visible_candidates_queryset,
     visible_tasks_queryset,
 )
 from onboarding.filters import CandidateChecklistTaskFilter
 from onboarding.models import CandidateChecklistTask
+from recruitment.models import Candidate
 
 
 @method_decorator(login_required, name="dispatch")
@@ -107,21 +107,25 @@ class MyTasksCandidateTabsView(HorillaTabView):
     (CandidateChecklistTaskKanbanView).
 
     Any query-string filters present on this view (status, phase, assignee,
-    search) are automatically carried onto every tab's lazy-load URL by
-    HorillaTabView.get_context_data - no extra wiring needed for filters
-    to reach each candidate's board.
+    search, candidate) are also applied here - both to decide which
+    candidates get a tab at all (one with zero matching tasks is dropped
+    rather than showing an empty board) and to the badge count - not just
+    carried onto each tab's lazy-load URL by HorillaTabView.get_context_data
+    (which still happens too, filtering that candidate's board content once
+    opened).
     """
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         visible = visible_tasks_queryset(self.request)
-        candidates = visible_candidates_queryset(self.request).annotate(
+        visible = CandidateChecklistTaskFilter(
+            data=self.request.GET, queryset=visible, request=self.request
+        ).qs
+
+        candidate_ids = visible.values_list("candidate_id", flat=True).distinct()
+        candidates = Candidate.objects.filter(id__in=candidate_ids).annotate(
             total_tasks=Count("checklist_tasks", filter=Q(checklist_tasks__in=visible))
         ).order_by("name")
-
-        candidate_filter = self.request.GET.get("candidate")
-        if candidate_filter:
-            candidates = candidates.filter(pk=candidate_filter)
 
         self.tabs = [
             {
