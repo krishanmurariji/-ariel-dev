@@ -43,6 +43,9 @@
                   <a class="block w-full text-left px-3 py-1.5 hover:text-primary-600 transition duration-300" href="{% url 'task-template-edit' template.pk %}">{% trans "Edit" %}</a>
                 </li>
                 <li>
+                  <a class="block w-full text-left px-3 py-1.5 hover:text-primary-600 transition duration-300" href="{% url 'task-template-create' %}?duplicate={{ template.pk }}">{% trans "Duplicate" %}</a>
+                </li>
+                <li>
                   <a class="block w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50 transition duration-300" href="{% url 'task-template-delete' template.pk %}"
                     onclick="return confirm('{% trans "Delete this task group and all its tasks?" %}')">{% trans "Delete" %}</a>
                 </li>

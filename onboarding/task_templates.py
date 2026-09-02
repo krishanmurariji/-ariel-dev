@@ -22,7 +22,11 @@ from onboarding.checklist_access import (
     visible_candidates_queryset,
 )
 from onboarding.filters import CandidateChecklistTaskFilter
-from onboarding.forms import TaskTemplateForm, TaskTemplateTaskFormSet
+from onboarding.forms import (
+    TaskTemplateForm,
+    TaskTemplateTaskFormSet,
+    build_duplicate_task_formset,
+)
 from onboarding.models import CandidateChecklistTask, TaskTemplate
 
 
@@ -83,9 +87,37 @@ class TaskTemplateFormView(View):
 
     def get(self, request, pk=None):
         instance = TaskTemplate.objects.filter(pk=pk).first() if pk else None
-        form = TaskTemplateForm(instance=instance)
-        formset = TaskTemplateTaskFormSet(instance=instance, prefix="tasks")
-        _lock_saved_task_forms(formset)
+        duplicate_source = None
+        if not instance:
+            duplicate_source = TaskTemplate.objects.filter(
+                pk=request.GET.get("duplicate")
+            ).first()
+
+        if duplicate_source:
+            # A duplicate is a brand-new, unsaved Task Group prefilled from
+            # an existing one - title is unique on the model, so "Copy of
+            # ..." avoids a guaranteed clash on first save while still
+            # carrying over every other detail unchanged.
+            form = TaskTemplateForm(
+                initial={
+                    "title": _("Copy of %(title)s") % {"title": duplicate_source.title},
+                    "phase": duplicate_source.phase,
+                    "default_assignee_id": duplicate_source.default_assignee_id_id,
+                    "default_due_offset": duplicate_source.default_due_offset,
+                }
+            )
+            initial_tasks = list(
+                duplicate_source.tasks.order_by("sequence", "id").values(
+                    "title", "description", "sequence"
+                )
+            )
+            formset = build_duplicate_task_formset(len(initial_tasks) + 1)(
+                instance=None, initial=initial_tasks, prefix="tasks"
+            )
+        else:
+            form = TaskTemplateForm(instance=instance)
+            formset = TaskTemplateTaskFormSet(instance=instance, prefix="tasks")
+            _lock_saved_task_forms(formset)
         return render(
             request,
             "onboarding/task_templates/form.html",

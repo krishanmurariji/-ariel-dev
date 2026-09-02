@@ -908,27 +908,47 @@ class TaskTemplateTaskForm(forms.ModelForm):
         return bool(title or description)
 
 
+TASK_TEMPLATE_TASK_WIDGETS = {
+    "title": forms.TextInput(
+        attrs={"class": "oh-input w-100", "placeholder": _("Task title")}
+    ),
+    "description": forms.Textarea(
+        attrs={
+            "class": "oh-input w-100 oh-autogrow",
+            "placeholder": _("Description (optional)"),
+            "rows": 1,
+        }
+    ),
+    "sequence": forms.HiddenInput(attrs={"class": "task-sequence-input"}),
+}
+
 TaskTemplateTaskFormSet = forms.inlineformset_factory(
     TaskTemplate,
     TaskTemplateTask,
     form=TaskTemplateTaskForm,
     fields=["title", "description", "sequence"],
-    widgets={
-        "title": forms.TextInput(
-            attrs={"class": "oh-input w-100", "placeholder": _("Task title")}
-        ),
-        "description": forms.Textarea(
-            attrs={
-                "class": "oh-input w-100 oh-autogrow",
-                "placeholder": _("Description (optional)"),
-                "rows": 1,
-            }
-        ),
-        "sequence": forms.HiddenInput(attrs={"class": "task-sequence-input"}),
-    },
+    widgets=TASK_TEMPLATE_TASK_WIDGETS,
     extra=1,
     can_delete=False,
 )
+
+
+def build_duplicate_task_formset(extra):
+    """
+    Duplicating a Task Group needs one pre-filled extra row per source
+    task (plus one trailing blank row to add more) - inlineformset_factory
+    bakes `extra` in as a class attribute, so a fresh class is built per
+    duplicate request instead of mutating the shared TaskTemplateTaskFormSet.
+    """
+    return forms.inlineformset_factory(
+        TaskTemplate,
+        TaskTemplateTask,
+        form=TaskTemplateTaskForm,
+        fields=["title", "description", "sequence"],
+        widgets=TASK_TEMPLATE_TASK_WIDGETS,
+        extra=extra,
+        can_delete=False,
+    )
 
 
 class ChecklistTemplateSelectForm(HorillaForm):
