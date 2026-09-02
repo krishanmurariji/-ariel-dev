@@ -5,6 +5,7 @@ Used to register filter for onboarding models
 
 import django_filters
 from django import forms
+from django.utils.translation import gettext_lazy as _
 from django_filters import filters
 
 from base.filters import FilterSet
@@ -42,7 +43,9 @@ class CandidateChecklistTaskFilter(HorillaFilterSet):
     Filter set backing the My Tasks Kanban and List views.
     """
 
-    search = django_filters.CharFilter(method="search_by_title")
+    search = django_filters.CharFilter(
+        method="search_by_title", label=_("Search")
+    )
     candidate = django_filters.ModelChoiceFilter(
         field_name="candidate_id", queryset=Candidate.objects.all()
     )

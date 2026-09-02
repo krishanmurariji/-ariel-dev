@@ -179,6 +179,12 @@ class CandidateChecklistTaskListView(HorillaListView):
     bulk_update = False
     records_per_page = 25
 
+    # The candidate grouping is permanent (get_context_data forces it below,
+    # not a user choice), so it shouldn't show up as a removable "Field:
+    # Candidate" filter tag - real filters (status/phase/search/...) still
+    # show there normally.
+    filter_keys_to_remove = ["field"]
+
     columns = [
         (_("Task"), "title"),
         (_("Phase"), "get_phase_display"),
