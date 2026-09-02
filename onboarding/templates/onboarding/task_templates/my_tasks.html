@@ -64,6 +64,14 @@
   .oh-view-types { display: flex; list-style: none; margin: 0; padding: 0; gap: 4px; }
   .oh-btn--view-active { background: var(--oh-primary, #E54F38); color: #fff; }
 
+  /* The generic filter-tags bar's "Save filter" button assumes a page
+     that also offers a way to browse/re-apply saved filters later (the
+     generic nav's own filter panel does) - this page's filter panel
+     (filters.html) is custom and never built that out, so saving one
+     here is a dead end with no way back to it. Hide just the entry
+     point rather than build out that whole feature. */
+  #myTasksBoard #saveFilterBtn { display: none; }
+
   /* Shared by _status_pill.html - defined once here rather than in the
      partial, since it's rendered once per row/card. */
   .oh-status-pill {
