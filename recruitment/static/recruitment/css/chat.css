@@ -22,7 +22,7 @@ is a standalone document.
     border-bottom: 1px solid #ebebeb;
     flex: none;
 }
-.oh-chat-header i { color: #E54F38; }
+.oh-chat-header i { color: var(--oh-chat-accent, #E54F38); }
 .oh-chat-header h3 { margin: 0; font-size: 1rem; font-weight: 700; }
 .oh-chat-header span { font-size: 0.72rem; color: #6c757d; }
 
@@ -75,7 +75,7 @@ is a standalone document.
     white-space: pre-line;
 }
 .oh-chat-bubble-row--me .oh-chat-bubble {
-    background: #E54F38;
+    background: var(--oh-chat-accent, #E54F38);
     color: #fff;
     border-bottom-right-radius: 4px;
 }
@@ -175,11 +175,16 @@ is a standalone document.
     line-height: 1.4;
     outline: none;
     resize: none;
+    /* The browser's own rows="1" sizing comes in ~2px short of one line's
+       line-height + this padding + border, clipping the very top/bottom of
+       typed text before the input listener's autogrow ever runs. min-height
+       guarantees the box is always tall enough for a single line. */
+    min-height: calc(1.4em + 1.1rem + 2px);
     max-height: 140px;
     overflow-y: auto;
     transition: border-color .15s ease;
 }
-.oh-chat-textarea:focus { border-color: #E54F38; }
+.oh-chat-textarea:focus { border-color: var(--oh-chat-accent, #E54F38); }
 
 .oh-chat-send {
     flex: none;
@@ -187,7 +192,7 @@ is a standalone document.
     height: 38px;
     border-radius: 50%;
     border: none;
-    background: #E54F38;
+    background: var(--oh-chat-accent, #E54F38);
     color: #fff;
     display: flex;
     align-items: center;
@@ -195,5 +200,5 @@ is a standalone document.
     cursor: pointer;
     transition: background .15s ease;
 }
-.oh-chat-send:hover { background: #cf4530; }
+.oh-chat-send:hover { background: var(--oh-chat-accent-hover, #cf4530); }
 .oh-chat-send:disabled { background: #cbd0d6; cursor: not-allowed; }

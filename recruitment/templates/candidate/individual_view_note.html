@@ -1,5 +1,6 @@
-{% load i18n static recruitmentfilters %}
-<div class="oh-chat-card" style="height: 520px;">
+{% load i18n static recruitmentfilters horillafilters %}
+{% get_company as theme_obj %}
+<div class="oh-chat-card" style="height: 520px; --oh-chat-accent: {{ theme_obj.primary_600|default:'#E54F38' }}; --oh-chat-accent-hover: {{ theme_obj.primary_700|default:'#cf4530' }};">
     <div class="oh-chat-header">
         <i class="fas fa-comments"></i>
         <div>

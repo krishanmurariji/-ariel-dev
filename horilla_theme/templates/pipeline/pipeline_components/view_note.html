@@ -1,4 +1,5 @@
-{% load static i18n basefilters recruitmentfilters %}
+{% load static i18n basefilters recruitmentfilters horillafilters %}
+{% get_company as theme_obj %}
 
 {% if messages %}
     <script>
@@ -6,7 +7,7 @@
     </script>
 {% endif %}
 
-<div class="oh-chat-card" id="pipelineChatCard" style="height: calc(100vh - 90px);">
+<div class="oh-chat-card" id="pipelineChatCard" style="height: calc(100vh - 90px); --oh-chat-accent: {{ theme_obj.primary_600|default:'#E54F38' }}; --oh-chat-accent-hover: {{ theme_obj.primary_700|default:'#cf4530' }};">
     <div class="oh-chat-header">
         <a
             style="cursor: pointer"
