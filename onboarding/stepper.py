@@ -461,13 +461,26 @@ def _save_checklist_tasks(request, candidate, phase):
         for employee in Employee.objects.filter(pk__in=assignee_ids)
     }
 
+    candidate_own_employee = (
+        Employee.objects.filter(pk=_candidate_own_employee_id(candidate)).first()
+        if candidate_assigned
+        else None
+    )
+
     unassigned = []
     for task_id in task_ids:
         template_task = template_tasks.get(task_id)
         if not template_task:
             continue
         if candidate_assigned:
-            assignee = None
+            # Employee Checklist tasks are self-service - the stepper form
+            # never shows an assignee picker for this phase (_task_rows.html)
+            # - so the assignee is the candidate's own Employee record
+            # (once they have one), not left blank. That also makes these
+            # tasks actually show up in the candidate's own My Tasks once
+            # they're an employee, since visibility there is assignee-based
+            # (checklist_access.visible_tasks_queryset).
+            assignee = candidate_own_employee
         else:
             assignee_raw = request.POST.get(f"assignee_{task_id}") or None
             assignee = employees.get(assignee_raw) if assignee_raw else None
