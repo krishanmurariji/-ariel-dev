@@ -50,17 +50,6 @@
                 {% trans "Allocations" %}
               </a>
             </li>
-            <li>
-              <a
-                class="block w-full text-left px-3 py-1.5 hover:text-primary-600 transition duration-300"
-                href="{% url 'rec-candidate-update' candidate.id %}?onboarding=True&container=true"
-                hx-get="{% url 'rec-candidate-update' candidate.id %}?onboarding=True&container=true"
-                hx-target="#candidateMainContainer"
-                hx-swap="innerHTML"
-                hx-push-url="true">
-                {% trans "Edit" %}
-              </a>
-            </li>
             {% if perms.pms.add_feedback %}
             <li>
               <a
