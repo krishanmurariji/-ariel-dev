@@ -163,8 +163,10 @@ class ChecklistTaskKanbanMoveCheck(View):
 @method_decorator(login_required, name="dispatch")
 class CandidateChecklistTaskListView(HorillaListView):
     """
-    Table ("List") view of My Tasks - flat across all visible candidates,
-    filterable down to one via the shared filter panel.
+    Table ("List") view of My Tasks - one expandable accordion row per
+    candidate (like the Kanban tabs), each holding that candidate's tasks.
+    Always grouped by candidate_id (get_context_data below), so there is
+    no flat/ungrouped mode to fall back to here.
     """
 
     model = CandidateChecklistTask
@@ -174,13 +176,12 @@ class CandidateChecklistTaskListView(HorillaListView):
     records_per_page = 25
 
     columns = [
-        (_("Candidate"), "candidate_id__name"),
         (_("Task"), "title"),
         (_("Phase"), "get_phase_display"),
         (_("Assignee"), "assignee_id__get_full_name"),
-        (_("Due Date"), "due_date"),
         (_("Status"), "status_col"),
         (_("Last Updated"), "status_updated_at"),
+        (_("Due Date"), "due_date"),
     ]
 
     row_attrs = """
@@ -197,3 +198,13 @@ class CandidateChecklistTaskListView(HorillaListView):
         )
         self.queryset = queryset
         return queryset
+
+    def get_context_data(self, **kwargs):
+        # HorillaListView only renders the accordion/group_by_table.html
+        # template (rather than a flat table) when _saved_filters has a
+        # "field" key - forcing it here, rather than relying on the user
+        # picking "Group By: Candidate" from the generic nav dropdown,
+        # makes the candidate-accordion layout this view's only mode.
+        self._saved_filters = self._saved_filters.copy()
+        self._saved_filters["field"] = "candidate_id"
+        return super().get_context_data(**kwargs)
