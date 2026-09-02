@@ -282,9 +282,9 @@ urlpatterns = [
         name="note-delete-individual",
     ),
     path(
-        "candidate-can-view-note/<int:id>/",
-        views.candidate_can_view_note,
-        name="candidate-can-view-note",
+        "candidate-notes-mark-read/<int:cand_id>/",
+        views.candidate_notes_mark_read,
+        name="candidate-notes-mark-read",
     ),
     path("send-mail/<int:cand_id>/", views.form_send_mail, name="send-mail"),
     path("send-mail/", views.form_send_mail, name="send-mail"),

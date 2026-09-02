@@ -21,6 +21,17 @@
             <li>
               <a
                 class="block w-full text-left px-3 py-1.5 hover:text-primary-600 transition duration-300"
+                href="#"
+                hx-get="{{ candidate.get_view_note_url }}"
+                hx-target="#activitySidebar"
+                data-target="#activitySidebar"
+                onclick="event.preventDefault();$('#activitySidebar').addClass('oh-activity-sidebar--show')">
+                {% trans "Chat" %}
+              </a>
+            </li>
+            <li>
+              <a
+                class="block w-full text-left px-3 py-1.5 hover:text-primary-600 transition duration-300"
                 href="{% url 'email-send' %}?ids={{candidate.id}}"
                 onclick="event.preventDefault(); $('select[name=ids]').val('{{candidate.id}}');"
                 data-target="#addAttachments"

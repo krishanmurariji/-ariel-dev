@@ -22,6 +22,7 @@
         hx-post="{% url 'candidate-file-upload' document.id %}"
         hx-target="#objectCreateModalTarget"
         hx-encoding="multipart/form-data"
+        hx-on-htmx-after-request="reloadMessage();"
         class="oh-profile-section pt-3"
     >
         {% csrf_token %}

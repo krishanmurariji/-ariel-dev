@@ -288,12 +288,12 @@
                                 {% endif %}
                             {% endif %}
                             {% if perms.recruitment.view_stagenote or request.user.employee_get in stage.stage_managers.all %}
-                                <button type="button" hx-get='{% url "view-note" cand.id %}' title="{% trans " View Note" %}"
+                                <button type="button" hx-get='{% url "view-note" cand.id %}' title="{% trans " Chat" %}"
                                     hx-target="#activitySidebar" hx-swap="innerHTML" data-target="#activitySidebar"
                                     onclick="$('#activitySidebar').addClass('oh-activity-sidebar--show')"
                                     hx-swap="innerHTML" class="oh-btn oh-btn--light oh-activity-sidebar__open"
                                     style="flex: 1 0 auto; width:20px;height: 40.68px; padding: 0;">
-                                    <ion-icon name="newspaper-outline"></ion-icon>
+                                    <ion-icon name="chatbubbles-outline"></ion-icon>
                                 </button>
                             {% endif %}
                             {% if check_candidate_self_tracking %}

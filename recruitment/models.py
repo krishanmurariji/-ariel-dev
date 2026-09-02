@@ -1303,6 +1303,9 @@ class Candidate(HorillaModel):
             return self.profile.url
         return static("images/ui/default_avatar.jpg")
 
+    def unread_chat_count(self):
+        return self.stagenote_set.filter(seen_by_candidate=False).count()
+
     def get_company(self):
         """
         This method is used to return the company
@@ -1785,9 +1788,17 @@ class StageNote(HorillaModel):
         Employee, on_delete=models.CASCADE, null=True, blank=True
     )
     candidate_can_view = models.BooleanField(default=False)
+    # Set at send time (True for a candidate's own message, False for an
+    # employee's) rather than defaulting purely on the field - lets the
+    # candidate-facing unread badge count real unseen employee messages
+    # without a per-viewer read-receipt table.
+    seen_by_candidate = models.BooleanField(default=False)
     objects = HorillaCompanyManager(
         related_company_field="candidate_id__recruitment_id__company_id"
     )
+
+    class Meta:
+        ordering = ["created_at", "id"]
 
     def __str__(self) -> str:
         return f"{self.description}"
@@ -1797,6 +1808,11 @@ class StageNote(HorillaModel):
             return self.updated_by
         else:
             return self.candidate_id
+
+    def sender_first_name(self):
+        if self.updated_by:
+            return self.updated_by.employee_first_name
+        return self.candidate_id.name.split()[0] if self.candidate_id.name else ""
 
 
 class RecruitmentSurvey(HorillaModel):
@@ -2130,6 +2146,11 @@ class InterviewSchedule(HorillaModel):
     Interview Scheduling Model
     """
 
+    interview_modes = [
+        ("online", _("Online Interview")),
+        ("offline", _("Offline Interview")),
+    ]
+
     candidate_id = models.ForeignKey(
         Candidate,
         verbose_name=_("Candidate"),
@@ -2139,6 +2160,17 @@ class InterviewSchedule(HorillaModel):
     employee_id = models.ManyToManyField(Employee, verbose_name=_("Interviewer"))
     interview_date = models.DateField(verbose_name=_("Interview Date"))
     interview_time = models.TimeField(verbose_name=_("Interview Time"))
+    interview_mode = models.CharField(
+        max_length=10,
+        choices=interview_modes,
+        default="online",
+        verbose_name=_("Interview Mode"),
+        help_text=_(
+            "Online interviews get a meeting link (Google Meet/Teams). "
+            "Offline interviews are still added to the calendar and "
+            "notified by mail, but without a meeting link."
+        ),
+    )
     description = models.TextField(
         verbose_name=_("Description"),
         blank=True,

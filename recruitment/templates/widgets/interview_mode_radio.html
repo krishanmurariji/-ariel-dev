@@ -1,0 +1,16 @@
+{% for group, options, index in widget.optgroups %}
+    {% for option in options %}
+        <div class="oh-radio" style="display:inline-block; padding-left:24px; margin-right:24px;">
+            <input
+                type="radio"
+                name="{{ widget.name }}"
+                value="{{ option.value }}"
+                id="{{ option.attrs.id }}"
+                {% if option.attrs.checked %}checked{% endif %}
+                {% if option.attrs.disabled %}disabled{% endif %}
+            >
+            <span class="oh-radio__checkmark"></span>
+            <label class="oh-label" for="{{ option.attrs.id }}">{{ option.label }}</label>
+        </div>
+    {% endfor %}
+{% endfor %}

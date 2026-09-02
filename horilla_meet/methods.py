@@ -59,13 +59,14 @@ def create_calendar_event(request, data):
             "timeZone": settings.TIME_ZONE,
         },
         "attendees": [{"email": mail} for mail in attendees],
-        "conferenceData": {
+    }
+    if data.get("is_online", True):
+        event["conferenceData"] = {
             "createRequest": {
                 "requestId": str(uuid.uuid4()),
                 "conferenceSolutionKey": {"type": "hangoutsMeet"},
             }
-        },
-    }
+        }
 
     try:
         created_event = (
@@ -115,6 +116,17 @@ def update_calendar_event(request, data, event_id=None):
     }
     event["attendees"] = [{"email": attendee} for attendee in attendees]
 
+    if data.get("is_online", True):
+        if "conferenceData" not in event:
+            event["conferenceData"] = {
+                "createRequest": {
+                    "requestId": str(uuid.uuid4()),
+                    "conferenceSolutionKey": {"type": "hangoutsMeet"},
+                }
+            }
+    else:
+        event.pop("conferenceData", None)
+
     try:
         updated_event = (
             service.events()
@@ -122,6 +134,7 @@ def update_calendar_event(request, data, event_id=None):
                 calendarId="primary",
                 eventId=event_id,
                 body=event,
+                conferenceDataVersion=1,
                 sendUpdates="all",
             )
             .execute()

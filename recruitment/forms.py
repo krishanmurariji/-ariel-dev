@@ -1650,6 +1650,7 @@ class ScheduleInterviewForm(BaseModelForm):
         "candidate_id": 12,
         "description": 12,
         "employee_id": 12,
+        "interview_mode": 12,
     }
 
     verbose_name = "Schedule Interview"
@@ -1664,6 +1665,13 @@ class ScheduleInterviewForm(BaseModelForm):
         self.fields["interview_date"].widget = forms.DateInput(
             attrs={"type": "date", "class": "oh-input w-100"}
         )
+        self.fields["interview_mode"].widget = forms.RadioSelect(
+            choices=InterviewSchedule.interview_modes
+        )
+        self.fields["interview_mode"].widget.template_name = (
+            "widgets/interview_mode_radio.html"
+        )
+        self.fields["interview_mode"].initial = "online"
         if self.instance.pk:
             # Update mode: keep this permissive and normalize manually in clean()
             # so unchanged browser values do not fail with "Enter a valid time".

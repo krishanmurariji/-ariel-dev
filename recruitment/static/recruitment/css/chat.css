@@ -1,0 +1,199 @@
+/*
+Shared chat UI - used by the three surfaces that all read/write StageNote:
+the candidate self-tracking portal, the HR-facing candidate profile "Chat"
+tab, and the recruiter pipeline "Chat" modal. Linked once from
+templates/index.html for the two HR-facing (htmx-fragment) surfaces, and
+separately from candidate_self_tracking.html's own <head> since that page
+is a standalone document.
+*/
+
+.oh-chat-card {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+}
+
+.oh-chat-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #ebebeb;
+    flex: none;
+}
+.oh-chat-header i { color: #E54F38; }
+.oh-chat-header h3 { margin: 0; font-size: 1rem; font-weight: 700; }
+.oh-chat-header span { font-size: 0.72rem; color: #6c757d; }
+
+.oh-chat-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 1rem 1.1rem;
+    background: #fbfbfb;
+}
+
+/* The bubble rows are children of #chatMessages (a plain wrapper div, kept
+   separate from .oh-chat-body so htmx's 10s poll can swap just this part)
+   - it has to be the flex column, not .oh-chat-body, or align-self on the
+   rows below has no flex parent to act on and every bubble silently falls
+   back to block-level full-width behavior instead of shrink-wrapping. */
+.oh-chat-messages { display: flex; flex-direction: column; gap: 12px; }
+
+.oh-chat-date-divider {
+    display: flex;
+    justify-content: center;
+    align-self: stretch;
+    margin: 4px 0;
+}
+.oh-chat-date-divider span {
+    background: #eef0f2;
+    color: #6c757d;
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 3px 12px;
+    border-radius: 999px;
+}
+
+.oh-chat-bubble-row { display: flex; flex-direction: column; max-width: 80%; }
+.oh-chat-bubble-row--me { align-self: flex-end; align-items: flex-end; }
+.oh-chat-bubble-row--other { align-self: flex-start; align-items: flex-start; }
+
+.oh-chat-bubble {
+    position: relative;
+    padding: 0.8rem 0.8rem;
+    border-radius: 14px;
+    font-size: 0.83rem;
+    line-height: 1.3;
+    word-break: break-word;
+    /* pre-line (not pre-wrap): {{ note.description }} sits inside heavily
+       indented template markup, and pre-wrap renders that indentation as
+       literal spaces, inflating a short message's intrinsic width to match
+       the template's whitespace instead of its own text. pre-line collapses
+       runs of spaces/tabs while still preserving real newlines the sender
+       typed (Shift+Enter). */
+    white-space: pre-line;
+}
+.oh-chat-bubble-row--me .oh-chat-bubble {
+    background: #E54F38;
+    color: #fff;
+    border-bottom-right-radius: 4px;
+}
+.oh-chat-bubble-row--other .oh-chat-bubble {
+    background: #eef0f2;
+    color: #222;
+    border-bottom-left-radius: 4px;
+}
+
+.oh-chat-bubble-files { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.oh-chat-bubble-files a {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.76rem;
+    color: inherit;
+    text-decoration: underline;
+    opacity: 0.9;
+}
+.oh-chat-bubble-files a:hover { opacity: 1; }
+
+.oh-chat-file-link { display: inline-flex; align-items: center; gap: 4px; }
+.oh-chat-file-link ion-icon[title] { font-size: 14px; opacity: 0.6; cursor: pointer; }
+.oh-chat-file-link ion-icon[title]:hover { opacity: 1; color: #dc3545; }
+
+.oh-chat-typing {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    align-self: flex-start;
+    background: #eef0f2;
+    border-radius: 14px;
+    padding: 0.6rem 0.9rem;
+}
+.oh-chat-typing span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #9aa0a6;
+    animation: oh-chat-typing-bounce 1.2s infinite ease-in-out;
+}
+.oh-chat-typing span:nth-child(2) { animation-delay: 0.15s; }
+.oh-chat-typing span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes oh-chat-typing-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+    30% { transform: translateY(-4px); opacity: 1; }
+}
+
+.oh-chat-meta {
+    font-size: 0.68rem;
+    color: #9aa0a6;
+    margin-top: 3px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+}
+
+.oh-chat-delete {
+    border: none;
+    background: transparent;
+    color: inherit;
+    opacity: 0.55;
+    font-size: 0.68rem;
+    cursor: pointer;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+}
+.oh-chat-delete:hover { opacity: 1; color: #dc3545; }
+
+.oh-chat-empty {
+    margin: auto;
+    text-align: center;
+    opacity: 0.6;
+}
+.oh-chat-empty img { width: 130px; margin-bottom: 0.75rem; }
+.oh-chat-empty h6 { font-size: 0.82rem; color: #6c757d; }
+
+.oh-chat-input {
+    flex: none;
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    padding: 0.85rem 1rem;
+    border-top: 1px solid #ebebeb;
+    background: #fff;
+}
+
+.oh-chat-textarea {
+    flex: 1;
+    border: 1px solid #e4e6ef;
+    border-radius: 18px;
+    padding: 0.55rem 1rem;
+    font-size: 0.83rem;
+    font-family: inherit;
+    line-height: 1.4;
+    outline: none;
+    resize: none;
+    max-height: 140px;
+    overflow-y: auto;
+    transition: border-color .15s ease;
+}
+.oh-chat-textarea:focus { border-color: #E54F38; }
+
+.oh-chat-send {
+    flex: none;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: #E54F38;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background .15s ease;
+}
+.oh-chat-send:hover { background: #cf4530; }
+.oh-chat-send:disabled { background: #cbd0d6; cursor: not-allowed; }

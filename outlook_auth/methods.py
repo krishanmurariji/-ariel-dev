@@ -36,7 +36,7 @@ def get_azure_api(request):
 
 def _teams_event_body(data):
     attendees = data["attendees"]
-    return {
+    body = {
         "subject": data["title"],
         "body": {"contentType": "HTML", "content": data["description"]},
         "start": {
@@ -53,9 +53,11 @@ def _teams_event_body(data):
             {"emailAddress": {"address": mail}, "type": "required"}
             for mail in attendees
         ],
-        "isOnlineMeeting": True,
-        "onlineMeetingProvider": "teamsForBusiness",
     }
+    if data.get("is_online", True):
+        body["isOnlineMeeting"] = True
+        body["onlineMeetingProvider"] = "teamsForBusiness"
+    return body
 
 
 def create_teams_calendar_event(api, data):

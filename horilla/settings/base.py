@@ -38,6 +38,11 @@ CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
 THEME_APP = "horilla_theme"
 
 INSTALLED_APPS = [
+    # daphne must be the first app for Channels to transparently take over
+    # `manage.py runserver` with an ASGI-aware dev server - without this,
+    # runserver stays on Django's default WSGI dev server and websocket
+    # connections would fail even though ASGI_APPLICATION is configured.
+    "daphne",
     # Default Django apps
     "django.contrib.admin",
     "django.contrib.auth",
@@ -47,6 +52,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.sites",
     # Third-party apps
+    "channels",
     "notifications",
     "mathfilters",
     "corsheaders",
@@ -256,6 +262,29 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "horilla.wsgi.application"
+ASGI_APPLICATION = "horilla.asgi.application"
+
+# Channel layer for the chat consumer (recruitment/consumers.py). Defaults
+# to the in-memory backend, which needs no extra infrastructure and works
+# correctly for a single-process dev server (manage.py runserver). It only
+# broadcasts within that one process, though - a production deployment
+# running more than one worker process (or more than one machine) needs a
+# shared backend instead, e.g. `channels_redis.core.RedisChannelLayer`
+# pointed at a real Redis instance. Set CHANNEL_LAYER_BACKEND=redis (and
+# CHANNEL_LAYER_REDIS_URL) once that's available, rather than editing this.
+if env("CHANNEL_LAYER_BACKEND", default="inmemory") == "redis":
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [env("CHANNEL_LAYER_REDIS_URL", default="redis://localhost:6379/0")],
+            },
+        },
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"},
+    }
 
 # ========================================
 # INTERNATIONALIZATION

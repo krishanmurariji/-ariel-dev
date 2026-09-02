@@ -114,6 +114,7 @@ from recruitment.forms import (
 )
 from onboarding.models import CandidateChecklistTask
 from recruitment.methods import recruitment_manages
+from recruitment.realtime import broadcast_new_message
 from recruitment.models import (
     Candidate,
     CandidateDocument,
@@ -1067,7 +1068,7 @@ def view_note(request, cand_id):
         id : candidate instance id
     """
     candidate_obj = Candidate.objects.get(id=cand_id)
-    notes = candidate_obj.stagenote_set.all().order_by("-id")
+    notes = candidate_obj.stagenote_set.all().order_by("id")
     return render(
         request,
         "pipeline/pipeline_components/view_note.html",
@@ -1094,9 +1095,16 @@ def add_note(request, pk=None):
             note.candidate_id = candidate
             note.stage_id = candidate.stage_id
             note.updated_by = request.user.employee_get
+            # No more per-message visibility toggle - every message is a
+            # normal two-way chat message, visible to the candidate as soon
+            # as it's sent (matches candidate_add_notes, which already
+            # always sets this for candidate-authored messages).
+            note.candidate_can_view = True
+            note.seen_by_candidate = note.updated_by is None
             note.save()
-            note.stage_files.set(attachment_ids)
-            messages.success(request, _("Note added successfully.."))
+            broadcast_new_message(candidate.id)
+            # No success toast here - the sent message appearing in the
+            # chat itself is the confirmation, like a normal chat app.
     candidate_obj = Candidate.objects.get(id=pk)
     return render(
         request,
@@ -1124,12 +1132,16 @@ def create_note(request, cand_id=None):
             note.candidate_id = candidate
             note.stage_id = candidate.stage_id
             note.updated_by = request.user.employee_get
+            # No more per-message visibility toggle - see add_note's
+            # matching comment above.
+            note.candidate_can_view = True
+            note.seen_by_candidate = note.updated_by is None
             note.save()
-            note.stage_files.set(attachment_ids)
-            messages.success(request, _("Note added successfully.."))
+            broadcast_new_message(candidate.id)
+            # No success toast here - see add_note's matching comment above.
             return redirect("view-note", cand_id=cand_id)
     candidate_obj = Candidate.objects.get(id=cand_id)
-    notes = candidate_obj.stagenote_set.all().order_by("-id")
+    notes = candidate_obj.stagenote_set.all().order_by("id")
     return render(
         request,
         "pipeline/pipeline_components/view_note.html",
@@ -1268,15 +1280,43 @@ def delete_individual_note_file(request, id):
     return HttpResponse(script)
 
 
-@login_required
+@candidate_login_required
 @hx_request_required
-@manager_can_enter(perm="recruitment.add_stagenote")
-def candidate_can_view_note(request, id):
-    note = StageNote.objects.filter(id=id)
-    note.update(candidate_can_view=not note.first().candidate_can_view)
-
-    messages.success(request, _("Candidate view status updated"))
-    return redirect("view-note", cand_id=note.first().candidate_id.id)
+def candidate_notes_mark_read(request, cand_id):
+    """
+    Marks every chat message currently visible to this candidate as seen -
+    called when the candidate opens the Chat tab, so the mobile bottom
+    navbar's badge reflects real unread count instead of total messages.
+    """
+    candidate_session_id = request.session.get("candidate_id")
+    is_this_candidate = candidate_session_id == cand_id
+    is_authorized_employee = False
+    if request.user.is_authenticated:
+        employee = Employee.objects.filter(employee_user_id=request.user).first()
+        is_authorized_employee = request.user.has_perm(
+            "recruitment.view_candidate"
+        ) or (
+            employee
+            and (
+                employee.recruitment_set.filter(candidate__id=cand_id).exists()
+                or employee.stage_set.filter(candidate=cand_id).exists()
+            )
+        )
+    if not (is_this_candidate or is_authorized_employee):
+        return HttpResponse("")
+    StageNote.objects.filter(candidate_id=cand_id, seen_by_candidate=False).update(
+        seen_by_candidate=True
+    )
+    # Drain (without displaying) any toast still sitting in the session
+    # from an older request - Django's messages framework holds onto a
+    # queued message until some template actually renders {% if messages
+    # %}, which on this page can otherwise be an unrelated later action
+    # (e.g. a task update) that has nothing to do with chat. Opening the
+    # Chat tab - the one server round trip a mobile menu switch makes - is
+    # a good choke point to make sure nothing chat-related lingers that
+    # long.
+    list(messages.get_messages(request))
+    return HttpResponse("")
 
 
 @login_required
@@ -3498,11 +3538,59 @@ def _interview_meeting_title(interview):
     return f"{stage_name} - {candidate.name}"
 
 
-_INTERVIEW_MEETING_HEADINGS = {
-    "scheduled": _("Online Interview Scheduled"),
-    "rescheduled": _("Online Interview Re-scheduled"),
-    "cancelled": _("Online Interview Cancelled"),
+_INTERVIEW_MEETING_STATUS_LABELS = {
+    "scheduled": _("Scheduled"),
+    "rescheduled": _("Re-scheduled"),
+    "cancelled": _("Cancelled"),
 }
+
+def _company_address_html(company):
+    """
+    Formats a Company's address/city/state/zip/country into a readable,
+    multi-line block for the offline-interview invite's "Venue" section.
+    Skips any part that isn't filled in on the Company record.
+    """
+    if not company:
+        return ""
+    address_line = escape(company.address) if company.address else ""
+    city_state = ", ".join(
+        escape(part) for part in (company.city, company.state) if part
+    )
+    if company.zip:
+        city_state = f"{city_state} - {escape(company.zip)}" if city_state else escape(company.zip)
+    country_line = escape(company.country) if company.country else ""
+    lines = [line for line in (address_line, city_state, country_line) if line]
+    return "<br>".join(lines)
+
+
+# Shown in the online-interview invite, above the closing "Regards" line -
+# not relevant for an offline (in-person) interview, so it's left out there.
+_INTERVIEW_GUIDELINES = [
+    _(
+        "Please ensure you have a stable and reliable internet connection "
+        "before joining the interview."
+    ),
+    _(
+        "We recommend joining the interview 5–10 minutes before the "
+        "scheduled time to allow time for any technical checks."
+    ),
+    _(
+        "Please use a laptop or desktop computer with a working camera "
+        "and microphone, if possible."
+    ),
+    _(
+        "Kindly check that your camera and microphone are functioning "
+        "properly before the interview begins."
+    ),
+    _(
+        "Please choose a quiet, well-lit, and distraction-free "
+        "environment to ensure a smooth conversation."
+    ),
+    _(
+        "We request that you keep your camera switched on throughout the "
+        "interview, unless otherwise instructed by the interviewer."
+    ),
+]
 
 
 def _interview_meeting_description(interview, status):
@@ -3515,9 +3603,17 @@ def _interview_meeting_description(interview, status):
     the event, so the "Canceled" notice Outlook/Google send on delete
     doesn't show whatever heading ("Scheduled"/"Re-scheduled") happened to
     be last saved.
+
+    Online interviews get an "Interview Guidelines" section above the
+    closing signature; offline interviews get a "Venue" row in the details
+    table instead (the company's address), since the guidelines
+    (camera/mic/internet checks) don't apply to an in-person interview.
     """
     candidate = interview.candidate_id
-    heading = _INTERVIEW_MEETING_HEADINGS[status]
+    is_online = interview.interview_mode != "offline"
+    company_obj = candidate.recruitment_id.company_id if candidate.recruitment_id else None
+    prefix = _("Online Interview") if is_online else _("Interview")
+    heading = f"{prefix} {_INTERVIEW_MEETING_STATUS_LABELS[status]}"
     when = (
         f"{interview.interview_date.strftime('%b %d, %Y')} "
         f"{interview.interview_time.strftime('%I:%M %p')}"
@@ -3537,6 +3633,10 @@ def _interview_meeting_description(interview, status):
         (_("Interview Date & Time"), when),
         (_("Panel Members"), panel),
     ]
+    if not is_online:
+        address_html = _company_address_html(company_obj)
+        if address_html:
+            rows.append((_("Venue"), address_html))
     # Google Calendar/Gmail strip `style` attributes from an invite's
     # description, which is why an inline-CSS table renders as plain,
     # borderless text there (Outlook keeps the CSS fine either way) -
@@ -3547,9 +3647,14 @@ def _interview_meeting_description(interview, status):
         for label, value in rows
     )
     extra_note = f"<p>{escape(interview.description)}</p>" if interview.description else ""
-    company = escape(
-        str(candidate.recruitment_id.company_id) if candidate.recruitment_id else ""
-    )
+    guidelines_html = ""
+    if is_online:
+        guidelines_items = "".join(f"<li>{item}</li>" for item in _INTERVIEW_GUIDELINES)
+        guidelines_html = (
+            f"<p><b>{_('Interview Guidelines')}</b></p>"
+            f"<ul>{guidelines_items}</ul>"
+        )
+    company = escape(str(company_obj) if company_obj else "")
     return (
         f"<div>"
         f"<h2>{heading}</h2>"
@@ -3557,7 +3662,8 @@ def _interview_meeting_description(interview, status):
         f"<p>{_('Please check the interview details below:')}</p>"
         f'<table border="1" cellpadding="8" cellspacing="0">{row_html}</table>'
         f"{extra_note}"
-        f"<p>{_('Regards,')}<br>{company} {_('Hiring Team')}</p>"
+        f"{guidelines_html}"
+        f"<p>{_('Warm Regards,')}<br>{_('Talent Acquisition Team')}<br>{company}</p>"
         f"</div>"
     )
 
@@ -3576,6 +3682,12 @@ def generate_interview_meeting(interview, request):
     (recruitment.cbv.interview.InterviewForm.form_valid) - callers decide
     how to surface the result dict; this never raises, since a meeting-link
     failure must never be treated as an interview-scheduling failure.
+
+    Always creates/updates the calendar event (so it's added to the
+    interviewers'/candidate's calendar and they're notified by mail) even
+    for interview.interview_mode == "offline" - only the video meeting
+    link (Google Meet conferenceData / Teams onlineMeeting) is skipped for
+    those.
 
     Returns a dict, one of:
       {"success": True, "created": bool}
@@ -3597,6 +3709,7 @@ def generate_interview_meeting(interview, request):
     start_time = datetime.combine(interview.interview_date, interview.interview_time)
     attendees = [employee.get_mail() for employee in interview.employee_id.all()]
     attendees.append(interview.candidate_id.get_email())
+    is_online = interview.interview_mode != "offline"
 
     if provider == "teams":
         if not django_apps.is_installed("outlook_auth"):
@@ -3633,6 +3746,7 @@ def generate_interview_meeting(interview, request):
                     "start_time": start_time,
                     "description": description,
                     "attendees": attendees,
+                    "is_online": is_online,
                 },
             )
             meeting.refresh_from_db()
@@ -3640,7 +3754,7 @@ def generate_interview_meeting(interview, request):
                 InterviewOutlookMeetingLink.objects.create(
                     interview=interview, meeting=meeting
                 )
-            return {"success": True, "created": created}
+            return {"success": True, "created": created, "is_online": is_online}
         except Exception as e:
             logger.error(f"Error creating/updating Teams Meeting: {e}")
             return {"error": str(e), "status": 500}
@@ -3675,12 +3789,13 @@ def generate_interview_meeting(interview, request):
                 "start_time": start_time,
                 "description": description,
                 "attendees": attendees,
+                "is_online": is_online,
             },
         )
         meeting.refresh_from_db()
         if not link:
             InterviewMeetingLink.objects.create(interview=interview, meeting=meeting)
-        return {"success": True, "created": created}
+        return {"success": True, "created": created, "is_online": is_online}
     except Exception as e:
         logger.error(f"Error creating/updating Google Meeting: {e}")
         return {"error": str(e), "status": 500}
@@ -3851,6 +3966,12 @@ def candidate_self_status_tracking(request):
                 "all_tasks": all_tasks,
                 "my_task_groups": _group_tasks_by_template(all_tasks),
                 "status_choices": CandidateChecklistTask.STATUS_CHOICES,
+                # The page pushes ?tab=<tab> into the address bar whenever
+                # the candidate switches tabs (see activateMainTab() in the
+                # template), purely so a real browser refresh lands back on
+                # the tab they were on instead of always defaulting to
+                # Scheduled Interviews.
+                "default_task_tab": request.GET.get("tab", "schedule-interview"),
             },
         )
     return render(request, "404.html")
@@ -3946,6 +4067,12 @@ def candidate_self_status_tracking_managers_view(request, cand_id):
                 "all_tasks": all_tasks,
                 "my_task_groups": _group_tasks_by_template(all_tasks),
                 "status_choices": CandidateChecklistTask.STATUS_CHOICES,
+                # The page pushes ?tab=<tab> into the address bar whenever
+                # the candidate switches tabs (see activateMainTab() in the
+                # template), purely so a real browser refresh lands back on
+                # the tab they were on instead of always defaulting to
+                # Scheduled Interviews.
+                "default_task_tab": request.GET.get("tab", "schedule-interview"),
             },
         )
     return render(request, "404.html")
@@ -4852,9 +4979,10 @@ def candidate_add_notes(request, cand_id):
             note.stage_id = candidate.stage_id
             note.updated_by = updated_by
             note.candidate_can_view = True
+            note.seen_by_candidate = updated_by is None
             note.save()
-            note.stage_files.set(attachment_ids)
-            messages.success(request, _("Note added successfully.."))
+            broadcast_new_message(candidate.id)
+            # No success toast here - see add_note's matching comment above.
             with contextlib.suppress(Exception):
                 managers = candidate.recruitment_id.recruitment_managers.all()
                 stage_managers = candidate.stage_id.stage_managers.all()

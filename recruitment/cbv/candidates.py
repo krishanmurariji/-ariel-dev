@@ -222,6 +222,17 @@ class ListCandidates(HorillaListView):
              """,
         },
         {
+            "action": _("Chat"),
+            "icon": "chatbubbles-outline",
+            "attrs": """
+                class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100 oh-activity-sidebar__open"
+                hx-get="{get_view_note_url}"
+                data-target="#activitySidebar"
+                hx-target="#activitySidebar"
+                onclick="event.stopPropagation();$('#activitySidebar').addClass('oh-activity-sidebar--show')"
+            """,
+        },
+        {
             "action": _("Archive"),
             "accessibility": "recruitment.cbv.accessibility.archive_status",
             "icon": "archive",
@@ -599,6 +610,16 @@ class CardCandidates(HorillaCardView):
             "accessibility": "recruitment.cbv.accessibility.check_candidate_self_tracking",
             "attrs": """
                 href="{get_self_tracking_url}"
+                class="oh-dropdown__link"
+            """,
+        },
+        {
+            "action": _("Chat"),
+            "attrs": """
+                hx-get="{get_view_note_url}"
+                data-target="#activitySidebar"
+                hx-target="#activitySidebar"
+                onclick="event.stopPropagation();$('#activitySidebar').addClass('oh-activity-sidebar--show')"
                 class="oh-dropdown__link"
             """,
         },

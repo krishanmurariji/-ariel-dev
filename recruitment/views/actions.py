@@ -166,18 +166,39 @@ def note_delete(request, note_id):
 
 @candidate_login_required
 @hx_request_required
-# @manager_can_enter(perm="recruitment.delete_stagenote")
 def note_delete_individual(request, note_id):
     """
-    This method is used to delete the stage note
+    This method is used to delete a chat message (StageNote). Only a user
+    with recruitment.delete_stagenote, or whoever actually sent this
+    specific message (the candidate, or the employee it's attributed to),
+    may delete it.
     """
     note = StageNote.find(note_id)
-    note.delete() if note else None
-    (
-        messages.success(request, _("Note deleted."))
-        if note
-        else messages.error(request, _("No Stage Note found matching the query."))
+    if not note:
+        messages.error(request, _("No Stage Note found matching the query."))
+        return HttpResponse("")
+
+    candidate_session_id = request.session.get("candidate_id")
+    is_own_candidate_message = (
+        note.updated_by_id is None
+        and candidate_session_id
+        and note.candidate_id_id == candidate_session_id
     )
+    is_own_employee_message = request.user.is_authenticated and note.updated_by_id == getattr(
+        request.user.employee_get, "pk", None
+    )
+    if not (
+        request.user.has_perm("recruitment.delete_stagenote")
+        or is_own_candidate_message
+        or is_own_employee_message
+    ):
+        messages.error(request, _("You can only delete your own messages."))
+        return HttpResponse("")
+
+    note.delete()
+    # No success toast - like the sends, the message disappearing from the
+    # chat is the confirmation. Error cases above still surface a toast
+    # since those are actionable failures, not routine chat activity.
     return HttpResponse("")
 
 

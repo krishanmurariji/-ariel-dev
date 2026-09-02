@@ -28,6 +28,7 @@ def handle_outlook_meeting_save(sender, instance, created, **kwargs):
         "start_time": instance.start_time,
         "duration": instance.duration,
         "attendees": instance.attendees,
+        "is_online": instance.is_online,
     }
 
     try:
@@ -53,7 +54,10 @@ def handle_outlook_meeting_save(sender, instance, created, **kwargs):
         )
         return
 
-    join_url = created_event.get("onlineMeeting", {}).get(
+    # Graph returns "onlineMeeting": null (not a missing key) for an
+    # offline event, so `.get("onlineMeeting", {})` isn't enough - the key
+    # is present with a None value, which the `or {}` below catches.
+    join_url = (created_event.get("onlineMeeting") or {}).get(
         "joinUrl", instance.join_url
     )
     event_id = created_event.get("id") or instance.event_id

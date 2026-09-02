@@ -24,6 +24,7 @@ def handle_google_meeting_save(sender, instance, created, **kwargs):
         "start_time": instance.start_time,
         "duration": instance.duration,
         "attendees": instance.attendees,
+        "is_online": instance.is_online,
     }
 
     try:

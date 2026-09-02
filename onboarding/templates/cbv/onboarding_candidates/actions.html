@@ -145,6 +145,18 @@
 	<button
 		type="button"
 		class="oh-btn oh-btn--light-bkg w-100"
+		title="{% trans 'Chat' %}"
+		hx-get="{{ instance.get_view_note_url }}"
+		hx-target="#activitySidebar"
+		data-target="#activitySidebar"
+		onclick="$('#activitySidebar').addClass('oh-activity-sidebar--show')"
+	>
+		<ion-icon name="chatbubbles-outline"></ion-icon>
+	</button>
+
+	<button
+		type="button"
+		class="oh-btn oh-btn--light-bkg w-100"
 		title="{% trans 'Allocations' %}"
 		hx-get="{% url 'allocation-view' instance.pk %}?model=recruitment.models.Candidate"
 		hx-target="#allocationModalBody"

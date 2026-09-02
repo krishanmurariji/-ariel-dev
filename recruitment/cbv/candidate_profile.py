@@ -170,7 +170,7 @@ CandidateProfileView.add_tab(
             "accessibility": "recruitment.cbv.accessibility.if_manager_accessibility",
         },
         {
-            "title": _("Notes"),
+            "title": _("Chat"),
             "view": views.add_note,
             "accessibility": "recruitment.cbv.accessibility.if_manager_accessibility",
         },

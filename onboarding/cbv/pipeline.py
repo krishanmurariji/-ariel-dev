@@ -463,8 +463,8 @@ class CandidateList(HorillaListView):
                 """,
         },
         {
-            "action": _("View Note"),
-            "icon": "newspaper-outline",
+            "action": _("Chat"),
+            "icon": "chatbubbles-outline",
             "attrs": """
                     class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100 oh-activity-sidebar__open"
                     hx-get="{candidate_id__get_view_note_url}"
@@ -721,7 +721,7 @@ class CandidateKanbanView(HorillaKanbanView):
             """,
         },
         {
-            "action": _("View Note"),
+            "action": _("Chat"),
             "attrs": """
                 hx-get="{get_view_note_url}"
                 data-target="#activitySidebar"

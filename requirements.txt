@@ -6,11 +6,13 @@ bs4
 bleach
 certifi
 cffi
+channels
 chardet
 charset-normalizer
 click
 cryptography
 cssselect2
+daphne
 Django==5.2
 django-auditlog
 django-apscheduler

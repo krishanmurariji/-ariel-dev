@@ -249,30 +249,54 @@ class InterviewForm(HorillaFormView):
             from recruitment.views.views import generate_interview_meeting
 
             meeting_result = generate_interview_meeting(form.instance, self.request)
+            is_online = form.instance.interview_mode != "offline"
             if meeting_result.get("success"):
                 if meeting_result.get("created"):
-                    messages.success(self.request, _("Meeting link generated."))
+                    messages.success(
+                        self.request,
+                        _("Meeting link generated.")
+                        if is_online
+                        else _("Interview added to calendar and candidate notified."),
+                    )
                 else:
                     messages.success(
-                        self.request, _("Meeting updated and invitees notified.")
+                        self.request,
+                        _("Meeting updated and invitees notified.")
+                        if is_online
+                        else _("Calendar event updated and invitees notified."),
                     )
             elif meeting_result.get("needs_auth"):
                 messages.warning(
                     self.request,
                     meeting_result.get("message")
-                    or _(
-                        "Interview saved, but the meeting link could "
-                        "not be generated: the meeting provider isn't "
-                        "connected yet. Use 'Send Meeting Link' from the "
-                        "interview once it's connected."
+                    or (
+                        _(
+                            "Interview saved, but the meeting link could "
+                            "not be generated: the meeting provider isn't "
+                            "connected yet. Use 'Send Meeting Link' from the "
+                            "interview once it's connected."
+                        )
+                        if is_online
+                        else _(
+                            "Interview saved, but it could not be added to "
+                            "the calendar: the meeting provider isn't "
+                            "connected yet."
+                        )
                     ),
                 )
             elif meeting_result.get("error"):
                 messages.warning(
                     self.request,
-                    _(
-                        "Interview saved, but the meeting link could "
-                        "not be generated: %(error)s"
+                    (
+                        _(
+                            "Interview saved, but the meeting link could "
+                            "not be generated: %(error)s"
+                        )
+                        if is_online
+                        else _(
+                            "Interview saved, but it could not be added to "
+                            "the calendar: %(error)s"
+                        )
                     )
                     % {"error": meeting_result["error"]},
                 )

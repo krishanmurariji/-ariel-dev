@@ -11,6 +11,9 @@ import uuid
 from django import template
 from django.apps import apps
 from django.template.defaultfilters import register
+from django.utils import timezone
+from django.utils.formats import date_format
+from django.utils.translation import gettext as _
 
 from horilla_auth.models import HorillaUser
 from recruitment.models import CandidateRating
@@ -177,3 +180,23 @@ def to_json(value):
         {"id": val.id, "stage": val.stage, "type": val.stage_type} for val in value
     ]
     return json.dumps(ordered_list)
+
+
+@register.filter(name="chat_date_label")
+def chat_date_label(value):
+    """
+    WhatsApp-style day divider label for a chat message's created_at -
+    "Today"/"Yesterday" for the last two days, otherwise a plain date like
+    "01 Aug 2026". Used with {% ifchanged %} in the chat templates to group
+    messages by day.
+    """
+    if not value:
+        return ""
+    message_date = timezone.localtime(value).date() if timezone.is_aware(value) else value.date()
+    today = timezone.localdate()
+    delta = (today - message_date).days
+    if delta == 0:
+        return _("Today")
+    if delta == 1:
+        return _("Yesterday")
+    return date_format(message_date, "d M Y")

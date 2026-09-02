@@ -106,6 +106,13 @@ class OutlookMeeting(HorillaModel):
         default=60, help_text=_("Duration in minutes")
     )
     attendees = models.JSONField(default=list, blank=True, null=True)
+    is_online = models.BooleanField(
+        default=True,
+        help_text=_(
+            "Whether this event should include a Teams video link. False "
+            "creates a plain calendar event with no meeting link."
+        ),
+    )
 
     class Meta:
         ordering = ["-start_time"]
