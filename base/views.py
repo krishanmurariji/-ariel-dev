@@ -737,6 +737,7 @@ class HorillaPasswordResetView(PasswordResetView):
     template_name = "forgot_password.html"
     form_class = PassWordResetForm
     success_url = reverse_lazy("reset-send-success")
+    html_email_template_name = "registration/password_reset_email_html.html"
 
     def form_valid(self, form):
         email_backend = ConfiguredEmailBackend()
@@ -779,6 +780,7 @@ class EmployeePasswordResetView(PasswordResetView):
 
     template_name = "forgot_password.html"
     form_class = PassWordResetForm
+    html_email_template_name = "registration/password_reset_email_html.html"
 
     def form_valid(self, form):
         try:

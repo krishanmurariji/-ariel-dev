@@ -15,6 +15,7 @@ import bleach
 from bleach.css_sanitizer import CSSSanitizer
 from django import forms
 from django.apps import apps
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import SetPasswordForm, _unicode_ci_compare
@@ -3119,12 +3120,25 @@ class PassWordResetForm(forms.Form):
                 site_name = domain
         else:
             site_name = domain = domain_override
+
+        # Same company-name resolution as
+        # base.context_processors.white_labelling_company, just sourced
+        # from the recipient's own employee record instead of
+        # request.user (this recipient is usually anonymous - they're
+        # requesting a reset because they're logged out).
+        white_label_company_name = "Horilla"
+        if getattr(settings, "WHITE_LABELLING", False):
+            company = employee.get_company() or Company.objects.filter(hq=True).last()
+            if company:
+                white_label_company_name = company.company
+
         if email:
             token = token_generator.make_token(user)
             context = {
                 "email": email,
                 "domain": domain,
                 "site_name": site_name,
+                "white_label_company_name": white_label_company_name,
                 "uid": urlsafe_base64_encode(force_bytes(user.pk)),
                 "user": user,
                 "token": token,
