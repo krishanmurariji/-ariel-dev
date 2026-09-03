@@ -5,6 +5,13 @@ tab, and the recruiter pipeline "Chat" modal. Linked once from
 templates/index.html for the two HR-facing (htmx-fragment) surfaces, and
 separately from candidate_self_tracking.html's own <head> since that page
 is a standalone document.
+
+Visual language: rounded gradient bubbles for "me", crisp white bubbles
+for "other" (WhatsApp/Instagram-DM inspired), a soft dotted canvas behind
+the thread, and a pill-shaped composer - built entirely on the two CSS
+vars callers already set per-company (--oh-chat-accent/-hover), so it
+carries whatever brand color the surface renders with instead of a fixed
+color.
 */
 
 .oh-chat-card {
@@ -17,55 +24,85 @@ is a standalone document.
 .oh-chat-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid #ebebeb;
+    gap: 10px;
+    padding: 0.9rem 1.25rem;
+    border-bottom: 1px solid #eee;
+    background: #fff;
+    flex: none;
+    z-index: 2;
+}
+.oh-chat-header i.fas.fa-comments {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    color: var(--oh-chat-accent, #E54F38);
+    background: color-mix(in srgb, var(--oh-chat-accent, #E54F38) 12%, #fff);
     flex: none;
 }
-.oh-chat-header i { color: var(--oh-chat-accent, #E54F38); }
-.oh-chat-header h3 { margin: 0; font-size: 1rem; font-weight: 700; }
-.oh-chat-header span { font-size: 0.72rem; color: #6c757d; }
+.oh-chat-header h3 { margin: 0; font-size: 0.98rem; font-weight: 700; color: #1c1c1c; }
+.oh-chat-header span { font-size: 0.74rem; color: #8a8f98; }
 
 .oh-chat-body {
     flex: 1 1 auto;
     overflow-y: auto;
-    padding: 1rem 1.1rem;
-    background: #fbfbfb;
+    padding: 1.1rem 1.1rem 0.4rem;
+    background:
+        radial-gradient(circle, rgba(0, 0, 0, 0.045) 1px, transparent 1.4px) 0 0/16px 16px,
+        #f7f7f5;
+    scrollbar-width: thin;
+    scrollbar-color: #d7d9dd transparent;
 }
+.oh-chat-body::-webkit-scrollbar { width: 6px; }
+.oh-chat-body::-webkit-scrollbar-track { background: transparent; }
+.oh-chat-body::-webkit-scrollbar-thumb { background: #d7d9dd; border-radius: 999px; }
+.oh-chat-body::-webkit-scrollbar-thumb:hover { background: #c1c4ca; }
 
 /* The bubble rows are children of #chatMessages (a plain wrapper div, kept
    separate from .oh-chat-body so htmx's 10s poll can swap just this part)
    - it has to be the flex column, not .oh-chat-body, or align-self on the
    rows below has no flex parent to act on and every bubble silently falls
    back to block-level full-width behavior instead of shrink-wrapping. */
-.oh-chat-messages { display: flex; flex-direction: column; gap: 12px; }
+.oh-chat-messages { display: flex; flex-direction: column; gap: 3px; padding-bottom: 0.75rem; }
 
 .oh-chat-date-divider {
     display: flex;
     justify-content: center;
     align-self: stretch;
-    margin: 4px 0;
+    margin: 14px 0 10px;
 }
 .oh-chat-date-divider span {
-    background: #eef0f2;
+    background: #fff;
     color: #6c757d;
-    font-size: 0.68rem;
-    font-weight: 600;
-    padding: 3px 12px;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    padding: 4px 13px;
     border-radius: 999px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.oh-chat-bubble-row { display: flex; flex-direction: column; max-width: 80%; }
+.oh-chat-bubble-row {
+    display: flex;
+    flex-direction: column;
+    max-width: 76%;
+    margin-top: 9px;
+}
 .oh-chat-bubble-row--me { align-self: flex-end; align-items: flex-end; }
 .oh-chat-bubble-row--other { align-self: flex-start; align-items: flex-start; }
 
 .oh-chat-bubble {
     position: relative;
-    padding: 0.8rem 0.8rem;
-    border-radius: 14px;
-    font-size: 0.83rem;
-    line-height: 1.3;
+    padding: 0.65rem 0.85rem;
+    border-radius: 16px;
+    font-size: 0.85rem;
+    line-height: 1.42;
     word-break: break-word;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     /* pre-line (not pre-wrap): {{ note.description }} sits inside heavily
        indented template markup, and pre-wrap renders that indentation as
        literal spaces, inflating a short message's intrinsic width to match
@@ -75,27 +112,38 @@ is a standalone document.
     white-space: pre-line;
 }
 .oh-chat-bubble-row--me .oh-chat-bubble {
-    background: var(--oh-chat-accent, #E54F38);
+    background: linear-gradient(135deg, var(--oh-chat-accent, #E54F38), var(--oh-chat-accent-hover, #cf4530));
     color: #fff;
     border-bottom-right-radius: 4px;
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--oh-chat-accent, #E54F38) 35%, transparent);
 }
 .oh-chat-bubble-row--other .oh-chat-bubble {
-    background: #eef0f2;
-    color: #222;
+    background: #ffffff;
+    color: #262626;
+    border: 1px solid #ececec;
     border-bottom-left-radius: 4px;
 }
 
-.oh-chat-bubble-files { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.oh-chat-bubble-files { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
 .oh-chat-bubble-files a {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    font-size: 0.76rem;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
     color: inherit;
-    text-decoration: underline;
-    opacity: 0.9;
+    text-decoration: none;
+    background: rgba(0, 0, 0, 0.08);
+    border-radius: 999px;
+    padding: 5px 11px 5px 9px;
+    max-width: 100%;
 }
-.oh-chat-bubble-files a:hover { opacity: 1; }
+.oh-chat-bubble-row--other .oh-chat-bubble-files a { background: #f2f2f2; }
+.oh-chat-bubble-files a i { font-size: 12px; opacity: 0.75; flex: none; }
+.oh-chat-bubble-files a span,
+.oh-chat-bubble-files a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oh-chat-bubble-files a:hover { background: rgba(0, 0, 0, 0.16); }
+.oh-chat-bubble-row--other .oh-chat-bubble-files a:hover { background: #e6e6e6; }
 
 .oh-chat-file-link { display: inline-flex; align-items: center; gap: 4px; }
 .oh-chat-file-link ion-icon[title] { font-size: 14px; opacity: 0.6; cursor: pointer; }
@@ -106,15 +154,19 @@ is a standalone document.
     align-items: center;
     gap: 4px;
     align-self: flex-start;
-    background: #eef0f2;
-    border-radius: 14px;
-    padding: 0.6rem 0.9rem;
+    background: #ffffff;
+    border: 1px solid #ececec;
+    border-radius: 16px;
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    padding: 0.62rem 0.9rem;
+    margin-top: 9px;
 }
 .oh-chat-typing span {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #9aa0a6;
+    background: #b7bcc3;
     animation: oh-chat-typing-bounce 1.2s infinite ease-in-out;
 }
 .oh-chat-typing span:nth-child(2) { animation-delay: 0.15s; }
@@ -125,9 +177,10 @@ is a standalone document.
 }
 
 .oh-chat-meta {
-    font-size: 0.68rem;
+    font-size: 0.66rem;
     color: #9aa0a6;
-    margin-top: 3px;
+    margin-top: 4px;
+    padding: 0 3px;
     display: flex;
     align-items: center;
     gap: 7px;
@@ -144,33 +197,40 @@ is a standalone document.
     padding: 0;
     display: inline-flex;
     align-items: center;
+    transition: opacity 0.12s ease, color 0.12s ease;
 }
 .oh-chat-delete:hover { opacity: 1; color: #dc3545; }
+@media (hover: hover) {
+    .oh-chat-delete { opacity: 0; }
+    .oh-chat-bubble-row:hover .oh-chat-delete { opacity: 0.55; }
+    .oh-chat-bubble-row:hover .oh-chat-delete:hover { opacity: 1; }
+}
 
 .oh-chat-empty {
     margin: auto;
     text-align: center;
-    opacity: 0.6;
+    opacity: 0.7;
 }
-.oh-chat-empty img { width: 130px; margin-bottom: 0.75rem; }
-.oh-chat-empty h6 { font-size: 0.82rem; color: #6c757d; }
+.oh-chat-empty img { width: 120px; margin-bottom: 0.75rem; opacity: 0.8; }
+.oh-chat-empty h6 { font-size: 0.82rem; color: #6c757d; font-weight: 600; }
 
 .oh-chat-input {
     flex: none;
     display: flex;
     align-items: flex-end;
-    gap: 6px;
-    padding: 0.85rem 1rem;
-    border-top: 1px solid #ebebeb;
+    gap: 8px;
+    padding: 0.8rem 1rem;
+    border-top: 1px solid #eee;
     background: #fff;
 }
 
 .oh-chat-textarea {
     flex: 1;
     border: 1px solid #e4e6ef;
-    border-radius: 18px;
-    padding: 0.55rem 1rem;
-    font-size: 0.83rem;
+    background: #f7f7f8;
+    border-radius: 20px;
+    padding: 0.6rem 1.05rem;
+    font-size: 0.85rem;
     font-family: inherit;
     line-height: 1.4;
     outline: none;
@@ -179,26 +239,39 @@ is a standalone document.
        line-height + this padding + border, clipping the very top/bottom of
        typed text before the input listener's autogrow ever runs. min-height
        guarantees the box is always tall enough for a single line. */
-    min-height: calc(1.4em + 1.1rem + 2px);
+    min-height: calc(1.4em + 1.2rem + 2px);
     max-height: 140px;
     overflow-y: auto;
-    transition: border-color .15s ease;
+    transition: border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
 }
-.oh-chat-textarea:focus { border-color: var(--oh-chat-accent, #E54F38); }
+.oh-chat-textarea:focus {
+    border-color: var(--oh-chat-accent, #E54F38);
+    background: #fff;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--oh-chat-accent, #E54F38) 14%, transparent);
+}
 
 .oh-chat-send {
     flex: none;
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     border: none;
-    background: var(--oh-chat-accent, #E54F38);
+    background: linear-gradient(135deg, var(--oh-chat-accent, #E54F38), var(--oh-chat-accent-hover, #cf4530));
     color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: background .15s ease;
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--oh-chat-accent, #E54F38) 40%, transparent);
+    transition: transform .12s ease, box-shadow .12s ease, background .15s ease;
 }
-.oh-chat-send:hover { background: var(--oh-chat-accent-hover, #cf4530); }
-.oh-chat-send:disabled { background: #cbd0d6; cursor: not-allowed; }
+.oh-chat-send i { transform: translateX(-1px); }
+.oh-chat-send:hover { transform: scale(1.06); }
+.oh-chat-send:active { transform: scale(0.96); }
+.oh-chat-send:disabled {
+    background: #e1e3e8;
+    color: #b0b4bb;
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+}
