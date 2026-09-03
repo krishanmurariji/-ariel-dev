@@ -1,5 +1,8 @@
+import logging
 import os
 import subprocess
+
+logger = logging.getLogger(__name__)
 
 
 def dump_postgres_db(
@@ -27,11 +30,21 @@ def dump_postgres_db(
 
     try:
         # Execute the pg_dump command
-        result = subprocess.run(
-            dump_command, check=True, text=True, capture_output=True
-        )
+        subprocess.run(dump_command, check=True, text=True, capture_output=True)
     except subprocess.CalledProcessError as e:
-        pass
+        # Previously swallowed outright - the caller (google_drive_backup)
+        # would then try to upload a dump file that was never written,
+        # failing with a *different*, more confusing error further down.
+        # Logging + re-raising surfaces the real cause (bad credentials,
+        # pg_dump not on PATH, etc.) instead of that misleading one.
+        logger.error("pg_dump failed for database %s: %s", db_name, e.stderr)
+        raise
+    except FileNotFoundError:
+        logger.error(
+            "pg_dump executable not found - is postgresql-client installed "
+            "on this server?"
+        )
+        raise
     finally:
         # Clean up the environment variable
         if password:

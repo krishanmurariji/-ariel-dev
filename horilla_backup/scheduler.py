@@ -1,3 +1,4 @@
+import logging
 import os
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -11,6 +12,8 @@ from .gdrive import *
 from .models import *
 from .pgdump import *
 from .zip import *
+
+logger = logging.getLogger(__name__)
 
 scheduler = BackgroundScheduler()
 
@@ -82,11 +85,20 @@ scheduler = BackgroundScheduler()
 
 
 def google_drive_backup():
-    if GoogleDriveBackup.objects.exists():
-        google_drive = GoogleDriveBackup.objects.first()
-        service_account_file = google_drive.service_account_file.path
-        gdrive_folder_id = google_drive.gdrive_folder_id
-        if google_drive.backup_db:
+    # Runs unattended on a background thread (APScheduler), so this is the
+    # only place any failure here ever gets recorded - previously an
+    # exception from any step below (a bad pg_dump, an upload rejected for
+    # lacking Drive folder permission, ...) just vanished, leaving the
+    # Settings page's "active" flag looking healthy indefinitely while
+    # nothing actually landed in Drive.
+    if not GoogleDriveBackup.objects.exists():
+        return
+    google_drive = GoogleDriveBackup.objects.first()
+    service_account_file = google_drive.service_account_file.path
+    gdrive_folder_id = google_drive.gdrive_folder_id
+
+    if google_drive.backup_db:
+        try:
             db = settings.DATABASES["default"]
             dump_postgres_db(
                 db_name=db["NAME"],
@@ -95,13 +107,23 @@ def google_drive_backup():
                 password=db["PASSWORD"],
             )
             upload_file("backupdb.dump", service_account_file, gdrive_folder_id)
-            os.remove("backupdb.dump")
-        if google_drive.backup_media:
+        except Exception:
+            logger.exception("Google Drive database backup failed")
+        finally:
+            if os.path.exists("backupdb.dump"):
+                os.remove("backupdb.dump")
+
+    if google_drive.backup_media:
+        try:
             folder_to_zip = settings.MEDIA_ROOT
             output_zip_file = "media.zip"
             zip_folder(folder_to_zip, output_zip_file)
             upload_file("media.zip", service_account_file, gdrive_folder_id)
-            os.remove("media.zip")
+        except Exception:
+            logger.exception("Google Drive media backup failed")
+        finally:
+            if os.path.exists("media.zip"):
+                os.remove("media.zip")
 
 
 def start_gdrive_backup_job():
