@@ -267,11 +267,6 @@ urlpatterns = [
     path("create-note/", views.create_note, name="create-note-post"),
     path("note-update/<int:note_id>/", views.note_update, name="note-update"),
     path(
-        "note-react/<int:note_id>/",
-        views.toggle_note_reaction,
-        name="note-react",
-    ),
-    path(
         "note-update-individual/<int:note_id>/",
         views.note_update_individual,
         name="note-update-individual",

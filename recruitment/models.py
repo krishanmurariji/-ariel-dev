@@ -1780,11 +1780,6 @@ class StageNote(HorillaModel):
     StageNote model
     """
 
-    # The fixed quick-react palette shown on message hover (WhatsApp/Teams
-    # style) - kept small and fixed rather than a free-form emoji picker,
-    # matching how both apps' default hover row works.
-    QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"]
-
     candidate_id = models.ForeignKey(Candidate, on_delete=models.CASCADE)
     description = models.TextField(verbose_name=_("Description"))  # 905
     stage_id = models.ForeignKey(Stage, on_delete=models.CASCADE)
@@ -1818,73 +1813,6 @@ class StageNote(HorillaModel):
         if self.updated_by:
             return self.updated_by.employee_first_name
         return self.candidate_id.name.split()[0] if self.candidate_id.name else ""
-
-    def reaction_groups(self):
-        """
-        This chat's reactions (StageNoteReaction), grouped by emoji for
-        display as WhatsApp/Teams-style pill+count badges under the
-        bubble. Returns [{"emoji": str, "count": int, "reactors": [Employee
-        | Candidate, ...]}] in first-used order. `reactors` carries the
-        actual actor objects (not ids) so a template can check membership
-        with a plain `{% if candidate in group.reactors %}` - mirrors the
-        `note.updated_user == candidate` comparison already used
-        elsewhere in these same templates for "me"/"other" bubble
-        alignment, rather than introducing a new comparison convention.
-        """
-        order = []
-        by_emoji = {}
-        reactions = self.reactions.select_related(
-            "reacted_by_employee", "reacted_by_candidate"
-        ).order_by("created_at")
-        for reaction in reactions:
-            if reaction.emoji not in by_emoji:
-                by_emoji[reaction.emoji] = []
-                order.append(reaction.emoji)
-            actor = reaction.reacted_by_employee or reaction.reacted_by_candidate
-            by_emoji[reaction.emoji].append(actor)
-        return [
-            {"emoji": emoji, "count": len(by_emoji[emoji]), "reactors": by_emoji[emoji]}
-            for emoji in order
-        ]
-
-
-class StageNoteReaction(HorillaModel):
-    """
-    A single quick-reaction (one of StageNote.QUICK_EMOJIS) on a chat
-    message, from either an Employee or a Candidate - mirrors StageNote's
-    own dual-actor pattern (updated_by/candidate_id) since a chat thread's
-    "other side" of the conversation can be either. One row per (note,
-    actor): reacting again with the same emoji removes it, a different
-    emoji replaces it - both handled in the view, not enforced here.
-    """
-
-    note = models.ForeignKey(
-        StageNote, on_delete=models.CASCADE, related_name="reactions"
-    )
-    emoji = models.CharField(max_length=8)
-    reacted_by_employee = models.ForeignKey(
-        Employee, on_delete=models.CASCADE, null=True, blank=True
-    )
-    reacted_by_candidate = models.ForeignKey(
-        Candidate, on_delete=models.CASCADE, null=True, blank=True
-    )
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["note", "reacted_by_employee"],
-                condition=models.Q(reacted_by_employee__isnull=False),
-                name="unique_stagenote_reaction_per_employee",
-            ),
-            models.UniqueConstraint(
-                fields=["note", "reacted_by_candidate"],
-                condition=models.Q(reacted_by_candidate__isnull=False),
-                name="unique_stagenote_reaction_per_candidate",
-            ),
-        ]
-
-    def __str__(self) -> str:
-        return f"{self.emoji} on {self.note_id}"
 
 
 class RecruitmentSurvey(HorillaModel):
