@@ -34,7 +34,6 @@ from base.models import Company
 
 logger = logging.getLogger(__name__)
 
-LETTERHEAD_ACCENT = "#E54F38"
 LETTERHEAD_TEMPLATE = "mail/letterhead_base.html"
 
 # The header strip's blue->black gradient bar. Rendered as a real image
@@ -43,6 +42,11 @@ LETTERHEAD_TEMPLATE = "mail/letterhead_base.html"
 # background/linear-gradient entirely, but scales an <img> reliably.
 LETTERHEAD_GRADIENT_START = "#0B5FCE"
 LETTERHEAD_GRADIENT_END = "#03060f"
+
+# CTA buttons and the no-logo text fallback all use this - kept equal to
+# the gradient's own blue so a button doesn't clash with the header
+# strip above it.
+LETTERHEAD_ACCENT = LETTERHEAD_GRADIENT_START
 _GRADIENT_CACHE_KEY = "letterhead_gradient_bar:v1"
 
 
