@@ -406,7 +406,7 @@ class EmployeeCreationForm(ModelForm):
     """
 
     employee_first_name = forms.CharField(required=True, label=_("First Name"))
-    employee_last_name = forms.CharField(required=False, label=_("Last Name"))
+    employee_last_name = forms.CharField(required=True, label=_("Last Name"))
     # Overriding the field like this bypasses the model field's own
     # validators=[phone_validator] (ModelForm only auto-applies those to
     # fields it generates itself from the model) - re-declared explicitly
