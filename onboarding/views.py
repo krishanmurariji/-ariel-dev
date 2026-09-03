@@ -918,7 +918,7 @@ def email_send(request):
 
         # Create / reset portal
         token = secrets.token_hex(15)
-        portal, _ = OnboardingPortal.objects.get_or_create(candidate_id=candidate)
+        portal, _created = OnboardingPortal.objects.get_or_create(candidate_id=candidate)
         portal.token = token
         portal.used = False
         portal.count = 0
