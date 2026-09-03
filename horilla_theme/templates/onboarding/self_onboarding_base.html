@@ -1,0 +1,316 @@
+{% load static %}
+{% load i18n horillafilters %}
+{% get_company as theme_obj %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{% trans "Employee Onboarding" %} - {{ white_label_company_name }}{% endblock %}</title>
+    <link
+        rel="apple-touch-icon" sizes="180x180"
+        href="{% if white_label_company.icon %}{{ white_label_company.icon.url }}{% else %}{% static 'favicons/apple-touch-icon.png' %}{% endif %}"
+    >
+    <link
+        rel="icon" type="image/png" sizes="32x32"
+        href="{% if white_label_company.icon %}{{ white_label_company.icon.url }}{% else %}{% static 'favicons/favicon-32x32.png' %}{% endif %}"
+    >
+    <link
+        rel="icon" type="image/png" sizes="16x16"
+        href="{% if white_label_company.icon %}{{ white_label_company.icon.url }}{% else %}{% static 'favicons/favicon-16x16.png' %}{% endif %}"
+    >
+    <link rel="stylesheet" href="{% static 'build/css/style.min.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/style.css' %}">
+    <style>
+        :root {
+            --swz-accent: {{ theme_obj.primary_600|default:"#E54F38" }};
+            --swz-accent-soft: {{ theme_obj.primary_100|default:"#FFF5F1" }};
+            --swz-accent-text: {{ theme_obj.primary_800|default:"#AC3B2A" }};
+            --swz-on-accent: {{ theme_obj.secondary_100|default:"#ffffff" }};
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; background: #f5f6f8; }
+
+        .oh-swz { display: flex; min-height: 100vh; align-items: stretch; }
+
+        /* ---------- Left rail: company + vertical stepper ---------- */
+        .oh-swz__sidebar {
+            flex: none;
+            width: 300px;
+            background: #ffffff;
+            border-right: 1px solid #ececec;
+            padding: 2rem 1.75rem;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        .oh-swz__brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 2.5rem;
+        }
+        .oh-swz__brand-logo { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; flex: none; }
+        .oh-swz__brand-name {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #222;
+            line-height: 1.25;
+            word-break: break-word;
+        }
+
+        .oh-swz__steps { list-style: none; margin: 0; padding: 0; }
+        .oh-swz__step {
+            display: flex;
+            gap: 12px;
+            position: relative;
+            padding-bottom: 1.75rem;
+        }
+        .oh-swz__step:last-child { padding-bottom: 0; }
+        .oh-swz__step-rail {
+            flex: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 30px;
+        }
+        .oh-swz__step-dot {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.78rem;
+            font-weight: 700;
+            flex: none;
+            background: #eef0f2;
+            color: #9aa0a6;
+            border: 2px solid transparent;
+        }
+        .oh-swz__step-line {
+            width: 2px;
+            flex: 1;
+            background: #eef0f2;
+            margin-top: 4px;
+            min-height: 12px;
+        }
+        .oh-swz__step-body { padding-top: 4px; }
+        .oh-swz__step-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #9aa0a6;
+        }
+        .oh-swz__step-state {
+            display: block;
+            font-size: 0.7rem;
+            color: #c1c5c9;
+            margin-top: 1px;
+        }
+
+        .oh-swz__step--done .oh-swz__step-dot {
+            background: var(--swz-accent);
+            color: var(--swz-on-accent);
+        }
+        .oh-swz__step--done .oh-swz__step-line { background: var(--swz-accent); }
+        .oh-swz__step--done .oh-swz__step-label { color: #222; }
+        .oh-swz__step--done .oh-swz__step-state { color: var(--swz-accent); }
+
+        .oh-swz__step--current .oh-swz__step-dot {
+            background: var(--swz-accent-soft);
+            color: var(--swz-accent);
+            border-color: var(--swz-accent);
+        }
+        .oh-swz__step--current .oh-swz__step-label { color: #222; }
+        .oh-swz__step--current .oh-swz__step-state { color: var(--swz-accent); font-weight: 600; }
+
+        /* ---------- Right side: the actual step content ---------- */
+        .oh-swz__main { flex: 1 1 auto; min-width: 0; padding: 2.75rem 3rem 4rem; }
+        .oh-swz__content { max-width: 880px; margin: 0 auto; }
+        .oh-swz__eyebrow {
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--swz-accent);
+            margin: 0 0 6px;
+        }
+        .oh-swz__title { font-size: 1.5rem; font-weight: 700; color: #1c1c1c; margin: 0 0 0.35rem; }
+        .oh-swz__subtitle { font-size: 0.88rem; color: #6c757d; margin: 0 0 2rem; }
+
+        .oh-swz__panel {
+            background: #fff;
+            border: 1px solid #ececec;
+            border-radius: 12px;
+            padding: 2rem;
+        }
+
+        /* Two-column field grid - real estate the old single-column-only
+           layout wasted. A field can opt into spanning both columns with
+           .oh-swz__field--full. */
+        .oh-swz__grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.1rem 1.5rem;
+        }
+        .oh-swz__field--full { grid-column: 1 / -1; }
+
+        .oh-swz__actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 2rem;
+        }
+        .oh-swz__actions .oh-btn { width: auto; min-width: 190px; }
+
+        .oh-swz__mobile-progress { display: none; }
+
+        @media (max-width: 991.98px) {
+            .oh-swz__sidebar { width: 240px; padding: 1.5rem 1.25rem; }
+            .oh-swz__main { padding: 2rem 1.75rem 3rem; }
+        }
+
+        @media (max-width: 767.98px) {
+            .oh-swz { flex-direction: column; }
+            .oh-swz__sidebar { display: none; }
+            .oh-swz__mobile-progress {
+                display: block;
+                position: sticky;
+                top: 0;
+                z-index: 5;
+                background: #fff;
+                border-bottom: 1px solid #ececec;
+                padding: 0.9rem 1.25rem;
+            }
+            .oh-swz__mobile-progress-track {
+                height: 6px;
+                border-radius: 999px;
+                background: #eef0f2;
+                overflow: hidden;
+                margin-top: 8px;
+            }
+            .oh-swz__mobile-progress-fill {
+                height: 100%;
+                background: var(--swz-accent);
+                border-radius: 999px;
+            }
+            .oh-swz__mobile-progress-label { font-size: 0.78rem; font-weight: 600; color: #444; }
+            .oh-swz__main { padding: 1.25rem 1.1rem 2.5rem; }
+            .oh-swz__panel { padding: 1.25rem; border-radius: 10px; }
+            .oh-swz__grid { grid-template-columns: 1fr; }
+        }
+
+        {% block extra_style %}{% endblock %}
+    </style>
+</head>
+
+<body>
+    {% if messages %}
+    <div class="oh-wrapper">
+        {% for message in messages %}
+        <div class="oh-alert-container">
+            <div class="oh-alert oh-alert--animated {{ message.tags }}">{{ message }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            {% for message in messages %}
+            if (window.Toast) {
+                Toast.fire({ icon: "{{ message.level_tag|default:'info'|escapejs }}", title: "{{ message|escapejs }}" });
+            }
+            {% endfor %}
+        });
+    </script>
+    {% endif %}
+
+    {% if form.errors %}
+    <div class="oh-wrapper">
+        <div class="oh-alert-container">
+            {% for error in form.non_field_errors %}
+            <div class="oh-alert oh-alert--animated oh-alert--danger">{{ error }}</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="oh-swz">
+        <aside class="oh-swz__sidebar">
+            <div class="oh-swz__brand">
+                {% if white_label_company.icon %}
+                <img src="{{ white_label_company.icon.url }}" class="oh-swz__brand-logo" alt="{{ company }}">
+                {% endif %}
+                <span class="oh-swz__brand-name">{{ company }}</span>
+            </div>
+            <ul class="oh-swz__steps">
+                {% for step in steps %}
+                <li class="oh-swz__step {% if step.done %}oh-swz__step--done{% elif step.key == current_step_key %}oh-swz__step--current{% endif %}">
+                    <div class="oh-swz__step-rail">
+                        <div class="oh-swz__step-dot">
+                            {% if step.done %}<ion-icon name="checkmark-outline"></ion-icon>{% else %}{{ forloop.counter }}{% endif %}
+                        </div>
+                        {% if not forloop.last %}<div class="oh-swz__step-line"></div>{% endif %}
+                    </div>
+                    <div class="oh-swz__step-body">
+                        <span class="oh-swz__step-label">{{ step.label }}</span>
+                        {% if step.done %}
+                        <span class="oh-swz__step-state">{% trans "Completed" %}</span>
+                        {% elif step.key == current_step_key %}
+                        <span class="oh-swz__step-state">{% trans "In progress" %}</span>
+                        {% endif %}
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </aside>
+
+        <div class="oh-swz__main">
+            <div class="oh-swz__mobile-progress">
+                <span class="oh-swz__mobile-progress-label">{% trans "Step" %} {{ current_step_number }} {% trans "of" %} {{ total_steps }} &middot; {{ current_step_label }}</span>
+                <div class="oh-swz__mobile-progress-track">
+                    <div class="oh-swz__mobile-progress-fill" style="width: {{ progress_pct }}%;"></div>
+                </div>
+            </div>
+            <div class="oh-swz__content">
+                <p class="oh-swz__eyebrow">{% trans "Step" %} {{ current_step_number }} {% trans "of" %} {{ total_steps }}</p>
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
+    <script>
+        var Toast = Swal.mixin({
+            toast: true,
+            icon: "success",
+            title: "General Title",
+            animation: true,
+            position: "top-right",
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            didOpen: function (toast) {
+                toast.addEventListener("mouseenter", Swal.stopTimer);
+                toast.addEventListener("mouseleave", Swal.resumeTimer);
+            },
+        });
+    </script>
+    <script src="{% static 'build/js/web.frontend.min.js' %}"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+    <script>
+        $(document).ready(function () {
+            $('input[required], select[required], textarea[required]').each(function () {
+                var label = $(this).closest(".oh-swz__field, div").find("label").first();
+                if (label.length && label.find(".oh-swz__required-star").length === 0) {
+                    label.append(' <span class="oh-swz__required-star" style="color:#dc3545;">*</span>');
+                }
+            });
+        });
+    </script>
+    {% block extra_script %}{% endblock %}
+</body>
+</html>

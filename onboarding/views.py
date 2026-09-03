@@ -43,7 +43,7 @@ from base.methods import (
     sortby,
 )
 from base.models import HorillaMailTemplate, JobPosition
-from employee.models import Employee, EmployeeBankDetails, EmployeeWorkInformation
+from employee.models import Employee, EmployeeWorkInformation
 from horilla import settings
 from horilla.decorators import (
     hx_request_required,
@@ -63,7 +63,6 @@ from onboarding.decorators import (
 )
 from onboarding.filters import OnboardingCandidateFilter, OnboardingStageFilter
 from onboarding.forms import (
-    BankDetailsCreationForm,
     EmployeeCreationForm,
     OnboardingCandidateForm,
     OnboardingTaskForm,
@@ -75,6 +74,7 @@ from onboarding.forms import (
     build_employee_emergency_contact_formset,
     build_employee_experience_formset,
 )
+from onboarding.self_onboarding_steps import STEPS, sidebar_context
 from onboarding.models import (
     CandidateStage,
     CandidateTask,
@@ -1167,7 +1167,45 @@ def kanban_view(request):
     )
 
 
-portal_user = {}
+PENDING_USER_SESSION_KEY = "onboarding_pending_user"
+
+
+def _resolve_pending_user(request, candidate):
+    """
+    Finds the HorillaUser this onboarding session should use: a persisted
+    one if account creation already completed, otherwise the not-yet-saved
+    one from the "Account Setup" step (if that step has run this session).
+
+    Previously this was a process-global dict keyed by session_key,
+    holding the actual unsaved model instance in memory - broken the
+    moment the account-creation POST and a later step's POST land on
+    different worker processes (the normal case for any multi-worker
+    deployment), since the dict isn't shared across processes. Storing
+    just the two plain values needed to reconstruct it (username, and
+    the password - already hashed by UserCreationForm.save(commit=False)
+    before this ever sees it) in the session survives across workers,
+    since Django's session backend is DB/cache-based, not per-process.
+    """
+    user = HorillaUser.objects.filter(username=candidate.email).first()
+    if user:
+        return user
+    pending = request.session.get(PENDING_USER_SESSION_KEY)
+    if pending and pending.get("username") == candidate.email:
+        return HorillaUser(username=pending["username"], password=pending["password"])
+    return None
+
+
+def _resume_redirect(onboarding_portal, token):
+    """
+    A candidate returning to their onboarding link (e.g. closed the tab
+    mid-way) should land back on whichever step they haven't finished
+    yet, not always the first one - `count` tracks how many steps are
+    done (see sidebar_context/self_onboarding_steps.STEPS for the order).
+    """
+    count = onboarding_portal.count
+    if 0 < count < len(STEPS):
+        return redirect(STEPS[count]["url_name"], token)
+    return None
 
 
 def user_creation(request, token):
@@ -1186,8 +1224,9 @@ def user_creation(request, token):
         onboarding_portal = OnboardingPortal.objects.get(token=token)
         if not onboarding_portal or onboarding_portal.used is True:
             return render(request, "404.html")
-        if onboarding_portal.count == 5:
-            return redirect("employee-bank-details", token)
+        resume = _resume_redirect(onboarding_portal, token)
+        if resume:
+            return resume
         candidate = onboarding_portal.candidate_id
         user = HorillaUser.objects.filter(username=candidate.email).first()
         form = UserCreationForm(instance=user)
@@ -1200,6 +1239,7 @@ def user_creation(request, token):
             messages.error(request, _("User with email-id already exists.."))
         onboarding_detail = getattr(candidate, "onboarding_detail", None)
         welcome_message = onboarding_detail.welcome_message if onboarding_detail else None
+        company = onboarding_portal.candidate_id.recruitment_id.company_id
         return render(
             request,
             "onboarding/user_creation.html",
@@ -1207,7 +1247,7 @@ def user_creation(request, token):
                 "form": form,
                 "candidate": candidate,
                 "welcome_message": welcome_message,
-                "company": onboarding_portal.candidate_id.recruitment_id.company_id,
+                **sidebar_context("account", company, onboarding_portal.count),
             },
         )
     except Exception as error:
@@ -1228,8 +1268,10 @@ def user_save(form, onboarding_portal, request, token):
     """
     user = form.save(commit=False)
     user.username = onboarding_portal.candidate_id.email
-    session_key = request.session.session_key
-    portal_user[session_key] = user
+    request.session[PENDING_USER_SESSION_KEY] = {
+        "username": user.username,
+        "password": user.password,
+    }
     onboarding_portal.count = 1
     onboarding_portal.save()
     messages.success(request, _("Account created successfully.."))
@@ -1271,7 +1313,7 @@ def profile_view(request, token):
             "form": form,
             "profile": candidate.profile,
             "token": token,
-            "company": candidate.recruitment_id.company_id,
+            **sidebar_context("profile", candidate.recruitment_id.company_id, onboarding_portal.count),
         },
     )
 
@@ -1314,7 +1356,7 @@ def roles_responsibility(request, token):
             "candidate": candidate,
             "roles_responsibilities": roles_responsibilities,
             "token": token,
-            "company": candidate.recruitment_id.company_id,
+            **sidebar_context("roles", candidate.recruitment_id.company_id, onboarding_portal.count),
         },
     )
 
@@ -1392,14 +1434,17 @@ def document_upload(request, token):
             "candidate": candidate,
             "document_rows": document_rows,
             "token": token,
-            "company": candidate.recruitment_id.company_id,
+            **sidebar_context("documents", candidate.recruitment_id.company_id, onboarding_portal.count),
         },
     )
 
 
 def employee_creation(request, token):
     """
-    function used to create employee.
+    function used to create employee's core personal details + emergency
+    contacts. Education and Experience are their own subsequent steps
+    (employee_education, employee_experience) - see
+    onboarding.self_onboarding_steps.STEPS for the full step order.
 
     Parameters:
     request (HttpRequest): The HTTP request object.
@@ -1407,7 +1452,7 @@ def employee_creation(request, token):
 
     Returns:
     GET : return employee creation profile template.
-    POST : return employee bank detail creation template.
+    POST : redirect to the Education step.
     """
     onboarding_portal = OnboardingPortal.objects.filter(token=token).first()
     if onboarding_portal is None:
@@ -1423,14 +1468,7 @@ def employee_creation(request, token):
         "zip": candidate.zip,
         "gender": candidate.gender,
     }
-    session_key = request.session.session_key
-    user = portal_user.get(session_key)
-    if user is None:
-        # Fallback for direct/opened links where in-memory portal state is absent.
-        user = HorillaUser.objects.filter(username=candidate.email).first()
-    elif not getattr(user, "pk", None):
-        # Related filters require a saved instance; resolve persisted user by email/username.
-        user = HorillaUser.objects.filter(username=candidate.email).first() or user
+    user = _resolve_pending_user(request, candidate)
 
     if user is None:
         messages.error(
@@ -1448,18 +1486,15 @@ def employee_creation(request, token):
         if getattr(user, "pk", None)
         else Employee.objects.none()
     )
-    if employee_qs.first() is not None:
-        employee = employee_qs.first()
-        if employee.employee_bank_details:
+    existing_employee = employee_qs.first()
+    if existing_employee is not None:
+        if onboarding_portal.used:
             messages.success(request, _("Employee already exists.."))
             return redirect("login")
-        initial = employee.__dict__
+        initial = existing_employee.__dict__
 
-    form = EmployeeCreationForm(
-        initial=initial,
-    )
+    form = EmployeeCreationForm(initial=initial)
 
-    existing_employee = employee_qs.first()
     # Resume case: rows were already saved on a previous visit to this
     # form - show those rather than re-seeding from the candidate's
     # application data (which would duplicate rows the person already
@@ -1476,83 +1511,21 @@ def employee_creation(request, token):
             for contact in candidate.emergency_contact_set.all()
         ]
         emergency_extra = len(emergency_initial)
-    if existing_employee and existing_employee.education_set.exists():
-        education_initial, education_extra = None, 0
-    else:
-        education_initial = [
-            {
-                "degree": edu.degree,
-                "specialization": edu.specialization,
-                "percentage_cgpa": edu.percentage_cgpa,
-                "start_date": edu.start_date,
-                "end_date": edu.end_date,
-                "university": edu.university,
-                "location": edu.location,
-            }
-            for edu in candidate.education_set.all()
-        ]
-        education_extra = len(education_initial)
-    if existing_employee and existing_employee.experience_set.exists():
-        experience_initial, experience_extra = None, 0
-    else:
-        experience_initial = [
-            {
-                "company_name": exp.company_name,
-                "designation": exp.designation,
-                "is_current_job": exp.is_current_job,
-                "start_date": exp.start_date,
-                "end_date": exp.end_date,
-                "location": exp.location,
-            }
-            for exp in candidate.experience_set.all()
-        ]
-        experience_extra = len(experience_initial)
 
     EmergencyContactFormSet = build_employee_emergency_contact_formset(
         extra=emergency_extra
     )
-    EducationFormSet = build_employee_education_formset(extra=education_extra)
-    ExperienceFormSet = build_employee_experience_formset(extra=experience_extra)
     emergency_contact_formset = EmergencyContactFormSet(
         instance=existing_employee, initial=emergency_initial, prefix="emergency"
     )
-    education_formset = EducationFormSet(
-        instance=existing_employee, initial=education_initial, prefix="education"
-    )
-    experience_formset = ExperienceFormSet(
-        instance=existing_employee, initial=experience_initial, prefix="experience"
-    )
 
-    # form.errors.clear()
     if request.method == "POST":
-        instance = employee_qs.first() if getattr(user, "pk", None) else None
-        form = EmployeeCreationForm(
-            request.POST,
-            instance=instance,
-        )
+        instance = existing_employee if getattr(user, "pk", None) else None
+        form = EmployeeCreationForm(request.POST, instance=instance)
         emergency_contact_formset = EmergencyContactFormSet(
             request.POST, instance=instance, prefix="emergency"
         )
-        education_formset = EducationFormSet(
-            request.POST, instance=instance, prefix="education"
-        )
-        experience_formset = ExperienceFormSet(
-            request.POST, instance=instance, prefix="experience"
-        )
-        if (
-            form.is_valid()
-            and emergency_contact_formset.is_valid()
-            and education_formset.is_valid()
-            and experience_formset.is_valid()
-        ):
-            if user is None:
-                messages.error(
-                    request,
-                    _(
-                        "User account was not found. Please complete account creation and try again."
-                    ),
-                )
-                return redirect("user-creation", token)
+        if form.is_valid() and emergency_contact_formset.is_valid():
             if not getattr(user, "pk", None):
                 user.save()
             login(request, user)
@@ -1572,20 +1545,6 @@ def employee_creation(request, token):
 
             emergency_contact_formset.instance = employee_personal_info
             emergency_contact_formset.save()
-
-            education_formset.instance = employee_personal_info
-            education_formset.save()
-
-            experience_formset.instance = employee_personal_info
-            experience_formset.save()
-            # is_current_job isn't on the form (see build_employee_experience_
-            # formset docstring) - a row can still arrive here already set to
-            # True if it was carried over unedited from the candidate's own
-            # application. They're being hired here now, so nothing on their
-            # experience history should still read as "currently working".
-            employee_personal_info.experience_set.filter(is_current_job=True).update(
-                is_current_job=False
-            )
 
             EmployeeWorkInformation.objects.update_or_create(
                 employee_id=employee_personal_info,
@@ -1620,84 +1579,165 @@ def employee_creation(request, token):
             messages.success(
                 request, _("Employee personal details created successfully..")
             )
-            return redirect("employee-bank-details", token)
+            return redirect("employee-education", token)
     return render(
         request,
         "onboarding/employee_creation.html",
         {
             "form": form,
-            "employee": candidate.recruitment_id.company_id,
             "emergency_contact_formset": emergency_contact_formset,
-            "education_formset": education_formset,
-            "experience_formset": experience_formset,
+            **sidebar_context("personal", candidate.recruitment_id.company_id, onboarding_portal.count),
         },
     )
 
 
-def employee_bank_details(request, token):
+def employee_education(request, token):
     """
-    function used to create employee bank details creation.
+    function used to add/edit the newly-created employee's education
+    history - its own step (previously a formset bundled onto the
+    "Personal Details" page alongside Experience and Emergency Contacts).
 
     Parameters:
     request (HttpRequest): The HTTP request object.
-    token : random generated onboarding portal token
+    token : random generated onboarding portal token.
 
     Returns:
-    GET : return bank details creation template
-    POST : return employee_bank_details_save function
+    GET : return education template.
+    POST : save the formset, then redirect to the Experience step.
     """
     onboarding_portal = OnboardingPortal.objects.filter(token=token).first()
-    if not onboarding_portal:
-        return HorillaRedirect(request, message=_("Onboarding portal not found."))
-
-    user = HorillaUser.objects.filter(
-        username=onboarding_portal.candidate_id.email
-    ).first()
-    employee = Employee.objects.filter(employee_user_id=user).first()
-    bank_info = EmployeeBankDetails.objects.filter(employee_id=employee).first()
-    form = BankDetailsCreationForm(instance=bank_info)
-    if request.method == "POST":
-        form = BankDetailsCreationForm(
-            request.POST,
-            instance=bank_info,
+    if onboarding_portal is None:
+        return render(request, "404.html")
+    candidate = onboarding_portal.candidate_id
+    employee = Employee.objects.filter(employee_user_id__username=candidate.email).first()
+    if employee is None:
+        messages.error(
+            request, _("Please complete your personal details first.")
         )
-        if form.is_valid():
-            return employee_bank_details_save(form, request, onboarding_portal)
-        return redirect(welcome_aboard)
+        return redirect("employee-creation", token)
+
+    if employee.education_set.exists():
+        education_initial, education_extra = None, 0
+    else:
+        education_initial = [
+            {
+                "degree": edu.degree,
+                "specialization": edu.specialization,
+                "percentage_cgpa": edu.percentage_cgpa,
+                "start_date": edu.start_date,
+                "end_date": edu.end_date,
+                "university": edu.university,
+                "location": edu.location,
+            }
+            for edu in candidate.education_set.all()
+        ]
+        education_extra = len(education_initial)
+
+    EducationFormSet = build_employee_education_formset(extra=education_extra)
+    education_formset = EducationFormSet(
+        instance=employee, initial=education_initial, prefix="education"
+    )
+
+    if request.method == "POST":
+        education_formset = EducationFormSet(
+            request.POST, instance=employee, prefix="education"
+        )
+        if education_formset.is_valid():
+            education_formset.save()
+            onboarding_portal.count = 6
+            onboarding_portal.save()
+            messages.success(request, _("Education details saved successfully.."))
+            return redirect("employee-experience", token)
     return render(
         request,
-        "onboarding/employee_bank_details.html",
+        "onboarding/employee_education.html",
         {
-            "form": form,
-            "company": onboarding_portal.candidate_id.recruitment_id.company_id,
+            "education_formset": education_formset,
+            **sidebar_context("education", candidate.recruitment_id.company_id, onboarding_portal.count),
         },
     )
 
 
-def employee_bank_details_save(form, request, onboarding_portal):
+def employee_experience(request, token):
     """
-    function used to save employee bank details.
+    function used to add/edit the newly-created employee's work
+    experience - its own step (previously a formset bundled onto the
+    "Personal Details" page alongside Education and Emergency Contacts).
+    This is the final data-entry step: on success it marks the onboarding
+    portal used and links the Candidate to the new Employee record (this
+    used to happen in the now-removed Bank Details step, which was the
+    old final step - bank details are collected later instead, on the
+    employee's own profile under HR's "Bank Info" tab).
 
     Parameters:
     request (HttpRequest): The HTTP request object.
-    form : Form object.
-    onboarding_portal : Onboarding portal object.
+    token : random generated onboarding portal token.
 
     Returns:
-    GET : return welcome onboard view
+    GET : return experience template.
+    POST : save the formset, finish onboarding, redirect to Welcome Aboard.
     """
-    employee_bank_detail = form.save(commit=False)
-    employee = Employee.objects.get(employee_user_id=request.user)
-    employee_bank_detail.employee_id = employee
+    onboarding_portal = OnboardingPortal.objects.filter(token=token).first()
+    if onboarding_portal is None:
+        return render(request, "404.html")
     candidate = onboarding_portal.candidate_id
-    candidate.converted_employee_id = employee
-    candidate.save()
-    employee_bank_detail.save()
-    onboarding_portal.count = 6
-    onboarding_portal.used = True
-    onboarding_portal.save()
-    messages.success(request, _("Employee bank details created successfully.."))
-    return redirect(welcome_aboard)
+    employee = Employee.objects.filter(employee_user_id__username=candidate.email).first()
+    if employee is None:
+        messages.error(
+            request, _("Please complete your personal details first.")
+        )
+        return redirect("employee-creation", token)
+
+    if employee.experience_set.exists():
+        experience_initial, experience_extra = None, 0
+    else:
+        experience_initial = [
+            {
+                "company_name": exp.company_name,
+                "designation": exp.designation,
+                "start_date": exp.start_date,
+                "end_date": exp.end_date,
+                "location": exp.location,
+            }
+            for exp in candidate.experience_set.all()
+        ]
+        experience_extra = len(experience_initial)
+
+    ExperienceFormSet = build_employee_experience_formset(extra=experience_extra)
+    experience_formset = ExperienceFormSet(
+        instance=employee, initial=experience_initial, prefix="experience"
+    )
+
+    if request.method == "POST":
+        experience_formset = ExperienceFormSet(
+            request.POST, instance=employee, prefix="experience"
+        )
+        if experience_formset.is_valid():
+            experience_formset.save()
+            # is_current_job isn't on the form (see build_employee_experience_
+            # formset docstring) - a row can still arrive here already set to
+            # True if it was carried over unedited from the candidate's own
+            # application. They're being hired here now, so nothing on their
+            # experience history should still read as "currently working".
+            employee.experience_set.filter(is_current_job=True).update(
+                is_current_job=False
+            )
+
+            candidate.converted_employee_id = employee
+            candidate.save()
+            onboarding_portal.count = 7
+            onboarding_portal.used = True
+            onboarding_portal.save()
+            messages.success(request, _("Onboarding completed successfully.."))
+            return redirect(welcome_aboard)
+    return render(
+        request,
+        "onboarding/employee_experience.html",
+        {
+            "experience_formset": experience_formset,
+            **sidebar_context("experience", candidate.recruitment_id.company_id, onboarding_portal.count),
+        },
+    )
 
 
 @login_required

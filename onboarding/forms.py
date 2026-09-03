@@ -21,6 +21,7 @@ class YourForm(forms.Form):
         pass
 """
 
+import re
 import uuid
 from datetime import date
 from typing import Any
@@ -36,7 +37,6 @@ from base.methods import reload_queryset
 from employee.filters import EmployeeFilter
 from employee.models import (
     Employee,
-    EmployeeBankDetails,
     EmployeeEducation,
     EmployeeEmergencyContact,
     EmployeeExperience,
@@ -472,9 +472,36 @@ class EmployeeCreationForm(ModelForm):
                 raise ValidationError(_("Enter a valid date of birth."))
         return dob
 
+    def _clean_name_field(self, field_name):
+        # Mirrors recruitment.forms.ApplicationForm.clean_name - same rule
+        # applied on the candidate side, kept consistent here.
+        value = (self.cleaned_data.get(field_name) or "").strip()
+        value = re.sub(r"\s+", " ", value)
+        if value and not re.match(r"^[A-Za-z ]+$", value):
+            raise ValidationError(_("Name can only contain letters and spaces."))
+        return value
+
+    def clean_employee_first_name(self):
+        return self._clean_name_field("employee_first_name")
+
+    def clean_employee_last_name(self):
+        return self._clean_name_field("employee_last_name")
+
+    def clean_address(self):
+        address = (self.cleaned_data.get("address") or "").strip()
+        if len(address) < 5:
+            raise ValidationError(_("Enter a complete address."))
+        return address
+
+    def clean_zip(self):
+        zip_code = (self.cleaned_data.get("zip") or "").strip()
+        if not re.match(r"^[A-Za-z0-9][A-Za-z0-9 -]{2,9}$", zip_code):
+            raise ValidationError(_("Enter a valid zip/postal code."))
+        return zip_code
+
     def clean(self):
         cleaned_data = self.cleaned_data
-        if cleaned_data["children"] and cleaned_data["children"] < 0:
+        if cleaned_data.get("children") is not None and cleaned_data["children"] < 0:
             raise ValidationError(
                 {"children": _("No of children should be a postive integier")}
             )
@@ -642,31 +669,6 @@ def build_employee_emergency_contact_formset(extra=0):
         extra=extra,
         can_delete=True,
     )
-
-
-class BankDetailsCreationForm(ModelForm):
-    """
-    Form for BankDetailsCreationForm
-    """
-
-    bank_name = forms.CharField(required=True, label="Bank Name")
-    account_number = forms.CharField(required=True, label="Account Number")
-    branch = forms.CharField(required=True, label="Branch")
-    address = forms.Textarea()
-    country = forms.CharField(required=True, label="Country")
-    state = forms.CharField(required=True, label="State")
-    city = forms.CharField(required=True, label="City")
-    any_other_code1 = forms.CharField(required=True, label="Code #1")
-    any_other_code2 = forms.CharField(required=False, label="Code #2")
-
-    class Meta:
-        """
-        Meta class to add some additional options
-        """
-
-        model = EmployeeBankDetails
-        fields = "__all__"
-        exclude = ["employee_id", "additional_info", "is_active"]
 
 
 class StageChangeForm(forms.ModelForm):

@@ -1,0 +1,157 @@
+{% extends "onboarding/self_onboarding_base.html" %}
+{% load i18n %}
+
+{% block extra_style %}
+.formset-row {
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    padding: 14px 14px 4px;
+    margin-bottom: 14px;
+    position: relative;
+}
+.formset-remove-row {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    border: none;
+    background: none;
+    color: #dc3545;
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+{% endblock %}
+
+{% block content %}
+<h1 class="oh-swz__title">{% trans "Education" %}</h1>
+<p class="oh-swz__subtitle">{% trans "Add your academic qualifications - you can add more than one." %}</p>
+
+<div class="oh-swz__panel">
+    <form method="post">
+        {% csrf_token %}
+        {{ education_formset.management_form }}
+        <div id="educationRows">
+            {% for edu_form in education_formset %}
+            <div class="formset-row" data-existing="{% if edu_form.instance.pk %}true{% else %}false{% endif %}">
+                {{ edu_form.id }}
+                <div style="display:none;">{{ edu_form.DELETE }}</div>
+                <button type="button" class="formset-remove-row" title="{% trans 'Remove' %}"><ion-icon name="close-outline"></ion-icon></button>
+                <div class="oh-swz__grid">
+                    <div class="oh-input-group">
+                        <label class="oh-label">{% trans "Course/Degree" %}</label>
+                        {{ edu_form.degree }}
+                    </div>
+                    <div class="oh-input-group">
+                        <label class="oh-label">{% trans "University/College" %}</label>
+                        {{ edu_form.university }}
+                    </div>
+                    <div class="oh-input-group">
+                        <label class="oh-label">{% trans "Branch/Specialization" %}</label>
+                        {{ edu_form.specialization }}
+                    </div>
+                    <div class="oh-input-group">
+                        <label class="oh-label">{% trans "CGPA/Percentage" %}</label>
+                        {{ edu_form.percentage_cgpa }}
+                    </div>
+                    <div class="oh-input-group">
+                        <label class="oh-label">{% trans "Start of Course" %}</label>
+                        {{ edu_form.start_date }}
+                    </div>
+                    <div class="oh-input-group">
+                        <label class="oh-label">{% trans "End of Course" %}</label>
+                        {{ edu_form.end_date }}
+                    </div>
+                    <div class="oh-swz__field--full oh-input-group">
+                        <label class="oh-label">{% trans "Location" %}</label>
+                        {{ edu_form.location }}
+                    </div>
+                </div>
+                {{ edu_form.errors }}
+            </div>
+            {% endfor %}
+        </div>
+        <button type="button" id="addEducationRow" class="oh-btn oh-btn--light-bkg oh-btn--sm mb-3">
+            <ion-icon name="add-outline"></ion-icon> {% trans "Add Education" %}
+        </button>
+        <template id="educationRowTemplate">
+            <div class="formset-row" data-existing="false">
+                <button type="button" class="formset-remove-row" title="{% trans 'Remove' %}"><ion-icon name="close-outline"></ion-icon></button>
+                <div class="oh-swz__grid">
+                    <div class="oh-input-group">
+                        <label class="oh-label">{% trans "Course/Degree" %}</label>
+                        <input type="text" class="oh-input w-100" name="education-__PREFIX__-degree">
+                    </div>
+                    <div class="oh-input-group">
+                        <label class="oh-label">{% trans "University/College" %}</label>
+                        <input type="text" class="oh-input w-100" name="education-__PREFIX__-university">
+                    </div>
+                    <div class="oh-input-group">
+                        <label class="oh-label">{% trans "Branch/Specialization" %}</label>
+                        <input type="text" class="oh-input w-100" name="education-__PREFIX__-specialization">
+                    </div>
+                    <div class="oh-input-group">
+                        <label class="oh-label">{% trans "CGPA/Percentage" %}</label>
+                        <input type="text" class="oh-input w-100" name="education-__PREFIX__-percentage_cgpa">
+                    </div>
+                    <div class="oh-input-group">
+                        <label class="oh-label">{% trans "Start of Course" %}</label>
+                        <input type="date" class="oh-input w-100" name="education-__PREFIX__-start_date">
+                    </div>
+                    <div class="oh-input-group">
+                        <label class="oh-label">{% trans "End of Course" %}</label>
+                        <input type="date" class="oh-input w-100" name="education-__PREFIX__-end_date">
+                    </div>
+                    <div class="oh-swz__field--full oh-input-group">
+                        <label class="oh-label">{% trans "Location" %}</label>
+                        <input type="text" class="oh-input w-100" name="education-__PREFIX__-location">
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <div class="oh-swz__actions">
+            <button type="submit" style="background-color: var(--swz-accent); color: var(--swz-on-accent);" class="oh-btn">
+                {% trans "Next Step" %} <ion-icon class="ms-2" name="arrow-forward-outline"></ion-icon>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+    $(document).ready(function () {
+        function wireFormsetSection(containerId, addBtnId, templateId, totalFormsName) {
+            var container = document.getElementById(containerId);
+            var addBtn = document.getElementById(addBtnId);
+            var template = document.getElementById(templateId);
+            var totalFormsInput = document.querySelector('input[name="' + totalFormsName + '"]');
+            if (!container || !addBtn || !template || !totalFormsInput) { return; }
+            function wireRemove(rowEl) {
+                var removeBtn = rowEl.querySelector(".formset-remove-row");
+                if (!removeBtn) { return; }
+                removeBtn.addEventListener("click", function () {
+                    if (rowEl.dataset.existing === "true") {
+                        var deleteBox = rowEl.querySelector('input[type="checkbox"][name$="-DELETE"]');
+                        if (deleteBox) { deleteBox.checked = true; }
+                        rowEl.style.display = "none";
+                    } else {
+                        rowEl.remove();
+                    }
+                });
+            }
+            addBtn.addEventListener("click", function () {
+                var index = parseInt(totalFormsInput.value, 10) || 0;
+                var html = template.innerHTML.split("__PREFIX__").join(index);
+                var wrapper = document.createElement("div");
+                wrapper.innerHTML = html.trim();
+                var rowEl = wrapper.firstElementChild;
+                container.appendChild(rowEl);
+                totalFormsInput.value = index + 1;
+                wireRemove(rowEl);
+            });
+            container.querySelectorAll(".formset-row").forEach(wireRemove);
+        }
+        wireFormsetSection("educationRows", "addEducationRow", "educationRowTemplate", "education-TOTAL_FORMS");
+    });
+</script>
+{% endblock %}

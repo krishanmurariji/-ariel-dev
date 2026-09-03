@@ -144,9 +144,14 @@ urlpatterns = [
         name="employee-creation",
     ),
     path(
-        "employee-bank-details/<str:token>/",
-        views.employee_bank_details,
-        name="employee-bank-details",
+        "employee-education/<str:token>/",
+        views.employee_education,
+        name="employee-education",
+    ),
+    path(
+        "employee-experience/<str:token>/",
+        views.employee_experience,
+        name="employee-experience",
     ),
     path("welcome-aboard/", views.welcome_aboard, name="welcome-aboard"),
     path(
