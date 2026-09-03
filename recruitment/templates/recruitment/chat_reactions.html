@@ -1,0 +1,34 @@
+{% load i18n %}
+{% comment %}
+Shared by all three chat surfaces (candidate self-tracking portal, HR
+profile "Chat" tab, recruiter pipeline "Chat" modal) - one reaction row
+per message: existing reactions as pills, plus a hover-revealed
+quick-react trigger (WhatsApp/Teams style). `note` and `viewer` (the
+Employee or Candidate looking at this thread - see
+StageNote.reaction_groups' docstring) come from whichever parent
+template includes this.
+{% endcomment %}
+<div class="oh-chat-reactions-row">
+    <div class="oh-chat-reactions" id="reactions-{{ note.id }}">
+        {% for group in note.reaction_groups %}
+        <button type="button"
+            class="oh-chat-reaction-pill{% if viewer in group.reactors %} oh-chat-reaction-pill--mine{% endif %}"
+            data-react-note="{{ note.id }}" data-react-emoji="{{ group.emoji }}"
+            aria-label="{{ group.emoji }} &middot; {{ group.count }}"
+        >{{ group.emoji }}<span>{{ group.count }}</span></button>
+        {% endfor %}
+    </div>
+    <div class="oh-chat-react-menu">
+        <button type="button" class="oh-chat-react-trigger" aria-label="{% trans 'React' %}">
+            <ion-icon name="happy-outline"></ion-icon>
+        </button>
+        <div class="oh-chat-react-popup">
+            <button type="button" class="oh-chat-react-option" data-react-note="{{ note.id }}" data-react-emoji="👍">👍</button>
+            <button type="button" class="oh-chat-react-option" data-react-note="{{ note.id }}" data-react-emoji="❤️">❤️</button>
+            <button type="button" class="oh-chat-react-option" data-react-note="{{ note.id }}" data-react-emoji="😂">😂</button>
+            <button type="button" class="oh-chat-react-option" data-react-note="{{ note.id }}" data-react-emoji="😮">😮</button>
+            <button type="button" class="oh-chat-react-option" data-react-note="{{ note.id }}" data-react-emoji="😢">😢</button>
+            <button type="button" class="oh-chat-react-option" data-react-note="{{ note.id }}" data-react-emoji="🙏">🙏</button>
+        </div>
+    </div>
+</div>

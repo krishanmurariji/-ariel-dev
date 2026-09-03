@@ -140,6 +140,7 @@ from recruitment.models import (
     Stage,
     StageFiles,
     StageNote,
+    StageNoteReaction,
 )
 from recruitment.views.linkedin import delete_post, post_recruitment_in_linkedin
 from recruitment.views.paginator_qry import paginator_qry
@@ -1077,7 +1078,7 @@ def view_note(request, cand_id):
     return render(
         request,
         "pipeline/pipeline_components/view_note.html",
-        {"cand": candidate_obj, "notes": notes},
+        {"cand": candidate_obj, "notes": notes, "viewer": request.user.employee_get},
     )
 
 
@@ -1117,6 +1118,7 @@ def add_note(request, pk=None):
         {
             "candidate": candidate_obj,
             "note_form": form,
+            "viewer": request.user.employee_get,
         },
     )
 
@@ -1150,7 +1152,12 @@ def create_note(request, cand_id=None):
     return render(
         request,
         "pipeline/pipeline_components/view_note.html",
-        {"note_form": form, "cand": candidate_obj, "notes": notes},
+        {
+            "note_form": form,
+            "cand": candidate_obj,
+            "notes": notes,
+            "viewer": request.user.employee_get,
+        },
     )
 
 
@@ -1210,6 +1217,60 @@ def note_update_individual(request, note_id):
             "form": form,
         },
     )
+
+
+@candidate_login_required
+def toggle_note_reaction(request, note_id):
+    """
+    Toggles a quick-emoji reaction (StageNote.QUICK_EMOJIS) on a chat
+    message for whichever actor is viewing - reused by all three chat
+    surfaces (candidate self-tracking portal, HR profile tab, pipeline
+    modal), same as candidate_login_required already allows all three to
+    reach a single endpoint. One reaction per (note, actor): clicking the
+    same emoji again removes it, a different emoji replaces it - matches
+    the WhatsApp/Teams hover-react convention this mirrors. The client
+    doesn't need this response's body - it just triggers the existing
+    refetchMessages() (recruitment/consumers.py's chat_message broadcast)
+    to pick up the change, same as sending an ordinary message does.
+    """
+    note = StageNote.find(note_id)
+    if not note or request.method != "POST":
+        return HttpResponse(status=404)
+
+    emoji = request.POST.get("emoji", "")
+    if emoji not in StageNote.QUICK_EMOJIS:
+        return HttpResponse(status=400)
+
+    # Priority matches candidate_add_notes' own updated_by resolution: an
+    # authenticated employee session wins even when request.session also
+    # carries a candidate_id - which it legitimately can at the same time
+    # for a staff member previewing the candidate portal
+    # (candidate_self_status_tracking_managers_view stamps candidate_id
+    # into the very same session on purpose). Checking candidate_id first
+    # would have misattributed every HR reaction on such a session to the
+    # candidate instead of the employee actually clicking.
+    if request.user.is_authenticated:
+        employee = request.user.employee_get
+        if not employee:
+            return HttpResponse(status=403)
+        reactor_filter = {"reacted_by_employee": employee}
+    else:
+        candidate_id = request.session.get("candidate_id")
+        if not candidate_id or candidate_id != note.candidate_id.id:
+            return HttpResponse(status=403)
+        reactor_filter = {"reacted_by_candidate": note.candidate_id}
+
+    existing = StageNoteReaction.objects.filter(note=note, **reactor_filter).first()
+    if existing and existing.emoji == emoji:
+        existing.delete()
+    elif existing:
+        existing.emoji = emoji
+        existing.save(update_fields=["emoji"])
+    else:
+        StageNoteReaction.objects.create(note=note, emoji=emoji, **reactor_filter)
+
+    broadcast_new_message(note.candidate_id.id)
+    return HttpResponse(status=204)
 
 
 @login_required
@@ -3972,6 +4033,7 @@ def candidate_self_status_tracking(request):
             "candidate/candidate_self_tracking.html",
             {
                 "candidate": candidate,
+                "viewer": candidate,
                 "interviews": interviews,
                 "all_tasks": all_tasks,
                 "my_task_groups": _group_tasks_by_template(all_tasks),
@@ -4026,6 +4088,7 @@ def candidate_task_self_update(request, task_id):
         "candidate/candidate_self_tracking.html",
         {
             "candidate": candidate,
+            "viewer": candidate,
             "all_tasks": all_tasks,
             "my_task_groups": _group_tasks_by_template(all_tasks),
             "status_choices": CandidateChecklistTask.STATUS_CHOICES,
@@ -4073,6 +4136,7 @@ def candidate_self_status_tracking_managers_view(request, cand_id):
             "candidate/candidate_self_tracking.html",
             {
                 "candidate": candidate,
+                "viewer": candidate,
                 "interviews": interviews,
                 "all_tasks": all_tasks,
                 "my_task_groups": _group_tasks_by_template(all_tasks),
@@ -5011,6 +5075,7 @@ def candidate_add_notes(request, cand_id):
         {
             "candidate": candidate,
             "note_form": form,
+            "viewer": candidate,
         },
     )
 
