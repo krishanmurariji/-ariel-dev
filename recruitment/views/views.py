@@ -2739,7 +2739,7 @@ def send_acknowledgement(request):
         )
         render_bdy = template_bdy.render(context)
         letterhead_bdy, company, _has_logo = render_letterhead_content(
-            render_bdy, tag_label=_("Recruitment"), team_label=_("Recruitment Team"),
+            render_bdy, tag_label=_("Recruitment"), team_label=_("Talent Acquisition Team"),
             company=getattr(candidate.recruitment_id, "company_id", None),
         )
         to = candidate.email
@@ -4936,7 +4936,7 @@ def notify_candidate_of_document_rejection(document_obj):
             },
             to=candidate.email,
             tag_label=_("Onboarding"),
-            team_label=_("Recruitment Team"),
+            team_label=_("Talent Acquisition Team"),
             company=getattr(candidate.recruitment_id, "company_id", None),
             from_email=display_email_name,
             reply_to=[display_email_name],

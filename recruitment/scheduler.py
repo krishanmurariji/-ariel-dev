@@ -46,7 +46,7 @@ def _send_closing_reminder_mail(rec, template_body, email_backend):
         django_template.Context({"instance": rec})
     )
     html_body, company, _has_logo = render_letterhead_content(
-        rendered_body, tag_label="Recruitment", team_label="Recruitment Team",
+        rendered_body, tag_label="Recruitment", team_label="Talent Acquisition Team",
         instance=rec,
     )
     try:

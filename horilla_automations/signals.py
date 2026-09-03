@@ -476,7 +476,12 @@ def send_mail(request, automation, instance):
         )
 
         tag_label = automation.model.split(".")[0].title() if automation.model else ""
-        team_label = f"{tag_label} Team" if tag_label else None
+        # Recruitment's own team goes by "Talent Acquisition Team" now -
+        # every other app keeps the generic "<App> Team" derivation.
+        if tag_label == "Recruitment":
+            team_label = "Talent Acquisition Team"
+        else:
+            team_label = f"{tag_label} Team" if tag_label else None
         letterhead_bdy, letterhead_company, _has_logo = render_letterhead_content(
             render_bdy, tag_label=tag_label, team_label=team_label,
             instance=context_instance or instance,
