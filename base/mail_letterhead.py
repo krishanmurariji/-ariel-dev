@@ -37,6 +37,14 @@ logger = logging.getLogger(__name__)
 LETTERHEAD_ACCENT = "#E54F38"
 LETTERHEAD_TEMPLATE = "mail/letterhead_base.html"
 
+# The header strip's blue->black gradient bar. Rendered as a real image
+# (not a CSS gradient) for the same reason the watermark is an image -
+# classic desktop Outlook's Word rendering engine ignores CSS
+# background/linear-gradient entirely, but scales an <img> reliably.
+LETTERHEAD_GRADIENT_START = "#0B5FCE"
+LETTERHEAD_GRADIENT_END = "#03060f"
+_GRADIENT_CACHE_KEY = "letterhead_gradient_bar:v1"
+
 
 def resolve_instance_company(instance):
     """
@@ -141,6 +149,47 @@ def _load_watermark_bytes(company):
     return data
 
 
+def _hex_to_rgb(hex_color):
+    hex_color = hex_color.lstrip("#")
+    return tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
+
+
+def _load_gradient_bar_bytes():
+    """
+    A left-to-right blue->black gradient PNG for the header strip, cached
+    once (it's a fixed brand element, not per-company) rather than
+    regenerated on every send.
+    """
+    cached = cache.get(_GRADIENT_CACHE_KEY)
+    if cached is not None:
+        return cached
+    try:
+        from PIL import Image
+
+        width, height = 1200, 12
+        start = _hex_to_rgb(LETTERHEAD_GRADIENT_START)
+        end = _hex_to_rgb(LETTERHEAD_GRADIENT_END)
+        img = Image.new("RGB", (width, height))
+        pixels = img.load()
+        row = []
+        for x in range(width):
+            t = x / (width - 1)
+            row.append(
+                tuple(round(start[i] + (end[i] - start[i]) * t) for i in range(3))
+            )
+        for y in range(height):
+            for x in range(width):
+                pixels[x, y] = row[x]
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        data = buf.getvalue()
+    except Exception as e:
+        logger.warning("Letterhead gradient bar generation failed: %s", e)
+        return None
+    cache.set(_GRADIENT_CACHE_KEY, data, timeout=60 * 60 * 24)
+    return data
+
+
 def attach_letterhead_images(message, company):
     """
     Attaches the company logo (cid:letterhead_logo) and its faded
@@ -176,6 +225,14 @@ def attach_letterhead_images(message, company):
         wm_img.add_header("Content-Disposition", "inline")
         message.attach(wm_img)
         has_watermark = True
+
+    # Fixed brand element, not company-specific - always attach.
+    gradient_bytes = _load_gradient_bar_bytes()
+    if gradient_bytes:
+        gradient_img = MIMEImage(gradient_bytes, _subtype="png")
+        gradient_img.add_header("Content-ID", "<letterhead_gradient>")
+        gradient_img.add_header("Content-Disposition", "inline")
+        message.attach(gradient_img)
 
     return has_logo, has_watermark
 
