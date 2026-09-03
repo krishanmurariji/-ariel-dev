@@ -8,10 +8,16 @@ MailSendThread pattern (ConfiguredEmailBackend + PDF attachment).
 import logging
 from threading import Thread
 
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
+from django.utils.translation import gettext as _
 
 from base.backends import ConfiguredEmailBackend
+from base.mail_letterhead import (
+    attach_letterhead_images,
+    letterhead_context,
+    resolve_letterhead_company,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +45,8 @@ class PayslipMailThread(Thread):
             employee = record.employee_id
             run = record.run_id
             period = f"{MONTH_NAMES[run.month - 1]} {run.year}"
+            company = resolve_letterhead_company(employee=employee)
+            has_logo = bool(company and company.icon)
             try:
                 html_message = render_to_string(
                     "payroll_pro/mail_templates/payslip_mail.html",
@@ -48,6 +56,10 @@ class PayslipMailThread(Thread):
                         "record": record,
                         "host": self.host,
                         "protocol": self.protocol,
+                        **letterhead_context(
+                            company, tag_label=_("Payroll"), team_label=_("Payroll Team"),
+                            has_logo=has_logo, has_watermark=has_logo,
+                        ),
                     },
                     request=self.request,
                 )
@@ -91,7 +103,7 @@ class PayslipMailThread(Thread):
                     except Exception:
                         pass
 
-                email = EmailMessage(
+                email = EmailMultiAlternatives(
                     f"Hello {employee.get_full_name()}, your payslip for "
                     f"{period} is ready!",
                     html_message,
@@ -99,8 +111,10 @@ class PayslipMailThread(Thread):
                     [employee.get_mail()],
                     reply_to=[display_email_name],
                 )
-                email.attachments = attachments
-                email.content_subtype = "html"
+                email.attach_alternative(html_message, "text/html")
+                for attachment in attachments:
+                    email.attach(*attachment)
+                attach_letterhead_images(email, company)
                 email.send()
                 record.sent_to_employee = True
                 record.save(update_fields=["sent_to_employee"])

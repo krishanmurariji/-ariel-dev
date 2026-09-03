@@ -34,6 +34,11 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
+from base.mail_letterhead import (
+    attach_letterhead_images,
+    letterhead_context,
+    resolve_letterhead_company,
+)
 from base.methods import reload_queryset
 from base.models import (
     Announcement,
@@ -3041,9 +3046,13 @@ class PassWordResetForm(forms.Form):
         from_email,
         to_email,
         html_email_template_name=None,
+        company=None,
     ):
         """
-        Send a django.core.mail.EmailMultiAlternatives to `to_email`.
+        Send a django.core.mail.EmailMultiAlternatives to `to_email`. The
+        HTML alternative extends mail/letterhead_base.html, so its logo/
+        watermark need attaching here the same way every other letterhead
+        mail does (base.mail_letterhead.attach_letterhead_images).
         """
         subject = loader.render_to_string(subject_template_name, context)
         # Email subject *must not* contain newlines
@@ -3054,6 +3063,7 @@ class PassWordResetForm(forms.Form):
         if html_email_template_name is not None:
             html_email = loader.render_to_string(html_email_template_name, context)
             email_message.attach_alternative(html_email, "text/html")
+            attach_letterhead_images(email_message, company)
 
         email_message.send()
 
@@ -3121,16 +3131,12 @@ class PassWordResetForm(forms.Form):
         else:
             site_name = domain = domain_override
 
-        # Same company-name resolution as
-        # base.context_processors.white_labelling_company, just sourced
-        # from the recipient's own employee record instead of
+        # Same company resolution as base.context_processors.white_labelling_company,
+        # just sourced from the recipient's own employee record instead of
         # request.user (this recipient is usually anonymous - they're
         # requesting a reset because they're logged out).
-        white_label_company_name = "Horilla"
-        if getattr(settings, "WHITE_LABELLING", False):
-            company = employee.get_company() or Company.objects.filter(hq=True).last()
-            if company:
-                white_label_company_name = company.company
+        company = resolve_letterhead_company(employee=employee)
+        has_logo = bool(company and company.icon)
 
         if email:
             token = token_generator.make_token(user)
@@ -3138,11 +3144,15 @@ class PassWordResetForm(forms.Form):
                 "email": email,
                 "domain": domain,
                 "site_name": site_name,
-                "white_label_company_name": white_label_company_name,
+                "white_label_company_name": company.company if company else "Horilla",
                 "uid": urlsafe_base64_encode(force_bytes(user.pk)),
                 "user": user,
                 "token": token,
                 "protocol": "https" if use_https else "http",
+                **letterhead_context(
+                    company, tag_label=_("Security"), team_label=_("IT Team"),
+                    has_logo=has_logo, has_watermark=has_logo,
+                ),
                 **(extra_email_context or {}),
             }
             self.send_mail(
@@ -3152,6 +3162,7 @@ class PassWordResetForm(forms.Form):
                 from_email,
                 email,
                 html_email_template_name=html_email_template_name,
+                company=company,
             )
 
 

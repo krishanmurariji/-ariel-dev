@@ -11,7 +11,7 @@ import types
 
 from bs4 import BeautifulSoup
 from django import template
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models.signals import post_delete, post_save, pre_save
@@ -470,17 +470,30 @@ def send_mail(request, automation, instance):
         soup = BeautifulSoup(render_bdy, "html.parser")
         plain_text = soup.get_text(separator="\n")
 
-        email = EmailMessage(
+        from base.mail_letterhead import (
+            attach_letterhead_images,
+            render_letterhead_content,
+        )
+
+        tag_label = automation.model.split(".")[0].title() if automation.model else ""
+        team_label = f"{tag_label} Team" if tag_label else None
+        letterhead_bdy, letterhead_company, _has_logo = render_letterhead_content(
+            render_bdy, tag_label=tag_label, team_label=team_label,
+            instance=context_instance or instance,
+        )
+
+        email = EmailMultiAlternatives(
             subject=render_title,
-            body=render_bdy,
+            body=letterhead_bdy,
             to=to,
             cc=cc,
             from_email=from_email,
             reply_to=reply_to,
         )
-        email.content_subtype = "html"
+        email.attach_alternative(letterhead_bdy, "text/html")
 
         email.attachments = attachments
+        attach_letterhead_images(email, letterhead_company)
 
         def _send_mail(email):
             try:

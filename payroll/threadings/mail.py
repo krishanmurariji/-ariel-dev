@@ -7,10 +7,16 @@ This module is used handle mail sent in thread
 import logging
 from threading import Thread
 
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
+from django.utils.translation import gettext as _
 
 from base.backends import ConfiguredEmailBackend
+from base.mail_letterhead import (
+    attach_letterhead_images,
+    letterhead_context,
+    resolve_letterhead_company,
+)
 from employee.models import EmployeeWorkInformation
 from payroll.models.models import Payslip
 from payroll.views.views import payslip_pdf
@@ -34,12 +40,20 @@ class MailSendThread(Thread):
     def run(self) -> None:
         super().run()
         for record in list(self.result_dict.values()):
+            employee = record["instances"][0].employee_id
+            company = resolve_letterhead_company(employee=employee)
+            has_logo = bool(company and company.icon)
+
             html_message = render_to_string(
                 "payroll/mail_templates/default.html",
                 {
                     "record": record,
                     "host": self.host,
                     "protocol": self.protocol,
+                    **letterhead_context(
+                        company, tag_label=_("Payroll"), team_label=_("Payroll Team"),
+                        has_logo=has_logo, has_watermark=has_logo,
+                    ),
                 },
                 request=self.request,
             )
@@ -53,7 +67,6 @@ class MailSendThread(Thread):
                         "application/pdf",
                     )
                 )
-            employee = record["instances"][0].employee_id
             email_backend = ConfiguredEmailBackend()
             display_email_name = email_backend.dynamic_from_email_with_display_name
             if self.request:
@@ -62,17 +75,19 @@ class MailSendThread(Thread):
                 except:
                     logger.error(Exception)
 
-            email = EmailMessage(
+            email = EmailMultiAlternatives(
                 f"Hello, {record['instances'][0].get_name()} Your Payslips is Ready!",
                 html_message,
                 display_email_name,
                 [employee.get_mail()],
                 reply_to=[display_email_name],
             )
-            email.attachments = attachments
+            email.attach_alternative(html_message, "text/html")
+            for attachment in attachments:
+                email.attach(*attachment)
+            attach_letterhead_images(email, company)
 
             # Send the email
-            email.content_subtype = "html"
             try:
                 email.send()
                 Payslip.objects.filter(id__in=self.ids).update(sent_to_employee=True)

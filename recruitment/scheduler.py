@@ -33,7 +33,9 @@ def _send_closing_reminder_mail(rec, template_body, email_backend):
     """Emails every recruitment head assigned to `rec` that it's closing soon."""
     import logging
     from django import template as django_template
-    from django.core.mail import EmailMessage
+    from django.core.mail import EmailMultiAlternatives
+
+    from base.mail_letterhead import attach_letterhead_images, render_letterhead_content
 
     heads = rec.recruitment_heads.select_related("employee_work_info")
     to_emails = list(filter(None, {head.get_mail() for head in heads}))
@@ -43,14 +45,19 @@ def _send_closing_reminder_mail(rec, template_body, email_backend):
     rendered_body = django_template.Template(template_body).render(
         django_template.Context({"instance": rec})
     )
+    html_body, company, _has_logo = render_letterhead_content(
+        rendered_body, tag_label="Recruitment", team_label="Recruitment Team",
+        instance=rec,
+    )
     try:
-        email = EmailMessage(
+        email = EmailMultiAlternatives(
             subject=f'Job opening "{rec}" closes on {rec.end_date}',
-            body=rendered_body,
+            body=html_body,
             from_email=email_backend.dynamic_from_email_with_display_name,
             to=to_emails,
         )
-        email.content_subtype = "html"
+        email.attach_alternative(html_body, "text/html")
+        attach_letterhead_images(email, company)
         email.send()
     except Exception:
         logging.getLogger(__name__).exception(

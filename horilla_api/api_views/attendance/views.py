@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from django import template
 from django.conf import settings
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.db.models import Case, CharField, F, Value, When
 from django.http import QueryDict
 from django.shortcuts import get_object_or_404
@@ -23,6 +23,7 @@ from attendance.views.dashboard import (
 )
 from attendance.views.views import *
 from base.backends import ConfiguredEmailBackend
+from base.mail_letterhead import attach_letterhead_images, render_letterhead_content
 from base.methods import generate_pdf, is_reportingmanager
 from base.models import HorillaMailTemplate
 from employee.filters import EmployeeFilter
@@ -1003,16 +1004,20 @@ class OfflineEmployeeMailsend(APIView):
             {"instance": employee, "self": request.user.employee_get}
         )
         render_bdy = template_bdy.render(context)
+        letterhead_bdy, company, _has_logo = render_letterhead_content(
+            render_bdy, tag_label="Employee", employee=employee,
+        )
 
-        email = EmailMessage(
+        email = EmailMultiAlternatives(
             subject,
-            render_bdy,
+            letterhead_bdy,
             host,
             [employee.employee_work_info.email],
         )
-        email.content_subtype = "html"
+        email.attach_alternative(letterhead_bdy, "text/html")
 
         email.attachments = attachments
+        attach_letterhead_images(email, company)
         try:
             email.send()
             if employee.employee_work_info.email:

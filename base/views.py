@@ -11,7 +11,6 @@ import os
 import threading
 import uuid
 from datetime import datetime, timedelta
-from email.mime.image import MIMEImage
 from os import path
 from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
@@ -51,6 +50,7 @@ from rest_framework_simplejwt.tokens import UntypedToken
 from accessibility.accessibility import ACCESSBILITY_FEATURE
 from accessibility.models import DefaultAccessibility
 from base.backends import ConfiguredEmailBackend
+from base.mail_letterhead import build_letterhead_email
 from base.decorators import (
     shift_request_change_permission,
     work_type_request_change_permission,
@@ -938,13 +938,26 @@ def send_otp(request):
     display_email_name = email_backend.dynamic_from_email_with_display_name
 
     otp_code = set_otp(request)
-    email = EmailMessage(
-        subject="Your OTP Code",
-        body=f"Your OTP code is {otp_code}",
-        from_email=display_email_name,
-        to=[email],
+    content_html = (
+        "<p style=\"margin:0 0 16px;font-size:15px;color:#2d2d2d;\">"
+        + str(_("Your one-time verification code is:"))
+        + "</p>"
+        + f"<p style=\"margin:0 0 16px;font-size:32px;font-weight:700;letter-spacing:4px;color:#2d2d2d;\">{otp_code}</p>"
+        + "<p style=\"margin:0;font-size:13px;color:#888888;\">"
+        + str(_("If you didn't request this code, you can safely ignore this email."))
+        + "</p>"
     )
-    thread = threading.Thread(target=email.send)
+    message = build_letterhead_email(
+        subject=_("Your OTP Code"),
+        content_html=content_html,
+        to=email,
+        tag_label=_("Security"),
+        team_label=_("IT Team"),
+        employee=employee,
+        from_email=display_email_name,
+        plain_text=_("Your OTP code is %(otp_code)s") % {"otp_code": otp_code},
+    )
+    thread = threading.Thread(target=message.send)
     thread.start()
 
     return redirect("two-factor")
@@ -1631,24 +1644,6 @@ def mail_server_conf(request):
 @permission_required("base.view_dynamicemailconfiguration")
 def mail_server_test_email(request):
     instance_id = request.GET.get("instance_id")
-    white_labelling = getattr(settings, "WHITE_LABELLING", False)
-    image_path = path.join(settings.STATIC_ROOT, "images/ui/horilla-logo.png")
-    company_name = "Horilla"
-
-    if white_labelling:
-        hq = Company.objects.filter(hq=True).last()
-        try:
-            company = (
-                request.user.employee_get.get_company()
-                if request.user.employee_get.get_company()
-                else hq
-            )
-        except:
-            company = hq
-
-        if company:
-            company_name = company.company
-            image_path = path.join(settings.MEDIA_ROOT, company.icon.name)
 
     form = DynamicMailTestForm()
     if request.method == "POST":
@@ -1657,36 +1652,14 @@ def mail_server_test_email(request):
             email_to = form.cleaned_data["to_email"]
             subject = _("Test mail from Horilla")
 
-            # HTML content
-            html_content = f"""
-            <html>
-                <body style="font-family: Arial, sans-serif; margin: 0; padding: 0;">
-                    <table align="center" width="600" cellpadding="0" cellspacing="0" border="0" style="border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden;">
-                        <tr>
-                            <td align="center" bgcolor="#4CAF50" style="padding: 20px 0;">
-                                <h1 style="color: #ffffff; margin: 0;">{company_name}</h1>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 20px;">
-                                <h3 style="color: #4CAF50;">Email tested successfully</h3>
-                                <b><p style="font-size: 14px;">Hi,<br>
-                                    This email is being sent as part of mail sever testing from {company_name}.</p></b>
-                                <img src="cid:unique_image_id" alt="Test Image" style="width: 200px; height: auto; margin: 20px 0;">
-                            </td>
-                        </tr>
-                        <tr>
-                            <td bgcolor="#f0f0f0" style="padding: 10px; text-align: center;">
-                                <p style="font-size: 12px; color: black;">&copy; {datetime.today().year} {company_name}</p>
-                            </td>
-                        </tr>
-                    </table>
-                </body>
-            </html>
-            """
-
-            # Plain text content (fallback for email clients that do not support HTML)
-            text_content = strip_tags(html_content)
+            employee = getattr(request.user, "employee_get", None)
+            content_html = (
+                "<p style=\"margin:0 0 16px;font-size:15px;color:#2d2d2d;\">"
+                + str(_("Hi,"))
+                + "</p><p style=\"margin:0;font-size:14px;color:#444444;line-height:1.7;\">"
+                + str(_("This email confirms your mail server configuration is working."))
+                + "</p>"
+            )
 
             email_backend = ConfiguredEmailBackend()
             emailconfig = DynamicEmailConfiguration.objects.filter(
@@ -1695,20 +1668,16 @@ def mail_server_test_email(request):
             email_backend.configuration = emailconfig
 
             try:
-                msg = EmailMultiAlternatives(
-                    subject,
-                    text_content,
-                    email_backend.dynamic_from_email_with_display_name,
-                    [email_to],
+                msg = build_letterhead_email(
+                    subject=subject,
+                    content_html=content_html,
+                    to=email_to,
+                    tag_label=_("Settings"),
+                    team_label=_("IT Team"),
+                    employee=employee,
+                    from_email=email_backend.dynamic_from_email_with_display_name,
                     connection=email_backend,
                 )
-                msg.attach_alternative(html_content, "text/html")
-
-                with open(image_path, "rb") as img:
-                    msg_img = MIMEImage(img.read())
-                    msg_img.add_header("Content-ID", "<unique_image_id>")
-                    msg.attach(msg_img)
-
                 msg.send()
             except Exception as e:
                 messages.error(request, " ".join([_("Something went wrong :"), str(e)]))

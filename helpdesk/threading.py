@@ -8,10 +8,16 @@ import logging
 from threading import Thread
 
 from django.contrib import messages
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
+from django.utils.translation import gettext as _
 
 from base.backends import ConfiguredEmailBackend
+from base.mail_letterhead import (
+    attach_letterhead_images,
+    letterhead_context,
+    resolve_letterhead_company,
+)
 from base.models import Department
 from employee.models import EmployeeWorkInformation
 from helpdesk.models import Ticket
@@ -54,6 +60,8 @@ class TicketSendThread(Thread):
         if ticket_id != "#":
             link = f"{protocol}://{host}/helpdesk/ticket-detail/{ticket_id}/"
         for recipient in recipients:
+            company = resolve_letterhead_company(employee=recipient)
+            has_logo = bool(company and company.icon)
             html_message = render_to_string(
                 "helpdesk/mail_templates/ticket_mail.html",
                 {
@@ -62,19 +70,24 @@ class TicketSendThread(Thread):
                     "host": host,
                     "protocol": protocol,
                     "subject": subject,
+                    **letterhead_context(
+                        company, tag_label=_("Helpdesk"), team_label=_("Helpdesk Team"),
+                        has_logo=has_logo, has_watermark=has_logo,
+                    ),
                     "content": content,
                 },
                 request=self.request,
             )
 
-            email = EmailMessage(
+            email = EmailMultiAlternatives(
                 subject=subject,
                 body=html_message,
                 from_email=display_email_name,
                 to=[recipient.email],
                 reply_to=[display_email_name],
             )
-            email.content_subtype = "html"
+            email.attach_alternative(html_message, "text/html")
+            attach_letterhead_images(email, company)
             try:
                 email.send()
             except:
@@ -162,6 +175,8 @@ class AddAssigneeThread(Thread):
                 pass
         link = f"{protocol}://{host}/helpdesk/ticket-detail/{self.ticket.id}/"
         for recipient in self.recipients:
+            company = resolve_letterhead_company(employee=recipient)
+            has_logo = bool(company and company.icon)
             html_message = render_to_string(
                 "helpdesk/mail_templates/ticket_mail.html",
                 {
@@ -170,19 +185,24 @@ class AddAssigneeThread(Thread):
                     "host": host,
                     "protocol": protocol,
                     "subject": subject,
+                    **letterhead_context(
+                        company, tag_label=_("Helpdesk"), team_label=_("Helpdesk Team"),
+                        has_logo=has_logo, has_watermark=has_logo,
+                    ),
                     "content": content,
                 },
                 request=self.request,
             )
 
-            email = EmailMessage(
+            email = EmailMultiAlternatives(
                 subject=subject,
                 body=html_message,
                 from_email=display_email_name,
                 to=[recipient.email],
                 reply_to=[display_email_name],
             )
-            email.content_subtype = "html"
+            email.attach_alternative(html_message, "text/html")
+            attach_letterhead_images(email, company)
             try:
                 email.send()
             except:
@@ -221,6 +241,8 @@ class RemoveAssigneeThread(Thread):
         protocol = self.protocol
         link = f"{protocol}://{host}/helpdesk/ticket-detail/{self.ticket.id}/"
         for recipient in self.recipients:
+            company = resolve_letterhead_company(employee=recipient)
+            has_logo = bool(company and company.icon)
             html_message = render_to_string(
                 "helpdesk/mail_templates/ticket_mail.html",
                 {
@@ -229,19 +251,24 @@ class RemoveAssigneeThread(Thread):
                     "host": host,
                     "protocol": protocol,
                     "subject": subject,
+                    **letterhead_context(
+                        company, tag_label=_("Helpdesk"), team_label=_("Helpdesk Team"),
+                        has_logo=has_logo, has_watermark=has_logo,
+                    ),
                     "content": content,
                 },
                 request=self.request,
             )
 
-            email = EmailMessage(
+            email = EmailMultiAlternatives(
                 subject=subject,
                 body=html_message,
                 from_email=display_email_name,
                 to=[recipient.email],
                 reply_to=[display_email_name],
             )
-            email.content_subtype = "html"
+            email.attach_alternative(html_message, "text/html")
+            attach_letterhead_images(email, company)
             try:
                 email.send()
             except:

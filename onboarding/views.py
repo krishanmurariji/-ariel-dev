@@ -23,9 +23,7 @@ from urllib.parse import parse_qs
 from django import template
 from django.contrib import messages
 from django.contrib.auth import login
-from django.contrib.staticfiles import finders
 from django.core.files.base import ContentFile
-from django.core.mail import EmailMessage, send_mail
 from django.core.paginator import Paginator
 from django.db.models import ProtectedError
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
@@ -845,13 +843,18 @@ def candidate_filter(request):
 
 
 import logging
-import os
 import secrets
-from email.mime.image import MIMEImage
 
 from django.contrib import messages
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
+
+from base.mail_letterhead import (
+    attach_letterhead_images,
+    letterhead_context,
+    render_letterhead_content,
+    resolve_letterhead_company,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -923,6 +926,8 @@ def email_send(request):
         portal.save()
 
         # Render email HTML
+        company = candidate.recruitment_id.company_id
+        has_logo = bool(company and company.icon)
         html_message = render_to_string(
             "onboarding/mail_templates/default.html",
             {
@@ -930,7 +935,10 @@ def email_send(request):
                 "instance": candidate,
                 "host": host,
                 "protocol": protocol,
-                "use_cid_logo": True,
+                **letterhead_context(
+                    company, tag_label=_("Onboarding"), team_label=_("HR Team"),
+                    has_logo=has_logo, has_watermark=has_logo,
+                ),
             },
             request=request,
         )
@@ -950,26 +958,7 @@ def email_send(request):
         for attachment in attachments:
             email.attach(*attachment)
 
-        # ✅ Attach company logo INLINE
-        try:
-            company = candidate.recruitment_id.company_id
-            if company and company.icon and os.path.exists(company.icon.path):
-                image_path = company.icon.path
-            else:
-                image_path = finders.find("images/ui/horilla-sticker-round.png")
-
-            if image_path:
-                with open(image_path, "rb") as f:
-                    logo = MIMEImage(f.read())
-                    logo.add_header("Content-ID", "<company_logo>")
-                    logo.add_header(
-                        "Content-Disposition",
-                        "inline",
-                        filename=os.path.basename(image_path),
-                    )
-                    email.attach(logo)
-        except Exception as e:
-            logger.error(f"Company logo attach failed: {e}")
+        attach_letterhead_images(email, company)
 
         # Send mail
         try:
@@ -2205,14 +2194,21 @@ def onboarding_send_mail(request, candidate_id):
         subject = request.POST["subject"]
         body = request.POST["body"]
         with contextlib.suppress(Exception):
-            res = send_mail(
-                subject,
-                body,
-                display_email_name,
-                [candidate_mail],
-                fail_silently=False,
+            company = getattr(candidate.recruitment_id, "company_id", None)
+            letterhead_bdy, letterhead_company, _has_logo = render_letterhead_content(
+                body, tag_label=_("Onboarding"), team_label=_("HR Team"),
+                company=company,
             )
-            if res == 1:
+            mail = EmailMultiAlternatives(
+                subject=subject,
+                body=letterhead_bdy,
+                from_email=display_email_name,
+                to=[candidate_mail],
+            )
+            mail.attach_alternative(letterhead_bdy, "text/html")
+            attach_letterhead_images(mail, letterhead_company)
+            sent_count = mail.send(fail_silently=False)
+            if sent_count == 1:
                 messages.success(request, _("Mail sent successfully"))
             else:
                 messages.error(request, _("Something went wrong"))

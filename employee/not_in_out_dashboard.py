@@ -10,7 +10,7 @@ from datetime import date
 from django import template
 from django.apps import apps
 from django.contrib import messages
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
@@ -18,6 +18,7 @@ from django.utils.translation import gettext_lazy as _
 
 from base.backends import ConfiguredEmailBackend
 from base.forms import MailTemplateForm
+from base.mail_letterhead import attach_letterhead_images, render_letterhead_content
 from base.methods import (
     build_safe_template_request,
     export_data,
@@ -306,20 +307,24 @@ def send_mail_to_employee(request):
             {"instance": employee, "self": request.user.employee_get}
         )
         render_bdy = template_bdy.render(context)
+        letterhead_bdy, company, _has_logo = render_letterhead_content(
+            render_bdy, tag_label=_("Employee"), employee=employee,
+        )
         send_to_mail = (
             employee.employee_work_info.email
             if employee.employee_work_info and employee.employee_work_info.email
             else employee.email
         )
 
-        email = EmailMessage(
+        email = EmailMultiAlternatives(
             subject=subject,
-            body=render_bdy,
+            body=letterhead_bdy,
             to=[send_to_mail],
         )
-        email.content_subtype = "html"
+        email.attach_alternative(letterhead_bdy, "text/html")
 
         email.attachments = attachments
+        attach_letterhead_images(email, company)
         try:
             email.send()
             if employee.employee_work_info.email or employee.email:
