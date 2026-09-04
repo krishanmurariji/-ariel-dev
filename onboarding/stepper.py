@@ -21,6 +21,7 @@ from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.utils.translation import gettext_lazy as _
 
 from base.models import Department, EmployeeShift, EmployeeType, JobPosition, JobRole, WorkType
@@ -187,6 +188,12 @@ def _task_groups(candidate, phase, template_ids):
             groups_by_id[template.id] = group
             groups.append(group)
         existing_row = existing.get(task.id)
+        if existing_row and existing_row.due_date:
+            due_date = existing_row.due_date
+        elif template.default_due_offset and candidate.joining_date:
+            due_date = candidate.joining_date + timedelta(days=template.default_due_offset)
+        else:
+            due_date = None
         group["rows"].append(
             {
                 "task": task,
@@ -195,6 +202,7 @@ def _task_groups(candidate, phase, template_ids):
                     if existing_row
                     else template.default_assignee_id_id
                 ),
+                "due_date": due_date,
             }
         )
     return groups
@@ -486,12 +494,20 @@ def _save_checklist_tasks(request, candidate, phase):
             assignee = employees.get(assignee_raw) if assignee_raw else None
             if not assignee:
                 unassigned.append(template_task.title)
-        due_offset = template_task.template_id.default_due_offset
-        due_date = (
-            candidate.joining_date + timedelta(days=due_offset)
-            if due_offset and candidate.joining_date
-            else None
-        )
+        # The date input is pre-filled (see _task_groups' matching due_date
+        # computation) with the group's default offset from the candidate's
+        # joining date, but it's a real date picker - whatever the user
+        # actually submits wins, whether that's the untouched prefill or a
+        # manually-picked date. Only falls back to auto-computing here if
+        # the field came through empty/unparseable (e.g. JS disabled).
+        due_date = parse_date(request.POST.get(f"due_date_{task_id}") or "")
+        if due_date is None:
+            due_offset = template_task.template_id.default_due_offset
+            due_date = (
+                candidate.joining_date + timedelta(days=due_offset)
+                if due_offset and candidate.joining_date
+                else None
+            )
         _task_obj, created = CandidateChecklistTask.objects.update_or_create(
             candidate_id=candidate,
             template_task_id=template_task,

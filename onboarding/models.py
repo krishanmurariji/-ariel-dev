@@ -316,12 +316,6 @@ PHASE_CHOICES = [
     ("employee_checklist", _("Employee Checklist")),
 ]
 
-DUE_OFFSET_CHOICES = [
-    (1, _("1 Day")),
-    (7, _("1 Week")),
-    (15, _("15 Days")),
-    (30, _("1 Month")),
-]
 
 
 class TaskTemplate(HorillaModel):
@@ -353,13 +347,15 @@ class TaskTemplate(HorillaModel):
         ),
     )
     default_due_offset = models.PositiveIntegerField(
-        choices=DUE_OFFSET_CHOICES,
         null=True,
         blank=True,
         verbose_name=_("Default Due Date"),
         help_text=_(
-            "Days after the candidate's joining date that each task in "
-            "this group is due, once assigned."
+            "Days after the candidate's joining date that each task in this "
+            "group is due by default - any number, not just a fixed list. "
+            "Pre-fills each task's due date once the group is picked in the "
+            "Configure Onboarding stepper, where it's shown as a real date "
+            "picker and can still be adjusted per task."
         ),
     )
     company_id = models.ForeignKey(

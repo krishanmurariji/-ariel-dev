@@ -12,7 +12,7 @@
     <span class="text-xs text-[#565E6C]">{% trans "Default Assigner" %}: <strong>{{ template.default_assignee_id.get_full_name }}</strong></span>
     {% endif %}
     {% if template.default_due_offset %}
-    <span class="text-xs text-[#565E6C]">{% trans "Default Due" %}: <strong>{{ template.get_default_due_offset_display }}</strong></span>
+    <span class="text-xs text-[#565E6C]">{% trans "Default Due" %}: <strong>{{ template.default_due_offset }} {% trans "day" %}{{ template.default_due_offset|pluralize }} {% trans "after joining" %}</strong></span>
     {% endif %}
   </div>
   {% if tasks %}

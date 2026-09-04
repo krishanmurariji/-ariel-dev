@@ -27,8 +27,8 @@
           <strong>{{ row.task.title }}</strong>
           {% if row.task.description %}<span class="oh-text-light small">{{ row.task.description }}</span>{% endif %}
         </div>
-        {% if phase != "employee_checklist" %}
         <div class="oh-checklist-row__controls">
+          {% if phase != "employee_checklist" %}
           <div class="oh-checklist-row__assignee-wrap">
             <select name="assignee_{{ row.task.id }}" class="oh-select oh-select-2 oh-checklist-row__assignee">
               <option value="">{% trans "---Choose Assignee---" %}</option>
@@ -37,8 +37,17 @@
               {% endfor %}
             </select>
           </div>
+          {% endif %}
+          <div class="oh-checklist-row__due-wrap">
+            <input
+              type="date"
+              name="due_date_{{ row.task.id }}"
+              class="oh-input oh-checklist-row__due"
+              value="{{ row.due_date|date:'Y-m-d' }}"
+              title="{% trans 'Due date' %}"
+            >
+          </div>
         </div>
-        {% endif %}
       </div>
       {% endfor %}
     </div>

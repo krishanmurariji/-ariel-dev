@@ -879,7 +879,13 @@ class TaskTemplateForm(HorillaModelForm):
         widgets = {
             "phase": forms.Select(attrs={"class": "oh-select oh-select-2 w-100"}),
             "default_assignee_id": forms.Select(attrs={"class": "oh-select oh-select-2 w-100"}),
-            "default_due_offset": forms.Select(attrs={"class": "oh-select oh-select-2 w-100"}),
+            "default_due_offset": forms.NumberInput(
+                attrs={
+                    "class": "oh-input w-100",
+                    "min": 0,
+                    "placeholder": _("e.g. 2"),
+                }
+            ),
         }
 
     def __init__(self, *args, **kwargs):
