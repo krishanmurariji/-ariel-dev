@@ -92,14 +92,7 @@
                         </div>
                     </div>
                     <div class="oh-feedback-form-grid__col">
-                        <div class="oh-input__group">
-                            <label
-                                class="oh-input__label"
-                                for="{{feedback_form.period.id_for_label}}"
-                            >{{ feedback_form.period.label }}</label>
-                            {{ feedback_form.period }}
-                            {{ feedback_form.period.errors }}
-                        </div>
+                        {{ feedback_form.period.as_hidden }}
                         <div class="oh-input__group">
                             <label class="oh-input__label" for="id_quick_period">{% trans "Quick Period" %}</label>
                             <select id="id_quick_period" class="oh-select oh-select-2 w-100">
@@ -109,7 +102,7 @@
                                 {% endfor %}
                             </select>
                             <span class="oh-input__group-hint" style="font-size:11px;color:#9AA1AC;">
-                                {% trans "Sets Start Date to today and computes End Date - an alternative to Period above." %}
+                                {% trans "Sets Start Date to today and computes End Date." %}
                             </span>
                         </div>
                         <div class="oh-input__group">
