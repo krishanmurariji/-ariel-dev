@@ -35,6 +35,14 @@
         .summernote("code", getHtml());
     {% if form.instance.pk %}
         $("#id_mail_to").val({{ form.instance.mail_to | safe }}).change()
+        {% if form.instance.mail_template_id %}
+        // Same restore-on-edit treatment as mail_to above - nothing here
+        // re-applies the instance's saved mail_template selection, so the
+        // dropdown was rendering as "----------" (empty) on every edit
+        // regardless of what was actually saved. Saving from that state
+        // silently wiped the real value back to null every time.
+        $("#id_mail_template").val("{{ form.instance.mail_template_id }}").trigger("change");
+        {% endif %}
         $("#dynamic_field_condition .note-editable").html($("<form id='multipleConditionForm'></form>"));
         $("#dynamic_field_condition .note-editable #multipleConditionForm").html($(`{{form.instance.condition_html|safe}}`))
         $(".note-editable select").parent().find("span.select2").remove()
