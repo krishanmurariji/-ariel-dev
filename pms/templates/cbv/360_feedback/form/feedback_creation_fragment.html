@@ -41,18 +41,28 @@
                         <div class="oh-input__group">
                             <label
                                 class="oh-input__label"
-                                for="{{feedback_form.employee_id.id_for_label}}"
-                            >{{ feedback_form.employee_id.label }}</label>
-                            {{ feedback_form.employee_id }}
-                            {{ feedback_form.employee_id.errors }}
+                                for="{{feedback_form.question_template_id.id_for_label}}"
+                            >{{ feedback_form.question_template_id.label }}</label>
+                            {{ feedback_form.question_template_id }}
+                            {{ feedback_form.question_template_id.errors }}
+                        </div>
+                        {{ feedback_form.period.as_hidden }}
+                        <div class="oh-input__group">
+                            <label class="oh-input__label" for="id_quick_period">{% trans "Quick Period" %}</label>
+                            <select id="id_quick_period" class="oh-select oh-select-2 w-100">
+                                <option value="">{% trans "Choose a duration..." %}</option>
+                                {% for preset in duration_presets %}
+                                <option value="{{ preset.days_count }}">{{ preset.label }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
                         <div class="oh-input__group">
                             <label
                                 class="oh-input__label"
-                                for="{{feedback_form.manager_id.id_for_label}}"
-                            >{{ feedback_form.manager_id.label }}</label>
-                            {{ feedback_form.manager_id }}
-                            {{ feedback_form.manager_id.errros }}
+                                for="{{feedback_form.end_date.id_for_label}}"
+                            >{{ feedback_form.end_date.label }}</label>
+                            {{ feedback_form.end_date }}
+                            {{ feedback_form.end_date.errors }}
                         </div>
                         <div class="oh-input__group">
                             <div style="display: flex">
@@ -67,6 +77,32 @@
                             </div>
                             {{ feedback_form.subordinate_id }}
                             {{ feedback_form.subordinate_id.errors }}
+                        </div>
+                    </div>
+                    <div class="oh-feedback-form-grid__col">
+                        <div class="oh-input__group">
+                            <label
+                                class="oh-input__label"
+                                for="{{feedback_form.employee_id.id_for_label}}"
+                            >{{ feedback_form.employee_id.label }}</label>
+                            {{ feedback_form.employee_id }}
+                            {{ feedback_form.employee_id.errors }}
+                        </div>
+                        <div class="oh-input__group">
+                            <label
+                                class="oh-input__label"
+                                for="{{feedback_form.start_date.id_for_label}}"
+                            >{{ feedback_form.start_date.label }}</label>
+                            {{ feedback_form.start_date }}
+                            {{ feedback_form.start_date.errors }}
+                        </div>
+                        <div class="oh-input__group">
+                            <label
+                                class="oh-input__label"
+                                for="{{feedback_form.manager_id.id_for_label}}"
+                            >{{ feedback_form.manager_id.label }}</label>
+                            {{ feedback_form.manager_id }}
+                            {{ feedback_form.manager_id.errros }}
                         </div>
                         <div class="oh-input__group">
                             <div style="display: flex">
@@ -89,50 +125,6 @@
                             >{{ feedback_form.others_id.label }}</label>
                             {{ feedback_form.others_id }}
                             {{ feedback_form.others_id.errors }}
-                        </div>
-                    </div>
-                    <div class="oh-feedback-form-grid__col">
-                        {{ feedback_form.period.as_hidden }}
-                        <div class="oh-input__group">
-                            <label class="oh-input__label" for="id_quick_period">{% trans "Quick Period" %}</label>
-                            <select id="id_quick_period" class="oh-select oh-select-2 w-100">
-                                <option value="">{% trans "Choose a duration..." %}</option>
-                                {% for preset in duration_presets %}
-                                <option value="{{ preset.days_count }}">{{ preset.label }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="oh-input__group">
-                            <label
-                                class="oh-input__label"
-                                for="{{feedback_form.start_date.id_for_label}}"
-                            >{{ feedback_form.start_date.label }}</label>
-                            {{ feedback_form.start_date }}
-                            {{ feedback_form.start_date.errors }}
-                        </div>
-                        <div class="oh-input__group">
-                            <label
-                                class="oh-input__label"
-                                for="{{feedback_form.end_date.id_for_label}}"
-                            >{{ feedback_form.end_date.label }}</label>
-                            {{ feedback_form.end_date }}
-                            {{ feedback_form.end_date.errors }}
-                        </div>
-                        <div class="oh-input__group">
-                            <label
-                                class="oh-input__label"
-                                for="{{feedback_form.question_template_id.id_for_label}}"
-                            >{{ feedback_form.question_template_id.label }}</label>
-                            {{ feedback_form.question_template_id }}
-                            {{ feedback_form.question_template_id.errors }}
-                        </div>
-                        <div class="oh-input__group">
-                            <label
-                                class="oh-input__label"
-                                for="id_employee_key_results_id"
-                            >{{ feedback_form.employee_key_results_id.label }}</label>
-                            {{ feedback_form.employee_key_results_id }}
-                            {{ feedback_form.employee_key_results_id.errors }}
                         </div>
                     </div>
                 </div>
@@ -267,14 +259,6 @@
     hidden
 >
 </button>
-<button
-    id="keyresultButtton"
-    hx-get="{% url 'get-collegues' %}"
-    hx-target="#id_employee_key_results_id"
-    hidden
->
-</button>
-
 <script>
     $(document).ready(function () {
         get_collegues($("#id_employee_id"));
@@ -317,15 +301,6 @@
                     JSON.stringify({
                         employee_id: employee_id,
                         data: "subordinates",
-                    })
-                )
-                .click();
-            $("#keyresultButtton")
-                .attr(
-                    "hx-vals",
-                    JSON.stringify({
-                        employee_id: employee_id,
-                        data: "keyresults",
                     })
                 )
                 .click();
