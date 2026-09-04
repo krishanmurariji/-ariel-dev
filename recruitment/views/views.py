@@ -19,7 +19,7 @@ import logging
 import os
 import random
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from itertools import chain
 from urllib.parse import parse_qs
 
@@ -2492,7 +2492,7 @@ def _cancel_interview_meeting(interview, request):
                         {
                             "title": meeting.title,
                             "description": _interview_meeting_description(
-                                interview, status="cancelled"
+                                interview, status="cancelled", duration_minutes=meeting.duration
                             ),
                             "start_time": meeting.start_time,
                             "duration": meeting.duration,
@@ -2519,7 +2519,7 @@ def _cancel_interview_meeting(interview, request):
                     {
                         "title": meeting.title,
                         "description": _interview_meeting_description(
-                            interview, status="cancelled"
+                            interview, status="cancelled", duration_minutes=meeting.duration
                         ),
                         "start_time": meeting.start_time,
                         "duration": meeting.duration,
@@ -3607,7 +3607,35 @@ _INTERVIEW_GUIDELINES = [
 ]
 
 
-def _interview_meeting_description(interview, status):
+def _ordinal_suffix(day):
+    if 11 <= day % 100 <= 13:
+        return "th"
+    return {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+
+
+def _format_time_12h(t):
+    hour = t.hour % 12 or 12
+    return f"{hour}:{t.minute:02d} {'AM' if t.hour < 12 else 'PM'}"
+
+
+def _format_interview_when(interview_date, start_time, duration_minutes):
+    """
+    e.g. "Wednesday, November 15th, from 1:00 PM to 1:45 PM" - avoids
+    strftime's %-I/%#I (no-leading-zero hour), which isn't portable
+    between the Linux production server and Windows dev machines.
+    """
+    end_time = (
+        datetime.combine(interview_date, start_time) + timedelta(minutes=duration_minutes)
+    ).time()
+    weekday_month = interview_date.strftime("%A, %B")
+    day = interview_date.day
+    return (
+        f"{weekday_month} {day}{_ordinal_suffix(day)}, from "
+        f"{_format_time_12h(start_time)} to {_format_time_12h(end_time)}"
+    )
+
+
+def _interview_meeting_description(interview, status, duration_minutes=60):
     """
     Builds the HTML shown in the Teams/Google Meet invite body - a table of
     the details a panel member (or the candidate, who is also an attendee)
@@ -3628,9 +3656,8 @@ def _interview_meeting_description(interview, status):
     company_obj = candidate.recruitment_id.company_id if candidate.recruitment_id else None
     prefix = _("Online Interview") if is_online else _("Interview")
     heading = f"{prefix} {_INTERVIEW_MEETING_STATUS_LABELS[status]}"
-    when = (
-        f"{interview.interview_date.strftime('%b %d, %Y')} "
-        f"{interview.interview_time.strftime('%I:%M %p')}"
+    when = _format_interview_when(
+        interview.interview_date, interview.interview_time, duration_minutes
     )
     # get_full_name(), not str(emp) - the latter appends the employee's
     # badge id in parentheses, which has no place in a candidate-facing
@@ -3754,7 +3781,9 @@ def generate_interview_meeting(interview, request):
         link = InterviewOutlookMeetingLink.objects.filter(interview=interview).first()
         meeting_id = link.meeting.id if link else None
         description = _interview_meeting_description(
-            interview, status="scheduled" if meeting_id is None else "rescheduled"
+            interview,
+            status="scheduled" if meeting_id is None else "rescheduled",
+            duration_minutes=link.meeting.duration if link else 60,
         )
         try:
             meeting, created = OutlookMeeting.objects.update_or_create(
@@ -3798,7 +3827,9 @@ def generate_interview_meeting(interview, request):
     link = InterviewMeetingLink.objects.filter(interview=interview).first()
     meeting_id = link.meeting.id if link else None
     description = _interview_meeting_description(
-        interview, status="scheduled" if meeting_id is None else "rescheduled"
+        interview,
+        status="scheduled" if meeting_id is None else "rescheduled",
+        duration_minutes=link.meeting.duration if link else 60,
     )
     try:
         meeting, created = GoogleMeeting.objects.update_or_create(

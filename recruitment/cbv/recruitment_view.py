@@ -504,9 +504,45 @@ class AddCandidateFormView(HorillaFormView):
         if form.is_valid():
             message = _("Candidate Added successfully.")
             form.save()
+            self._send_portal_login_mail(form.instance)
             messages.success(self.request, message)
             return self.HttpResponse("<script>window.location.reload</script>")
         return super().form_valid(form)
+
+    def _send_portal_login_mail(self, candidate):
+        """
+        The "Candidate Portal Login" automation only fires on_create for
+        candidates landing in an "applied"-type stage (it's phrased as an
+        application-received acknowledgement) - a candidate added here by
+        staff can be dropped into any stage, so that condition silently
+        skips them. Send it explicitly instead, gated on the same portal
+        mail toggle (Settings > Recruitment > Candidate Self Tracking) so
+        it still respects that setting.
+        """
+        from horilla_automations.models import MailAutomation
+        from horilla_automations.signals import send_mail as automation_send_mail
+        from recruitment.models import RecruitmentGeneralSetting
+
+        selected_company = self.request.session.get("selected_company")
+        company_id = (
+            None if not selected_company or selected_company == "all" else selected_company
+        )
+        settings_row = RecruitmentGeneralSetting.objects.filter(
+            company_id_id=company_id
+        ).first()
+        if not (
+            settings_row
+            and settings_row.candidate_self_tracking
+            and settings_row.send_candidate_portal_mail
+        ):
+            return
+        automation = MailAutomation.objects.filter(
+            model="recruitment.models.Candidate",
+            mail_template__title="Candidate Portal Login",
+            is_active=True,
+        ).first()
+        if automation:
+            automation_send_mail(self.request, automation, candidate)
 
 
 @method_decorator(login_required, name="dispatch")
