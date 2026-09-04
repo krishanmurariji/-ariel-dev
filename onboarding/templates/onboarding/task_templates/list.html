@@ -7,17 +7,26 @@
       <h3 class="text-lg font-semibold m-0">{% trans "Task Templates" %}</h3>
       <!-- <p class="text-xs text-[#565E6C] m-0 mt-1">{% trans "Reusable Task Groups for the onboarding checklist steps." %}</p> -->
     </div>
-    <a href="{% url 'task-template-create' %}" class="px-4 py-2 bg-primary-600 text-white rounded-md text-xs flex items-center gap-2 hover:bg-primary-800 transition duration-300">
-      <i class="fa-solid fa-plus"></i> {% trans "New Task Group" %}
-    </a>
+    <div class="flex items-center gap-3 flex-wrap">
+      <div id="taskGroupPhaseFilter" class="oh-phase-filter flex items-center gap-1">
+        <button type="button" class="oh-phase-filter__btn active" data-phase-filter="">{% trans "All" %}</button>
+        {% for value, label in phase_choices %}
+        <button type="button" class="oh-phase-filter__btn" data-phase-filter="{{ value }}">{{ label }}</button>
+        {% endfor %}
+      </div>
+      <a href="{% url 'task-template-create' %}" class="px-4 py-2 bg-primary-600 text-white rounded-md text-xs flex items-center gap-2 hover:bg-primary-800 transition duration-300">
+        <i class="fa-solid fa-plus"></i> {% trans "New Task Group" %}
+      </a>
+    </div>
   </div>
 
   <div class="bg-white rounded-md shadow-card p-5">
     {% if templates %}
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div id="taskGroupGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       {% for template in templates %}
       <div
         class="oh-template-card group relative border border-[#ebebeb] rounded-md shadow-card p-4 transition duration-300 hover:border-primary-600 hover:shadow-lg cursor-pointer"
+        data-phase="{{ template.phase }}"
         hx-get="{% url 'task-template-view-modal' template.pk %}"
         hx-target="#genericModalBody"
         data-toggle="oh-modal-toggle"
@@ -71,6 +80,9 @@
       </div>
       {% endfor %}
     </div>
+    <div id="taskGroupPhaseEmpty" class="flex flex-col items-center justify-center py-12" hidden>
+      <p class="text-[#666] text-sm">{% trans "No task groups for this phase." %}</p>
+    </div>
     {% else %}
     <div class="flex flex-col items-center justify-center py-12">
       <img src="/static/horilla_theme/assets/img/no-records.svg" alt="" width="220" class="mb-4">
@@ -83,6 +95,16 @@
 <style>
   .oh-view-pill { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; }
   .oh-view-pill--yes { background: #dcfce7; color: #166534; }
+
+  .oh-phase-filter { background: #f3f4f6; border-radius: 8px; padding: 3px; }
+  .oh-phase-filter__btn {
+    border: none; background: transparent; cursor: pointer;
+    font-size: 12px; font-weight: 500; color: #565E6C;
+    padding: 6px 12px; border-radius: 6px; transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .oh-phase-filter__btn:hover { color: #1f2937; }
+  .oh-phase-filter__btn.active { background: #fff; color: var(--primary-600, #4a90e2); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
 </style>
 
 <script>
@@ -99,6 +121,27 @@
     document.addEventListener("click", function () {
       document.querySelectorAll(".oh-template-card__menu").forEach(function (m) { m.hidden = true; });
     });
+
+    var filterBar = document.getElementById("taskGroupPhaseFilter");
+    var grid = document.getElementById("taskGroupGrid");
+    var emptyState = document.getElementById("taskGroupPhaseEmpty");
+    if (filterBar && grid) {
+      var cards = grid.querySelectorAll("[data-phase]");
+      filterBar.addEventListener("click", function (e) {
+        var btn = e.target.closest("[data-phase-filter]");
+        if (!btn) { return; }
+        filterBar.querySelectorAll(".oh-phase-filter__btn").forEach(function (b) { b.classList.remove("active"); });
+        btn.classList.add("active");
+        var phase = btn.dataset.phaseFilter;
+        var visibleCount = 0;
+        cards.forEach(function (card) {
+          var matches = !phase || card.dataset.phase === phase;
+          card.hidden = !matches;
+          if (matches) { visibleCount += 1; }
+        });
+        if (emptyState) { emptyState.hidden = visibleCount !== 0; }
+      });
+    }
   })();
 </script>
 {% endblock content %}

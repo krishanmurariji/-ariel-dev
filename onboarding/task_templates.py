@@ -27,7 +27,7 @@ from onboarding.forms import (
     TaskTemplateTaskFormSet,
     build_duplicate_task_formset,
 )
-from onboarding.models import CandidateChecklistTask, TaskTemplate
+from onboarding.models import PHASE_CHOICES, CandidateChecklistTask, TaskTemplate
 
 
 @method_decorator(login_required, name="dispatch")
@@ -40,7 +40,9 @@ class TaskTemplateListView(View):
     def get(self, request):
         templates = TaskTemplate.objects.prefetch_related("tasks")
         return render(
-            request, "onboarding/task_templates/list.html", {"templates": templates}
+            request,
+            "onboarding/task_templates/list.html",
+            {"templates": templates, "phase_choices": PHASE_CHOICES},
         )
 
 
