@@ -51,6 +51,7 @@ from base.models import (
     CompanyLeaves,
     Department,
     DriverViewed,
+    DurationPreset,
     DynamicEmailConfiguration,
     DynamicPagination,
     EmployeeShift,
@@ -3485,3 +3486,27 @@ class RosterCellUpdateForm(ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["shift"].required = False
+
+
+# ---------------------------------------------------------------------------
+# Duration Preset Forms
+# ---------------------------------------------------------------------------
+
+
+class DurationPresetForm(ModelForm):
+    """
+    Admin-configurable duration presets (e.g. "1 Week", "Quarter") used by
+    the Feedback Period quick-picker and the Task Template Default Due
+    Date picker.
+    """
+
+    class Meta:
+        model = DurationPreset
+        fields = ["label", "amount", "unit", "is_active"]
+        widgets = {
+            "label": forms.TextInput(
+                attrs={"class": "oh-input w-100", "placeholder": _("e.g. 1 Week")}
+            ),
+            "amount": forms.NumberInput(attrs={"class": "oh-input w-100", "min": 1}),
+            "unit": forms.Select(attrs={"class": "oh-select oh-select-2 w-100"}),
+        }

@@ -35,7 +35,7 @@ from base.methods import (
     paginator_qry,
     sortby,
 )
-from base.models import Company
+from base.models import Company, DurationPreset
 from employee.models import Employee, EmployeeWorkInformation
 from horilla.decorators import (
     hx_request_required,
@@ -1560,6 +1560,7 @@ def feedback_creation(request):
     context = {
         "feedback_form": form,
         "hide_title": hide_title,
+        "duration_presets": DurationPreset.objects.filter(is_active=True),
     }
     is_htmx = request.headers.get("HX-Request") is not None
     if request.method == "POST":

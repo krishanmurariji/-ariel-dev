@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 
 from base import announcement
 from base import dashboard as dashboard_module
-from base import ess_dashboard, request_and_approve, views
+from base import duration_presets, ess_dashboard, request_and_approve, views
 from base.cbv import (
     announcement_cbv,
     company,
@@ -1918,6 +1918,28 @@ urlpatterns = [
         name="roster-template-download",
     ),
     # ── End Shift Roster ──────────────────────────────────────────────────
+    # ── Duration Presets ──────────────────────────────────────────────────
+    path(
+        "duration-presets/",
+        duration_presets.DurationPresetListView.as_view(),
+        name="duration-preset-list",
+    ),
+    path(
+        "duration-presets/create/",
+        duration_presets.DurationPresetFormView.as_view(),
+        name="duration-preset-create",
+    ),
+    path(
+        "duration-presets/<int:pk>/edit/",
+        duration_presets.DurationPresetFormView.as_view(),
+        name="duration-preset-edit",
+    ),
+    path(
+        "duration-presets/<int:pk>/delete/",
+        duration_presets.duration_preset_delete,
+        name="duration-preset-delete",
+    ),
+    # ── End Duration Presets ──────────────────────────────────────────────
 ]
 
 urlpatterns.append(

@@ -13,6 +13,23 @@ $(document).ready(function () {
             });
         }
     });
+
+    $("#id_quick_period").on("change", function () {
+        var days = $(this).val();
+        if (days === "") { return; }
+        var start = new Date();
+        var end = new Date();
+        end.setDate(end.getDate() + parseInt(days, 10));
+
+        function toInputDate(d) {
+            var m = ("0" + (d.getMonth() + 1)).slice(-2);
+            var day = ("0" + d.getDate()).slice(-2);
+            return d.getFullYear() + "-" + m + "-" + day;
+        }
+
+        $("#id_start_date").val(toInputDate(start));
+        $("#id_end_date").val(toInputDate(end));
+    });
 });
 
 function changeCyclicFeedback(element) {

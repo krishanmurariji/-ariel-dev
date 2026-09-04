@@ -101,6 +101,18 @@
                             {{ feedback_form.period.errors }}
                         </div>
                         <div class="oh-input__group">
+                            <label class="oh-input__label" for="id_quick_period">{% trans "Quick Period" %}</label>
+                            <select id="id_quick_period" class="oh-select oh-select-2 w-100">
+                                <option value="">{% trans "Choose a duration..." %}</option>
+                                {% for preset in duration_presets %}
+                                <option value="{{ preset.days_count }}">{{ preset.label }}</option>
+                                {% endfor %}
+                            </select>
+                            <span class="oh-input__group-hint" style="font-size:11px;color:#9AA1AC;">
+                                {% trans "Sets Start Date to today and computes End Date - an alternative to Period above." %}
+                            </span>
+                        </div>
+                        <div class="oh-input__group">
                             <label
                                 class="oh-input__label"
                                 for="{{feedback_form.start_date.id_for_label}}"

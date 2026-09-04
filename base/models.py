@@ -3,7 +3,9 @@ This module is used to register django models
 """
 
 import ipaddress
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+
+from dateutil.relativedelta import relativedelta
 
 from django.apps import apps
 from django.contrib import messages
@@ -3081,6 +3083,70 @@ class IntegrationApps(HorillaModel, NoPermissionModel):
 
     class Meta:
         unique_together = ("app_label", "company")
+
+
+DURATION_UNIT_CHOICES = [
+    ("day", _("Day(s)")),
+    ("week", _("Week(s)")),
+    ("month", _("Month(s)")),
+    ("quarter", _("Quarter(s)")),
+    ("half_year", _("Half Year(s)")),
+    ("year", _("Year(s)")),
+]
+
+
+class DurationPreset(HorillaModel):
+    """
+    A reusable, admin-configurable duration (e.g. "1 Week", "1 Month",
+    "Quarter") - shared by anything that needs a quick "starting from a
+    reference date, due/ending N days/weeks/months later" picker instead
+    of typing a raw day count or fixed calendar dates. Used by the
+    Feedback Period quick-picker (start = today) and the Task Template
+    Default Due Date picker (offset = this many days).
+    """
+
+    label = models.CharField(max_length=50, unique=True, verbose_name=_("Label"))
+    amount = models.PositiveIntegerField(default=1, verbose_name=_("Amount"))
+    unit = models.CharField(
+        max_length=20, choices=DURATION_UNIT_CHOICES, verbose_name=_("Unit")
+    )
+    is_active = models.BooleanField(default=True, verbose_name=_("Active"))
+
+    class Meta:
+        ordering = ["id"]
+        verbose_name = _("Duration Preset")
+        verbose_name_plural = _("Duration Presets")
+
+    def __str__(self):
+        return self.label
+
+    def end_date_from(self, start_date):
+        """
+        The calendar date `amount` `unit`(s) after `start_date`.
+        """
+        if self.unit == "day":
+            return start_date + timedelta(days=self.amount)
+        if self.unit == "week":
+            return start_date + timedelta(weeks=self.amount)
+        if self.unit == "month":
+            return start_date + relativedelta(months=self.amount)
+        if self.unit == "quarter":
+            return start_date + relativedelta(months=self.amount * 3)
+        if self.unit == "half_year":
+            return start_date + relativedelta(months=self.amount * 6)
+        if self.unit == "year":
+            return start_date + relativedelta(years=self.amount)
+        return start_date
+
+    def days_count(self):
+        """
+        Whole-day equivalent of this preset, anchored at today - lets a
+        plain "N days" field (e.g. Task Template's Default Due Date) offer
+        this same preset list without needing to store a unit/amount
+        pair itself.
+        """
+        today = date.today()
+        return (self.end_date_from(today) - today).days
 
 
 # User.add_to_class("is_new_employee", models.BooleanField(default=False))

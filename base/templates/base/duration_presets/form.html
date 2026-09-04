@@ -1,0 +1,43 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+<div class="oh-wrapper">
+  <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+    <div>
+      <h3 class="text-lg font-semibold m-0">{% if instance %}{% trans "Edit Duration Preset" %}{% else %}{% trans "New Duration Preset" %}{% endif %}</h3>
+    </div>
+    <a href="{% url 'duration-preset-list' %}" class="px-4 py-2 bg-primary-600 text-white rounded-md text-xs flex items-center gap-2 hover:bg-primary-800 transition duration-300">
+      <i class="fa-solid fa-arrow-left"></i> {% trans "Back" %}
+    </a>
+  </div>
+  <div class="bg-white rounded-md shadow-card">
+    <form method="post" class="p-5">
+      {% csrf_token %}
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div>
+          <label class="block text-xs font-medium text-[#333] mb-1">{{ form.label.label }} <span class="text-red-600">*</span></label>
+          {{ form.label }}
+          {{ form.label.errors }}
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-[#333] mb-1">{{ form.amount.label }} <span class="text-red-600">*</span></label>
+          {{ form.amount }}
+          {{ form.amount.errors }}
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-[#333] mb-1">{{ form.unit.label }} <span class="text-red-600">*</span></label>
+          {{ form.unit }}
+          {{ form.unit.errors }}
+        </div>
+        <div class="flex items-center gap-2 mt-2">
+          {{ form.is_active }}
+          <label class="text-xs font-medium text-[#333] m-0">{{ form.is_active.label }}</label>
+        </div>
+      </div>
+      <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md text-xs hover:bg-primary-800 transition duration-300">
+        {% trans "Save" %}
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock content %}

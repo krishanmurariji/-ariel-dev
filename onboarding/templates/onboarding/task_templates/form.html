@@ -39,10 +39,29 @@
           </div>
           <div>
             <label class="block text-xs font-medium text-[#333] mb-1">{{ form.default_due_offset.label }}</label>
-            {{ form.default_due_offset }}
+            <div class="flex items-center gap-2">
+              {{ form.default_due_offset }}
+              <select id="dueOffsetPresetPicker" class="oh-select oh-select-2" style="max-width:160px;">
+                <option value="">{% trans "Quick pick..." %}</option>
+                {% for preset in duration_presets %}
+                <option value="{{ preset.days_count }}">{{ preset.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
           </div>
         </div>
       </div>
+      <script>
+        (function () {
+          var picker = document.getElementById("dueOffsetPresetPicker");
+          var target = document.getElementById("{{ form.default_due_offset.id_for_label }}");
+          if (picker && target) {
+            picker.addEventListener("change", function () {
+              if (picker.value !== "") { target.value = picker.value; }
+            });
+          }
+        })();
+      </script>
 
       {{ formset.management_form }}
 

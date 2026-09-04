@@ -27,7 +27,12 @@ from onboarding.forms import (
     TaskTemplateTaskFormSet,
     build_duplicate_task_formset,
 )
+from base.models import DurationPreset
 from onboarding.models import PHASE_CHOICES, CandidateChecklistTask, TaskTemplate
+
+
+def _duration_presets():
+    return DurationPreset.objects.filter(is_active=True)
 
 
 @method_decorator(login_required, name="dispatch")
@@ -123,7 +128,12 @@ class TaskTemplateFormView(View):
         return render(
             request,
             "onboarding/task_templates/form.html",
-            {"form": form, "formset": formset, "instance": instance},
+            {
+                "form": form,
+                "formset": formset,
+                "instance": instance,
+                "duration_presets": _duration_presets(),
+            },
         )
 
     def post(self, request, pk=None):
@@ -146,7 +156,12 @@ class TaskTemplateFormView(View):
         return render(
             request,
             "onboarding/task_templates/form.html",
-            {"form": form, "formset": formset, "instance": instance},
+            {
+                "form": form,
+                "formset": formset,
+                "instance": instance,
+                "duration_presets": _duration_presets(),
+            },
         )
 
 
