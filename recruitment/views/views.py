@@ -3915,6 +3915,16 @@ def candidate_login(request):
         candidate = backend.authenticate(request, username=email, password=mobile)
 
         if candidate is not None:
+            if candidate.canceled:
+                return render(
+                    request,
+                    "candidate/self_login.html",
+                    {
+                        "error": _(
+                            "Your account has been disabled by the administrator."
+                        )
+                    },
+                )
             request.session["candidate_id"] = candidate.id
             request.session["candidate_email"] = candidate.email
             return redirect("candidate-self-status-tracking")

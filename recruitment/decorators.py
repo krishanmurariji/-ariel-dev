@@ -10,11 +10,12 @@ from django.conf import settings
 from django.contrib import messages
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
+from django.utils.translation import gettext as _
 
 from employee.models import Employee
 from horilla.config import logger
 from horilla.methods import handle_no_permission
-from recruitment.models import Recruitment, Stage
+from recruitment.models import Candidate, Recruitment, Stage
 
 
 def decorator_with_arguments(decorator):
@@ -199,6 +200,28 @@ def candidate_login_required(view_func):
                     allow_func = True
 
         if "candidate_id" in request.session:
+            candidate = Candidate.objects.filter(
+                pk=request.session["candidate_id"]
+            ).first()
+            if candidate and candidate.canceled:
+                # A candidate rejected mid-session (their application moved
+                # to a "cancelled"-type stage while they were logged in)
+                # loses portal access immediately, not just on their next
+                # login attempt. self_login.html reads its error message
+                # straight from this "error" context var, not the messages
+                # framework, so render it directly the same way the login
+                # view itself does for a rejected login attempt.
+                request.session.pop("candidate_id", None)
+                request.session.pop("candidate_email", None)
+                return render(
+                    request,
+                    "candidate/self_login.html",
+                    {
+                        "error": _(
+                            "Your account has been disabled by the administrator."
+                        )
+                    },
+                )
             allow_func = True
 
         if allow_func:
