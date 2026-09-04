@@ -168,9 +168,24 @@ def start_automation():
                         instance,
                         previous_instance,
                     )
-                    thread = threading.Thread(
-                        target=lambda: send_automated_mail(*args),
-                    )
+
+                    def _run_automated_mail():
+                        # Runs detached from the request thread, so an
+                        # uncaught exception here (a misconfigured
+                        # automation - e.g. no mail_template linked, per
+                        # send_mail's own guard below) previously just
+                        # killed this thread silently: the triggering
+                        # save/request completed and looked successful,
+                        # while the mail never went out and nothing was
+                        # ever logged anywhere.
+                        try:
+                            send_automated_mail(*args)
+                        except Exception:
+                            logger.exception(
+                                "Mail automation '%s' failed", automation.title
+                            )
+
+                    thread = threading.Thread(target=_run_automated_mail)
                     thread.start()
 
                 signal_handler.__name__ = name
@@ -427,6 +442,21 @@ def send_mail(request, automation, instance):
         except:
             sender = None
         if context_instance:
+            if not mail_template:
+                # context_instance resolving successfully doesn't mean a
+                # template is actually linked - automation.mail_template
+                # is nullable, and an automation created/edited without
+                # one previously reached `mail_template.body` below and
+                # raised AttributeError, silently killing this background
+                # thread (see _run_automated_mail's docstring) with the
+                # triggering save looking completely successful and no
+                # mail ever sent.
+                logger.error(
+                    "Mail automation '%s' has no mail_template configured - "
+                    "skipping send.",
+                    automation.title,
+                )
+                return
             if template_attachments := automation.template_attachments.all():
                 for template_attachment in template_attachments:
                     template_bdy = template.Template(template_attachment.body)
