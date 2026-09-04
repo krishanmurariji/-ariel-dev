@@ -3654,10 +3654,15 @@ def _interview_meeting_description(interview, status):
     # Google Calendar/Gmail strip `style` attributes from an invite's
     # description, which is why an inline-CSS table renders as plain,
     # borderless text there (Outlook keeps the CSS fine either way) -
-    # legacy HTML attributes (border/bgcolor/cellpadding) survive that
-    # sanitizing pass on both providers, so those are used instead of CSS.
+    # legacy HTML attributes (border/bgcolor/cellpadding/color, and the
+    # deprecated <font color> tag) survive that sanitizing pass on both
+    # providers, so those - not the letterhead's own CSS/CID-image
+    # approach, which calendar invites can't carry at all - are what
+    # bring in the same blue brand accent here.
+    ACCENT = "#0b5fce"
+    ACCENT_TINT = "#eef5fd"
     row_html = "".join(
-        f"<tr><td bgcolor=\"#f5f5f5\"><b>{label}</b></td><td>{value}</td></tr>"
+        f'<tr><td bgcolor="{ACCENT_TINT}"><b>{label}</b></td><td>{value}</td></tr>'
         for label, value in rows
     )
     extra_note = f"<p>{escape(interview.description)}</p>" if interview.description else ""
@@ -3665,19 +3670,19 @@ def _interview_meeting_description(interview, status):
     if is_online:
         guidelines_items = "".join(f"<li>{item}</li>" for item in _INTERVIEW_GUIDELINES)
         guidelines_html = (
-            f"<p><b>{_('Interview Guidelines')}</b></p>"
+            f'<p><b><font color="{ACCENT}">{_("Interview Guidelines")}</font></b></p>'
             f"<ul>{guidelines_items}</ul>"
         )
     company = escape(str(company_obj) if company_obj else "")
     return (
         f"<div>"
-        f"<h2>{heading}</h2>"
+        f'<h2><font color="{ACCENT}">{heading}</font></h2>'
         f"<p>{_('Greetings,')}</p>"
         f"<p>{_('Please check the interview details below:')}</p>"
-        f'<table border="1" cellpadding="8" cellspacing="0">{row_html}</table>'
+        f'<table border="1" cellpadding="8" cellspacing="0" bordercolor="{ACCENT_TINT}">{row_html}</table>'
         f"{extra_note}"
         f"{guidelines_html}"
-        f"<p>{_('Warm Regards,')}<br>{_('Talent Acquisition Team')}<br>{company}</p>"
+        f'<p>{_("Warm Regards,")}<br><b><font color="{ACCENT}">{_("Talent Acquisition Team")}</font></b><br>{company}</p>'
         f"</div>"
     )
 
