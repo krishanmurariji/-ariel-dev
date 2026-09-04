@@ -1395,6 +1395,12 @@ def document_upload(request, token):
             if not uploaded:
                 continue
             existing_doc = submitted_docs_by_request.get(doc_request.pk)
+            if existing_doc and existing_doc.status == "approved":
+                # Already verified by HR - the UI hides the upload control
+                # for this case, but guard the same here in case of a
+                # direct POST, since an approved document shouldn't be
+                # swappable by the candidate after the fact.
+                continue
             if existing_doc:
                 existing_doc.document = uploaded
                 existing_doc.status = "submitted"
