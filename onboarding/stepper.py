@@ -508,16 +508,33 @@ def _save_checklist_tasks(request, candidate, phase):
                 if due_offset and candidate.joining_date
                 else None
             )
-        _task_obj, created = CandidateChecklistTask.objects.update_or_create(
-            candidate_id=candidate,
-            template_task_id=template_task,
-            phase=phase,
-            defaults={
-                "title": template_task.title,
-                "assignee_id": assignee,
-                "due_date": due_date,
-            },
-        )
+        # Not update_or_create(): it wraps get_or_create() in
+        # select_for_update(), and CandidateChecklistTask's manager
+        # (HorillaCompanyManager) adds a DISTINCT to every queryset once a
+        # company is selected - Postgres rejects "FOR UPDATE" combined with
+        # DISTINCT outright, so update_or_create() 500s here in production
+        # (sqlite doesn't enforce that combination, so this never showed up
+        # locally). A plain get-then-save/create sidesteps the locking
+        # entirely, which this per-request save doesn't need anyway.
+        existing_task = CandidateChecklistTask.objects.filter(
+            candidate_id=candidate, template_task_id=template_task, phase=phase
+        ).first()
+        if existing_task:
+            existing_task.title = template_task.title
+            existing_task.assignee_id = assignee
+            existing_task.due_date = due_date
+            existing_task.save(update_fields=["title", "assignee_id", "due_date"])
+            _task_obj, created = existing_task, False
+        else:
+            _task_obj = CandidateChecklistTask.objects.create(
+                candidate_id=candidate,
+                template_task_id=template_task,
+                phase=phase,
+                title=template_task.title,
+                assignee_id=assignee,
+                due_date=due_date,
+            )
+            created = True
         if created:
             _task_obj.status_updated_at = timezone.now()
             _task_obj.save(update_fields=["status_updated_at"])
