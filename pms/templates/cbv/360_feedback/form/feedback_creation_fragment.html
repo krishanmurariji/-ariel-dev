@@ -57,6 +57,7 @@
                         {{ feedback_form.employee_question_template_id.errors }}
                         <span class="oh-input__group-hint" style="font-size:11px;color:#9AA1AC;">{% trans "Optional self-assessment for the employee. Leave blank to skip asking them to review themselves." %}</span>
                     </div>
+                    {% if not feedback_form.employee_id.field.disabled %}
                     <div class="oh-input__group">
                         <label
                             class="oh-input__label"
@@ -65,6 +66,7 @@
                         {{ feedback_form.employee_id }}
                         {{ feedback_form.employee_id.errors }}
                     </div>
+                    {% endif %}
                     <div class="oh-input__group">
                         <label class="oh-input__label" for="id_quick_period">{% trans "Quick Period" %}</label>
                         <select id="id_quick_period" class="oh-select oh-select-2 w-100">
