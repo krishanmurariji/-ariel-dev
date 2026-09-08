@@ -1540,6 +1540,97 @@ def send_feedback_notifications(request, feedback):
             redirect=reverse("feedback-detailed-view", kwargs={"id": feedback.id}),
             icon="chatbox-ellipses",
         )
+    _send_feedback_emails(request, feedback)
+
+
+def _send_feedback_emails(request, feedback):
+    """
+    Emails every reviewer (and the reviewed employee, who also answers a
+    self-assessment) a direct "Submit Feedback" link - feedback-answer-get
+    is @login_required and resolves which employee is answering from
+    request.user itself, so clicking it while logged out bounces through
+    the login page (?next=...) and lands straight back here afterward,
+    with nothing further to click.
+
+    Sent in a background thread, matching the mail-automation engine's
+    own convention elsewhere in the app - a slow SMTP send must never
+    hold up the "Save" request that triggered it.
+    """
+    import threading
+
+    from django.core.mail import EmailMultiAlternatives
+    from django.utils.html import escape
+
+    from base.backends import ConfiguredEmailBackend
+    from base.mail_letterhead import attach_letterhead_images, render_letterhead_content
+
+    answer_url = request.build_absolute_uri(
+        reverse("feedback-answer-get", kwargs={"id": feedback.id})
+    )
+    email_backend = ConfiguredEmailBackend()
+    from_email = email_backend.dynamic_from_email_with_display_name
+    reviewed_employee = feedback.employee_id
+
+    def _build_and_send(employee):
+        to_email = employee.get_mail()
+        if not to_email:
+            return
+        is_self = reviewed_employee_id and employee.id == reviewed_employee_id
+        if is_self:
+            intro = (
+                _("A feedback review <b>%(title)s</b> has been set up for you.")
+                % {"title": escape(feedback.review_cycle)}
+            )
+            button_text = _("Submit Your Feedback")
+        else:
+            intro = (
+                _(
+                    "You have been requested to provide feedback for "
+                    "<b>%(employee)s</b> as part of <b>%(title)s</b>."
+                )
+                % {
+                    "employee": escape(reviewed_employee.get_full_name())
+                    if reviewed_employee
+                    else "",
+                    "title": escape(feedback.review_cycle),
+                }
+            )
+            button_text = _("Submit Feedback")
+        body_html = (
+            f"<p>{_('Hi')} {escape(employee.get_full_name())},</p>"
+            f"<p>{intro}</p>"
+            f'<p><a href="{answer_url}" '
+            f'style="background:#0B5FCE;color:#ffffff;padding:10px 18px;'
+            f'border-radius:6px;text-decoration:none;display:inline-block;">'
+            f"{button_text}</a></p>"
+        )
+        html_body, company, _has_logo = render_letterhead_content(
+            body_html,
+            tag_label=_("Performance"),
+            team_label=_("Performance Team"),
+            employee=employee,
+        )
+        email = EmailMultiAlternatives(
+            subject=_("Feedback Request: %(title)s") % {"title": feedback.review_cycle},
+            body=html_body,
+            from_email=from_email,
+            to=[to_email],
+        )
+        email.attach_alternative(html_body, "text/html")
+        attach_letterhead_images(email, company)
+        try:
+            email.send()
+        except Exception:
+            logger.exception("Feedback request email failed for %s", to_email)
+
+    reviewed_employee_id = reviewed_employee.id if reviewed_employee else None
+    recipients = {employee for employee in feedback.requested_employees() if employee}
+
+    def _send_all():
+        for employee in recipients:
+            _build_and_send(employee)
+
+    threading.Thread(target=_send_all).start()
 
 
 def _candidate_linked_employee_id(candidate_id):
