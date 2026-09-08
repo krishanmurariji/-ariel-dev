@@ -1542,30 +1542,85 @@ def send_feedback_notifications(request, feedback):
         )
 
 
+def _candidate_linked_employee_id(candidate_id):
+    """
+    Resolves a Candidate's own Employee record, if any - checking
+    converted_employee_id first, then falling back to an email match,
+    since the candidate self-service portal's own employee-creation flow
+    never sets converted_employee_id even though it creates a real
+    Employee with the candidate's email (mirrors
+    onboarding.stepper._candidate_own_employee_id).
+    """
+    from recruitment.models import Candidate
+
+    candidate = Candidate.objects.filter(pk=candidate_id).first()
+    if not candidate:
+        return None
+    if candidate.converted_employee_id_id:
+        return candidate.converted_employee_id_id
+    match = Employee.objects.filter(email=candidate.email).first()
+    return match.pk if match else None
+
+
 @login_required
 @manager_can_enter(perm="pms.add_feedback")
 def feedback_creation(request):
     """
     This view is used to create feedback object.
+
+    Opened from an Onboarding candidate's own card ("Setup Feedback"),
+    ?candidate_id=<pk> locks the Employee field to that candidate's own
+    Employee record instead of leaving a full staff list to search
+    through - candidates not yet converted to an employee can't have a
+    Feedback set up for them at all (Feedback.employee_id is a real
+    Employee FK), so that case shows a message instead of the form.
+
     Returns:
         it will return feedback creation html.
     """
-    form = FeedbackForm()
+    candidate_id = request.GET.get("candidate_id") or request.POST.get("candidate_id")
+    locked_employee_id = (
+        _candidate_linked_employee_id(candidate_id) if candidate_id else None
+    )
+    if candidate_id and not locked_employee_id:
+        messages.error(
+            request,
+            _(
+                "This candidate hasn't been converted to an employee yet - "
+                "convert them first, then set up feedback."
+            ),
+        )
+        return HttpResponse(
+            "<script>$('#feedbackSetupModal').removeClass('oh-modal--show');"
+            "$('#reloadMessagesButton').click();</script>"
+        )
+
+    form = FeedbackForm(
+        initial={"employee_id": locked_employee_id} if locked_employee_id else None
+    )
     form.fields["manager_id"].required = False
-    # Also checked on POST via a hidden field on the form itself, since a
+    if locked_employee_id:
+        form.fields["employee_id"].disabled = True
+    # Also checked on POST via hidden fields on the form itself, since a
     # validation-error resubmit posts back to a plain URL with no query
-    # string - the ?modal=1 the initial GET arrived with would otherwise be
-    # lost, and the modal would regain its redundant section heading.
+    # string - the ?modal=1/candidate_id the initial GET arrived with
+    # would otherwise be lost.
     hide_title = request.GET.get("modal") == "1" or request.POST.get("is_modal") == "1"
     context = {
         "feedback_form": form,
         "hide_title": hide_title,
         "duration_presets": DurationPreset.objects.filter(is_active=True),
+        "candidate_id": candidate_id,
     }
     is_htmx = request.headers.get("HX-Request") is not None
     if request.method == "POST":
-        form = FeedbackForm(request.POST)
+        form = FeedbackForm(
+            request.POST,
+            initial={"employee_id": locked_employee_id} if locked_employee_id else None,
+        )
         form.fields["manager_id"].required = False
+        if locked_employee_id:
+            form.fields["employee_id"].disabled = True
         if form.is_valid():
             employees = form.data.getlist("subordinate_id")
             if key_result_ids := request.POST.getlist("employee_key_results_id"):

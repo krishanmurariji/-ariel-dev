@@ -55,7 +55,7 @@
               <a
                 class="block w-full text-left px-3 py-1.5 hover:text-primary-600 transition duration-300"
                 href="#"
-                hx-get="{% url 'feedback-creation' %}?modal=1"
+                hx-get="{% url 'feedback-creation' %}?modal=1&candidate_id={{ candidate.id }}"
                 hx-target="#feedbackSetupModalTarget"
                 hx-swap="innerHTML"
                 data-toggle="oh-modal-toggle"

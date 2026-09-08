@@ -21,6 +21,7 @@
             {{ feedback_form.non_field_errors }}
             {% csrf_token %}
             {% if hide_title %}<input type="hidden" name="is_modal" value="1">{% endif %}
+            {% if candidate_id %}<input type="hidden" name="candidate_id" value="{{ candidate_id }}">{% endif %}
             <div class="oh-onboarding-card__address-group">
                 {% if not hide_title %}
                 <h2 class="oh-onboarding-card__section-title">
