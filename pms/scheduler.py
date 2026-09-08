@@ -4,11 +4,10 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from dateutil.relativedelta import relativedelta
 
-from notifications.signals import notify
-
 
 def cyclic_feedback_creation():
     from pms.models import Feedback
+    from pms.views import send_feedback_notifications
 
     feedbacks = Feedback.objects.filter(cyclic_next_start_date=datetime.today().date())
     for feedback in feedbacks:
@@ -31,6 +30,15 @@ def cyclic_feedback_creation():
             feedback_obj.start_date = feedback.cyclic_next_start_date
             feedback_obj.end_date = feedback.cyclic_next_end_date
             feedback_obj.save()
+            # M2M fields (subordinate/colleague/others) aren't copied by
+            # the field-by-field loop above - request_employees() and the
+            # notification/email below would otherwise silently miss them
+            # for every auto-recreated cycle after the first.
+            feedback_obj.subordinate_id.set(feedback.subordinate_id.all())
+            feedback_obj.colleague_id.set(feedback.colleague_id.all())
+            feedback_obj.others_id.set(feedback.others_id.all())
+
+            send_feedback_notifications(None, feedback_obj)
 
             feedback.cyclic_feedback = False
             feedback.save()
@@ -90,50 +98,14 @@ def probation_feedback_creation():
         if month_number == 1 and cycle.buddy_id:
             feedback.others_id.add(cycle.buddy_id)
 
-        _notify_probation_feedback(feedback)
+        from pms.views import send_feedback_notifications
+
+        send_feedback_notifications(None, feedback)
 
         cycle.months_completed = month_number
         if cycle.months_completed >= cycle.total_months:
             cycle.is_active = False
         cycle.save()
-
-
-def _notify_probation_feedback(feedback):
-    """
-    Mirrors pms/views.py's send_feedback_notifications, minus the request
-    object (none available in a background job) - the Feedback instance
-    itself is used as the notification sender, matching the no-request
-    pattern already used above for the recruitment closing-reminder job.
-    """
-    from django.urls import reverse
-
-    if feedback.employee_id.employee_user_id:
-        notify.send(
-            feedback,
-            recipient=feedback.employee_id.employee_user_id,
-            verb="You have received feedback!",
-            verb_ar="لقد تلقيت ملاحظات!",
-            verb_de="Sie haben Feedback erhalten!",
-            verb_es="¡Has recibido retroalimentación!",
-            verb_fr="Vous avez reçu des commentaires !",
-            redirect=reverse("feedback-detailed-view", kwargs={"id": feedback.id}),
-            icon="chatbox-ellipses",
-        )
-
-    reviewers = [feedback.manager_id] + list(feedback.others_id.all())
-    recipients = [r.employee_user_id for r in reviewers if r and r.employee_user_id]
-    if recipients:
-        notify.send(
-            feedback,
-            recipient=recipients,
-            verb="You have been requested to provide feedback!",
-            verb_ar="لقد طُلب منك تقديم ملاحظات!",
-            verb_de="Sie wurden gebeten, Feedback zu geben!",
-            verb_es="Se le ha solicitado que proporcione comentarios.",
-            verb_fr="Il vous a été demandé de fournir des commentaires.",
-            redirect=reverse("feedback-detailed-view", kwargs={"id": feedback.id}),
-            icon="chatbox-ellipses",
-        )
 
 
 scheduler = BackgroundScheduler()

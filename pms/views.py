@@ -1513,11 +1513,19 @@ def key_result_update(request, id):
 
 # feedback section
 def send_feedback_notifications(request, feedback):
+    """
+    request is optional - background jobs (cyclic/probation feedback
+    auto-creation, pms/scheduler.py) have no request to hand in, so the
+    Feedback instance itself stands in as the notification "actor"
+    instead, same as this app's other no-request notify.send calls
+    (e.g. the recruitment closing-reminder job).
+    """
+    actor = request.user.employee_get if request else feedback
     # Send notification to employee
     if feedback.employee_id:
         employee = feedback.employee_id
         notify.send(
-            request.user.employee_get,
+            actor,
             recipient=employee.employee_user_id,
             verb="You have received feedback!",
             verb_ar="لقد تلقيت ملاحظات!",
@@ -1530,7 +1538,7 @@ def send_feedback_notifications(request, feedback):
     all_employees = feedback.requested_employees()
     for employee in all_employees:
         notify.send(
-            request.user.employee_get,
+            actor,
             recipient=employee.employee_user_id,
             verb="You have been requested to provide feedback!",
             verb_ar="لقد طُلب منك تقديم ملاحظات!",
@@ -1541,6 +1549,26 @@ def send_feedback_notifications(request, feedback):
             icon="chatbox-ellipses",
         )
     _send_feedback_emails(request, feedback)
+
+
+def _absolute_url(path):
+    """
+    Builds an absolute URL without a request - for background jobs
+    (cyclic/probation feedback auto-creation) that have none.
+
+    CSRF_TRUSTED_ORIGINS, not ALLOWED_HOSTS, is the reliable source here:
+    it already has to carry a real, fully-qualified scheme+host (Django
+    rejects a bare "*" there), and every htmx POST in this app - Setup
+    Feedback's own Save button included - already depends on it being
+    configured correctly in production, or none of those would work at
+    all. ALLOWED_HOSTS commonly is just ["*"], which carries no usable
+    domain. django.contrib.sites is installed but never actually
+    configured/read anywhere, so it's not a usable source either.
+    """
+    from django.conf import settings
+
+    origin = next(iter(settings.CSRF_TRUSTED_ORIGINS), None)
+    return f"{origin}{path}" if origin else path
 
 
 def _send_feedback_emails(request, feedback):
@@ -1569,8 +1597,9 @@ def _send_feedback_emails(request, feedback):
     from base.backends import ConfiguredEmailBackend
     from base.mail_letterhead import attach_letterhead_images, render_letterhead_content
 
-    answer_url = request.build_absolute_uri(
-        reverse("feedback-answer-get", kwargs={"id": feedback.id})
+    answer_path = reverse("feedback-answer-get", kwargs={"id": feedback.id})
+    answer_url = (
+        request.build_absolute_uri(answer_path) if request else _absolute_url(answer_path)
     )
     email_backend = ConfiguredEmailBackend()
     from_email = email_backend.dynamic_from_email_with_display_name
