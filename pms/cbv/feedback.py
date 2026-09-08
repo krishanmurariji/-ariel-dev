@@ -166,6 +166,20 @@ class FeedbackListView(HorillaListView):
     row_status_class = "status-{status}"
 
 
+def _tab_badge_count(view_class, request):
+    """
+    Reuses a tab's own view class to count its queryset, so the number on
+    the tab badge can never drift from what clicking the tab actually
+    shows - horilla_tabs.html renders tab.badge as a plain, one-time
+    server-side number (not lazily fetched), so leaving it unset (as
+    these tabs previously did) always displays 0 via its own
+    {{ tab.badge|default:0 }} fallback regardless of the real count.
+    """
+    instance = view_class()
+    instance.request = request
+    return instance.get_queryset().count()
+
+
 @method_decorator(login_required, name="dispatch")
 class FeedbackGenericTabView(HorillaTabView):
     """
@@ -180,14 +194,17 @@ class FeedbackGenericTabView(HorillaTabView):
             {
                 "title": _("Self Feedback"),
                 "url": f"{reverse('self-feedback-tab')}",
+                "badge": _tab_badge_count(SelfFeedbacktab, self.request),
             },
             {
                 "title": _("Requested Feedback"),
                 "url": f"{reverse('requested-feedback-tab')}",
+                "badge": _tab_badge_count(RequestedFeedbackTab, self.request),
             },
             {
                 "title": _("Anonymous Feedback"),
                 "url": f"{reverse('anonymous-feedback-tab')}",
+                "badge": _tab_badge_count(AnonymousFeedbackTab, self.request),
                 "actions": [
                     {
                         "action": _("Add Anonymous"),
@@ -210,6 +227,7 @@ class FeedbackGenericTabView(HorillaTabView):
                 {
                     "title": _("Feedbacks to Review"),
                     "url": f"{reverse('all-feedback-tab')}",
+                    "badge": _tab_badge_count(AllFeedbackTab, self.request),
                 },
             )
 
