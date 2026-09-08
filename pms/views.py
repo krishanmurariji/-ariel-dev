@@ -1545,12 +1545,17 @@ def send_feedback_notifications(request, feedback):
 
 def _send_feedback_emails(request, feedback):
     """
-    Emails every reviewer (and the reviewed employee, who also answers a
-    self-assessment) a direct "Submit Feedback" link - feedback-answer-get
-    is @login_required and resolves which employee is answering from
-    request.user itself, so clicking it while logged out bounces through
-    the login page (?next=...) and lands straight back here afterward,
-    with nothing further to click.
+    Emails everyone involved in a Feedback. Reviewers (Manager,
+    Subordinates, Colleague, Others) always get a direct "Submit
+    Feedback" link. The reviewed employee gets that same call-to-action
+    only if a self-assessment question set was chosen for them
+    (employee_question_template_id) - otherwise they just get a plain
+    informational notice, since there's nothing for them to submit.
+
+    feedback-answer-get is @login_required and resolves which employee
+    is answering from request.user itself, so clicking the link while
+    logged out bounces through the login page (?next=...) and lands
+    straight back here afterward, with nothing further to click.
 
     Sent in a background thread, matching the mail-automation engine's
     own convention elsewhere in the app - a slow SMTP send must never
@@ -1570,40 +1575,21 @@ def _send_feedback_emails(request, feedback):
     email_backend = ConfiguredEmailBackend()
     from_email = email_backend.dynamic_from_email_with_display_name
     reviewed_employee = feedback.employee_id
+    reviewed_employee_id = reviewed_employee.id if reviewed_employee else None
 
-    def _build_and_send(employee):
-        to_email = employee.get_mail()
-        if not to_email:
-            return
-        is_self = reviewed_employee_id and employee.id == reviewed_employee_id
-        if is_self:
-            intro = (
-                _("A feedback review <b>%(title)s</b> has been set up for you.")
-                % {"title": escape(feedback.review_cycle)}
-            )
-            button_text = _("Submit Your Feedback")
-        else:
-            intro = (
-                _(
-                    "You have been requested to provide feedback for "
-                    "<b>%(employee)s</b> as part of <b>%(title)s</b>."
-                )
-                % {
-                    "employee": escape(reviewed_employee.get_full_name())
-                    if reviewed_employee
-                    else "",
-                    "title": escape(feedback.review_cycle),
-                }
-            )
-            button_text = _("Submit Feedback")
-        body_html = (
-            f"<p>{_('Hi')} {escape(employee.get_full_name())},</p>"
-            f"<p>{intro}</p>"
+    def _cta_button(text):
+        return (
             f'<p><a href="{answer_url}" '
             f'style="background:#0B5FCE;color:#ffffff;padding:10px 18px;'
             f'border-radius:6px;text-decoration:none;display:inline-block;">'
-            f"{button_text}</a></p>"
+            f"{text}</a></p>"
         )
+
+    def _send_one(employee, intro, cta_html):
+        to_email = employee.get_mail()
+        if not to_email:
+            return
+        body_html = f"<p>{_('Hi')} {escape(employee.get_full_name())},</p><p>{intro}</p>{cta_html}"
         html_body, company, _has_logo = render_letterhead_content(
             body_html,
             tag_label=_("Performance"),
@@ -1623,12 +1609,44 @@ def _send_feedback_emails(request, feedback):
         except Exception:
             logger.exception("Feedback request email failed for %s", to_email)
 
-    reviewed_employee_id = reviewed_employee.id if reviewed_employee else None
-    recipients = {employee for employee in feedback.requested_employees() if employee}
+    # Reviewers - requested_employees() only includes the reviewed
+    # employee when a self-assessment template is set, so exclude them
+    # explicitly here too to guarantee they're never double-emailed
+    # below regardless.
+    reviewers = {
+        employee
+        for employee in feedback.requested_employees()
+        if employee and employee.id != reviewed_employee_id
+    }
 
     def _send_all():
-        for employee in recipients:
-            _build_and_send(employee)
+        for employee in reviewers:
+            intro = _(
+                "You have been requested to provide feedback for "
+                "<b>%(employee)s</b> as part of <b>%(title)s</b>."
+            ) % {
+                "employee": escape(reviewed_employee.get_full_name())
+                if reviewed_employee
+                else "",
+                "title": escape(feedback.review_cycle),
+            }
+            _send_one(employee, intro, _cta_button(_("Submit Feedback")))
+
+        if reviewed_employee:
+            if feedback.employee_question_template_id:
+                intro = _(
+                    "A feedback review <b>%(title)s</b> has been set up for "
+                    "you, including a self-assessment."
+                ) % {"title": escape(feedback.review_cycle)}
+                cta_html = _cta_button(_("Submit Your Feedback"))
+            else:
+                intro = _(
+                    "A feedback review <b>%(title)s</b> has been set up for "
+                    "you. No action is needed from you - you'll be "
+                    "notified once it's complete."
+                ) % {"title": escape(feedback.review_cycle)}
+                cta_html = ""
+            _send_one(reviewed_employee, intro, cta_html)
 
     threading.Thread(target=_send_all).start()
 
@@ -2107,19 +2125,20 @@ def feedback_answer_get(request, id, **kwargs):
     user = request.user
     employee = Employee.objects.filter(employee_user_id=user).first()
     answer = Answer.objects.filter(feedback_id=feedback, employee_id=employee)
-    question_template = feedback.question_template_id
-    questions = question_template.question.all()
-    options = QuestionOptions.objects.all()
-    feedback_employees = (
-        [feedback.employee_id]
-        + [feedback.manager_id]
-        + list(feedback.colleague_id.all())
-        + list(feedback.subordinate_id.all())
-        + list(feedback.others_id.all())
-    )
+    # requested_employees() only includes the reviewed employee when a
+    # self-assessment template was chosen for them, so this both gates
+    # who's allowed to answer and picks the right question set below.
+    feedback_employees = feedback.requested_employees()
     if not employee in feedback_employees:
         messages.info(request, _("You are not allowed to answer"))
         return redirect(reverse("feedback-view"))
+
+    is_self = employee and feedback.employee_id_id == employee.id
+    question_template = (
+        feedback.employee_question_template_id if is_self else feedback.question_template_id
+    )
+    questions = question_template.question.all() if question_template else []
+    options = QuestionOptions.objects.all()
 
     # Employee does not have an answer object
     for employee in feedback_employees:
@@ -2161,8 +2180,11 @@ def feedback_answer_post(request, id):
 
     user = request.user
     employee = Employee.objects.filter(employee_user_id=user).first()
-    question_template = feedback.question_template_id
-    questions = question_template.question.all()
+    is_self = employee and feedback.employee_id_id == employee.id
+    question_template = (
+        feedback.employee_question_template_id if is_self else feedback.question_template_id
+    )
+    questions = question_template.question.all() if question_template else []
 
     if request.method == "POST":
         for question in questions:

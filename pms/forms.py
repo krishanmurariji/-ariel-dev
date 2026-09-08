@@ -697,6 +697,7 @@ class FeedbackForm(HorillaModelForm):
             "start_date",
             "end_date",
             "question_template_id",
+            "employee_question_template_id",
             "employee_key_results_id",
             "cyclic_feedback",
             "cyclic_feedback_days_count",
@@ -715,7 +716,8 @@ class FeedbackForm(HorillaModelForm):
             "manager_id": _("Manager"),
             "employee_id": _("Employee"),
             "colleague_id": _("Colleague"),
-            "question_template_id": _("Question Template"),
+            "question_template_id": _("Reviewer Question Template"),
+            "employee_question_template_id": _("Employee Question Template"),
             "employee_key_results_id": _("Key Result"),
             "cyclic_feedback": _("Is Cyclic Feedback"),
             # "cyclic_feedback_period":_("")

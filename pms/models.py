@@ -1055,6 +1055,19 @@ class Feedback(HorillaModel):
         blank=False,
         verbose_name=_("Question Template"),
     )
+    employee_question_template_id = models.ForeignKey(
+        QuestionTemplate,
+        on_delete=models.DO_NOTHING,
+        related_name="feedback_employee_question_template",
+        null=True,
+        blank=True,
+        verbose_name=_("Employee Question Template"),
+        help_text=_(
+            "Self-assessment question set for the employee being reviewed - "
+            "optional. Leave blank to skip asking them for a self-review; "
+            "they'll still get an informational email either way."
+        ),
+    )
     status = models.CharField(
         max_length=50, choices=STATUS_CHOICES, default="Not Started"
     )
@@ -1200,12 +1213,18 @@ class Feedback(HorillaModel):
         )
 
     def requested_employees(self):
+        """
+        Everyone actually expected to submit an answer. The reviewed
+        employee is only included if a self-assessment question set was
+        chosen for them (employee_question_template_id) - otherwise
+        they're not asked to answer anything at all, just notified.
+        """
         employees = set(self.subordinate_id.all())
         employees.update(self.colleague_id.all())
         employees.update(self.others_id.all())
         if self.manager_id:
             employees.add(self.manager_id)
-        if self.employee_id:
+        if self.employee_id and self.employee_question_template_id:
             employees.add(self.employee_id)
         return list(employees)
 
