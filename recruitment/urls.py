@@ -9,6 +9,7 @@ from django.urls import path
 from base.views import add_remove_dynamic_fields, object_duplicate
 from recruitment import cbvs
 from recruitment import dashboard as rec_dashboard
+from recruitment import loi
 from recruitment.cbv import (
     candidate_intake,
     candidate_mail_log,
@@ -423,6 +424,15 @@ urlpatterns = [
     path(
         "send-acknowledgement/", views.send_acknowledgement, name="send-acknowledgement"
     ),
+    # ── Send LOI ──────────────────────────────────────────────────────────
+    path("send-loi/<int:cand_id>/", loi.send_loi_form, name="send-loi-form"),
+    path("send-loi-post/<int:cand_id>/", loi.send_loi, name="send-loi"),
+    path(
+        "loi-response/<str:token>/<str:action>/",
+        loi.loi_response,
+        name="loi-response",
+    ),
+    # ── End Send LOI ──────────────────────────────────────────────────────
     path(
         "skill-zone-status-dashboard/",
         dashboard.SkillZoneStatusList.as_view(),

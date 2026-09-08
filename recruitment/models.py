@@ -3006,3 +3006,34 @@ class AISettings(models.Model):
         """
         obj, _created = cls.objects.get_or_create(pk=1)
         return obj
+
+
+class CandidateLOIResponse(HorillaModel):
+    """
+    One Accept/Decline click-through link generated for a candidate when
+    a Letter of Intent mail is sent (recruitment/loi.py) - the token is
+    what the two public, no-login response links carry, so a candidate
+    can respond straight from their email without needing portal access.
+    """
+
+    STATUS_CHOICES = [
+        ("pending", _("Pending")),
+        ("accepted", _("Accepted")),
+        ("declined", _("Declined")),
+    ]
+
+    candidate_id = models.ForeignKey(
+        Candidate,
+        on_delete=models.CASCADE,
+        related_name="loi_responses",
+        verbose_name=_("Candidate"),
+    )
+    token = models.CharField(max_length=64, unique=True, editable=False)
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default="pending"
+    )
+    sent_at = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.candidate_id} - {self.get_status_display()}"

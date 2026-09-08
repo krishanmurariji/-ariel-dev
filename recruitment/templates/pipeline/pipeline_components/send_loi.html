@@ -1,0 +1,45 @@
+{% load i18n %}
+<div class="oh-modal__dialog-header">
+    <span class="oh-modal__dialog-title" id="sendLoiModalLabel">
+        <h5>{% trans "Send Letter of Intent to" %} {{ candidate.name }}</h5>
+    </span>
+    <button class="oh-modal__close" aria-label="Close"><ion-icon name="close-outline"></ion-icon></button>
+</div>
+
+<div class="oh-modal__dialog-body">
+    <form onsubmit="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')"
+        hx-post='{% url "send-loi" candidate.id %}' hx-swap="none" class="oh-profile-section"
+        id="sendLoiForm-{{ candidate.id }}">
+        {% csrf_token %}
+
+        <div class="modal-body">
+            <div class="oh-timeoff-modal__profile-content">
+                <div class="oh-profile mb-2">
+                    <div class="oh-profile__avatar">
+                        <img src="https://ui-avatars.com/api/?name={{ candidate.name }}&amp;background=random"
+                            class="oh-profile__image me-2">
+                    </div>
+                    <div class="oh-timeoff-modal__profile-info">
+                        <span class="oh-timeoff-modal__user fw-bold">{{ candidate.name }}</span>
+                        <span class="oh-timeoff-modal__user m-0" style="font-size: 15px; color: #4d4a4a">
+                            {{ candidate.email }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group mt-2">
+                <label for="loiBody-{{ candidate.id }}"><h6>{% trans "Message" %}</h6></label>
+                <textarea id="loiBody-{{ candidate.id }}" class="oh-input oh-input--textarea" hidden
+                    name="body" data-summernote required>{{ loi_body }}</textarea>
+            </div>
+            <div class="form-hint" style="margin-top: 10px; font-size: 13px; color: #888;">
+                {% trans "Replace the placeholder line with your own message - the Accept/Decline buttons are already built in and don't need editing." %}
+            </div>
+        </div>
+
+        <div class="oh-modal__dialog-footer mt-3">
+            <button type="button" class="oh-btn oh-btn--secondary oh-modal__close">{% trans "Cancel" %}</button>
+            <button type="submit" class="oh-btn oh-btn--secondary oh-btn--shadow">{% trans "Send" %}</button>
+        </div>
+    </form>
+</div>
