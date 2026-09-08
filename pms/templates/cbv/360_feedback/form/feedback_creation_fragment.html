@@ -1,5 +1,11 @@
 {% load static i18n widget_tweaks %}
 <link rel="stylesheet" href="{% static 'css/pms.css' %}">
+<!-- Out-of-band: the modal chrome (header) lives outside this fragment's
+     own swap target, and its id repeats once per candidate card on the
+     page - htmx still routes an hx-swap-oob element by id correctly
+     regardless, keeping the header in sync with whichever candidate's
+     form this request actually resolved. -->
+<span id="feedbackSetupModalLabel" hx-swap-oob="true">{% if locked_employee_name %}{% blocktrans %}Setup Feedback for {{ locked_employee_name }}{% endblocktrans %}{% else %}{% trans "Setup Feedback" %}{% endif %}</span>
 {% if feedback_form.errors %}
     <div class="oh-wrapper">
         <div class="oh-alert-container">

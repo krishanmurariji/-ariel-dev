@@ -1720,6 +1720,11 @@ def feedback_creation(request):
         "hide_title": hide_title,
         "duration_presets": DurationPreset.objects.filter(is_active=True),
         "candidate_id": candidate_id,
+        "locked_employee_name": (
+            Employee.objects.filter(pk=locked_employee_id).first().get_full_name()
+            if locked_employee_id
+            else None
+        ),
     }
     is_htmx = request.headers.get("HX-Request") is not None
     if request.method == "POST":
