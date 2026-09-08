@@ -1671,6 +1671,18 @@ def _candidate_linked_employee_id(candidate_id):
     return match.pk if match else None
 
 
+def _employee_reporting_manager_id(employee_id):
+    """
+    The employee's currently assigned reporting manager, if any - used to
+    prefill (not lock) Setup Feedback's Manager field so it doesn't start
+    on "---Choose Manager---" when that's already known.
+    """
+    employee = Employee.objects.filter(pk=employee_id).first()
+    work_info = getattr(employee, "employee_work_info", None) if employee else None
+    manager = getattr(work_info, "reporting_manager_id", None) if work_info else None
+    return manager.pk if manager else None
+
+
 @login_required
 @manager_can_enter(perm="pms.add_feedback")
 def feedback_creation(request):
@@ -1704,9 +1716,16 @@ def feedback_creation(request):
             "$('#reloadMessagesButton').click();</script>"
         )
 
-    form = FeedbackForm(
-        initial={"employee_id": locked_employee_id} if locked_employee_id else None
+    prefill_manager_id = (
+        _employee_reporting_manager_id(locked_employee_id) if locked_employee_id else None
     )
+    initial = {}
+    if locked_employee_id:
+        initial["employee_id"] = locked_employee_id
+    if prefill_manager_id:
+        initial["manager_id"] = prefill_manager_id
+
+    form = FeedbackForm(initial=initial or None)
     form.fields["manager_id"].required = False
     if locked_employee_id:
         form.fields["employee_id"].disabled = True
