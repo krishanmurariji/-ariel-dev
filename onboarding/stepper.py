@@ -212,8 +212,14 @@ def _task_groups(candidate, phase, template_ids):
         existing_row = existing.get(task.id)
         if existing_row and existing_row.due_date:
             due_date = existing_row.due_date
-        elif template.default_due_offset and candidate.joining_date:
-            due_date = candidate.joining_date + timedelta(days=template.default_due_offset)
+        elif template.default_due_offset:
+            # Pre-Joining Checklist tasks are configured before Job
+            # Profile (where joining_date actually gets set), so there's
+            # often no joining date yet at this point - fall back to
+            # today rather than leaving the field blank just because the
+            # candidate hasn't been given a joining date yet.
+            reference_date = candidate.joining_date or timezone.now().date()
+            due_date = reference_date + timedelta(days=template.default_due_offset)
         else:
             due_date = None
         group["rows"].append(
@@ -534,11 +540,11 @@ def _save_checklist_tasks(request, candidate, phase):
         due_date = parse_date(request.POST.get(f"due_date_{task_id}") or "")
         if due_date is None:
             due_offset = template_task.template_id.default_due_offset
-            due_date = (
-                candidate.joining_date + timedelta(days=due_offset)
-                if due_offset and candidate.joining_date
-                else None
-            )
+            if due_offset:
+                reference_date = candidate.joining_date or timezone.now().date()
+                due_date = reference_date + timedelta(days=due_offset)
+            else:
+                due_date = None
         # Not update_or_create(): it wraps get_or_create() in
         # select_for_update(), and CandidateChecklistTask's manager
         # (HorillaCompanyManager) adds a DISTINCT to every queryset once a
