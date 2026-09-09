@@ -10,6 +10,7 @@ DynamicEmailConfiguration.send_via is set to "outlook".
 
 import base64
 from email.mime.base import MIMEBase
+from email.utils import parseaddr
 
 from outlook_auth.models import AzureApi
 from outlook_auth.views import get_valid_oauth_session
@@ -30,7 +31,26 @@ def get_azure_api_for_company(company):
 
 
 def _graph_recipients(addresses):
-    return [{"emailAddress": {"address": address}} for address in addresses or [] if address]
+    """
+    Django recipient lists can hold either bare emails or
+    "Display Name <email@x.com>" formatted strings. Graph's `address`
+    field needs the bare email - a formatted string, or a name with no
+    actual address, gets the whole message rejected by Graph (e.g.
+    "ErrorParticipantDoesntHaveAnEmailAddress"), so parse and drop
+    anything that doesn't resolve to a real address.
+    """
+    recipients = []
+    for raw in addresses or []:
+        if not raw:
+            continue
+        name, address = parseaddr(raw)
+        if not address:
+            continue
+        entry = {"address": address}
+        if name:
+            entry["name"] = name
+        recipients.append({"emailAddress": entry})
+    return recipients
 
 
 def _graph_attachments(email_message):
@@ -84,8 +104,9 @@ def _graph_message_payload(email_message):
         "bccRecipients": _graph_recipients(email_message.bcc),
         "attachments": _graph_attachments(email_message),
     }
-    if email_message.reply_to:
-        payload["replyTo"] = _graph_recipients(email_message.reply_to)
+    reply_to = _graph_recipients(email_message.reply_to)
+    if reply_to:
+        payload["replyTo"] = reply_to
     return {"message": payload, "saveToSentItems": "true"}
 
 
