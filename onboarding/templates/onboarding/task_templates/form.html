@@ -50,16 +50,22 @@
         </div>
       </div>
       <script>
-        (function () {
+        function initDueOffsetPicker() {
           // The app's global `.oh-select-2` auto-init (static/build/js/
-          // web.frontend.js, loadSelect2) runs `$(".oh-select-2").select2()`
-          // with no placeholder option, which renders the empty first
-          // <option> as a normal, clickable row reading blank - not what
-          // we want. Re-initializing just this one element with an actual
-          // `placeholder` makes Select2 show "Quick pick..." only in the
-          // closed box when nothing's chosen, and leaves it out of the
-          // open dropdown list entirely (Select2's own convention for an
-          // empty-value first <option> + a placeholder option).
+          // web.frontend.js, loadSelect2) runs on window "load" and does
+          // `$(".oh-select-2").select2()` with no placeholder option,
+          // which would otherwise render the empty first <option> as a
+          // normal, clickable blank row instead of true placeholder text.
+          // This page is a full page load (extends index.html, not an
+          // htmx fragment), and jQuery fires same-event handlers in the
+          // order they were bound - since the global bundle's script tag
+          // loads before this inline one, binding this init to "load" too
+          // guarantees it runs right after the global call, so it's the
+          // one that actually sticks. Re-initializing with `placeholder`
+          // makes Select2 show "Quick pick..." only in the closed box,
+          // and leaves it out of the open dropdown list entirely
+          // (Select2's own convention for an empty-value first <option>
+          // + a placeholder option).
           var $picker = $("#dueOffsetPresetPicker");
           if ($picker.length) {
             if ($picker.hasClass("select2-hidden-accessible")) {
@@ -94,7 +100,30 @@
               if (picker.value !== "") { target.value = picker.value; }
             });
           }
-        })();
+        }
+
+        function deferredInitDueOffsetPicker() {
+          // The global bundle's own <script src> tag actually sits AFTER
+          // this page's content in index.html, so its "load" handler
+          // (loadSelect2) is registered - and therefore fires - *after*
+          // this one, which would stomp the placeholder config right
+          // back off with a plain `.select2()` call. A 0ms setTimeout
+          // pushes this to run once every same-tick "load" handler
+          // (global init included) has already finished, regardless of
+          // registration order - the standard trick for "run genuinely
+          // last" here.
+          setTimeout(initDueOffsetPicker, 0);
+        }
+
+        if (document.readyState === "complete") {
+          // window "load" already fired before this script ran (e.g. a
+          // very slow-parsing page) - the global init has already run
+          // too in that case, so it's safe to init immediately instead
+          // of waiting for an event that's never coming again.
+          deferredInitDueOffsetPicker();
+        } else {
+          $(window).on("load", deferredInitDueOffsetPicker);
+        }
       </script>
 
       {{ formset.management_form }}
