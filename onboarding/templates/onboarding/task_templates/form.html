@@ -39,23 +39,57 @@
           </div>
           <div>
             <label class="block text-xs font-medium text-[#333] mb-1">{{ form.default_due_offset.label }}</label>
-            <div class="flex items-center gap-2">
-              {{ form.default_due_offset }}
-              <select id="dueOffsetPresetPicker" class="oh-select oh-select-2" style="max-width:160px;">
-                <option value="">{% trans "Quick pick..." %}</option>
-                {% for preset in duration_presets %}
-                <option value="{{ preset.days_count }}">{{ preset.label }}</option>
-                {% endfor %}
-              </select>
-            </div>
+            {{ form.default_due_offset.as_hidden }}
+            <select id="dueOffsetPresetPicker" class="oh-select oh-select-2 w-100">
+              <option value=""></option>
+              {% for preset in duration_presets %}
+              <option value="{{ preset.days_count }}">{{ preset.label }}</option>
+              {% endfor %}
+            </select>
           </div>
         </div>
       </div>
       <script>
         (function () {
+          // The app's global `.oh-select-2` auto-init (static/build/js/
+          // web.frontend.js, loadSelect2) runs `$(".oh-select-2").select2()`
+          // with no placeholder option, which renders the empty first
+          // <option> as a normal, clickable row reading blank - not what
+          // we want. Re-initializing just this one element with an actual
+          // `placeholder` makes Select2 show "Quick pick..." only in the
+          // closed box when nothing's chosen, and leaves it out of the
+          // open dropdown list entirely (Select2's own convention for an
+          // empty-value first <option> + a placeholder option).
+          var $picker = $("#dueOffsetPresetPicker");
+          if ($picker.length) {
+            if ($picker.hasClass("select2-hidden-accessible")) {
+              $picker.select2("destroy");
+            }
+            $picker.select2({
+              placeholder: "{% trans 'Quick pick...' %}",
+              width: "100%",
+            });
+          }
+
           var picker = document.getElementById("dueOffsetPresetPicker");
           var target = document.getElementById("{{ form.default_due_offset.id_for_label }}");
           if (picker && target) {
+            // Pre-select whichever preset matches the value already saved
+            // on this Task Group (e.g. editing one created before this
+            // dropdown existed, or one whose offset was set by a preset
+            // that's since been renamed/removed - in the latter case none
+            // will match, and it just falls back to "Quick pick...").
+            if (target.value) {
+              for (var i = 0; i < picker.options.length; i++) {
+                if (picker.options[i].value === String(target.value)) {
+                  // .val().trigger("change") (not a plain assignment) so
+                  // Select2's own rendered selection box actually updates
+                  // to show it, not just the underlying <select>.
+                  $picker.val(target.value).trigger("change");
+                  break;
+                }
+              }
+            }
             picker.addEventListener("change", function () {
               if (picker.value !== "") { target.value = picker.value; }
             });
