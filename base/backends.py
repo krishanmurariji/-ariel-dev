@@ -201,7 +201,11 @@ class ConfiguredEmailBackend(BACKEND_CLASS):
         if configuration and configuration.send_via == "outlook":
             from outlook_auth.mailer import send_via_outlook
 
-            response = send_via_outlook(email_messages, company=configuration.company_id)
+            response = send_via_outlook(
+                email_messages,
+                company=configuration.company_id,
+                fail_silently=self.dynamic_fail_silently,
+            )
         else:
             response = super(BACKEND_CLASS, self).send_messages(email_messages)
         for message in email_messages:

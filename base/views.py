@@ -1678,9 +1678,19 @@ def mail_server_test_email(request):
                     from_email=email_backend.dynamic_from_email_with_display_name,
                     connection=email_backend,
                 )
-                msg.send()
+                sent_count = msg.send()
             except Exception as e:
                 messages.error(request, " ".join([_("Something went wrong :"), str(e)]))
+                return HorillaRedirect(request)
+
+            if not sent_count:
+                messages.error(
+                    request,
+                    _(
+                        "Mail could not be sent. Check the mail server "
+                        "configuration and try again."
+                    ),
+                )
                 return HorillaRedirect(request)
 
             messages.success(request, _("Mail sent successfully"))

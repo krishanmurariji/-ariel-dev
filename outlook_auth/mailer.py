@@ -89,17 +89,23 @@ def _graph_message_payload(email_message):
     return {"message": payload, "saveToSentItems": "true"}
 
 
-def send_via_outlook(email_messages, company=None):
+def send_via_outlook(email_messages, company=None, fail_silently=False):
     """
     Send a list of Django EmailMessage objects through Microsoft Graph's
     /me/sendMail using the Outlook account connected for `company` (or
     whichever account is marked primary). Returns the number of messages
     sent successfully, matching Django email backend's send_messages()
-    contract.
+    contract. Raises RuntimeError with the underlying Graph error detail
+    on failure unless fail_silently is True.
     """
     api = get_azure_api_for_company(company)
     if api is None or not api.token:
-        return 0
+        if fail_silently:
+            return 0
+        raise RuntimeError(
+            "No connected Outlook account is available to send mail - "
+            "check Settings > Mail Servers > Outlook."
+        )
 
     oauth = get_valid_oauth_session(api)
     sent_count = 0
@@ -108,4 +114,9 @@ def send_via_outlook(email_messages, company=None):
         response = oauth.post(f"{api.outlook_api_endpoint}/me/sendMail", json=payload)
         if response.ok:
             sent_count += 1
+        elif not fail_silently:
+            raise RuntimeError(
+                f"Outlook (Graph API) rejected the mail: "
+                f"{response.status_code} {response.text[:500]}"
+            )
     return sent_count
