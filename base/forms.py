@@ -2633,9 +2633,23 @@ class DynamicMailConfForm(ModelForm):
         fields = "__all__"
         exclude = ["is_active"]
 
-    # def clean(self):
-    #     from_mail = self.from_email
-    #     return super().clean()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # SMTP connection details are only meaningful when this server is
+        # actually used to send mail via SMTP - not when send_via is set
+        # to "outlook", so don't force the admin to fill in placeholder
+        # values just to save the form.
+        for field_name in ("host", "port", "username", "password"):
+            self.fields[field_name].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("send_via", "smtp") == "smtp":
+            for field_name in ("host", "port", "username"):
+                if not cleaned_data.get(field_name):
+                    self.add_error(field_name, _("This field is required."))
+        return cleaned_data
+
     def as_p(self):
         """
         Render the form fields as HTML table rows with Bootstrap styling.

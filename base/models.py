@@ -2046,6 +2046,22 @@ class DynamicEmailConfiguration(HorillaModel):
         verbose_name=_("Company"),
     )
 
+    SEND_VIA_CHOICES = [
+        ("smtp", _("Configured Mail Server (SMTP)")),
+        ("outlook", _("Outlook (Connected Account)")),
+    ]
+    send_via = models.CharField(
+        max_length=10,
+        choices=SEND_VIA_CHOICES,
+        default="smtp",
+        verbose_name=_("Send Mail Via"),
+        help_text=_(
+            "Choose whether outgoing mail for this company is sent through "
+            "this SMTP configuration or through the connected Outlook "
+            "account (Settings > Mail Servers > Outlook)."
+        ),
+    )
+
     def highlight_cell(self):
         if self.is_primary:
             return f'style="background-color: rgba(255, 68, 0, 0.134);" '
