@@ -92,12 +92,7 @@
                 {% endif %}
             </div>
             {% if submitted_doc.status == "approved" %}
-            <div class="oh-dropzone oh-dropzone--done oh-dropzone--locked">
-                <ion-icon name="lock-closed-outline" class="oh-dropzone__icon" style="color: var(--swz-accent);"></ion-icon>
-                <span class="oh-dropzone__text">
-                    <span class="oh-dropzone__filename">{% trans "Verified - can't be changed" %}</span>
-                    <div class="oh-dropzone__hint">{% trans "Contact HR if this needs to be updated." %}</div>
-                </span>
+            <div class="oh-dropzone oh-dropzone--done oh-dropzone--locked" style="justify-content:flex-end;">
                 <a href="{{ submitted_doc.document.url }}" target="_blank" class="oh-dropzone__view" style="color: var(--swz-accent-text);">{% trans "View" %}</a>
             </div>
             {% else %}

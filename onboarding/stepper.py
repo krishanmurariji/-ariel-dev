@@ -611,6 +611,37 @@ def document_request_modal(request, pk):
         form = OnboardingDocumentRequestForm(request.POST)
         if form.is_valid():
             data = form.cleaned_data
+            # Nothing else guards against requesting the same document
+            # twice for one candidate (e.g. a double click on "Request
+            # Document") - each click created its own separate
+            # CandidateDocumentRequest row with the same title, so one
+            # could end up approved while its identically-named sibling
+            # still sat there unfilled, reading like a stale/duplicate
+            # entry that "won't go away" even after the other was dealt
+            # with. Block an exact-title repeat instead.
+            duplicate = CandidateDocumentRequest.objects.filter(
+                candidate_id=candidate, title__iexact=data["title"]
+            ).exists()
+            if duplicate:
+                # The modal's own hx-target is #documentListContainer (see
+                # document_request_modal.html), not the modal body itself,
+                # and its form unconditionally closes the modal ~150ms
+                # after any submit - so a field error rendered back into
+                # the modal would never actually be seen. Surface this via
+                # the same messages framework "Document request created"
+                # already relies on below, and re-render the unchanged
+                # list so the response still matches what htmx expects to
+                # swap into that target.
+                messages.error(
+                    request,
+                    _("This candidate already has a document request titled \"%(title)s\".")
+                    % {"title": data["title"]},
+                )
+                return render(
+                    request,
+                    "onboarding/stepper/_document_list.html",
+                    {"candidate": candidate, **_document_context(candidate)},
+                )
             doc_request = CandidateDocumentRequest.objects.create(
                 title=data["title"],
                 format=data["format"],
