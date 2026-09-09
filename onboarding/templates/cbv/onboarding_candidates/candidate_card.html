@@ -108,7 +108,7 @@
             <li>
               <span class="block w-full px-3 py-1.5 text-[#9AA1AC]">{% trans "Probation feedback cycle running" %}</span>
             </li>
-            {% elif candidate.onboarding_detail.probation_period %}
+            {% elif candidate.get_probation_months %}
             <li>
               <a
                 class="block w-full text-left px-3 py-1.5 hover:text-primary-600 transition duration-300"
@@ -116,7 +116,7 @@
                 hx-post="{% url 'onboarding-start-feedback-cycle' candidate.pk %}"
                 hx-target="#messages"
                 hx-swap="innerHTML"
-                hx-confirm="{% trans 'Start a monthly probation feedback cycle for this candidate? Month 1 goes to the Reporting Manager and Buddy, later months go to the Reporting Manager only.' %}"
+                hx-confirm="{% trans 'Start a monthly probation feedback cycle for this candidate, based on Date of Joining and Probation End? Month 1 goes to the Reporting Manager and Buddy, later months go to the Reporting Manager only.' %}"
                 hx-on:htmx:after-request="if(event.detail.successful){htmx.ajax('GET', '{{ search_url }}', {target: '#{{ view_id }}', swap: 'outerHTML'});$('#reloadMessagesButton').click();}">
                 {% trans "Start Probation Feedback Cycle" %}
               </a>
@@ -206,19 +206,8 @@
 {% endif %}
 </div>
 
-{% if perms.pms.add_feedback %}
-<div class="oh-modal" id="feedbackSetupModal" role="dialog" aria-labelledby="feedbackSetupModalLabel" aria-hidden="true">
-  <div class="oh-modal__dialog" style="max-width: 900px">
-    <div class="oh-modal__dialog-header">
-      <span class="oh-modal__dialog-title" id="feedbackSetupModalLabel">{% trans "Setup Feedback" %}</span>
-      <button type="button" class="oh-modal__close" aria-label="Close" onclick="$('#feedbackSetupModal').removeClass('oh-modal--show');">
-        <ion-icon name="close-outline"></ion-icon>
-      </button>
-    </div>
-    <div class="oh-modal__dialog-body" id="feedbackSetupModalTarget"></div>
-  </div>
-</div>
-{% endif %}
+{# feedbackSetupModal lives at the page level (onboarding_candidates.html) - #}
+{# it needs to exist regardless of whether the list or card view is active. #}
 
 <style>
 .oh-progress-ring {

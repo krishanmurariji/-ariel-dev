@@ -242,6 +242,7 @@ TEMPLATES = [
                 "base.context_processors.check_candidate_portal_mail",
                 "base.context_processors.check_platform_conversion_widget",
                 "base.context_processors.check_default_meeting_provider",
+                "base.context_processors.check_default_probation_period",
                 "base.context_processors.get_initial_prefix",
                 "base.context_processors.biometric_app_exists",
                 "base.context_processors.enable_late_come_early_out_tracking",

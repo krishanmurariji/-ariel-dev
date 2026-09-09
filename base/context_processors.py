@@ -349,6 +349,33 @@ def check_default_meeting_provider(request):
     return {"check_default_meeting_provider": default_meeting_provider}
 
 
+def check_default_probation_period(request):
+    """
+    This method is used to get the configured Default Probation Period
+    (months) - auto-filled onto a candidate's Probation End date when
+    they're moved to a Hired stage (recruitment.models.Candidate.save).
+    """
+    default_probation_period = None
+    selected_company = request.session.get("selected_company")
+    if apps.is_installed("recruitment"):
+        RecruitmentGeneralSetting = get_horilla_model_class(
+            app_label="recruitment", model="recruitmentgeneralsetting"
+        )
+        if selected_company and selected_company != "all":
+            first = RecruitmentGeneralSetting.objects.filter(
+                company_id_id=selected_company
+            ).first()
+        else:
+            first = RecruitmentGeneralSetting.objects.filter(
+                company_id__isnull=True
+            ).first()
+    else:
+        first = None
+    if first:
+        default_probation_period = first.default_probation_period
+    return {"check_default_probation_period": default_probation_period}
+
+
 def check_platform_conversion_widget(request):
     """
     This method is used to check enabled/disabled of the 'Platform

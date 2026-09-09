@@ -714,42 +714,21 @@ class StageChangeForm(forms.ModelForm):
 # ── Configure Onboarding stepper ─────────────────────────────────────────
 
 
-class OhClearableFileInput(forms.ClearableFileInput):
-    """
-    Friendlier replacement for Django's default ClearableFileInput - its
-    "Currently: <path> / Clear [ ] / Change: No file chosen" layout reads
-    like raw form internals to a non-technical user. Renders a dropzone-
-    style upload control (with a plain "View current file" / "Remove"
-    pair when a file already exists) instead.
-    """
-
-    template_name = "onboarding/widgets/clearable_file_input.html"
-
-
 class WelcomeMessageForm(HorillaModelForm):
     """
-    Step 1 - Welcome. Also carries the Offer Letter status + document, so
-    this step isn't just a bare textarea.
+    Offer Letter tab (part of the "Offer, Hiring & Closure" step) - just
+    the welcome note. Offer status/document is entirely LOI-driven now
+    (recruitment/loi.py) - no separate offer letter dropdown or upload
+    here.
     """
-
-    offer_letter_status = forms.ChoiceField(
-        choices=Candidate.offer_letter_statuses,
-        required=False,
-        label=_("Offer Letter Status"),
-        widget=forms.Select(attrs={"class": "oh-select oh-select-2"}),
-    )
 
     class Meta:
         model = OnboardingCandidateDetail
-        fields = ["welcome_message", "offer_letter"]
+        fields = ["welcome_message"]
         widgets = {
             "welcome_message": forms.Textarea(
                 attrs={"rows": 6, "placeholder": _("Write a welcome note...")}
             ),
-            "offer_letter": OhClearableFileInput(),
-        }
-        labels = {
-            "offer_letter": _("Offer Letter Document"),
         }
 
 
@@ -769,6 +748,34 @@ class RolesResponsibilityForm(HorillaModelForm):
         }
         labels = {
             "roles_responsibilities": _("Roles & Responsibilities"),
+        }
+
+
+class BackgroundVerificationForm(HorillaModelForm):
+    """
+    Background Verification tab (part of the "Offer, Hiring & Closure"
+    step) - free-text rich notes, same pattern as RolesResponsibilityForm.
+    Its tab panel sits outside the step's <form> in the template (the
+    Document Verification tab in between has its own nested forms, and
+    forms can't nest), so the widget carries a `form` attribute pointing
+    back at that form's id - the standard HTML5 way for a field to submit
+    with a form it isn't a DOM descendant of.
+    """
+
+    class Meta:
+        model = OnboardingCandidateDetail
+        fields = ["background_verification_notes"]
+        widgets = {
+            "background_verification_notes": forms.Textarea(
+                attrs={
+                    "data-summernote": "",
+                    "rows": 8,
+                    "form": "offerHiringClosureForm",
+                }
+            ),
+        }
+        labels = {
+            "background_verification_notes": _("Background Verification Notes"),
         }
 
 

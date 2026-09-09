@@ -84,6 +84,20 @@ body.onboarding-list-hide-toolbar #onboardingCandidatesNavBar {
     </div>
   </div>
 
+  {% if perms.pms.add_feedback %}
+  <div class="oh-modal" id="feedbackSetupModal" role="dialog" aria-labelledby="feedbackSetupModalLabel" aria-hidden="true">
+    <div class="oh-modal__dialog" style="max-width: 900px">
+      <div class="oh-modal__dialog-header">
+        <span class="oh-modal__dialog-title" id="feedbackSetupModalLabel">{% trans "Setup Feedback" %}</span>
+        <button type="button" class="oh-modal__close" aria-label="Close" onclick="$('#feedbackSetupModal').removeClass('oh-modal--show');">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      </div>
+      <div class="oh-modal__dialog-body" id="feedbackSetupModalTarget"></div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="oh-modal" id="addAttachments" role="dialog" aria-labelledby="addAttachments" aria-hidden="true">
     <div class="oh-modal__dialog">
       <div class="oh-modal__dialog-header">

@@ -194,6 +194,24 @@ def _load_gradient_bar_bytes():
     return data
 
 
+def get_gradient_bar_bytes():
+    """
+    Public accessor for the header/footer gradient bar PNG - for a
+    browser-viewable live preview of a letterhead mail before it's sent
+    (the real mail embeds it as a cid: attachment, which only resolves
+    inside an actual email client).
+    """
+    return _load_gradient_bar_bytes()
+
+
+def get_watermark_bytes(company):
+    """
+    Public accessor for a company's faded logo watermark PNG - see
+    get_gradient_bar_bytes.
+    """
+    return _load_watermark_bytes(company)
+
+
 def attach_letterhead_images(message, company):
     """
     Attaches the company logo (cid:letterhead_logo) and its faded

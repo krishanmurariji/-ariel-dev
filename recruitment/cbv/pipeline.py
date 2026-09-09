@@ -281,6 +281,7 @@ class CandidateList(HorillaListView):
         (_("Stage"), "stage_drop_down"),
         (_("Rating"), "rating_bar"),
         (_("AI Score"), "ai_score_number"),
+        (_("LOI Status"), "loi_status_badge"),
         (_("Date of Apply"), "applied_on_display"),
         (_("Hired Date"), "hired_date"),
         (_("Scheduled Interview"), "get_interview_count"),
@@ -339,6 +340,17 @@ class CandidateList(HorillaListView):
                 data-toggle="oh-modal-toggle"
                 data-target="#objectDetailsModal"
                 hx-target="#objectDetailsModalTarget"
+            """,
+        },
+        {
+            "action": _("Send LOI"),
+            "icon": "document-text-outline",
+            "attrs": """
+                class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100"
+                hx-get="{get_send_loi_url}"
+                data-toggle="oh-modal-toggle"
+                data-target="#objectCreateModal"
+                hx-target="#objectCreateModalTarget"
             """,
         },
         {
@@ -555,6 +567,15 @@ class CandidateCard(HorillaKanbanView):
                 data-toggle="oh-modal-toggle"
                 data-target="#objectDetailsModal"
                 hx-target="#objectDetailsModalTarget"
+            """,
+        },
+        {
+            "action": _("Send LOI"),
+            "attrs": """
+                hx-get="{get_send_loi_url}"
+                data-toggle="oh-modal-toggle"
+                data-target="#objectCreateModal"
+                hx-target="#objectCreateModalTarget"
             """,
         },
         {

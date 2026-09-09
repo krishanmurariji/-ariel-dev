@@ -3537,6 +3537,36 @@ def default_meeting_provider(request):
     return HttpResponse("<script>$('#reloadMessagesButton').click()</script>")
 
 
+@login_required
+@hx_request_required
+@permission_required("recruitment.change_recruitmentgeneralsetting")
+def default_probation_period_setting(request):
+    """
+    This method is used to set the Default Probation Period (months) -
+    auto-filled onto a candidate's Probation End date when they're moved
+    to a Hired stage (see Candidate.save).
+    """
+    selected_company = request.session.get("selected_company")
+    company_id = (
+        None if not selected_company or selected_company == "all" else selected_company
+    )
+    settings, created = RecruitmentGeneralSetting.objects.get_or_create(
+        company_id_id=company_id
+    )
+    raw_value = request.GET.get("default_probation_period", "").strip()
+    if raw_value == "":
+        settings.default_probation_period = None
+        settings.save()
+        messages.success(request, _("Default probation period cleared "))
+    elif raw_value.isdigit() and int(raw_value) > 0:
+        settings.default_probation_period = int(raw_value)
+        settings.save()
+        messages.success(request, _("Default probation period updated "))
+    else:
+        messages.error(request, _("Enter a whole number of months "))
+    return HttpResponse("<script>$('#reloadMessagesButton').click()</script>")
+
+
 def _interview_meeting_title(interview):
     """
     "{Stage} - {Candidate} at {Company}" - e.g. "Interview - Avantika Thakur
@@ -3554,7 +3584,7 @@ def _interview_meeting_title(interview):
 
 _INTERVIEW_MEETING_STATUS_LABELS = {
     "scheduled": _("Scheduled"),
-    "rescheduled": _("Re-scheduled"),
+    "rescheduled": _("Rescheduled"),
     "cancelled": _("Cancelled"),
 }
 

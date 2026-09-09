@@ -427,6 +427,20 @@ urlpatterns = [
     # ── Send LOI ──────────────────────────────────────────────────────────
     path("send-loi/<int:cand_id>/", loi.send_loi_form, name="send-loi-form"),
     path("send-loi-post/<int:cand_id>/", loi.send_loi, name="send-loi"),
+    path("loi-preview/<int:cand_id>/", loi.loi_preview, name="loi-preview"),
+    path(
+        "loi-sent-preview/<int:response_id>/",
+        loi.loi_sent_preview,
+        name="loi-sent-preview",
+    ),
+    path(
+        "loi-preview-gradient/", loi.loi_preview_gradient, name="loi-preview-gradient"
+    ),
+    path(
+        "loi-preview-watermark/<int:company_id>/",
+        loi.loi_preview_watermark,
+        name="loi-preview-watermark",
+    ),
     path(
         "loi-response/<str:token>/<str:action>/",
         loi.loi_response,
@@ -763,6 +777,11 @@ urlpatterns = [
         "default-meeting-provider/",
         views.default_meeting_provider,
         name="default-meeting-provider",
+    ),
+    path(
+        "default-probation-period/",
+        views.default_probation_period_setting,
+        name="default-probation-period",
     ),
     path(
         "create-interview-meeting/",

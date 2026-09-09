@@ -219,33 +219,108 @@ class InterviewForm(HorillaFormView):
             cand_id = self.form.cleaned_data["candidate_id"]
             interview_date = self.form.cleaned_data["interview_date"]
             interview_time = self.form.cleaned_data["interview_time"]
-            users = [employee.employee_user_id for employee in emp_ids]
-            notify.send(
-                self.request.user.employee_get,
-                recipient=users,
-                verb=f"You are scheduled as an interviewer for an interview with {cand_id.name} on {interview_date} at {interview_time}.",
-                verb_ar=f"أنت مجدول كمقابلة مع {cand_id.name} يوم {interview_date} في توقيت {interview_time}.",
-                verb_de=f"Sie sind als Interviewer für ein Interview mit {cand_id.name} am {interview_date} um {interview_time} eingeplant.",
-                verb_es=f"Estás programado como entrevistador para una entrevista con {cand_id.name} el {interview_date} a las {interview_time}.",
-                verb_fr=f"Vous êtes programmé en tant qu'intervieweur pour un entretien avec {cand_id.name} le {interview_date} à {interview_time}.",
-                icon="people-circle",
-                redirect=reverse("interview-view"),
-            )
-            if form.instance.pk:
+
+            is_update = bool(form.instance.pk)
+            # Only re-notify when a field that actually affects the
+            # calendar invite changed. Editing just `completed` (or
+            # `is_active`, not form-editable at all) must not re-notify
+            # everyone with a calendar update that misleadingly reads as a
+            # reschedule - see the bug this guards against: ticking "Mark
+            # as Complete" alone used to fire the exact same "Interview
+            # Re-scheduled" mail as an actual date/time change, since both
+            # went through this same save path with no notion of what was
+            # actually edited.
+            #
+            # form.changed_data can't be trusted here: on edit,
+            # interview_time is swapped for a permissive CharField (see
+            # __init__ above) so browser round-trip formatting doesn't
+            # fail validation, and Django computes changed_data from that
+            # field's own raw cleaned value *before* this form's clean()
+            # re-parses it back into a real time - so it always reports
+            # "changed" even when the time is identical. Comparing the
+            # actual saved values against form.cleaned_data (already
+            # normalized by clean()) instead sidesteps that entirely.
+            schedule_relevant_changed = True
+            if is_update:
+                old = (
+                    InterviewSchedule.objects.filter(pk=form.instance.pk)
+                    .values(
+                        "candidate_id",
+                        "interview_date",
+                        "interview_time",
+                        "interview_mode",
+                        "description",
+                    )
+                    .first()
+                )
+                old_employee_ids = set(
+                    InterviewSchedule.objects.get(pk=form.instance.pk)
+                    .employee_id.values_list("pk", flat=True)
+                )
+                new_employee_ids = {employee.pk for employee in emp_ids}
+                schedule_relevant_changed = bool(old) and (
+                    old["candidate_id"] != cand_id.pk
+                    or old["interview_date"] != interview_date
+                    or old["interview_time"] != interview_time
+                    or old["interview_mode"] != form.cleaned_data["interview_mode"]
+                    or old["description"] != form.cleaned_data.get("description", "")
+                    or old_employee_ids != new_employee_ids
+                )
+            should_notify = not is_update or schedule_relevant_changed
+
+            if should_notify:
+                users = [employee.employee_user_id for employee in emp_ids]
+                if is_update:
+                    verb = f"Your interview with {cand_id.name} has been rescheduled to {interview_date} at {interview_time}."
+                    verb_ar = f"تمت إعادة جدولة مقابلتك مع {cand_id.name} إلى {interview_date} في توقيت {interview_time}."
+                    verb_de = f"Ihr Interview mit {cand_id.name} wurde auf den {interview_date} um {interview_time} verschoben."
+                    verb_es = f"Tu entrevista con {cand_id.name} ha sido reprogramada para el {interview_date} a las {interview_time}."
+                    verb_fr = f"Votre entretien avec {cand_id.name} a été reprogrammé au {interview_date} à {interview_time}."
+                else:
+                    verb = f"You are scheduled as an interviewer for an interview with {cand_id.name} on {interview_date} at {interview_time}."
+                    verb_ar = f"أنت مجدول كمقابلة مع {cand_id.name} يوم {interview_date} في توقيت {interview_time}."
+                    verb_de = f"Sie sind als Interviewer für ein Interview mit {cand_id.name} am {interview_date} um {interview_time} eingeplant."
+                    verb_es = f"Estás programado como entrevistador para una entrevista con {cand_id.name} el {interview_date} a las {interview_time}."
+                    verb_fr = f"Vous êtes programmé en tant qu'intervieweur pour un entretien avec {cand_id.name} le {interview_date} à {interview_time}."
+                notify.send(
+                    self.request.user.employee_get,
+                    recipient=users,
+                    verb=verb,
+                    verb_ar=verb_ar,
+                    verb_de=verb_de,
+                    verb_es=verb_es,
+                    verb_fr=verb_fr,
+                    icon="people-circle",
+                    redirect=reverse("interview-view"),
+                )
+            if is_update:
                 messages.success(self.request, _("Interview Updated Successfully"))
             else:
                 messages.success(self.request, _("Interview Scheduled successfully."))
             form.save()
 
+            if not should_notify:
+                # Nothing schedule-relevant changed (e.g. only "Mark as
+                # Complete" was toggled) - skip touching the calendar
+                # event entirely, so no attendee gets a mail at all.
+                return HttpResponse(
+                    "<script>"
+                    "$('#genericModal').removeClass('oh-modal--show');"
+                    "$('#applyFilter').click();"
+                    "$('#reloadMessagesButton').click();"
+                    "</script>"
+                )
+
             # Best-effort: a candidate/interviewer without the meeting
             # provider connected yet (needs_auth) or a provider-side
             # error must not undo the interview that was just scheduled
             # or updated - they can still generate/refresh it later via
-            # the existing "Send Meeting Link" action. This also runs on
-            # every edit (not just creation) so that adding/removing
-            # interviewers or changing the date/time pushes an updated
-            # attendee list to the provider, which is what triggers the
-            # add/cancellation emails for changed attendees.
+            # the existing "Send Meeting Link" action. This runs whenever
+            # a schedule-relevant field changed (including on creation),
+            # so that adding/removing interviewers or changing the
+            # date/time/mode/description pushes an updated attendee list
+            # to the provider, which is what triggers the add/cancellation
+            # emails for changed attendees.
             from recruitment.views.views import generate_interview_meeting
 
             meeting_result = generate_interview_meeting(form.instance, self.request)

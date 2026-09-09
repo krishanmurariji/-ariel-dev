@@ -1,4 +1,15 @@
 {% load i18n %}
+<style>
+    #objectCreateModal:has(#sendLoiForm-{{ candidate.id }}) .oh-modal__dialog {
+        max-width: 1040px;
+    }
+    @media (max-width: 900px) {
+        .oh-loi-columns {
+            grid-template-columns: 1fr !important;
+        }
+    }
+</style>
+
 <div class="oh-modal__dialog-header">
     <span class="oh-modal__dialog-title" id="sendLoiModalLabel">
         <h5>{% trans "Send Letter of Intent to" %} {{ candidate.name }}</h5>
@@ -13,27 +24,29 @@
         {% csrf_token %}
 
         <div class="modal-body">
-            <div class="oh-timeoff-modal__profile-content">
-                <div class="oh-profile mb-2">
-                    <div class="oh-profile__avatar">
-                        <img src="https://ui-avatars.com/api/?name={{ candidate.name }}&amp;background=random"
-                            class="oh-profile__image me-2">
-                    </div>
-                    <div class="oh-timeoff-modal__profile-info">
-                        <span class="oh-timeoff-modal__user fw-bold">{{ candidate.name }}</span>
-                        <span class="oh-timeoff-modal__user m-0" style="font-size: 15px; color: #4d4a4a">
-                            {{ candidate.email }}</span>
+            <div class="oh-loi-columns" style="display:grid;grid-template-columns:1fr 1.1fr;gap:24px;">
+
+                <div>
+                    <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#333;">
+                        {% trans "Your message" %}
+                    </p>
+                    <div style="background:#f8f9fb;border-radius:8px;padding:16px 18px;">
+                        <p style="margin:0 0 10px;color:#333;">{% trans "Dear" %} {{ candidate.name }},</p>
+
+                        <textarea id="loiMessageInput-{{ candidate.id }}" name="message" required rows="10"
+                            placeholder="{% trans 'Write your message to the candidate here...' %}"
+                            class="oh-input oh-input--textarea w-100" style="resize:vertical;"></textarea>
                     </div>
                 </div>
-            </div>
 
-            <div class="form-group mt-2">
-                <label for="loiBody-{{ candidate.id }}"><h6>{% trans "Message" %}</h6></label>
-                <textarea id="loiBody-{{ candidate.id }}" class="oh-input oh-input--textarea" hidden
-                    name="body" data-summernote required>{{ loi_body }}</textarea>
-            </div>
-            <div class="form-hint" style="margin-top: 10px; font-size: 13px; color: #888;">
-                {% trans "Replace the placeholder line with your own message - the Accept/Decline buttons are already built in and don't need editing." %}
+                <div>
+                    <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#333;">
+                        {% trans "This is exactly what" %} {{ candidate.name }} {% trans "will receive" %}
+                    </p>
+                    <iframe id="loiPreviewFrame-{{ candidate.id }}" title="{% trans 'Email preview' %}"
+                        style="width:100%;height:480px;border:1px solid #e5e7eb;border-radius:8px;background:#e9e9e9;"></iframe>
+                </div>
+
             </div>
         </div>
 
@@ -43,3 +56,35 @@
         </div>
     </form>
 </div>
+
+<script>
+    (function () {
+        var input = document.getElementById("loiMessageInput-{{ candidate.id }}");
+        var frame = document.getElementById("loiPreviewFrame-{{ candidate.id }}");
+        var previewUrl = "{% url 'loi-preview' candidate.id %}";
+        var csrfToken = document.querySelector(
+            '#sendLoiForm-{{ candidate.id }} [name="csrfmiddlewaretoken"]'
+        ).value;
+        var timer = null;
+
+        function loadPreview() {
+            fetch(previewUrl, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": csrfToken,
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: "message=" + encodeURIComponent(input.value),
+            })
+                .then(function (resp) { return resp.text(); })
+                .then(function (html) { frame.srcdoc = html; });
+        }
+
+        input.addEventListener("input", function () {
+            clearTimeout(timer);
+            timer = setTimeout(loadPreview, 400);
+        });
+
+        loadPreview();
+    })();
+</script>

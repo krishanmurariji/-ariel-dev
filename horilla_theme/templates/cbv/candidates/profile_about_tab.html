@@ -127,6 +127,14 @@
                         {% endif %}
                     </p>
                 </div>
+                <div>
+                    <p class="cp-field-label">{% trans 'Letter of Intent' %}</p>
+                    <p class="cp-field-value">
+                        {% with resp=candidate.get_latest_loi_response %}
+                        {% if resp %}{{ candidate.loi_status_badge|safe }}{% else %}—{% endif %}
+                        {% endwith %}
+                    </p>
+                </div>
             </div>
         </div>
     </div>

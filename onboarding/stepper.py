@@ -1,12 +1,16 @@
 """
 stepper.py
 
-Full-page "Configure Onboarding" stepper for a candidate: Document
-Verification -> Pre-Joining Checklist -> Job Profile -> Post-Joining
-Checklist -> Roles & Responsibility -> Employee Checklist -> Offer Letter
--> Finalize. Steps always run in this fixed order (no per-step skipping).
-Offer Letter sits right before Finalize since Finalize isn't a step of its
-own - just a recap of everything already filled in.
+Full-page "Configure Onboarding" stepper for a candidate: Offer, Hiring &
+Closure -> Pre-Joining Checklist -> Job Profile -> Post-Joining Checklist
+-> Roles & Responsibility -> Employee Checklist -> Finalize. Steps always
+run in this fixed order (no per-step skipping).
+"Offer, Hiring & Closure" (step key "documents", kept from when this was
+just Document Verification) bundles three tabs - Offer Letter/LOI,
+Document Verification, and Background Verification - so all of a
+candidate's closing paperwork lives in one place instead of Document
+Verification sitting alone as step 1 and the offer letter separately
+near the end.
 Employee Checklist tasks are always done by the candidate themself (no
 assignee to pick), unlike pre_joining/post_joining tasks which are done by
 someone else about the candidate. Steps render as
@@ -28,6 +32,7 @@ from base.models import Department, EmployeeShift, EmployeeType, JobPosition, Jo
 from employee.models import Employee
 from horilla.decorators import hx_request_required, login_required, permission_required
 from onboarding.forms import (
+    BackgroundVerificationForm,
     ChecklistTemplateSelectForm,
     OnboardingDetailsForm,
     OnboardingDocumentRequestForm,
@@ -45,13 +50,12 @@ from recruitment.models import Candidate, CandidateDocument, CandidateDocumentRe
 from recruitment.views.views import notify_candidate_of_document_rejection
 
 STEPS = [
-    ("documents", _("Document Verification")),
+    ("documents", _("Offer, Hiring & Closure")),
     ("pre_joining", _("Pre-Joining Checklist")),
     ("details", _("Job Profile")),
     ("post_joining", _("Post-Joining Checklist")),
     ("roles", _("Roles & Responsibility")),
     ("employee_checklist", _("Employee Checklist")),
-    ("welcome", _("Offer Letter")),
     ("finalize", _("Finalize")),
 ]
 STEP_KEYS = [key for key, _label in STEPS]
@@ -162,6 +166,24 @@ def _document_context(candidate):
     }
 
 
+def _last_saved_welcome_message():
+    """
+    Fallback prefill for a candidate who doesn't have their own welcome
+    message yet - HR usually writes near-identical welcome notes for
+    every new hire, so starting from whatever was last actually saved
+    (for any candidate) saves re-typing it each time. Only ever used as
+    the form's initial value, never written to the candidate's own row
+    unless they actually save it themselves.
+    """
+    row = (
+        OnboardingCandidateDetail.objects.exclude(welcome_message="")
+        .exclude(welcome_message__isnull=True)
+        .order_by("-welcome_message_updated_at")
+        .first()
+    )
+    return row.welcome_message if row else ""
+
+
 def _task_groups(candidate, phase, template_ids):
     """
     Tasks for the selected Task Groups, grouped under their group heading.
@@ -236,17 +258,7 @@ def _render_step(request, candidate, detail, step_key, extra=None):
     context["next_key"] = _next_key(step_key) if step_key != "finalize" else None
     context.update(extra or {})
 
-    if step_key == "welcome":
-        context.setdefault(
-            "form",
-            WelcomeMessageForm(
-                instance=detail,
-                initial={"offer_letter_status": candidate.offer_letter_status},
-            ),
-        )
-        template = "onboarding/stepper/step_welcome.html"
-
-    elif step_key == "details":
+    if step_key == "details":
         if "form" not in context:
             context["form"] = OnboardingDetailsForm(
                 exclude_employee_id=_candidate_own_employee_id(candidate),
@@ -271,7 +283,21 @@ def _render_step(request, candidate, detail, step_key, extra=None):
 
     elif step_key == "documents":
         context.update(_document_context(candidate))
-        template = "onboarding/stepper/step_documents.html"
+        context.setdefault(
+            "welcome_form",
+            WelcomeMessageForm(
+                instance=detail,
+                initial={
+                    "welcome_message": detail.welcome_message
+                    or _last_saved_welcome_message()
+                },
+            ),
+        )
+        context.setdefault(
+            "background_form", BackgroundVerificationForm(instance=detail)
+        )
+        context["latest_loi"] = candidate.get_latest_loi_response()
+        template = "onboarding/stepper/step_offer_hiring_closure.html"
 
     elif step_key == "roles":
         context.setdefault("form", RolesResponsibilityForm(instance=detail))
@@ -373,14 +399,19 @@ def _save_step(request, candidate, detail, step_key):
     Returns an error message string if the step failed to save/validate,
     otherwise None.
     """
-    if step_key == "welcome":
-        form = WelcomeMessageForm(request.POST, request.FILES, instance=detail)
-        if not form.is_valid():
+    if step_key == "documents":
+        # Both forms are bound to the same `detail` instance, so validating
+        # both before saving either leaves `detail` fully populated from
+        # one save() call - no need for two separate writes.
+        welcome_form = WelcomeMessageForm(request.POST, request.FILES, instance=detail)
+        if not welcome_form.is_valid():
             return _("Please check the welcome message.")
-        form.save()
-        if form.cleaned_data.get("offer_letter_status"):
-            candidate.offer_letter_status = form.cleaned_data["offer_letter_status"]
-            candidate.save()
+        background_form = BackgroundVerificationForm(request.POST, instance=detail)
+        if not background_form.is_valid():
+            return _("Please check the background verification notes.")
+        if detail.welcome_message:
+            detail.welcome_message_updated_at = timezone.now()
+        detail.save()
         return None
 
     if step_key == "details":

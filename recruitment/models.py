@@ -16,6 +16,7 @@ from uuid import uuid4
 
 import django
 import requests
+from dateutil.relativedelta import relativedelta
 from django import forms
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
@@ -1042,6 +1043,26 @@ class Candidate(HorillaModel):
             context={"instance": self},
         )
 
+    def get_latest_loi_response(self):
+        """
+        Most recent Letter of Intent sent to this candidate, if any -
+        used to show whether they've accepted/declined it yet. Ordered by
+        last_sent_at (not sent_at, which only reflects a row's first-ever
+        send) so a resend that reuses a still-pending row still sorts as
+        the latest.
+        """
+        return self.loi_responses.order_by("-last_sent_at", "-sent_at").first()
+
+    def loi_status_badge(self):
+        """
+        Custom column/card-row showing the candidate's latest LOI
+        response status - blank if no LOI has been sent yet.
+        """
+        return render_template(
+            path="cbv/pipeline/loi_status_badge.html",
+            context={"instance": self},
+        )
+
     def onboarding_status_col(self):
         """
         This method for get custome coloumn for status.
@@ -1276,6 +1297,32 @@ class Candidate(HorillaModel):
         url = reverse_lazy("send-mail", kwargs={"cand_id": self.pk})
         return url
 
+    def get_send_loi_url(self):
+        """
+        Candidate detail
+        """
+        url = reverse_lazy("send-loi-form", kwargs={"cand_id": self.pk})
+        return url
+
+    def get_probation_months(self):
+        """
+        Whole number of months from Date of Joining to Probation End (both
+        set on the Job Profile onboarding step) - the actual source of
+        truth for how long a probation feedback cycle should run, rather
+        than a separately hand-entered month count. A partial trailing
+        month still counts as a full month, so the last stretch of
+        probation gets a review too. None if either date isn't set yet.
+        """
+        if not self.joining_date or not self.probation_end:
+            return None
+        if self.probation_end <= self.joining_date:
+            return None
+        delta = relativedelta(self.probation_end, self.joining_date)
+        months = delta.years * 12 + delta.months
+        if delta.days > 0:
+            months += 1
+        return max(months, 1)
+
     def is_offer_rejected(self):
         """
         Is offer rejected checking method
@@ -1390,22 +1437,51 @@ class Candidate(HorillaModel):
             context={"instance": self, "interviews": interviews},
         )
 
+    def _default_probation_months(self):
+        """
+        The company's (or, failing that, the global) configured Default
+        Probation Period - see RecruitmentGeneralSetting.
+        """
+        company = getattr(self.recruitment_id, "company_id", None)
+        setting = None
+        if company:
+            setting = RecruitmentGeneralSetting.objects.filter(company_id=company).first()
+        if not setting:
+            setting = RecruitmentGeneralSetting.objects.filter(
+                company_id__isnull=True
+            ).first()
+        return setting.default_probation_period if setting else None
+
     def save(self, *args, **kwargs):
+        previous = (
+            Candidate.objects.filter(pk=self.pk)
+            .values(
+                "recruitment_id", "job_position_id", "stage_id__stage_type"
+            )
+            .first()
+            if self.pk
+            else None
+        )
+
         if self.stage_id is not None:
             self.hired = self.stage_id.stage_type == "hired"
+            was_hired_before = bool(
+                previous and previous["stage_id__stage_type"] == "hired"
+            )
+            if self.hired and not was_hired_before and not self.probation_end:
+                default_months = self._default_probation_months()
+                if default_months:
+                    reference_date = self.joining_date or tz.now().date()
+                    self.probation_end = reference_date + relativedelta(
+                        months=default_months
+                    )
 
         should_validate_job_position = not self.pk
-        if self.pk:
-            previous = (
-                Candidate.objects.filter(pk=self.pk)
-                .values("recruitment_id", "job_position_id")
-                .first()
+        if previous:
+            should_validate_job_position = (
+                previous["recruitment_id"] != self.recruitment_id_id
+                or previous["job_position_id"] != self.job_position_id_id
             )
-            if previous:
-                should_validate_job_position = (
-                    previous["recruitment_id"] != self.recruitment_id_id
-                    or previous["job_position_id"] != self.job_position_id_id
-                )
 
         if not self.recruitment_id.is_event_based and self.job_position_id is None:
             self.job_position_id = self.recruitment_id.job_position_id
@@ -2133,6 +2209,18 @@ class RecruitmentGeneralSetting(HorillaModel):
         help_text=_(
             "Platform used to create the meeting link when 'Send Meeting "
             "Link' is clicked on an interview."
+        ),
+    )
+    default_probation_period = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name=_("Default Probation Period (months)"),
+        help_text=_(
+            "When a candidate is moved to a Hired stage, their Probation "
+            "End date is auto-filled as Date of Joining (or today, if "
+            "joining date isn't set yet) plus this many months - only "
+            "when Probation End isn't already set. Leave blank to not "
+            "auto-fill it at all."
         ),
     )
     company_id = models.OneToOneField(
@@ -3034,6 +3122,46 @@ class CandidateLOIResponse(HorillaModel):
     )
     sent_at = models.DateTimeField(auto_now_add=True)
     responded_at = models.DateTimeField(null=True, blank=True)
+    message = models.TextField(
+        blank=True, default="", verbose_name=_("Message"),
+        help_text=_("The raw message HR typed for this send."),
+    )
+    rendered_body = models.TextField(
+        blank=True, default="", verbose_name=_("Rendered Body"),
+        help_text=_(
+            "The exact letterhead-wrapped HTML actually emailed, frozen at "
+            "send time - lets HR play back exactly what a candidate "
+            "received, even after the message/branding later changes."
+        ),
+    )
+    company = models.ForeignKey(
+        "base.Company",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_("Company"),
+        help_text=_("Which company's branding rendered_body's cid: image refs belong to."),
+    )
+    last_sent_at = models.DateTimeField(
+        null=True, blank=True, verbose_name=_("Last Sent At"),
+        help_text=_(
+            "Bumped on every real send, including a resend that reuses "
+            "this same still-pending row - sent_at only ever reflects the "
+            "first send, so this is what 'most recently sent' sorts by."
+        ),
+    )
+    sent_by = models.ForeignKey(
+        Employee,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="loi_responses_sent",
+        verbose_name=_("Sent By"),
+        help_text=_(
+            "Who clicked Send for this LOI - notified by mail once the "
+            "candidate accepts or declines."
+        ),
+    )
 
     def __str__(self):
         return f"{self.candidate_id} - {self.get_status_display()}"

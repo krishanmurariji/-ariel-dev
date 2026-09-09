@@ -526,6 +526,17 @@ class OnboardingCandidateDetail(HorillaModel):
         verbose_name=_("Candidate"),
     )
     welcome_message = models.TextField(blank=True, null=True, verbose_name=_("Welcome Message"))
+    welcome_message_updated_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_("Welcome Message Updated At"),
+        help_text=_(
+            "When welcome_message was last actually saved (non-empty) for "
+            "this candidate - used to find the most recently written "
+            "welcome message across all candidates, as a prefill default "
+            "for a candidate who doesn't have one of their own yet."
+        ),
+    )
     department_id = models.ForeignKey(
         Department,
         on_delete=models.SET_NULL,
@@ -569,9 +580,6 @@ class OnboardingCandidateDetail(HorillaModel):
         blank=True,
         verbose_name=_("Employee Type"),
     )
-    probation_period = models.PositiveIntegerField(
-        null=True, blank=True, verbose_name=_("Probation Period (months)")
-    )
     offer_letter = models.FileField(
         upload_to="onboarding/offer_letters",
         null=True,
@@ -607,6 +615,9 @@ class OnboardingCandidateDetail(HorillaModel):
     )
     roles_responsibilities = models.TextField(
         blank=True, null=True, verbose_name=_("Roles & Responsibilities")
+    )
+    background_verification_notes = models.TextField(
+        blank=True, null=True, verbose_name=_("Background Verification Notes")
     )
     objects = HorillaCompanyManager("candidate_id__recruitment_id__company_id")
 

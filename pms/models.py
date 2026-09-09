@@ -1255,12 +1255,14 @@ class ProbationFeedbackCycle(HorillaModel):
     """
     Tracks a candidate's month-by-month probation review schedule, started
     manually from the Onboarding candidate list/card (onboarding/views.py:
-    start_feedback_cycle) using the probation period + buddy already
-    captured on OnboardingCandidateDetail. A daily background job
-    (pms/scheduler.py: probation_feedback_creation) walks active rows here,
-    resolves the actual Employee once conversion has happened, and
-    generates one Feedback per elapsed month - buddy only on month 1, the
-    employee's current reporting manager every month.
+    start_feedback_cycle). total_months is derived from the candidate's
+    Date of Joining and Probation End dates (Candidate.get_probation_months,
+    both set on the Job Profile onboarding step), and buddy comes from
+    OnboardingCandidateDetail. A daily background job (pms/scheduler.py:
+    probation_feedback_creation) walks active rows here, resolves the
+    actual Employee once conversion has happened, and generates one
+    Feedback per elapsed month - buddy only on month 1, the employee's
+    current reporting manager every month.
     """
 
     candidate_id = models.OneToOneField(

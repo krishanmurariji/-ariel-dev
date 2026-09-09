@@ -17,7 +17,6 @@ import logging
 import os
 import random
 import secrets
-from datetime import date
 from urllib.parse import parse_qs
 
 from django import template
@@ -100,23 +99,28 @@ logger = logging.getLogger(__name__)
 @permission_required("recruitment.change_candidate")
 def start_feedback_cycle(request, pk):
     """
-    Starts a monthly Probation Feedback Cycle for this candidate, using the
-    probation period and buddy already captured on OnboardingCandidateDetail
-    during the Job Profile step. Safe to call even before the candidate has
-    been converted to an employee - the actual Feedback records only start
-    appearing once conversion happens (see pms.scheduler.probation_feedback_creation).
+    Starts a monthly Probation Feedback Cycle for this candidate. The
+    number of months is derived from Date of Joining -> Probation End
+    (Candidate.get_probation_months(), both already captured on the Job
+    Profile onboarding step) - not a separately hand-entered count, since
+    those two dates are the actual source of truth for how long
+    probation runs. Buddy comes from OnboardingCandidateDetail. Safe to
+    call even before the candidate has been converted to an employee -
+    the actual Feedback records only start appearing once conversion
+    happens (see pms.scheduler.probation_feedback_creation).
     """
     from pms.models import ProbationFeedbackCycle, QuestionTemplate
 
     candidate = get_object_or_404(Candidate, pk=pk)
     if request.method == "POST":
         detail = getattr(candidate, "onboarding_detail", None)
-        if not detail or not detail.probation_period:
+        total_months = candidate.get_probation_months()
+        if not total_months:
             messages.error(
                 request,
                 _(
-                    "Set a probation period for this candidate first "
-                    "(Job Profile step)."
+                    "Set a Date of Joining and a Probation End date after "
+                    "it for this candidate first (Job Profile step)."
                 ),
             )
         elif ProbationFeedbackCycle.objects.filter(candidate_id=candidate).exists():
@@ -134,10 +138,10 @@ def start_feedback_cycle(request, pk):
             else:
                 ProbationFeedbackCycle.objects.create(
                     candidate_id=candidate,
-                    buddy_id=detail.buddy_id,
+                    buddy_id=detail.buddy_id if detail else None,
                     question_template_id=question_template,
-                    start_date=candidate.joining_date or date.today(),
-                    total_months=detail.probation_period,
+                    start_date=candidate.joining_date,
+                    total_months=total_months,
                 )
                 messages.success(request, _("Probation feedback cycle started."))
     return HorillaRedirect(request)

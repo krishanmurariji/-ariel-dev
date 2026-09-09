@@ -41,12 +41,29 @@
         </div>
 </div>
 
+<div class="oh-inner-sidebar-content__header mt-4">
+    <h2 class="oh-inner-sidebar-content__title">{% trans 'Probation' %}</h2>
+</div>
+<div class="row d-flex">
+        <div class="oh-label__info" for="default_probation_period">
+            <label class="oh-label" for="default_probation_period">{% trans "Default Probation Period (months)" %}</label>
+            <span class="oh-info mr-2" title="{% trans "When a candidate is moved to a Hired stage, their Probation End date is auto-filled using this many months from their Date of Joining (or today, if joining date isn't set yet) - only when Probation End isn't already set. Leave blank to not auto-fill it." %}">
+            </span>
+            <input type="number" min="1" step="1" class="oh-input" id="default_probation_period"
+                style="max-width: 120px;"
+                value="{% if check_default_probation_period %}{{ check_default_probation_period }}{% endif %}"
+                onchange="defaultProbationPeriod($(this))" />
+        </div>
+</div>
+
 <div class="oh-inner-sidebar-content__footer"></div>
 <button id="selfTrackButton" hx-get="{% url 'candidate-self-tracking' %}" hx-target="#reloadMessages" hidden>
 </button>
 <button id="ratingButton" hx-get="{% url 'candidate-self-tracking-rating-option' %}" hx-target="#reloadMessages" hidden>
 </button>
 <button id="meetingProviderButton" hx-get="{% url 'default-meeting-provider' %}" hx-target="#reloadMessages" hidden>
+</button>
+<button id="probationPeriodButton" hx-get="{% url 'default-probation-period' %}" hx-target="#reloadMessages" hidden>
 </button>
 
 <script>
@@ -64,6 +81,11 @@
         var value = $(element).val()
         $('#meetingProviderButton').attr('hx-vals', `{"default_meeting_provider":"${value}"}`);
         $('#meetingProviderButton').click()
+    }
+    function defaultProbationPeriod(element){
+        var value = $(element).val()
+        $('#probationPeriodButton').attr('hx-vals', `{"default_probation_period":"${value}"}`);
+        $('#probationPeriodButton').click()
     }
 </script>
 {% endblock settings %}

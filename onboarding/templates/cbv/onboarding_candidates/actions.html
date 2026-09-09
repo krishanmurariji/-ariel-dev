@@ -82,6 +82,21 @@
 		><ion-icon name="rocket-outline"></ion-icon
 	></a>
 
+	{% if perms.pms.add_feedback %}
+		<button
+			type="button"
+			class="oh-btn oh-btn--light-bkg w-100"
+			title="{% trans 'Setup Feedback' %}"
+			hx-get="{% url 'feedback-creation' %}?modal=1&candidate_id={{ instance.id }}"
+			hx-target="#feedbackSetupModalTarget"
+			hx-swap="innerHTML"
+			data-toggle="oh-modal-toggle"
+			data-target="#feedbackSetupModal"
+		>
+			<ion-icon name="chatbox-outline"></ion-icon>
+		</button>
+	{% endif %}
+
 	<button
 		type="button"
 		class="oh-btn oh-btn--light-bkg w-100"
@@ -125,7 +140,7 @@
 			>
 				<ion-icon name="checkmark-circle-outline"></ion-icon>
 			</a>
-		{% elif instance.onboarding_detail.probation_period %}
+		{% elif instance.get_probation_months %}
 			<form
 				hx-post="{% url 'onboarding-start-feedback-cycle' instance.pk %}"
 				hx-target="#reloadMessages"
@@ -136,7 +151,7 @@
 						event.preventDefault();
 						Swal.fire({
 							title: `{% trans 'Start probation feedback cycle?' %}`,
-							text: `{% trans 'Generates one review each month for' %} {{ instance.onboarding_detail.probation_period }} {% trans 'month(s) - month 1 goes to the Reporting Manager and Buddy, later months go to the Reporting Manager only.' %}`,
+							text: `{% trans 'Generates one review each month for' %} {{ instance.get_probation_months }} {% trans 'month(s), based on Date of Joining and Probation End - month 1 goes to the Reporting Manager and Buddy, later months go to the Reporting Manager only.' %}`,
 							icon: 'question',
 							showCancelButton: true,
 							confirmButtonText: `{% trans 'Yes' %}`,

@@ -74,6 +74,7 @@
           <ion-icon name="hourglass-outline"></ion-icon> {% trans "Pending Upload" %}
         </span>
         {% endif %}
+        {% if req %}
         <button
           type="button"
           class="oh-doc-request-row__cancel"
@@ -84,6 +85,7 @@
           hx-confirm="{% trans 'Remove this document request?' %}">
           <ion-icon name="trash-outline"></ion-icon>
         </button>
+        {% endif %}
       </div>
     </div>
     {% endwith %}

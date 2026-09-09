@@ -147,6 +147,37 @@
             </div>
         </div>
     </div>
+    <div class="border border-[#ebebeb] rounded-md overflow-hidden mb-5">
+        <h5 class="text-sm font-semibold bg-[#f3f3f3] px-4 py-3 text-[#333]">
+            {% trans 'Probation' %}
+        </h5>
+        <div class="p-4">
+            <div class="grid grid-cols-12 gap-4 myform">
+                <div class="col-span-12 lg:col-span-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex space-x-2">
+                            <h3 class="text-sm font-medium">{% trans "Default Probation Period (months)" %}</h3>
+                            <span
+                                class="oh-info mr-2"
+                                title='{% trans "When a candidate is moved to a Hired stage, their Probation End date is auto-filled using this many months from their Date of Joining (or today, if joining date is not set yet) - only when Probation End is not already set. Leave blank to not auto-fill it." %}'
+                            >
+                            </span>
+                        </div>
+                        <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            class="border border-[#d9d9d9] rounded-md text-sm px-3 py-1.5"
+                            style="max-width: 120px;"
+                            id="default_probation_period"
+                            value="{% if check_default_probation_period %}{{ check_default_probation_period }}{% endif %}"
+                            onchange="defaultProbationPeriod($(this))"
+                        >
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     <button id="selfTrackButton" hx-get="{% url 'candidate-self-tracking' %}" hx-target="#reloadMessages" hidden>
     </button>
     <button
@@ -173,6 +204,13 @@
     <button
         id="meetingProviderButton"
         hx-get="{% url 'default-meeting-provider' %}"
+        hx-target="#reloadMessages"
+        hidden
+    >
+    </button>
+    <button
+        id="probationPeriodButton"
+        hx-get="{% url 'default-probation-period' %}"
         hx-target="#reloadMessages"
         hidden
     >
@@ -206,6 +244,11 @@
             var value = $(element).val()
             $('#meetingProviderButton').attr('hx-vals', `{"default_meeting_provider":"${value}"}`);
             $('#meetingProviderButton').click()
+        }
+        function defaultProbationPeriod(element){
+            var value = $(element).val()
+            $('#probationPeriodButton').attr('hx-vals', `{"default_probation_period":"${value}"}`);
+            $('#probationPeriodButton').click()
         }
     </script>
 {% endblock settings %}

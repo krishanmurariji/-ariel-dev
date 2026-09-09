@@ -134,6 +134,19 @@
                             >{{candidate.stage_id}}</span
                           >
                         </li>
+                        {% with resp=candidate.get_latest_loi_response %}
+                        {% if resp %}
+                        <li class="oh-profile__card-info-item">
+                          <span class="oh-profile__info-label mb-1">
+                            <ion-icon name="document-text-outline"></ion-icon>
+                            <span>{% trans "Letter of Intent" %}</span>
+                          </span>
+                          <span class="oh-profile__info-value">
+                            {{candidate.loi_status_badge|safe}}
+                          </span>
+                        </li>
+                        {% endif %}
+                        {% endwith %}
                         <li class="oh-profile__card-info-item">
                           <span class="oh-profile__info-label mb-1">
                             <ion-icon name="briefcase-outline"></ion-icon>
