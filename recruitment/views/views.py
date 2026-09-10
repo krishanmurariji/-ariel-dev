@@ -35,7 +35,7 @@ from django.core.paginator import Paginator
 from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
 from django.db.models import Case, IntegerField, ProtectedError, Q, When
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -3936,15 +3936,37 @@ def platform_conversion_widget_setting(request):
     return HttpResponse("<script>$('#reloadMessagesButton').click()</script>")
 
 
+# The candidate portal authenticates with the applicant's own phone number
+# (CandidateAuthenticationBackend) rather than a real secret, and a phone
+# number is low-entropy and often known to third parties - so this login
+# is throttled per-email to make brute-forcing the phone number
+# impractical, the way a generated/emailed secret wouldn't need to be.
+CANDIDATE_LOGIN_MAX_ATTEMPTS = 5
+CANDIDATE_LOGIN_LOCKOUT_SECONDS = 15 * 60
+
+
 def candidate_login(request):
     if request.method == "POST":
         email = request.POST.get("email", "").strip()
         mobile = request.POST.get("phone", "").strip()
+        attempts_key = f"candidate_login_attempts:{email.lower()}"
+
+        if email and CACHE.get(attempts_key, 0) >= CANDIDATE_LOGIN_MAX_ATTEMPTS:
+            return render(
+                request,
+                "candidate/self_login.html",
+                {
+                    "error": _(
+                        "Too many failed login attempts. Please try again in a few minutes."
+                    )
+                },
+            )
 
         backend = CandidateAuthenticationBackend()
         candidate = backend.authenticate(request, username=email, password=mobile)
 
         if candidate is not None:
+            CACHE.delete(attempts_key)
             if candidate.canceled:
                 return render(
                     request,
@@ -3959,6 +3981,12 @@ def candidate_login(request):
             request.session["candidate_email"] = candidate.email
             return redirect("candidate-self-status-tracking")
         else:
+            if email:
+                CACHE.set(
+                    attempts_key,
+                    CACHE.get(attempts_key, 0) + 1,
+                    CANDIDATE_LOGIN_LOCKOUT_SECONDS,
+                )
             return render(
                 request, "candidate/self_login.html", {"error": "Invalid credentials"}
             )
@@ -4851,7 +4879,10 @@ def file_upload(request, id):
 
     Returns: return document_form template
     """
-    document_item = CandidateDocument.objects.get(id=id)
+    document_item = get_object_or_404(CandidateDocument, id=id)
+    session_candidate_id = request.session.get("candidate_id")
+    if session_candidate_id and document_item.candidate_id_id != session_candidate_id:
+        raise Http404
     form = CandidateDocumentUpdateForm(instance=document_item)
     if request.method == "POST":
         form = CandidateDocumentUpdateForm(
@@ -4881,7 +4912,10 @@ def view_file(request, id):
 
     Returns: return view_file template
     """
-    document_obj = CandidateDocument.objects.filter(id=id).first()
+    document_obj = get_object_or_404(CandidateDocument, id=id)
+    session_candidate_id = request.session.get("candidate_id")
+    if session_candidate_id and document_obj.candidate_id_id != session_candidate_id:
+        raise Http404
     context = {
         "document": document_obj,
     }
@@ -5037,6 +5071,9 @@ def candidate_add_notes(request, cand_id):
         return HorillaRedirect(
             request, message=_("No Candidate found matching the query.")
         )
+    session_candidate_id = request.session.get("candidate_id")
+    if session_candidate_id and session_candidate_id != candidate.pk:
+        raise Http404
 
     updated_by = request.user.employee_get if request.user.is_authenticated else None
     label = (

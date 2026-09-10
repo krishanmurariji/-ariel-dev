@@ -2,31 +2,20 @@
 This module used for recruitment candidates
 """
 
-import ast
-import io
-import json
 import re
 from typing import Any
 
-from bs4 import BeautifulSoup
 from django import forms
 from django.contrib import messages
 from django.db.models import Min
 from django.http import HttpResponse
 from django.shortcuts import render
-from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 from django.views import View
-from import_export import fields, resources
-from openpyxl import Workbook
-from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-from openpyxl.utils import get_column_letter
-from xhtml2pdf import pisa
 
 from employee.forms import BulkUpdateFieldForm
-from horilla.horilla_middlewares import _thread_locals
 from horilla.http.response import HorillaRedirect
 from horilla_views.cbv_methods import (
     export_xlsx,
@@ -55,7 +44,6 @@ from recruitment.forms import (
 from recruitment.models import (
     Candidate,
     RecruitmentSurvey,
-    RecruitmentSurveyAnswer,
     RejectedCandidate,
     SkillZoneCandidate,
 )
@@ -324,241 +312,15 @@ class ListCandidates(HorillaListView):
                 class="cursor-pointer"
                 """
 
-    def export_data(self, *args, **kwargs):
-        """
-        Export with survey answer and question
-        """
-
-        request = getattr(_thread_locals, "request", None)
-        ids = ast.literal_eval(request.POST["ids"])
-        _columns = ast.literal_eval(request.POST["columns"])
-        queryset = self.model.objects.filter(id__in=ids)
-        question_mapping = self.survey_question_mapping
-        export_format = request.POST.get("format", "xlsx")
-
-        _model = self.model
-
-        class HorillaListViewResorce(resources.ModelResource):
-            """
-            Instant Resource class
-            """
-
-            id = fields.Field(column_name="ID")
-            question = {}
-
-            class Meta:
-                """
-                Meta class for additional option
-                """
-
-                model = _model
-                fields = [field[1] for field in _columns]  # 773
-
-            def __init__(self, **kwargs):
-                super().__init__(**kwargs)
-
-                for field_tuple in _columns:
-                    if field_tuple[1].startswith("question_"):
-                        safe_field_name = field_tuple[1]
-                        self.fields[safe_field_name] = fields.Field(
-                            column_name=question_mapping[safe_field_name],
-                            attribute=safe_field_name,
-                            readonly=True,
-                        )
-
-            def export_field(self, field, obj):
-                """
-                Override this method to fetch the candidate's answers dynamically.
-                """
-
-                if field.attribute:
-                    # Get the stored JSON field containing answers
-                    survey_answers = RecruitmentSurveyAnswer.objects.filter(
-                        candidate_id=obj
-                    ).first()
-                    if survey_answers and field.attribute.startswith("question_"):
-                        survey_answers = survey_answers.answer_json
-                        if isinstance(survey_answers, str):
-                            try:
-                                survey_answers = ast.literal_eval(
-                                    survey_answers
-                                )  # Convert string to dict
-                            except Exception:
-                                survey_answers = {}
-
-                        # Extract the actual question text
-
-                        original_question = question_mapping[field.attribute]
-                        # Retrieve answer from JSON if available
-                        answer = survey_answers.get(original_question, "")
-                        if not answer:
-                            answer = survey_answers.get(
-                                "rating_" + original_question, ""
-                            )
-                        if not answer:
-                            answer = survey_answers.get(
-                                "percentage_" + original_question, ""
-                            )
-                        if not answer:
-                            answer = survey_answers.get("file_" + original_question, "")
-                        if not answer:
-                            answer = survey_answers.get("date_" + original_question, "")
-                        if not answer:
-                            answer = survey_answers.get(
-                                "multiple_choices_" + original_question, ""
-                            )
-                        return answer
-
-                return super().export_field(field, obj)
-
-            def dehydrate_id(self, instance):
-                """
-                Dehydrate method for id field
-                """
-                return instance.pk
-
-            for field_tuple in _columns:
-                if not field_tuple[1].startswith("question_"):
-                    dynamic_fn_str = f"def dehydrate_{field_tuple[1]}(self, instance):return self.remove_extra_spaces(getattribute(instance, '{field_tuple[1]}'))"
-                    exec(dynamic_fn_str)
-                    dynamic_fn = locals()[f"dehydrate_{field_tuple[1]}"]
-                    locals()[field_tuple[1]] = fields.Field(column_name=field_tuple[0])
-
-            def remove_extra_spaces(self, text):
-                """
-                Remove blank space but keep line breaks and add new lines for <li> tags.
-                """
-                soup = BeautifulSoup(str(text), "html.parser")
-                for li in soup.find_all("li"):
-                    li.insert_before("\n")
-                    li.unwrap()
-                text = soup.get_text()
-                lines = text.splitlines()
-                non_blank_lines = [line.strip() for line in lines if line.strip()]
-                cleaned_text = "\n".join(non_blank_lines)
-                return cleaned_text
-
-        book_resource = HorillaListViewResorce()
-
-        # Export the data using the resource
-        dataset = book_resource.export(queryset)
-
-        # Set the response headers
-        # file_name = self.export_file_name
-        if export_format == "json":
-            json_data = json.loads(dataset.export("json"))
-            response = HttpResponse(
-                json.dumps(json_data, indent=4), content_type="application/json"
-            )
-            response["Content-Disposition"] = (
-                f'attachment; filename="{self.export_file_name}.json"'
-            )
-            return response
-
-        # CSV
-        elif export_format == "csv":
-            csv_data = dataset.export("csv")
-            response = HttpResponse(csv_data, content_type="text/csv")
-            response["Content-Disposition"] = (
-                f'attachment; filename="{self.export_file_name}.csv"'
-            )
-            return response
-        elif export_format == "pdf":
-
-            headers = dataset.headers
-            rows = dataset.dict
-
-            # Render to HTML using a template
-            html_string = render_to_string(
-                "generic/export_pdf.html",
-                {
-                    "headers": headers,
-                    "rows": rows,
-                },
-            )
-
-            # Convert HTML to PDF using xhtml2pdf
-            result = io.BytesIO()
-            pisa_status = pisa.CreatePDF(html_string, dest=result)
-
-            if pisa_status.err:
-                return HttpResponse("PDF generation failed", status=500)
-
-            # Return response
-            response = HttpResponse(result.getvalue(), content_type="application/pdf")
-            response["Content-Disposition"] = (
-                f'attachment; filename="{self.export_file_name}.pdf"'
-            )
-            return response
-
-        # response = HttpResponse(
-        #     dataset.export("xlsx"), content_type="application/vnd.ms-excel"
-        # )
-        # response["Content-Disposition"] = (
-        #     f'attachment; filename="{self.export_file_name}.xls"'
-        # )
-        json_data = json.loads(dataset.export("json"))
-        headers = list(json_data[0].keys()) if json_data else []
-
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Exported Data"
-
-        # Styling
-        header_fill = PatternFill(
-            start_color="FFD700", end_color="FFD700", fill_type="solid"
-        )
-        bold_font = Font(bold=True)
-        thin_border = Border(
-            left=Side(style="thin"),
-            right=Side(style="thin"),
-            top=Side(style="thin"),
-            bottom=Side(style="thin"),
-        )
-        wrap_alignment = Alignment(vertical="top", wrap_text=True)
-
-        # Write headers
-        for col_idx, header in enumerate(headers, start=1):
-            cell = ws.cell(row=1, column=col_idx, value=header)
-            cell.fill = header_fill
-            cell.font = bold_font
-            cell.border = thin_border
-            cell.alignment = Alignment(
-                horizontal="center", vertical="center", wrap_text=True
-            )
-
-        # Write data rows
-        for row_idx, item in enumerate(json_data, start=2):
-            for col_idx, key in enumerate(headers, start=1):
-                value = item.get(key, "")
-                # Convert lists to newline-separated string
-                if isinstance(value, list):
-                    value = "\n".join(str(v) for v in value)
-                elif isinstance(value, dict):
-                    value = json.dumps(
-                        value, ensure_ascii=False
-                    )  # or format it as needed
-                cell = ws.cell(row=row_idx, column=col_idx, value=value)
-                cell.border = thin_border
-                cell.alignment = wrap_alignment
-
-        # Auto-fit column widths
-        for col_cells in ws.columns:
-            max_len = max(len(str(cell.value or "")) for cell in col_cells)
-            col_letter = get_column_letter(col_cells[0].column)
-            ws.column_dimensions[col_letter].width = min(max_len + 5, 50)
-
-        # Output to Excel
-        output = io.BytesIO()
-        wb.save(output)
-        output.seek(0)
-
-        response = HttpResponse(
-            output.read(),
-            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-        response["Content-Disposition"] = 'attachment; filename="exported_data.xlsx"'
-        return response
+    # A per-view export_data() override used to live here. It generated and
+    # exec()'d a Python function-definition string built from
+    # request.POST-derived column names with no sanitization - a real RCE
+    # if ever wired to a URL. Removed entirely (2026-09-10) rather than
+    # patched: confirmed unreachable (no export_path set on this view, and
+    # HorillaListView's own export_data is commented out in the base class
+    # / never calls this polymorphically) - the generic HorillaListView
+    # export path (horilla_views/views.py) already covers CSV/XLSX/JSON/PDF
+    # export safely for this list.
 
 
 @method_decorator(login_required, name="dispatch")

@@ -669,6 +669,12 @@ class ApplicationForm(RegistrationForm):
         reason = (self.cleaned_data.get("reason_to_leave") or "").strip()
         return reason
 
+    def clean_name(self):
+        name = (self.cleaned_data.get("name") or "").strip()
+        if not name:
+            raise ValidationError(_("This field is required"))
+        return name
+
     def clean(self, *args, **kwargs):
         name = self.cleaned_data.get("name")
         request = getattr(_thread_locals, "request", None)
@@ -1819,14 +1825,19 @@ class CandidateDocumentRequestForm(ModelForm):
 
 
 class CandidateDocumentUpdateForm(ModelForm):
-    """form to Update a Document"""
+    """
+    Form for a candidate to (re)upload their own document - status and
+    reject_reason are review fields only HR sets, via the separate
+    document_approve/document_reject views, and candidate_id must never
+    be client-settable (it's how ownership is determined), so none of
+    those three are exposed here.
+    """
 
     verbose_name = "CandidateDocument"
 
     class Meta:
         model = CandidateDocument
-        fields = "__all__"
-        exclude = ["is_active", "document_request_id"]
+        fields = ["title", "document"]
 
 
 class CandidateDocumentRejectForm(ModelForm):

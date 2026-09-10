@@ -22,6 +22,7 @@ from urllib.parse import parse_qs
 from django import template
 from django.contrib import messages
 from django.contrib.auth import login
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.paginator import Paginator
 from django.db.models import ProtectedError
@@ -1394,6 +1395,7 @@ def document_upload(request, token):
         if doc.document_request_id_id and doc.document
     }
     if request.method == "POST":
+        upload_errors = []
         for doc_request in document_requests:
             uploaded = request.FILES.get(f"doc_request_{doc_request.pk}")
             if not uploaded:
@@ -1408,16 +1410,24 @@ def document_upload(request, token):
             if existing_doc:
                 existing_doc.document = uploaded
                 existing_doc.status = "submitted"
-                existing_doc.save()
-                submitted_docs_by_request[doc_request.pk] = existing_doc
+                candidate_document = existing_doc
             else:
-                submitted_docs_by_request[doc_request.pk] = CandidateDocument.objects.create(
+                candidate_document = CandidateDocument(
                     title=doc_request.title,
                     candidate_id=candidate,
                     document_request_id=doc_request,
                     document=uploaded,
                     status="submitted",
                 )
+            try:
+                candidate_document.full_clean()
+            except ValidationError as e:
+                upload_errors.append(f"{doc_request.title}: {' '.join(e.messages)}")
+                continue
+            candidate_document.save()
+            submitted_docs_by_request[doc_request.pk] = candidate_document
+        if upload_errors:
+            messages.error(request, " ".join(upload_errors))
         missing_mandatory = [
             req.title
             for req in document_requests

@@ -22,6 +22,8 @@ jumped to directly, up to the furthest one actually reached.
 from datetime import timedelta
 
 from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -69,6 +71,12 @@ PHASE_STEP_LABELS = {
 # stepper never asks for an employee assignee - unlike pre_joining/
 # post_joining, which are always done by someone else about the candidate.
 CANDIDATE_ASSIGNED_PHASES = {"employee_checklist"}
+
+# CandidateDocument.clean()'s size/format checks only run when a
+# document_request_id is attached (they read its configured max_size/
+# format), which the HR ad hoc "Documents" tab upload never has - so it
+# needs its own cap rather than relying on that check.
+DEFAULT_MAX_UPLOAD_SIZE_MB = 25
 
 
 def _get_detail(candidate):
@@ -191,8 +199,14 @@ def _task_groups(candidate, phase, template_ids):
     only - deselecting a Task Group above removes all of its tasks - so
     there's no per-task exclusion state to track here.
     """
+    # TaskTemplateTask has no company-scoped manager of its own - route the
+    # requested template_ids through TaskTemplate.objects (which is
+    # HorillaCompanyManager-scoped) first, so a request naming another
+    # company's TaskTemplate silently drops it instead of leaking that
+    # company's group/task titles into this candidate's checklist.
+    visible_template_ids = TaskTemplate.objects.filter(pk__in=template_ids)
     tasks = (
-        TaskTemplateTask.objects.filter(template_id__in=template_ids)
+        TaskTemplateTask.objects.filter(template_id__in=visible_template_ids)
         .select_related("template_id")
         .order_by("template_id__id", "sequence", "id")
     )
@@ -342,7 +356,13 @@ def finalize_onboarding(request, pk):
     email and no portal token, matching the explicit "no mail" requirement.
     """
     candidate = get_object_or_404(Candidate, pk=pk)
+    detail = _get_detail(candidate)
     if request.method == "POST":
+        if detail.furthest_step_key != "finalize":
+            messages.error(
+                request, _("Please complete every step before finishing configuration.")
+            )
+            return redirect(reverse("onboarding-stepper-page", kwargs={"pk": candidate.pk}))
         Candidate.objects.filter(pk=candidate.pk).update(start_onboard=True)
         try:
             stage = candidate.recruitment_id.onboarding_stage.first()
@@ -380,6 +400,13 @@ def stepper_step(request, pk, step_key):
     if step_key not in STEP_KEYS:
         step_key = STEP_KEYS[0]
 
+    if not _is_step_unlocked(detail, step_key):
+        messages.error(
+            request, _("Please complete the previous steps first.")
+        )
+        step_key = detail.furthest_step_key
+        return _render_step(request, candidate, detail, step_key)
+
     if request.method == "POST":
         error = _save_step(request, candidate, detail, step_key)
         if error:
@@ -389,14 +416,7 @@ def stepper_step(request, pk, step_key):
         _advance_furthest_if_needed(detail, next_key)
         return _render_step(request, candidate, detail, next_key)
 
-    if not _is_step_unlocked(detail, step_key):
-        messages.error(
-            request, _("Please complete the previous steps first.")
-        )
-        step_key = detail.furthest_step_key
-    else:
-        _advance_furthest_if_needed(detail, step_key)
-
+    _advance_furthest_if_needed(detail, step_key)
     return _render_step(request, candidate, detail, step_key)
 
 
@@ -490,11 +510,15 @@ def _save_step(request, candidate, detail, step_key):
 def _save_checklist_tasks(request, candidate, phase):
     candidate_assigned = phase in CANDIDATE_ASSIGNED_PHASES
     task_ids = request.POST.getlist("task_id")
+    # See the matching comment in _task_groups - TaskTemplateTask isn't
+    # company-scoped on its own, so route through TaskTemplate.objects
+    # (which is) to keep a POSTed task_id from another company's template
+    # from being honored here.
     template_tasks = {
         str(task.pk): task
-        for task in TaskTemplateTask.objects.filter(pk__in=task_ids).select_related(
-            "template_id"
-        )
+        for task in TaskTemplateTask.objects.filter(
+            pk__in=task_ids, template_id__in=TaskTemplate.objects.all()
+        ).select_related("template_id")
     }
     assignee_ids = {
         request.POST.get(f"assignee_{task_id}")
@@ -618,10 +642,25 @@ def document_request_modal(request, pk):
             # could end up approved while its identically-named sibling
             # still sat there unfilled, reading like a stale/duplicate
             # entry that "won't go away" even after the other was dealt
-            # with. Block an exact-title repeat instead.
-            duplicate = CandidateDocumentRequest.objects.filter(
-                candidate_id=candidate, title__iexact=data["title"]
-            ).exists()
+            # with. Block an exact-title repeat instead - locking the
+            # candidate row for the duration of the check-then-create
+            # closes the race between two near-simultaneous submissions
+            # (candidate_id is a ManyToManyField, so there's no direct FK
+            # to lock on CandidateDocumentRequest itself).
+            with transaction.atomic():
+                Candidate.objects.select_for_update().get(pk=candidate.pk)
+                duplicate = CandidateDocumentRequest.objects.filter(
+                    candidate_id=candidate, title__iexact=data["title"]
+                ).exists()
+                if not duplicate:
+                    doc_request = CandidateDocumentRequest.objects.create(
+                        title=data["title"],
+                        format=data["format"],
+                        max_size=data["max_size"],
+                        is_mandatory=data["is_mandatory"],
+                        description=data["description"],
+                    )
+                    doc_request.candidate_id.add(candidate)
             if duplicate:
                 # The modal's own hx-target is #documentListContainer (see
                 # document_request_modal.html), not the modal body itself,
@@ -642,14 +681,6 @@ def document_request_modal(request, pk):
                     "onboarding/stepper/_document_list.html",
                     {"candidate": candidate, **_document_context(candidate)},
                 )
-            doc_request = CandidateDocumentRequest.objects.create(
-                title=data["title"],
-                format=data["format"],
-                max_size=data["max_size"],
-                is_mandatory=data["is_mandatory"],
-                description=data["description"],
-            )
-            doc_request.candidate_id.add(candidate)
             messages.success(request, _("Document request created"))
             return render(
                 request,
@@ -696,13 +727,29 @@ def document_upload(request, pk):
         title = request.POST.get("title", "").strip()
         uploaded = request.FILES.get("document")
         if title and uploaded:
-            CandidateDocument.objects.create(
+            if uploaded.size > DEFAULT_MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+                messages.error(
+                    request,
+                    _("File size exceeds the %(limit)s MB limit.")
+                    % {"limit": DEFAULT_MAX_UPLOAD_SIZE_MB},
+                )
+                return render(
+                    request,
+                    "onboarding/stepper/_document_list.html",
+                    {"candidate": candidate, **_document_context(candidate)},
+                )
+            document = CandidateDocument(
                 title=title,
                 candidate_id=candidate,
                 document=uploaded,
                 status="submitted",
             )
-            messages.success(request, _("Document uploaded"))
+            try:
+                document.full_clean()
+                document.save()
+                messages.success(request, _("Document uploaded"))
+            except ValidationError as e:
+                messages.error(request, " ".join(e.messages))
     return render(
         request,
         "onboarding/stepper/_document_list.html",

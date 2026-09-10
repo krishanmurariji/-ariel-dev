@@ -26,6 +26,9 @@ import uuid
 from datetime import date
 from typing import Any
 
+import bleach
+from bleach.css_sanitizer import CSSSanitizer
+
 from django import forms
 from django.contrib.auth.forms import UserCreationForm as UserForm
 from django.forms import DateInput, ValidationError
@@ -713,6 +716,41 @@ class StageChangeForm(forms.ModelForm):
 
 # ── Configure Onboarding stepper ─────────────────────────────────────────
 
+# Shared allowlist for the Summernote rich-text fields below
+# (roles_responsibilities, background_verification_notes) - stored as raw
+# HTML and re-rendered by Summernote's own JS as live markup when the
+# form reloads (not just displayed as escaped text), so unsanitized input
+# is a stored-XSS vector. Mirrors the bleach.clean() pattern already used
+# for HorillaMailTemplate.clean_body (base/forms.py), scoped down to what
+# Summernote's default toolbar can actually produce for a plain notes
+# field - no tables/divs, since this isn't an email layout.
+_RICH_TEXT_ALLOWED_TAGS = [
+    "p", "br", "b", "strong", "i", "em", "u", "s", "strike",
+    "ul", "ol", "li", "a", "span", "blockquote",
+    "h1", "h2", "h3", "h4", "h5", "h6",
+]
+_RICH_TEXT_ALLOWED_ATTRIBUTES = {
+    "a": ["href", "title", "target"],
+    "span": ["style"],
+    "p": ["style"],
+}
+_RICH_TEXT_ALLOWED_CSS_PROPERTIES = [
+    "color", "background-color", "font-size", "font-weight",
+    "text-align", "text-decoration",
+]
+
+
+def _sanitize_rich_text(value):
+    if not value:
+        return value
+    return bleach.clean(
+        value,
+        tags=_RICH_TEXT_ALLOWED_TAGS,
+        attributes=_RICH_TEXT_ALLOWED_ATTRIBUTES,
+        css_sanitizer=CSSSanitizer(allowed_css_properties=_RICH_TEXT_ALLOWED_CSS_PROPERTIES),
+        strip=True,
+    )
+
 
 class WelcomeMessageForm(HorillaModelForm):
     """
@@ -750,6 +788,9 @@ class RolesResponsibilityForm(HorillaModelForm):
             "roles_responsibilities": _("Roles & Responsibilities"),
         }
 
+    def clean_roles_responsibilities(self):
+        return _sanitize_rich_text(self.cleaned_data.get("roles_responsibilities", ""))
+
 
 class BackgroundVerificationForm(HorillaModelForm):
     """
@@ -777,6 +818,9 @@ class BackgroundVerificationForm(HorillaModelForm):
         labels = {
             "background_verification_notes": _("Background Verification Notes"),
         }
+
+    def clean_background_verification_notes(self):
+        return _sanitize_rich_text(self.cleaned_data.get("background_verification_notes", ""))
 
 
 def _choice_field(queryset, label_field, label, required=False):

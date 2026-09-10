@@ -62,6 +62,9 @@ def validate_mobile(value):
         )
 
 
+MAX_RESUME_SIZE_MB = 15
+
+
 def validate_pdf(value):
     """
     This method is used to validate pdf
@@ -69,6 +72,10 @@ def validate_pdf(value):
     ext = os.path.splitext(value.name)[1]  # Get file extension
     if ext.lower() != ".pdf":
         raise ValidationError(_("File must be a PDF."))
+    if value.size > MAX_RESUME_SIZE_MB * 1024 * 1024:
+        raise ValidationError(
+            _("File size must not exceed %(limit)s MB.") % {"limit": MAX_RESUME_SIZE_MB}
+        )
 
 
 def validate_image(value):
@@ -345,10 +352,6 @@ class Recruitment(HorillaModel):
             if self.title is None and self.job_position_id
             else self.title
         )
-
-        if not self.is_event_based and self.job_position_id is not None:
-            self.open_positions.add(self.job_position_id)
-
         return str(title)
 
     def clean(self):
@@ -1453,15 +1456,45 @@ class Candidate(HorillaModel):
         return setting.default_probation_period if setting else None
 
     def save(self, *args, **kwargs):
+        if self.name is not None:
+            self.name = self.name.strip()
+            if not self.name:
+                raise ValidationError({"name": _("This field is required")})
+
         previous = (
             Candidate.objects.filter(pk=self.pk)
             .values(
-                "recruitment_id", "job_position_id", "stage_id__stage_type"
+                "recruitment_id", "job_position_id", "stage_id__stage_type", "email"
             )
             .first()
             if self.pk
             else None
         )
+
+        should_validate_email = not self.pk
+        if previous:
+            should_validate_email = (
+                previous["recruitment_id"] != self.recruitment_id_id
+                or previous["email"] != self.email
+            )
+        if should_validate_email and self.email and self.recruitment_id_id:
+            # Meta.unique_together = ("email", "recruitment_id") is
+            # case-sensitive at the DB level, unlike the case-insensitive
+            # check CandidateForm.clean() does - so a creation path that
+            # doesn't go through that form (e.g. the email-intake feature,
+            # which saves directly) could otherwise create a second
+            # candidate for the same person/recruitment differing only by
+            # email case. Enforce the same case-insensitive rule here so
+            # it applies regardless of entry point.
+            duplicate_qs = Candidate.objects.filter(
+                email__iexact=self.email, recruitment_id=self.recruitment_id
+            )
+            if self.pk:
+                duplicate_qs = duplicate_qs.exclude(pk=self.pk)
+            if duplicate_qs.exists():
+                raise ValidationError(
+                    {"email": _("A candidate with this email has already applied for this job.")}
+                )
 
         if self.stage_id is not None:
             self.hired = self.stage_id.stage_type == "hired"
@@ -2411,6 +2444,11 @@ FORMATS = [
     ("jpeg", "JPEG"),
 ]
 
+# CandidateDocumentRequest.max_size is optional (HR may leave it blank),
+# but a falsy max_size must not mean "no size limit at all" - fall back to
+# this cap in CandidateDocument.clean() below.
+DEFAULT_MAX_DOCUMENT_SIZE_MB = 25
+
 
 class CandidateDocumentRequest(HorillaModel):
     title = models.CharField(max_length=100, verbose_name=_("Title"))
@@ -2457,12 +2495,11 @@ class CandidateDocument(HorillaModel):
 
         if file and self.document_request_id:
             format = self.document_request_id.format
-            max_size = self.document_request_id.max_size
-            if max_size:
-                if file.size > max_size * 1024 * 1024:
-                    raise ValidationError(
-                        {"document": _("File size exceeds the limit")}
-                    )
+            max_size = self.document_request_id.max_size or DEFAULT_MAX_DOCUMENT_SIZE_MB
+            if file.size > max_size * 1024 * 1024:
+                raise ValidationError(
+                    {"document": _("File size exceeds the limit")}
+                )
 
             # Use the true final extension so a double extension such as
             # "file.pdf.html" cannot bypass the format check and enable stored
