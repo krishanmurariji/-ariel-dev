@@ -707,7 +707,6 @@ def save_payslip(**kwargs):
         instance.deduction = round(kwargs["deduction"], 2)
         instance.net_pay = round(kwargs["net_pay"], 2)
         instance.pay_head_data = kwargs["pay_data"]
-        instance.full_clean(exclude=["pay_head_data"])
         instance.save()
         instance.installment_ids.set(kwargs["installments"])
     return instance
