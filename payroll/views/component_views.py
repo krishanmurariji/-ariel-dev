@@ -40,6 +40,7 @@ from base.methods import (
 from base.models import Company
 from employee.models import Employee, EmployeeWorkInformation
 from horilla.decorators import (
+    check_manager,
     handle_no_permission,
     hx_request_required,
     login_required,
@@ -1844,6 +1845,23 @@ def create_reimbursement(request):
 
     if instance_id:
         instance = Reimbursement.objects.filter(id=instance_id).first()
+        # owner_can_enter (used correctly by the sibling
+        # reimbursement_individual_view/reimbursement_attachments views)
+        # only reads instance_id from URL kwargs or an "employee_id"
+        # param, neither of which this GET-param-based view uses -
+        # replicate the same ownership check inline instead of silently
+        # trusting any instance_id: without it, any employee could edit
+        # (and, via Reimbursement.save()'s own reassignment logic,
+        # effectively hijack) another employee's pending claim.
+        if instance:
+            owner = instance.employee_id
+            can_enter = (
+                request.user.employee_get == owner
+                or request.user.has_perm("payroll.change_reimbursement")
+                or check_manager(request.user.employee_get, owner)
+            )
+            if not can_enter:
+                return render(request, "no_perm.html")
 
     if request.method == "POST":
         form = forms.ReimbursementForm(request.POST, request.FILES, instance=instance)
@@ -2098,7 +2116,13 @@ def delete_attachments(request, _reimbursement_id):
     This mehtod is used to delete the attachements
     """
     ids = request.GET.getlist("ids")
-    ReimbursementMultipleAttachment.objects.filter(id__in=ids).delete()
+    # owner_can_enter above only checked that the caller owns
+    # _reimbursement_id - without scoping this query to that same
+    # reimbursement, an owner of ANY reimbursement could pass another
+    # employee's attachment ids here and delete them.
+    ReimbursementMultipleAttachment.objects.filter(
+        id__in=ids, reimbursement__id=_reimbursement_id
+    ).delete()
     messages.success(request, "Attachment deleted")
     return redirect("view-reimbursement")
 

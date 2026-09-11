@@ -2013,14 +2013,19 @@ class Payslip(HorillaModel):
             raise ValidationError(_("The start date cannot be in the future."))
 
     def save(self, *args, **kwargs):
-        if (
-            Payslip.objects.filter(
-                employee_id=self.employee_id,
-                start_date=self.start_date,
-                end_date=self.end_date,
-            ).count()
-            > 1
-        ):
+        # Was `.count() > 1`, which only ever catches a *third* duplicate
+        # (it needs 2 other matching rows to already exist) - the second
+        # payslip for the same employee/period, the actual case this
+        # exists to prevent, always sailed through. exclude(pk=self.pk)
+        # so updating an existing payslip doesn't flag itself.
+        duplicate_qs = Payslip.objects.filter(
+            employee_id=self.employee_id,
+            start_date=self.start_date,
+            end_date=self.end_date,
+        )
+        if self.pk:
+            duplicate_qs = duplicate_qs.exclude(pk=self.pk)
+        if duplicate_qs.exists():
             raise ValidationError(_("Employee ,start and end date must be unique"))
 
         if not isinstance(self.pay_head_data, (QueryDict, dict)):

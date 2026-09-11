@@ -7,7 +7,7 @@ from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 
 from base.methods import filter_own_records
-from horilla_views.cbv_methods import login_required
+from horilla_views.cbv_methods import login_required, owner_can_enter
 from horilla_views.generic.cbv.views import (
     HorillaDetailedView,
     HorillaFormView,
@@ -312,6 +312,10 @@ class BonusEncashmentsDetailedView(ReimbursementsDetailView):
 
 
 @method_decorator(login_required, name="dispatch")
+@method_decorator(
+    owner_can_enter(perm="payroll.change_reimbursement", model=Reimbursement),
+    name="dispatch",
+)
 class ReimbursementsFormView(HorillaFormView):
     """
     Create and edit form for reimbursements
