@@ -295,3 +295,66 @@ class TestExportPerEmployeeHoliday(HolidayFixtureMixin, TestCase):
         """Global holidays must not appear in the per-employee specific dict."""
         emp_holidays = self._build_specific_employee_holidays(self.global_date)
         self.assertEqual(emp_holidays, {})
+
+
+# ---------------------------------------------------------------------------
+# Regression coverage for the attendance/views/requests.py QA pattern-audit
+# (2026-09-10): attendance_request_changes and validate_attendance_request
+# had no ownership check at all - unlike the sibling
+# cancel_attendance_request, which already checked ownership - so any
+# authenticated employee could open or submit a correction request against
+# another employee's attendance record by guessing/incrementing
+# attendance_id.
+# ---------------------------------------------------------------------------
+
+import json as _json
+
+from recruitment.factories import PASSWORD, CompanyFactory, EmployeeFactory
+
+
+class AttendanceRequestOwnershipTests(TestCase):
+    def setUp(self):
+        self.company = CompanyFactory()
+        self.employee_a = EmployeeFactory(company=self.company)
+        self.employee_b = EmployeeFactory(company=self.company)
+        self.attendance_b = Attendance.objects.create(
+            employee_id=self.employee_b,
+            attendance_date=date.today(),
+            attendance_clock_in_date=date.today(),
+            attendance_clock_in="09:00",
+        )
+        self.attendance_b.request_type = "update_request"
+        self.attendance_b.requested_data = _json.dumps(self.attendance_b.serialize())
+        self.attendance_b.save()
+
+    def _client_as(self, employee):
+        client = Client()
+        client.login(username=employee.email, password=PASSWORD)
+        session = client.session
+        session["selected_company"] = str(self.company.pk)
+        session.save()
+        return client
+
+    def test_attacker_cannot_open_change_request_form_for_others_attendance(self):
+        client = self._client_as(self.employee_a)
+        response = client.get(f"/attendance/request-attendance/{self.attendance_b.pk}/")
+        self.assertNotEqual(response.status_code, 200)
+
+    def test_attacker_cannot_validate_others_attendance_request(self):
+        client = self._client_as(self.employee_a)
+        response = client.get(
+            f"/attendance/validate-attendance-request/{self.attendance_b.pk}/"
+        )
+        self.assertNotEqual(response.status_code, 200)
+
+    def test_owner_can_open_own_change_request_form(self):
+        client = self._client_as(self.employee_b)
+        response = client.get(f"/attendance/request-attendance/{self.attendance_b.pk}/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_owner_can_validate_their_own_attendance_request(self):
+        client = self._client_as(self.employee_b)
+        response = client.get(
+            f"/attendance/validate-attendance-request/{self.attendance_b.pk}/"
+        )
+        self.assertEqual(response.status_code, 200)

@@ -307,6 +307,19 @@ def attendance_request_changes(request, attendance_id):
         return HorillaRedirect(
             request, message=_("No Attendance found matching the query.")
         )
+    # Same ownership check cancel_attendance_request already applies -
+    # without it, any authenticated employee could forge a correction
+    # request on another employee's attendance record (and, since the
+    # form saves normally below, have it notify that employee's real
+    # manager as if they'd submitted it themselves).
+    if not (
+        attendance.employee_id.employee_user_id == request.user
+        or is_reportingmanager(request)
+        or request.user.has_perm("attendance.change_attendance")
+    ):
+        return HorillaRedirect(
+            request, message=_("You don't have permission for this attendance record.")
+        )
 
     if request.GET.get("previous_url"):
         form = AttendanceRequestForm(initial=request.GET.dict())
@@ -404,6 +417,18 @@ def validate_attendance_request(request, attendance_id):
     if not attendance:
         return HorillaRedirect(
             request, message=_("No Attendance found matching the query.")
+        )
+    # Same ownership check as attendance_request_changes/
+    # cancel_attendance_request - without it, any authenticated employee
+    # could view another employee's pending correction-request diff by
+    # guessing/incrementing attendance_id.
+    if not (
+        attendance.employee_id.employee_user_id == request.user
+        or is_reportingmanager(request)
+        or request.user.has_perm("attendance.change_attendance")
+    ):
+        return HorillaRedirect(
+            request, message=_("You don't have permission for this attendance record.")
         )
 
     first_dict = attendance.serialize()
