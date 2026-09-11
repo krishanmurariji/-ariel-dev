@@ -8,6 +8,8 @@ Functions:
     biometric_is_installed(request): Checks if the biometric system is installed.
 """
 
+from django.core.exceptions import ValidationError
+
 from base.models import BiometricAttendance, Company
 
 
@@ -35,7 +37,16 @@ def biometric_is_installed(request):
 
     instance = BiometricAttendance.objects.filter(company_id=company).first()
     if not instance:
-        instance = BiometricAttendance.objects.create(
-            is_installed=False, company_id=company
-        )
-    return {"is_installed": instance.is_installed}
+        # This runs on every page render, so two concurrent first-requests
+        # for a company with no row yet can both pass the .filter().first()
+        # check above before either commits - BiometricAttendance.save()
+        # correctly detects that and raises, but letting that raise here
+        # would take down the page render for whoever lost the race.
+        # Fall back to the row the winning request just created instead.
+        try:
+            instance = BiometricAttendance.objects.create(
+                is_installed=False, company_id=company
+            )
+        except ValidationError:
+            instance = BiometricAttendance.objects.filter(company_id=company).first()
+    return {"is_installed": instance.is_installed if instance else False}
