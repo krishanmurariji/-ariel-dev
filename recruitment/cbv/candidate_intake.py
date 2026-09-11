@@ -171,7 +171,10 @@ class CandidateIntakeLogNav(HorillaNavView):
         super().__init__(**kwargs)
         self.search_url = reverse("candidate-intake-log-list")
         status_url = reverse("candidate-intake-poll-status")
-        self.nav_title = mark_safe(
+        # Built entirely from a static translated string and a reverse()
+        # URL (never user-controllable) - no request-supplied data flows
+        # into this markup.
+        self.nav_title = mark_safe(  # nosec B703 B308
             f'{_("Email Applications")} '
             f'<span id="pollStatusInline" class="text-muted" '
             f'style="font-size:0.8rem; font-weight:normal; margin-left:0.5rem;" '

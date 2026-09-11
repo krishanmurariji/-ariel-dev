@@ -6,9 +6,9 @@ name: Docker CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, main]
   pull_request:
-    branches: [master]
+    branches: [master, main]
 
 env:
   COMPOSE_FILE: docker-compose.yml
@@ -105,3 +105,66 @@ jobs:
         run: |
           docker compose -f "$COMPOSE_FILE" --profile production down -v --remove-orphans || true
           docker compose -f "$COMPOSE_FILE" down -v --remove-orphans || true
+
+  static-analysis:
+    # Runs directly on the runner against SQLite (no Docker/Postgres) so it
+    # finishes in a couple of minutes and gives fast feedback in parallel
+    # with docker-smoke above. Catches a different class of issue than the
+    # behavioral test suite does - see the exec()-based RCE this caught
+    # retroactively in recruitment/cbv/candidates.py (fixed 2026-09-10).
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install bandit coverage pip-audit
+
+      - name: Ensure local_settings exists (gitignored; Django settings import requires it)
+        run: |
+          if [ ! -f horilla/settings/local_settings.py ]; then
+            printf '%s\n' '# Ephemeral for CI — allows settings import *' > horilla/settings/local_settings.py
+          fi
+
+      - name: Bandit — recruitment & onboarding (blocking)
+        # Scoped to the two modules covered by the 2026-09-10 QA audit -
+        # fails the build on medium+ severity findings, so the same class
+        # of bug (e.g. the exec()-based RCE found and removed that day)
+        # can't be reintroduced here unnoticed.
+        run: bandit -r recruitment onboarding -ll
+
+      - name: Bandit — full repo (informational)
+        # Broader legacy code hasn't been through the same audit yet, so
+        # this reports findings without failing the build - a starting
+        # point for extending the audit to other modules.
+        continue-on-error: true
+        run: bandit -r . -x ./venv,./.venv,./node_modules,./static,./staticfiles -ll
+
+      - name: pip-audit — dependency vulnerabilities (informational)
+        continue-on-error: true
+        run: pip-audit -r requirements.txt
+
+      - name: Coverage — recruitment & onboarding test suite
+        run: |
+          coverage run --source=recruitment,onboarding manage.py test recruitment onboarding --noinput
+          coverage report -m
+          coverage html -d coverage_html
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: coverage_html/
+          retention-days: 14

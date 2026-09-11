@@ -105,6 +105,7 @@ def linkedin_callback(request):
             "client_id": linkedin_account.client_id,
             "client_secret": linkedin_account.client_secret,
         },
+        timeout=30,
     )
     if token_response.status_code != 200:
         logger.error(
@@ -119,7 +120,7 @@ def linkedin_callback(request):
 
     access_token = token_response.json().get("access_token")
     userinfo_response = requests.get(
-        LINKEDIN_USERINFO_URL, headers={"Authorization": f"Bearer {access_token}"}
+        LINKEDIN_USERINFO_URL, headers={"Authorization": f"Bearer {access_token}"}, timeout=30
     )
     if userinfo_response.status_code != 200:
         messages.error(
@@ -202,7 +203,7 @@ def validate_linkedin_token(request, pk):
     access_token = linkedin_account.api_token
     url = "https://api.linkedin.com/v2/userinfo"
     headers = {"Authorization": f"Bearer {access_token}"}
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, timeout=30)
     if response.status_code == 200:
         messages.success(request, _("LinkedIn connection success."))
     else:
@@ -301,7 +302,7 @@ def _looks_publicly_reachable(site_url):
     application form.
     """
     host = urlparse(site_url).hostname or ""
-    if not host or host in ("localhost", "0.0.0.0") or host.endswith(".local"):
+    if not host or host in ("localhost", "0.0.0.0") or host.endswith(".local"):  # nosec B104 - string comparison for URL validation, not a bind address
         return False
     try:
         ip = ipaddress.ip_address(host)

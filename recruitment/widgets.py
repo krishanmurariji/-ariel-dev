@@ -34,4 +34,8 @@ class RecruitmentAjaxWidget(forms.Widget):
         """
         attrs = attrs or {}
         attrs["required"] = False
-        return mark_safe(rendered_script + additional_script)
+        # Both strings are built entirely from settings.STATIC_URL and the
+        # widget's own field name (a Python identifier chosen in the
+        # form's own source, never user input) - no request-supplied data
+        # flows into this markup.
+        return mark_safe(rendered_script + additional_script)  # nosec B703 B308

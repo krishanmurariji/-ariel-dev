@@ -2548,7 +2548,7 @@ class LinkedInAccount(HorillaModel):
         url = "https://api.linkedin.com/v2/userinfo"
         headers = {"Authorization": f"Bearer {self.api_token}"}
 
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, timeout=30)
 
         if response.status_code == 200:
             data = response.json()
