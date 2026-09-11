@@ -1005,63 +1005,14 @@ def leave_request_delete(request, id):
     return redirect(reverse("request-filter"))
 
 
-@login_required
-@manager_can_enter("leave.change_leaverequest")
-def leave_request_approve(request, id, emp_id=None):
+def _leave_request_approve_locked(request, leave_request, available_leave, employee_id, emp_id):
     """
-    function used to approve a leave request.
-
-    Parameters:
-    request (HttpRequest): The HTTP request object.
-    id : leave request id
-    emp_id : employee id if the approval operation comes from "/employee/employee-view/{employee_id}/" template.
-
-
-    Returns:
-    GET : If `emp_id` is provided, it returns to the "/employee/employee-view/{employee_id}/" template after approval.
-          Otherwise, it returns to the default leave request view template.
+    The actual approve-and-deduct logic for leave_request_approve, called
+    from inside a transaction.atomic() block with available_leave already
+    locked via select_for_update() - split out only so that locked
+    section can `return` its result directly from within the `with`
+    block above, without duplicating this body inline there.
     """
-    leave_request = LeaveRequest.find(id)
-    if not leave_request:
-        return HorillaRedirect(
-            request, message=_("No leave rquest found matching the query.")
-        )
-    employee_id = leave_request.employee_id
-    if not request.user.is_superuser:
-        if employee_id == request.user.employee_get:
-            messages.error(request, _("You cannot approve your own leave request."))
-            if emp_id is not None:
-                employee_id = emp_id
-                return redirect(f"/employee/employee-view/{employee_id}/")
-            return HorillaRedirect(request)
-    leave_type_id = leave_request.leave_type_id
-    try:
-        available_leave = AvailableLeave.objects.get(
-            leave_type_id=leave_type_id, employee_id=employee_id
-        )
-    except AvailableLeave.DoesNotExist:
-        messages.error(
-            request,
-            _("No available leave record found for this employee and leave type."),
-        )
-        if request.headers.get("HX-Request"):
-            response = HttpResponse("", status=200)
-            response["HX-Trigger"] = json.dumps(
-                {
-                    "reloadLeaveRequestList": {"target": "body"},
-                    "horillaMessage": {
-                        "level": "error",
-                        "text": str(
-                            _(
-                                "No available leave record found for this employee and leave type."
-                            )
-                        ),
-                    },
-                }
-            )
-            return response
-        return HorillaRedirect(request)
-
     total_available_leave = (
         available_leave.available_days + available_leave.carryforward_days
     )
@@ -1186,6 +1137,74 @@ def leave_request_approve(request, id, emp_id=None):
         employee_id = emp_id
         return redirect(f"/employee/employee-view/{employee_id}/")
     return HorillaRedirect(request)
+
+
+@login_required
+@manager_can_enter("leave.change_leaverequest")
+def leave_request_approve(request, id, emp_id=None):
+    """
+    function used to approve a leave request.
+
+    Parameters:
+    request (HttpRequest): The HTTP request object.
+    id : leave request id
+    emp_id : employee id if the approval operation comes from "/employee/employee-view/{employee_id}/" template.
+
+
+    Returns:
+    GET : If `emp_id` is provided, it returns to the "/employee/employee-view/{employee_id}/" template after approval.
+          Otherwise, it returns to the default leave request view template.
+    """
+    leave_request = LeaveRequest.find(id)
+    if not leave_request:
+        return HorillaRedirect(
+            request, message=_("No leave rquest found matching the query.")
+        )
+    employee_id = leave_request.employee_id
+    if not request.user.is_superuser:
+        if employee_id == request.user.employee_get:
+            messages.error(request, _("You cannot approve your own leave request."))
+            if emp_id is not None:
+                employee_id = emp_id
+                return redirect(f"/employee/employee-view/{employee_id}/")
+            return HorillaRedirect(request)
+    leave_type_id = leave_request.leave_type_id
+    try:
+        # select_for_update() so the whole check-then-deduct sequence
+        # below is atomic w.r.t. this employee/leave-type's balance row -
+        # without it, two near-simultaneous approvals (or an approval
+        # racing the auto-approval path in user_leave_request) can both
+        # read the same pre-deduction total_available_leave, both pass
+        # the >= check, and both deduct - over-drawing the balance.
+        with transaction.atomic():
+            available_leave = AvailableLeave.objects.select_for_update().get(
+                leave_type_id=leave_type_id, employee_id=employee_id
+            )
+            return _leave_request_approve_locked(
+                request, leave_request, available_leave, employee_id, emp_id
+            )
+    except AvailableLeave.DoesNotExist:
+        messages.error(
+            request,
+            _("No available leave record found for this employee and leave type."),
+        )
+        if request.headers.get("HX-Request"):
+            response = HttpResponse("", status=200)
+            response["HX-Trigger"] = json.dumps(
+                {
+                    "reloadLeaveRequestList": {"target": "body"},
+                    "horillaMessage": {
+                        "level": "error",
+                        "text": str(
+                            _(
+                                "No available leave record found for this employee and leave type."
+                            )
+                        ),
+                    },
+                }
+            )
+            return response
+        return HorillaRedirect(request)
 
 
 @login_required
@@ -4396,7 +4415,10 @@ def view_leaverequest_comment(request, leave_id):
     if request.FILES:
         files = request.FILES.getlist("files")
         comment_id = request.GET["comment_id"]
-        comment = LeaverequestComment.objects.get(id=comment_id)
+        # Scope to this leave_id (already ownership-checked above) -
+        # without it, an owner of ANY leave request could attach files
+        # to another employee's comment by passing its comment_id here.
+        comment = LeaverequestComment.objects.get(id=comment_id, request_id=leave_id)
         attachments = []
         for file in files:
             file_instance = LeaverequestFile()
@@ -4557,7 +4579,12 @@ def view_allocationrequest_comment(request, leave_id):
     if request.FILES:
         files = request.FILES.getlist("files")
         comment_id = request.GET["comment_id"]
-        comment = LeaveallocationrequestComment.objects.get(id=comment_id)
+        # Scope to this leave_id (already ownership-checked above) -
+        # without it, an owner of ANY allocation request could attach
+        # files to another employee's comment by passing its comment_id.
+        comment = LeaveallocationrequestComment.objects.get(
+            id=comment_id, request_id=leave_id
+        )
         attachments = []
         for file in files:
             file_instance = LeaverequestFile()
@@ -4621,7 +4648,13 @@ def delete_allocation_comment_file(request):
         or request.user.has_perm("leave.delete_leaverequestfile")
         or is_reportingmanager(request)
     ):
-        LeaverequestFile.objects.filter(id__in=ids).delete()
+        # comment's ownership is checked above, but without scoping this
+        # delete to files actually attached to it, an owner of ANY
+        # allocation-request comment could pass another employee's file
+        # ids here and delete them.
+        LeaverequestFile.objects.filter(
+            id__in=ids, leaveallocationrequestcomment=comment
+        ).delete()
         messages.success(request, _("File deleted successfully"))
     else:
         messages.warning(request, _("You don't have permission"))
@@ -4864,7 +4897,13 @@ def delete_leave_comment_file(request):
         or request.user.has_perm("leave.delete_leaverequestfile")
         or is_reportingmanager(request)
     ):
-        LeaverequestFile.objects.filter(id__in=ids).delete()
+        # comment's ownership is checked above, but without scoping this
+        # delete to files actually attached to it, an owner of ANY
+        # comment could pass another employee's file ids here and
+        # delete them.
+        LeaverequestFile.objects.filter(
+            id__in=ids, leaverequestcomment=comment
+        ).delete()
         messages.success(request, _("File deleted successfully"))
     else:
         messages.warning(request, _("You don't have permission"))
@@ -4914,12 +4953,28 @@ if apps.is_installed("attendance"):
         Used to delete attachment
         """
         ids = request.GET.getlist("ids")
-        LeaverequestFile.objects.filter(id__in=ids).delete()
         leave_id = request.GET.get("leave_id")
         if not leave_id:
             return HorillaRedirect(
                 request, message=_("No leave comment found matching the query.")
             )
+        # This previously deleted files by id with NO permission or
+        # ownership check at all - any logged-in user could delete any
+        # LeaverequestFile. Require the caller to actually own (or have
+        # delete rights over, or manage) the compensatory leave request
+        # named by leave_id, then scope the delete to files genuinely
+        # attached to one of ITS comments.
+        comp_leave_req = CompensatoryLeaveRequest.objects.filter(id=leave_id).first()
+        if not comp_leave_req or not (
+            request.user.employee_get == comp_leave_req.employee_id
+            or request.user.has_perm("leave.delete_compensatoryleaverequestcomment")
+            or is_reportingmanager(request)
+        ):
+            messages.warning(request, _("You don't have permission"))
+            return HorillaRedirect(request)
+        LeaverequestFile.objects.filter(
+            id__in=ids, compensatoryleaverequestcomment__request_id=leave_id
+        ).delete()
         comments = CompensatoryLeaverequestComment.objects.all()
         if not request.user.has_perm("leave.delete_compensatoryleaverequestcomment"):
             comments = comments.filter(employee_id__employee_user_id=request.user)
@@ -5261,6 +5316,11 @@ if apps.is_installed("attendance"):
     @login_required
     @is_compensatory_leave_enabled()
     @hx_request_required
+    @owner_can_enter(
+        perm="leave.view_compensatoryleaverequest",
+        model=CompensatoryLeaveRequest,
+        manager_access=True,
+    )
     def compensatory_leave_individual_view(request, comp_leave_id):
         """
         function used to present the compensatory leave request detailed view.
@@ -5293,6 +5353,11 @@ if apps.is_installed("attendance"):
     @login_required
     @is_compensatory_leave_enabled()
     @hx_request_required
+    @owner_can_enter(
+        perm="leave.view_compensatoryleaverequest",
+        model=CompensatoryLeaveRequest,
+        manager_access=True,
+    )
     def view_compensatory_leave_comment(request, comp_leave_id):
         """
         This method is used to show Leave request comments
@@ -5307,7 +5372,13 @@ if apps.is_installed("attendance"):
         if request.FILES:
             files = request.FILES.getlist("files")
             comment_id = request.GET["comment_id"]
-            comment = CompensatoryLeaverequestComment.objects.get(id=comment_id)
+            # Scope to this comp_leave_id (already ownership-checked
+            # above) - without it, an owner of ANY compensatory leave
+            # request could attach files to another employee's comment
+            # by passing its comment_id here.
+            comment = CompensatoryLeaverequestComment.objects.get(
+                id=comment_id, request_id=comp_leave_id
+            )
             attachments = []
             for file in files:
                 file_instance = LeaverequestFile()

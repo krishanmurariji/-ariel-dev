@@ -570,3 +570,113 @@ class TestTodayHolidaysMethod(LeaveHolidayFixtureMixin, TestCase):
         far_past = self.today - timedelta(days=200)
         qs = Holidays.today_holidays(today=far_past)
         self.assertFalse(qs.exists())
+
+
+# ---------------------------------------------------------------------------
+# Regression coverage for the leave/views.py QA pattern-audit (2026-09-10):
+# several "delete comment attachment" endpoints let a caller delete files
+# that belonged to someone else's leave/allocation/compensatory-leave
+# request, and one had no ownership check whatsoever. See [[leave-audit]].
+# ---------------------------------------------------------------------------
+
+from django.test import Client
+
+from recruitment.factories import PASSWORD, CompanyFactory, EmployeeFactory
+
+from leave.models import (
+    CompensatoryLeaverequestComment,
+    CompensatoryLeaveRequest,
+    LeaverequestFile,
+)
+
+
+class CompensatoryLeaveFileDeletionIdorTests(TestCase):
+    """
+    delete_comment_compensatory_file (leave/views.py) previously had NO
+    permission or ownership check at all - any logged-in user could
+    delete any LeaverequestFile by id. It now requires the caller to own
+    (or manage, or have delete rights over) the compensatory leave
+    request named by leave_id, and scopes the delete to files actually
+    attached to one of that request's comments.
+    """
+
+    def setUp(self):
+        from django.contrib.auth.models import AnonymousUser
+        from django.test import RequestFactory
+        from horilla import horilla_middlewares
+
+        self.company = CompanyFactory()
+
+        # LeaveType.save() (and the HorillaModel base save()) read the
+        # current company/user off a thread-local request - fake one
+        # here since this setup happens outside a request/response
+        # cycle.
+        request = RequestFactory().get("/")
+        request.session = {"selected_company": str(self.company.pk)}
+        request.user = AnonymousUser()
+        horilla_middlewares._thread_locals.request = request
+        try:
+            # CompensatoryLeaveRequest.save() always overwrites
+            # leave_type_id with whichever LeaveType has
+            # is_compensatory_leave=True, ignoring whatever is passed in.
+            self.leave_type = LeaveType.objects.create(
+                name="Test Comp Leave Type", is_compensatory_leave=True
+            )
+            self.employee_a = EmployeeFactory(company=self.company)
+            self.employee_b = EmployeeFactory(company=self.company)
+
+            self.comp_leave_a = CompensatoryLeaveRequest.objects.create(
+                leave_type_id=self.leave_type,
+                employee_id=self.employee_a,
+                description="A's compensatory leave request",
+            )
+            self.comp_leave_b = CompensatoryLeaveRequest.objects.create(
+                leave_type_id=self.leave_type,
+                employee_id=self.employee_b,
+                description="B's compensatory leave request",
+            )
+            self.comment_b = CompensatoryLeaverequestComment.objects.create(
+                request_id=self.comp_leave_b,
+                employee_id=self.employee_b,
+                comment="B's comment",
+            )
+            self.file_b = LeaverequestFile.objects.create(file="test-files/b.txt")
+        finally:
+            horilla_middlewares._thread_locals.request = None
+        self.comment_b.files.add(self.file_b)
+
+    def _client_as(self, employee):
+        client = Client()
+        client.login(username=employee.email, password=PASSWORD)
+        session = client.session
+        session["selected_company"] = str(self.company.pk)
+        session.save()
+        return client
+
+    def test_attacker_cannot_delete_file_via_someone_elses_leave_id(self):
+        """Attacker owns no compensatory leave request matching leave_id at all."""
+        client = self._client_as(self.employee_a)
+        client.get(
+            "/leave/delete-compensatory-comment-file/",
+            data={"ids": [self.file_b.pk], "leave_id": self.comp_leave_b.pk},
+        )
+        self.assertTrue(LeaverequestFile.objects.filter(pk=self.file_b.pk).exists())
+
+    def test_attacker_cannot_delete_file_by_scoping_to_their_own_leave_id(self):
+        """Attacker owns comp_leave_a, but passes comp_leave_b's file id - the
+        delete must stay scoped to files attached to comp_leave_a's own
+        comments, not just any id the caller supplies."""
+        client = self._client_as(self.employee_a)
+        client.get(
+            "/leave/delete-compensatory-comment-file/",
+            data={"ids": [self.file_b.pk], "leave_id": self.comp_leave_a.pk},
+        )
+        self.assertTrue(LeaverequestFile.objects.filter(pk=self.file_b.pk).exists())
+
+    def test_owner_can_delete_their_own_comment_file(self):
+        client = self._client_as(self.employee_b)
+        client.get(
+            "/leave/delete-compensatory-comment-file/",
+            data={"ids": [self.file_b.pk], "leave_id": self.comp_leave_b.pk},
+        )
+        self.assertFalse(LeaverequestFile.objects.filter(pk=self.file_b.pk).exists())
