@@ -292,7 +292,13 @@ def _render_step(request, candidate, detail, step_key, extra=None):
                     "work_type_id": detail.work_type_id_id,
                     "employee_type_id": detail.employee_type_id_id,
                     "date_of_joining": candidate.joining_date,
-                    "probation_end": candidate.probation_end,
+                    # Falls back to what the current Default Probation
+                    # Period setting would compute, when nothing has been
+                    # saved yet - Candidate.save() only auto-fills this
+                    # once, at the moment of hiring, so a default period
+                    # set (or changed) afterward would otherwise never
+                    # show up here at all.
+                    "probation_end": candidate.get_default_probation_end(),
                 },
             )
         template = "onboarding/stepper/step_details.html"

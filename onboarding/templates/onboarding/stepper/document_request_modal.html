@@ -13,12 +13,14 @@
   {% csrf_token %}
   <div class="oh-modal__dialog-body">
     <div class="oh-input__group">
-      <label class="oh-input__label">{{ form.title.label }}</label>
+      <label class="oh-input__label required-star">{{ form.title.label }}</label>
       {{ form.title }}
+      {% if form.title.errors %}<span class="text-danger">{{ form.title.errors|join:", " }}</span>{% endif %}
     </div>
     <div class="oh-input__group">
-      <label class="oh-input__label">{{ form.format.label }}</label>
+      <label class="oh-input__label required-star">{{ form.format.label }}</label>
       {{ form.format }}
+      {% if form.format.errors %}<span class="text-danger">{{ form.format.errors|join:", " }}</span>{% endif %}
     </div>
     <div class="oh-input__group">
       <label class="oh-input__label">{{ form.max_size.label }}</label>

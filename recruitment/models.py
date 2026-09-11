@@ -1455,6 +1455,26 @@ class Candidate(HorillaModel):
             ).first()
         return setting.default_probation_period if setting else None
 
+    def get_default_probation_end(self):
+        """
+        What probation_end would be computed as from the current Default
+        Probation Period setting, if it isn't already set explicitly.
+        save() only ever auto-fills probation_end once, at the exact
+        moment a candidate's stage transitions to Hired - if the
+        default-period setting is configured (or changed) any time after
+        that, probation_end stays blank forever with no way to pick up
+        the new default. Used to prefill onboarding's Job Profile step
+        so the setting still has a visible effect even when it wasn't in
+        place yet at hire time.
+        """
+        if self.probation_end:
+            return self.probation_end
+        default_months = self._default_probation_months()
+        if not default_months:
+            return None
+        reference_date = self.joining_date or tz.now().date()
+        return reference_date + relativedelta(months=default_months)
+
     def save(self, *args, **kwargs):
         if self.name is not None:
             self.name = self.name.strip()

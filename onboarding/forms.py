@@ -1039,12 +1039,13 @@ class OnboardingDocumentRequestForm(HorillaForm):
 
     title = forms.CharField(
         label=_("Document Title"),
-        widget=forms.TextInput(attrs={"class": "oh-input w-100"}),
+        widget=forms.TextInput(attrs={"class": "oh-input w-100", "required": "required"}),
     )
     format = forms.ChoiceField(
         choices=FORMATS,
+        initial="any",
         label=_("Accepted Format"),
-        widget=forms.Select(attrs={"class": "oh-select oh-select-2"}),
+        widget=forms.Select(attrs={"class": "oh-select oh-select-2", "required": "required"}),
     )
     max_size = forms.IntegerField(
         required=False,
