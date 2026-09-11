@@ -1928,6 +1928,16 @@ class StageNote(HorillaModel):
 
     class Meta:
         ordering = ["created_at", "id"]
+        # The UI calls this feature "Chat" (candidate_can_view/
+        # seen_by_candidate make it a two-way conversation, unlike
+        # EmployeeNote/OffboardingNote, which are one-way internal
+        # notes) - without an explicit verbose_name here, Django's
+        # auto-derived "stage note" would keep showing as "Can add/view/
+        # change/delete stage note" in the permissions section, out of
+        # sync with the rename and not obviously "candidate" to an
+        # admin assigning roles.
+        verbose_name = _("candidate chat message")
+        verbose_name_plural = _("candidate chat messages")
 
     def __str__(self) -> str:
         return f"{self.description}"

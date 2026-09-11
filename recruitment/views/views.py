@@ -5111,11 +5111,13 @@ def candidate_add_notes(request, cand_id):
                     candidate,
                     label=label,
                     recipient=users,
-                    verb=f"{label} has added a note on the candidate {candidate}",
-                    verb_ar=f"أضاف {label} ملاحظة حول المرشح {candidate}",
-                    verb_de=f"{label} hat dem {candidate} eine Notiz hinzugefügt.",
-                    verb_es=f"{label} agregó una nota al {candidate}.",
-                    verb_fr=f"{label} a ajouté une note à {candidate}.",
+                    # "note" here used to match the UI label before it was
+                    # renamed to "Chat" - keep both in sync.
+                    verb=f"{label} sent a new chat message about candidate {candidate}",
+                    verb_ar=f"أرسل {label} رسالة دردشة جديدة حول المرشح {candidate}",
+                    verb_de=f"{label} hat eine neue Chatnachricht zu {candidate} gesendet.",
+                    verb_es=f"{label} envió un nuevo mensaje de chat sobre {candidate}.",
+                    verb_fr=f"{label} a envoyé un nouveau message de chat concernant {candidate}.",
                     icon="people-circle",
                     redirect=reverse(
                         "candidate-view-individual", kwargs={"cand_id": cand_id}
