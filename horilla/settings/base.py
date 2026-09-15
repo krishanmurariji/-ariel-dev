@@ -35,6 +35,12 @@ DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
 
+# Only require HTTPS for these cookies when DEBUG is off - local dev
+# (DEBUG=True) serves plain http://localhost, and browsers silently drop
+# Secure cookies over http, which would break login there.
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
 THEME_APP = "horilla_theme"
 
 INSTALLED_APPS = [
