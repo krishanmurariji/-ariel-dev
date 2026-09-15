@@ -1009,9 +1009,14 @@ class Candidate(HorillaModel):
         return self.resume.url
 
     def onboarding_portal_html(self):
+        # onboarding_portal is a OneToOneField reverse accessor - it raises
+        # RelatedObjectDoesNotExist (not just returning None) for any
+        # candidate who hasn't had an OnboardingPortal row created yet,
+        # which crashed this page with a 500 (found via load testing).
+        portal = getattr(self, "onboarding_portal", None)
         return format_html(
             '<div class="oh-checkpoint-badge oh-checkpoint-badge--secondary">{}/4</div>',
-            self.onboarding_portal.count,
+            portal.count if portal else 0,
         )
 
     def rating(self):
