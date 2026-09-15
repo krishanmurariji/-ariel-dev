@@ -175,3 +175,7 @@ CLAUDE.md
 db_new.sqlite3
 TestDB.sqlite3
 *.enc
+
+# Local scratch / load-test files
+mail_preview_tmp.html
+locustfile.py

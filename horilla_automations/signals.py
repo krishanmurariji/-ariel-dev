@@ -39,32 +39,52 @@ SIGNAL_HANDLERS = []
 INSTANCE_HANDLERS = []
 REFRESH_METHODS = {}
 
+# Set once start_automation() has connected the post_save/post_delete
+# handlers that actually fire mail/notification automations. Startup
+# (horilla_automations.apps.HorillaAutomationConfig.ready()) can fail this
+# on a transient DB hiccup and previously swallowed it silently, leaving a
+# worker's automations permanently dead until restart - see
+# ensure_automation_ready() below.
+AUTOMATIONS_CONNECTED = False
+_META_SIGNALS_CONNECTED = False
+
 
 def start_automation():
     """
     Automation signals
     """
+    global AUTOMATIONS_CONNECTED, _META_SIGNALS_CONNECTED
     from base.models import HorillaMailTemplate
     from horilla_automations.methods.methods import get_model_class, split_query_string
     from horilla_automations.models import MailAutomation
 
-    @receiver(post_delete, sender=MailAutomation)
-    @receiver(post_save, sender=MailAutomation)
-    def automation_signal(sender, instance, **kwargs):
-        """
-        signal method to handle automation post save
-        """
-        start_connection()
-        track_previous_instance()
+    # These two only need to be registered once per process, ever - they
+    # just re-run start_connection()/track_previous_instance() below
+    # whenever a MailAutomation/HorillaMailTemplate is edited. Guarded so a
+    # retry from ensure_automation_ready() doesn't stack duplicate
+    # receivers (which would re-run the (re)connect logic once per
+    # duplicate on every future edit).
+    if not _META_SIGNALS_CONNECTED:
 
-    @receiver(post_delete, sender=HorillaMailTemplate)
-    @receiver(post_save, sender=HorillaMailTemplate)
-    def template_signal(sender, instance, **kwargs):
-        """
-        signal method to handle automation post save
-        """
-        start_connection()
-        track_previous_instance()
+        @receiver(post_delete, sender=MailAutomation)
+        @receiver(post_save, sender=MailAutomation)
+        def automation_signal(sender, instance, **kwargs):
+            """
+            signal method to handle automation post save
+            """
+            start_connection()
+            track_previous_instance()
+
+        @receiver(post_delete, sender=HorillaMailTemplate)
+        @receiver(post_save, sender=HorillaMailTemplate)
+        def template_signal(sender, instance, **kwargs):
+            """
+            signal method to handle automation post save
+            """
+            start_connection()
+            track_previous_instance()
+
+        _META_SIGNALS_CONNECTED = True
 
     def clear_connection():
         """
@@ -285,6 +305,28 @@ def start_automation():
 
     track_previous_instance()
     start_connection()
+    AUTOMATIONS_CONNECTED = True
+
+
+def ensure_automation_ready():
+    """
+    Self-healing retry for start_automation(). Called from
+    ThreadLocalMiddleware on every request (a cheap no-op once
+    AUTOMATIONS_CONNECTED is True). If the process's initial startup
+    attempt in HorillaAutomationConfig.ready() failed - e.g. the DB wasn't
+    reachable yet when this worker booted - this worker's post_save
+    handlers were never connected, so every mail/notification automation
+    (recruitment's "Application Received" and rejection mail among them)
+    would otherwise silently never fire for any request landing on it, for
+    its whole lifetime. Retrying here means it self-heals on the first
+    request after the DB becomes reachable, instead of needing a restart.
+    """
+    if AUTOMATIONS_CONNECTED:
+        return
+    try:
+        start_automation()
+    except Exception:
+        logger.exception("Automation signal connection retry failed")
 
 
 def send_automated_mail(
@@ -435,6 +477,19 @@ def send_mail(request, automation, instance):
         except Exception as e:
             logger.error(f"Error generating user-based email display name: {e}")
 
+    if not (pk_or_text and request and to_emails):
+        # Previously a silent no-op: no exception, no EmailLog row, nothing
+        # in the server log - the triggering save looked completely
+        # successful while the mail just never went out. Most commonly hit
+        # when `request` is falsy (e.g. this automation fired from a
+        # non-request context with no thread-local request available).
+        logger.warning(
+            "Automation '%s' skipped sending: pk_or_text=%r request=%s to_emails=%r",
+            automation.title,
+            pk_or_text,
+            bool(request),
+            to_emails,
+        )
     if pk_or_text and request and to_emails:
         attachments = []
         try:

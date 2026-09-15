@@ -51,6 +51,12 @@ class ThreadLocalMiddleware:
 
     def __call__(self, request):
         _thread_locals.request = request
+        try:
+            from horilla_automations.signals import ensure_automation_ready
+
+            ensure_automation_ready()
+        except Exception:
+            logger.exception("ensure_automation_ready() check failed")
         response = self.get_response(request)
         return response
 
