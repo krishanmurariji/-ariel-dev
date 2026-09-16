@@ -266,6 +266,26 @@ urlpatterns = [
     path("add-note/", views.add_note, name="add-note-post"),
     path("create-note/<int:cand_id>/", views.create_note, name="create-note"),
     path("create-note/", views.create_note, name="create-note-post"),
+    path(
+        "view-candidate-notes/<int:cand_id>/",
+        views.view_candidate_notes,
+        name="view-candidate-notes",
+    ),
+    path(
+        "add-candidate-note/<int:cand_id>/",
+        views.add_candidate_note,
+        name="add-candidate-note",
+    ),
+    path(
+        "candidate-note-delete/<int:note_id>/",
+        views.candidate_note_delete,
+        name="candidate-note-delete",
+    ),
+    path(
+        "delete-candidate-note-file/<int:file_id>/",
+        views.delete_candidate_note_file,
+        name="delete-candidate-note-file",
+    ),
     path("note-update/<int:note_id>/", views.note_update, name="note-update"),
     path(
         "note-update-individual/<int:note_id>/",

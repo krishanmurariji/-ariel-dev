@@ -54,6 +54,8 @@ from recruitment.models import (
     CandidateEmergencyContact,
     CandidateExperience,
     CandidateIntakeMailbox,
+    CandidateNote,
+    CandidateNoteFiles,
     InterviewSchedule,
     JobPosition,
     LinkedInAccount,
@@ -1089,6 +1091,40 @@ class StageNoteForm(ModelForm):
         instance = super().save(commit)
         if commit:
             instance.stage_files.add(*multiple_attachment_ids)
+        return instance, multiple_attachment_ids
+
+
+class CandidateNoteForm(ModelForm):
+    """
+    Form for CandidateNote model - the internal-only Notes tab, separate
+    from Chat. No visibility toggle: notes are always internal.
+    """
+
+    class Meta:
+        """
+        Meta class to add the additional info
+        """
+
+        model = CandidateNote
+        fields = ["description"]
+        exclude = ["is_active"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["note_files"] = MultipleFileField(label="files")
+        self.fields["note_files"].required = False
+
+    def save(self, commit: bool = True):
+        multiple_attachment_ids = []
+        if self.files.getlist("note_files"):
+            for attachment in self.files.getlist("note_files"):
+                file_instance = CandidateNoteFiles()
+                file_instance.files = attachment
+                file_instance.save()
+                multiple_attachment_ids.append(file_instance.pk)
+        instance = super().save(commit)
+        if commit:
+            instance.note_files.add(*multiple_attachment_ids)
         return instance, multiple_attachment_ids
 
 

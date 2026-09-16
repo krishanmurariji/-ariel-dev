@@ -1995,6 +1995,40 @@ class StageNote(HorillaModel):
         return self.candidate_id.name.split()[0] if self.candidate_id.name else ""
 
 
+class CandidateNoteFiles(HorillaModel):
+    files = models.FileField(upload_to=upload_path, blank=True, null=True)
+
+    def __str__(self):
+        return self.files.name.split("/")[-1]
+
+
+class CandidateNote(HorillaModel):
+    """
+    Internal-only note on a candidate. Distinct from Chat (StageNote):
+    there is no candidate-facing side to this at all, so unlike StageNote
+    there's no candidate_can_view/seen_by_candidate - a note is never
+    visible on the candidate portal and never needs a visibility toggle.
+    """
+
+    candidate_id = models.ForeignKey(
+        Candidate, on_delete=models.CASCADE, related_name="candidate_note"
+    )
+    description = models.TextField(verbose_name=_("Description"))
+    note_files = models.ManyToManyField(CandidateNoteFiles, blank=True)
+    updated_by = models.ForeignKey(Employee, on_delete=models.CASCADE)
+    objects = HorillaCompanyManager(
+        related_company_field="candidate_id__recruitment_id__company_id"
+    )
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = _("candidate note")
+        verbose_name_plural = _("candidate notes")
+
+    def __str__(self) -> str:
+        return f"{self.description}"
+
+
 class RecruitmentSurvey(HorillaModel):
     """
     RecruitmentSurvey model

@@ -26,6 +26,24 @@
         </div>
     </div>
 
+    <div class="oh-chat-tabs" role="tablist">
+        <button type="button" class="oh-chat-tab oh-chat-tab--active" id="chatTabBtn" role="tab" aria-selected="true" onclick="showCandidateChatTab('chat')">
+            {% trans "Chat" %}
+        </button>
+        {% if perms.recruitment.view_candidatenote or request|is_any_manager %}
+        <button type="button" class="oh-chat-tab" id="notesTabBtn" role="tab" aria-selected="false"
+            onclick="showCandidateChatTab('notes')"
+            hx-get="{% url 'view-candidate-notes' cand.id %}"
+            hx-target="#notesBody"
+            hx-swap="innerHTML"
+            hx-trigger="click once"
+        >
+            {% trans "Notes" %}
+        </button>
+        {% endif %}
+    </div>
+
+    <div class="oh-chat-pane" id="chatPane">
     <div class="oh-chat-body" id="chatBody"
         hx-get="{% url 'view-note' cand.id %}"
         hx-trigger="every 10s"
@@ -225,5 +243,34 @@
                 }
             });
         })();
+    </script>
+    </div>
+
+    <div class="oh-chat-pane" id="notesPane" style="display:none;">
+        <div class="oh-chat-body" id="notesBody">
+            <div class="oh-chat-empty">
+                <h6>{% trans "Loading notes..." %}</h6>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showCandidateChatTab(tab) {
+            var chatPane = document.getElementById('chatPane');
+            var notesPane = document.getElementById('notesPane');
+            var chatBtn = document.getElementById('chatTabBtn');
+            var notesBtn = document.getElementById('notesTabBtn');
+            var showingNotes = tab === 'notes';
+            if (chatPane) { chatPane.style.display = showingNotes ? 'none' : ''; }
+            if (notesPane) { notesPane.style.display = showingNotes ? '' : 'none'; }
+            if (chatBtn) {
+                chatBtn.classList.toggle('oh-chat-tab--active', !showingNotes);
+                chatBtn.setAttribute('aria-selected', String(!showingNotes));
+            }
+            if (notesBtn) {
+                notesBtn.classList.toggle('oh-chat-tab--active', showingNotes);
+                notesBtn.setAttribute('aria-selected', String(showingNotes));
+            }
+        }
     </script>
 </div>

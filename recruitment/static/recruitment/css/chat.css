@@ -6,6 +6,11 @@ templates/index.html for the two HR-facing (htmx-fragment) surfaces, and
 separately from candidate_self_tracking.html's own <head> since that page
 is a standalone document.
 
+Also styles the internal-only "Notes" tab (CandidateNote, unrelated model)
+that sits alongside Chat in the staff-facing pipeline modal - .oh-chat-tabs/
+.oh-chat-tab/.oh-chat-pane below. Notes has no candidate-portal surface, so
+those classes are never loaded into candidate_self_tracking.html.
+
 Visual language: rounded gradient bubbles for "me", crisp white bubbles
 for "other" (WhatsApp/Instagram-DM inspired), a soft dotted canvas behind
 the thread, and a pill-shaped composer - built entirely on the two CSS
@@ -45,6 +50,57 @@ color.
 }
 .oh-chat-header h3 { margin: 0; font-size: 0.98rem; font-weight: 700; color: #1c1c1c; }
 .oh-chat-header span { font-size: 0.74rem; color: #8a8f98; }
+
+.oh-chat-tabs {
+    display: flex;
+    gap: 1.25rem;
+    padding: 0 1.25rem;
+    border-bottom: 1px solid #eee;
+    background: #fff;
+    flex: none;
+}
+.oh-chat-tab {
+    border: none;
+    background: transparent;
+    padding: 0.65rem 0.1rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #8a8f98;
+    cursor: pointer;
+    position: relative;
+}
+.oh-chat-tab::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    background: transparent;
+    border-radius: 2px 2px 0 0;
+}
+.oh-chat-tab--active { color: var(--oh-chat-accent, #E54F38); }
+.oh-chat-tab--active::after { background: var(--oh-chat-accent, #E54F38); }
+
+/* Chat and Notes are two independently-toggled full-height panes stacked
+   inside the same flex column card - each needs to be a flex column
+   itself so its own .oh-chat-body can still flex-grow/scroll within the
+   remaining height, exactly like .oh-chat-card did before tabs existed. */
+.oh-chat-pane { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+
+.oh-chat-attach {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #8a8f98;
+    cursor: pointer;
+    transition: background .12s ease, color .12s ease;
+}
+.oh-chat-attach:hover { background: #f2f2f2; color: var(--oh-chat-accent, #E54F38); }
 
 .oh-chat-body {
     flex: 1 1 auto;

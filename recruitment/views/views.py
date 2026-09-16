@@ -105,6 +105,7 @@ from recruitment.forms import (
     CandidateDocumentRequestForm,
     CandidateDocumentUpdateForm,
     CandidateExportForm,
+    CandidateNoteForm,
     RecruitmentCreationForm,
     RejectReasonForm,
     ResumeForm,
@@ -123,6 +124,8 @@ from recruitment.realtime import broadcast_new_message
 from recruitment.models import (
     Candidate,
     CandidateDocument,
+    CandidateNote,
+    CandidateNoteFiles,
     CandidateRating,
     InterviewSchedule,
     LinkedInAccount,
@@ -1155,6 +1158,89 @@ def create_note(request, cand_id=None):
             "cand": candidate_obj,
             "notes": notes,
         },
+    )
+
+
+@login_required
+@hx_request_required
+@all_manager_can_enter(perm="recruitment.view_candidatenote")
+def view_candidate_notes(request, cand_id):
+    """
+    Renders the internal-only "Notes" tab inside the candidate Chat panel.
+    Separate feature from Chat (StageNote): notes are staff-only and are
+    never surfaced on the candidate portal.
+    """
+    candidate_obj = Candidate.objects.get(id=cand_id)
+    candidate_notes = candidate_obj.candidate_note.all()
+    return render(
+        request,
+        "pipeline/pipeline_components/view_candidate_notes.html",
+        {"cand": candidate_obj, "candidate_notes": candidate_notes},
+    )
+
+
+@login_required
+@hx_request_required
+@manager_can_enter(perm="recruitment.add_candidatenote")
+def add_candidate_note(request, cand_id):
+    """
+    Adds an internal-only note to a candidate.
+    """
+    candidate = Candidate.objects.get(id=cand_id)
+    if request.method == "POST":
+        form = CandidateNoteForm(request.POST, request.FILES)
+        if form.is_valid() and form.cleaned_data.get("description", "").strip():
+            note, attachment_ids = form.save(commit=False)
+            note.candidate_id = candidate
+            note.updated_by = request.user.employee_get
+            note.save()
+            note.note_files.add(*attachment_ids)
+    candidate_notes = candidate.candidate_note.all()
+    return render(
+        request,
+        "pipeline/pipeline_components/view_candidate_notes.html",
+        {"cand": candidate, "candidate_notes": candidate_notes},
+    )
+
+
+@login_required
+@hx_request_required
+@manager_can_enter(perm="recruitment.delete_candidatenote")
+def candidate_note_delete(request, note_id):
+    """
+    Deletes an internal candidate note.
+    """
+    note = CandidateNote.objects.filter(id=note_id).first()
+    candidate = note.candidate_id if note else None
+    if note:
+        note.delete()
+    candidate_notes = candidate.candidate_note.all() if candidate else []
+    return render(
+        request,
+        "pipeline/pipeline_components/view_candidate_notes.html",
+        {"cand": candidate, "candidate_notes": candidate_notes},
+    )
+
+
+@login_required
+@hx_request_required
+@manager_can_enter(perm="recruitment.delete_candidatenote")
+def delete_candidate_note_file(request, file_id):
+    """
+    Removes a single attachment from an internal candidate note.
+    """
+    file_instance = CandidateNoteFiles.objects.filter(id=file_id).first()
+    note = (
+        file_instance.candidatenote_set.all().first() if file_instance else None
+    )
+    candidate = note.candidate_id if note else None
+    if file_instance:
+        file_instance.delete()
+    candidate_notes = candidate.candidate_note.all() if candidate else []
+    return render(
+        request,
+        "pipeline/pipeline_components/view_candidate_notes.html",
+        {"cand": candidate, "candidate_notes": candidate_notes},
     )
 
 
