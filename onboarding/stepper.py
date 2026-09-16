@@ -817,6 +817,33 @@ def candidate_tasks_tab(request, pk, **kwargs):
 @login_required
 @hx_request_required
 @permission_required("recruitment.change_candidate")
+def send_portal_status(request, pk):
+    """
+    Status fragment shown inside the "Send Onboarding Portal" confirmation
+    modal, right before the actual send - either a warning that Configure
+    Onboarding hasn't been done yet for this candidate (no reporting
+    manager/buddy/checklist tasks exist at all), or, once it has, a
+    Pre-Joining Checklist progress bar - so whoever's about to notify the
+    candidate can see what state things are actually in first.
+    """
+    candidate = get_object_or_404(Candidate, pk=pk)
+    configured = OnboardingCandidateDetail.objects.filter(candidate_id=candidate).exists()
+    context = {"candidate": candidate, "configured": configured}
+    if configured:
+        pre_joining_tasks = candidate.checklist_tasks.filter(phase="pre_joining")
+        total = pre_joining_tasks.count()
+        done = pre_joining_tasks.filter(status="done").count()
+        context.update(
+            total=total,
+            done=done,
+            percent=round(done / total * 100) if total else 0,
+        )
+    return render(request, "onboarding/stepper/_send_portal_status.html", context)
+
+
+@login_required
+@hx_request_required
+@permission_required("recruitment.change_candidate")
 def document_status_update(request, pk, doc_id, action):
     candidate = get_object_or_404(Candidate, pk=pk)
     document = get_object_or_404(CandidateDocument, pk=doc_id, candidate_id=candidate)

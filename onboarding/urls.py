@@ -396,6 +396,11 @@ urlpatterns = [
         name="onboarding-stepper-finalize",
     ),
     path(
+        "candidate/<int:pk>/send-portal-status/",
+        stepper.send_portal_status,
+        name="onboarding-send-portal-status",
+    ),
+    path(
         "candidate/<int:pk>/onboard-document-upload/",
         stepper.document_upload,
         name="onboarding-stepper-document-upload",

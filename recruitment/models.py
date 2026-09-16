@@ -1090,8 +1090,13 @@ class Candidate(HorillaModel):
         """
         from onboarding.models import CandidateStage, CandidateTask
 
-        cand_stage = self.onboarding_stage.id
-        cand_stage_obj = CandidateStage.objects.get(id=cand_stage)
+        # onboarding_stage is a OneToOne reverse accessor that only exists
+        # once Configure Onboarding has been finalized for this candidate -
+        # unguarded, it raised RelatedObjectDoesNotExist and crashed this
+        # page's Tasks column for anyone earlier in the pipeline (found via
+        # load testing, hidden behind the now-fixed onboarding_portal_html
+        # crash on the same page until that one was fixed first).
+        cand_stage_obj = CandidateStage.objects.filter(candidate_id=self).first()
         choices = CandidateTask.choice
 
         return render_template(
@@ -1178,6 +1183,13 @@ class Candidate(HorillaModel):
         This method to get the url for the move-to-another-pipeline modal.
         """
         return reverse_lazy("candidate-move-pipeline-form", kwargs={"pk": self.pk})
+
+    def get_update_status_url(self):
+        """
+        URL for the "Update Status" modal - Move to Pipeline and Add to
+        Rejected combined into one action.
+        """
+        return reverse_lazy("candidate-update-status-form", kwargs={"pk": self.pk})
 
     def get_document_request(self):
         """

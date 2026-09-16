@@ -1,0 +1,25 @@
+{% load i18n %}
+{% if not configured %}
+<div class="oh-alert oh-alert--warning" style="margin-bottom:14px;">
+    <strong>{% trans "Onboarding has not been configured for this candidate yet." %}</strong>
+    <div style="font-size:13px;margin-top:4px;">
+        {% trans "No reporting manager, buddy, or checklist tasks have been set up. Are you sure you want to send the portal link now?" %}
+    </div>
+</div>
+{% else %}
+<div style="margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;font-size:13px;color:#565e6c;margin-bottom:5px;">
+        <span>{% trans "Pre-Joining Checklist" %}</span>
+        <span>
+            {% if total %}
+                {{ done }}/{{ total }} {% trans "complete" %}
+            {% else %}
+                {% trans "No pre-joining tasks set up" %}
+            {% endif %}
+        </span>
+    </div>
+    <div style="background:#eceeee;border-radius:6px;height:8px;overflow:hidden;">
+        <div style="background:{% if percent == 100 %}#2f9e44{% else %}#f59f00{% endif %};height:100%;width:{{ percent }}%;transition:width .3s;"></div>
+    </div>
+</div>
+{% endif %}
