@@ -7,6 +7,21 @@
     </script>
 {% endif %}
 
+<style>
+    /* Structural fallback, independent of chat.css: guarantees the tab
+       row lays out correctly and #chatPane/#notesPane actually fill the
+       card's remaining height even on a page load that races ahead of a
+       collectstatic deploy picking up chat.css's own copy of these rules.
+       A missed collectstatic used to leave #chatPane sized to its content
+       instead of flex-growing, showing as dead blank space below the
+       composer for the rest of the card's fixed height. */
+    .oh-chat-card { display: flex; flex-direction: column; overflow: hidden; }
+    .oh-chat-header-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 auto; }
+    .oh-chat-tabs { display: flex; align-items: center; gap: 16px; }
+    .oh-chat-tab { border: none; background: transparent; padding: 0; margin: 0; font-size: 0.92rem; font-weight: 700; color: #9aa0a6; cursor: pointer; }
+    .oh-chat-tab--active { color: var(--oh-chat-accent, #E54F38); }
+    .oh-chat-pane { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+</style>
 <div class="oh-chat-card" id="pipelineChatCard" style="height: calc(100vh - 90px); --oh-chat-accent: {{ theme_obj.primary_600|default:'#E54F38' }}; --oh-chat-accent-hover: {{ theme_obj.primary_700|default:'#cf4530' }};">
     <div class="oh-chat-header">
         <a
@@ -20,27 +35,25 @@
             ></ion-icon>
         </a>
         <i class="fas fa-comments"></i>
-        <div>
-            <h3>{% trans "Chat" %}</h3>
+        <div class="oh-chat-header-info">
+            <div class="oh-chat-tabs" role="tablist">
+                <button type="button" class="oh-chat-tab oh-chat-tab--active" id="chatTabBtn" role="tab" aria-selected="true" onclick="showCandidateChatTab('chat')">
+                    {% trans "Chat" %}
+                </button>
+                {% if perms.recruitment.view_candidatenote or request|is_any_manager %}
+                <button type="button" class="oh-chat-tab" id="notesTabBtn" role="tab" aria-selected="false"
+                    onclick="showCandidateChatTab('notes')"
+                    hx-get="{% url 'view-candidate-notes' cand.id %}"
+                    hx-target="#notesBody"
+                    hx-swap="innerHTML"
+                    hx-trigger="click once"
+                >
+                    {% trans "Notes" %}
+                </button>
+                {% endif %}
+            </div>
             <span>{{ cand }}</span>
         </div>
-    </div>
-
-    <div class="oh-chat-tabs" role="tablist">
-        <button type="button" class="oh-chat-tab oh-chat-tab--active" id="chatTabBtn" role="tab" aria-selected="true" onclick="showCandidateChatTab('chat')">
-            {% trans "Chat" %}
-        </button>
-        {% if perms.recruitment.view_candidatenote or request|is_any_manager %}
-        <button type="button" class="oh-chat-tab" id="notesTabBtn" role="tab" aria-selected="false"
-            onclick="showCandidateChatTab('notes')"
-            hx-get="{% url 'view-candidate-notes' cand.id %}"
-            hx-target="#notesBody"
-            hx-swap="innerHTML"
-            hx-trigger="click once"
-        >
-            {% trans "Notes" %}
-        </button>
-        {% endif %}
     </div>
 
     <div class="oh-chat-pane" id="chatPane">
