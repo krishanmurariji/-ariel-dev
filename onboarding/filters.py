@@ -317,7 +317,7 @@ class KanbanCandidateFilter(FilterSet):
         fields = [
             field.name
             for field in OnboardingCandidate._meta.fields
-            if field.name not in ["profile", "resume"]
+            if field.name not in ["profile", "profile_thumbnail", "resume"]
         ]
 
     def search_by_name(self, queryset, _, value):

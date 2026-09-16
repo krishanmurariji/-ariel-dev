@@ -25,6 +25,11 @@ from PIL import Image
 
 from accessibility.accessibility import ACCESSBILITY_FEATURE
 from base.horilla_company_manager import HorillaCompanyManager
+from base.image_utils import (
+    file_field_changed,
+    make_thumbnail,
+    validate_profile_image_size,
+)
 from base.models import (
     Company,
     Department,
@@ -104,7 +109,18 @@ class Employee(models.Model):
         max_length=200, null=True, blank=True, verbose_name=_("Last Name")
     )
     employee_profile = models.ImageField(
-        upload_to=upload_path, null=True, blank=True, verbose_name=_("Profile Image")
+        upload_to=upload_path,
+        null=True,
+        blank=True,
+        validators=[validate_profile_image_size],
+        verbose_name=_("Profile Image"),
+    )
+    employee_profile_thumbnail = models.ImageField(
+        upload_to=upload_path,
+        null=True,
+        blank=True,
+        editable=False,
+        verbose_name=_("Profile Image Thumbnail"),
     )
     email = models.EmailField(max_length=254, unique=True)
     phone = models.CharField(max_length=25, validators=[phone_validator])
@@ -311,6 +327,10 @@ class Employee(models.Model):
         )
 
     def get_avatar(self):
+        if self.employee_profile_thumbnail and default_storage.exists(
+            self.employee_profile_thumbnail.name
+        ):
+            return self.employee_profile_thumbnail.url
         if self.employee_profile and default_storage.exists(self.employee_profile.name):
             return self.employee_profile.url
         return static("images/ui/default_avatar.jpg")
@@ -698,6 +718,17 @@ class Employee(models.Model):
         committed = getattr(file, "committed", False)
         same_as_db = self._employee_profile_path_matches_db(file)
 
+        if not (committed or same_as_db):
+            # HorillaModel.clean_fields() (horilla/models.py) fully overrides
+            # Django's own implementation and never runs field-level
+            # `validators=[...]` at all - so the size validator declared on
+            # employee_profile's field only actually takes effect if invoked
+            # explicitly here, same as the format check right below.
+            try:
+                validate_profile_image_size(file)
+            except ValidationError as e:
+                raise ValidationError({"employee_profile": e.messages})
+
         try:
             file.seek(0)
             content = file.read()
@@ -728,6 +759,14 @@ class Employee(models.Model):
 
     def save(self, *args, **kwargs):
         self.full_clean()
+        if file_field_changed(self, "employee_profile"):
+            # Gated on an actual change so an unrelated save() (e.g. the
+            # archive toggle just below) doesn't re-read and re-encode the
+            # photo on every call. None for an SVG/undecodable upload -
+            # get_avatar() falls back to the original file in that case.
+            self.employee_profile_thumbnail = (
+                make_thumbnail(self.employee_profile) if self.employee_profile else None
+            )
         super().save(*args, **kwargs)
 
         request = getattr(horilla_middlewares._thread_locals, "request", None)

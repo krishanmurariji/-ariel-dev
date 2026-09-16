@@ -33,6 +33,11 @@ from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
 from base.horilla_company_manager import HorillaCompanyManager
+from base.image_utils import (
+    file_field_changed,
+    make_thumbnail,
+    validate_profile_image_size,
+)
 from base.models import Company, JobPosition
 from employee.models import Employee
 from horilla.horilla_middlewares import _thread_locals
@@ -76,13 +81,6 @@ def validate_pdf(value):
         raise ValidationError(
             _("File size must not exceed %(limit)s MB.") % {"limit": MAX_RESUME_SIZE_MB}
         )
-
-
-def validate_image(value):
-    """
-    This method is used to validate the image
-    """
-    return value
 
 
 def candidate_photo_upload_path(instance, filename):
@@ -708,7 +706,12 @@ class Candidate(HorillaModel):
         ("joined", _("Joined")),
     ]
     name = models.CharField(max_length=100, null=True, verbose_name=_("Name"))
-    profile = models.ImageField(upload_to=upload_path, null=True)  # 853
+    profile = models.ImageField(
+        upload_to=upload_path, null=True, validators=[validate_profile_image_size]
+    )  # 853
+    profile_thumbnail = models.ImageField(
+        upload_to=upload_path, null=True, blank=True, editable=False
+    )
     portfolio = models.URLField(max_length=200, blank=True, verbose_name=_("Portfolio"))
     about = models.TextField(
         blank=True, null=True, max_length=1000, verbose_name=_("About")
@@ -1354,6 +1357,8 @@ class Candidate(HorillaModel):
         return self.created_at.strftime("%b %d, %Y") if self.created_at else ""
 
     def get_avatar(self):
+        if self.profile_thumbnail and default_storage.exists(self.profile_thumbnail.name):
+            return self.profile_thumbnail.url
         if self.profile and default_storage.exists(self.profile.name):
             return self.profile.url
         return static("images/ui/default_avatar.jpg")
@@ -1481,6 +1486,25 @@ class Candidate(HorillaModel):
         return reference_date + relativedelta(months=default_months)
 
     def save(self, *args, **kwargs):
+        if file_field_changed(self, "profile"):
+            # HorillaModel.clean_fields() (horilla/models.py) fully
+            # overrides Django's own implementation and never runs
+            # field-level `validators=[...]` at all, and Candidate.save()
+            # doesn't call full_clean() the way Employee's does either - so
+            # the size validator declared on profile's field only actually
+            # takes effect invoked explicitly here.
+            if self.profile:
+                try:
+                    validate_profile_image_size(self.profile)
+                except ValidationError as e:
+                    raise ValidationError({"profile": e.messages})
+            # Gated on an actual change so this doesn't re-read and
+            # re-encode the photo on every one of this model's very
+            # frequent saves (stage moves, rating updates, etc). None for
+            # an undecodable upload - get_avatar() falls back to the
+            # original file in that case.
+            self.profile_thumbnail = make_thumbnail(self.profile) if self.profile else None
+
         if self.name is not None:
             self.name = self.name.strip()
             if not self.name:
