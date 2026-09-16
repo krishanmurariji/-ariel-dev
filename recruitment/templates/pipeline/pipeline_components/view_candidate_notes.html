@@ -10,7 +10,6 @@
 </script>
 {% endif %}
 
-<div id="notesMessages">
 {% for note in candidate_notes %}
     <div id="candidateNoteEntry{{ note.id }}" class="oh-chat-bubble-row oh-chat-bubble-row--other">
         <div class="oh-chat-bubble">
@@ -23,7 +22,7 @@
                     {% if perms.recruitment.delete_candidatenote or request|is_any_manager %}
                     <ion-icon name="close-circle-outline" title="{% trans 'Remove file' %}"
                         hx-get="{% url 'delete-candidate-note-file' file.id %}"
-                        hx-target="#notesBody"
+                        hx-target="#notesMessages"
                         hx-swap="innerHTML"
                         hx-on:click="event.preventDefault();event.stopPropagation();"
                     ></ion-icon>
@@ -38,7 +37,7 @@
             {% if note.updated_by == request.user.employee_get or perms.recruitment.delete_candidatenote or request|is_any_manager %}
             <span
                 hx-get="{% url 'candidate-note-delete' note.id %}"
-                hx-target="#notesBody"
+                hx-target="#notesMessages"
                 hx-swap="innerHTML"
                 class="oh-chat-delete"
                 role="button"
@@ -57,66 +56,3 @@
         <p style="font-size: 0.7rem; color: #9aa0a6; margin-top: 4px;">{% trans "Notes are internal only - the candidate never sees this tab." %}</p>
     </div>
 {% endfor %}
-</div>
-
-{% if perms.recruitment.add_candidatenote or request|is_any_manager %}
-<form
-    class="oh-chat-input"
-    hx-post="{% url 'add-candidate-note' cand.id %}"
-    hx-target="#notesBody"
-    hx-swap="innerHTML"
-    hx-encoding="multipart/form-data"
-    id="noteCommentForm"
->
-    {% csrf_token %}
-    <textarea
-        name="description"
-        id="noteCommentInput"
-        class="oh-chat-textarea"
-        rows="1"
-        autocomplete="off"
-        placeholder="{% trans 'Add an internal note...' %}"
-    ></textarea>
-    <label for="noteFileInput" class="oh-chat-attach" title="{% trans 'Attach file' %}">
-        <i class="fas fa-paperclip"></i>
-    </label>
-    <input type="file" name="note_files" id="noteFileInput" multiple style="display:none;">
-    <button type="submit" id="noteCommentButton" class="oh-chat-send" aria-label="{% trans 'Add note' %}" disabled>
-        <i class="fas fa-paper-plane"></i>
-    </button>
-</form>
-<script>
-    (function () {
-        var textarea = document.getElementById("noteCommentInput");
-        var sendBtn = document.getElementById("noteCommentButton");
-        var form = document.getElementById("noteCommentForm");
-        var fileInput = document.getElementById("noteFileInput");
-        if (!textarea || !form) { return; }
-
-        function refreshSendState() {
-            var hasFiles = fileInput && fileInput.files && fileInput.files.length > 0;
-            sendBtn.disabled = textarea.value.trim().length === 0 && !hasFiles;
-        }
-
-        function autogrow() {
-            textarea.style.height = "auto";
-            textarea.style.height = textarea.scrollHeight + "px";
-        }
-
-        textarea.addEventListener("input", function () {
-            autogrow();
-            refreshSendState();
-        });
-        textarea.addEventListener("keydown", function (e) {
-            if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                if (!sendBtn.disabled) { form.requestSubmit(); }
-            }
-        });
-        if (fileInput) { fileInput.addEventListener("change", refreshSendState); }
-
-        autogrow();
-        refreshSendState();
-    })();
-</script>
-{% endif %}

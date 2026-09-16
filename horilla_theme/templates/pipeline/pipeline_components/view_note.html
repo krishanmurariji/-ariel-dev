@@ -8,19 +8,26 @@
 {% endif %}
 
 <style>
-    /* Structural fallback, independent of chat.css: guarantees the tab
-       row lays out correctly and #chatPane/#notesPane actually fill the
-       card's remaining height even on a page load that races ahead of a
-       collectstatic deploy picking up chat.css's own copy of these rules.
-       A missed collectstatic used to leave #chatPane sized to its content
-       instead of flex-growing, showing as dead blank space below the
-       composer for the rest of the card's fixed height. */
+    /* Structural fallback, independent of chat.css: guarantees every
+       layout-critical rule this card needs - tab row, and BOTH flex
+       levels (.oh-chat-pane the outer pane, .oh-chat-body the inner
+       scrolling list) - applies even on a page load that races ahead of
+       a collectstatic deploy picking up chat.css's own copy of these
+       rules. Previously only .oh-chat-pane was covered here; .oh-chat-body
+       staying stale-CSS-dependent meant #chatBody/#notesBody could still
+       shrink to content instead of filling their pane, which Chat's own
+       message volume happened to mask but Notes' near-empty state made
+       obvious as blank space below the composer. Cosmetic-only rules
+       (colors, the dotted background, bubble styling) are left to
+       chat.css - a delay there is invisible, never a broken layout. */
     .oh-chat-card { display: flex; flex-direction: column; overflow: hidden; }
     .oh-chat-header-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 auto; }
     .oh-chat-tabs { display: flex; align-items: center; gap: 16px; }
     .oh-chat-tab { border: none; background: transparent; padding: 0; margin: 0; font-size: 0.92rem; font-weight: 700; color: #9aa0a6; cursor: pointer; }
     .oh-chat-tab--active { color: var(--oh-chat-accent, #E54F38); }
     .oh-chat-pane { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+    .oh-chat-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
+    .oh-chat-input { flex: none; }
 </style>
 <div class="oh-chat-card" id="pipelineChatCard" style="height: calc(100vh - 90px); --oh-chat-accent: {{ theme_obj.primary_600|default:'#E54F38' }}; --oh-chat-accent-hover: {{ theme_obj.primary_700|default:'#cf4530' }};">
     <div class="oh-chat-header">
@@ -44,7 +51,7 @@
                 <button type="button" class="oh-chat-tab" id="notesTabBtn" role="tab" aria-selected="false"
                     onclick="showCandidateChatTab('notes')"
                     hx-get="{% url 'view-candidate-notes' cand.id %}"
-                    hx-target="#notesBody"
+                    hx-target="#notesMessages"
                     hx-swap="innerHTML"
                     hx-trigger="click once"
                 >
@@ -261,10 +268,86 @@
 
     <div class="oh-chat-pane" id="notesPane" style="display:none;">
         <div class="oh-chat-body" id="notesBody">
-            <div class="oh-chat-empty">
-                <h6>{% trans "Loading notes..." %}</h6>
+            <div id="notesMessages">
+                <div class="oh-chat-empty">
+                    <h6>{% trans "Loading notes..." %}</h6>
+                </div>
             </div>
         </div>
+
+        {% if perms.recruitment.add_candidatenote or request|is_any_manager %}
+        <form
+            class="oh-chat-input"
+            hx-post="{% url 'add-candidate-note' cand.id %}"
+            hx-target="#notesMessages"
+            hx-swap="innerHTML"
+            hx-encoding="multipart/form-data"
+            id="noteCommentForm"
+        >
+            {% csrf_token %}
+            <textarea
+                name="description"
+                id="noteCommentInput"
+                class="oh-chat-textarea"
+                rows="1"
+                autocomplete="off"
+                placeholder="{% trans 'Add an internal note...' %}"
+            ></textarea>
+            <label for="noteFileInput" class="oh-chat-attach" title="{% trans 'Attach file' %}">
+                <i class="fas fa-paperclip"></i>
+            </label>
+            <input type="file" name="note_files" id="noteFileInput" multiple style="display:none;">
+            <button type="submit" id="noteCommentButton" class="oh-chat-send" aria-label="{% trans 'Add note' %}" disabled>
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </form>
+        <script>
+            (function () {
+                var textarea = document.getElementById("noteCommentInput");
+                var sendBtn = document.getElementById("noteCommentButton");
+                var form = document.getElementById("noteCommentForm");
+                var fileInput = document.getElementById("noteFileInput");
+                if (!textarea || !form) { return; }
+
+                function refreshSendState() {
+                    var hasFiles = fileInput && fileInput.files && fileInput.files.length > 0;
+                    sendBtn.disabled = textarea.value.trim().length === 0 && !hasFiles;
+                }
+
+                function autogrow() {
+                    textarea.style.height = "auto";
+                    textarea.style.height = textarea.scrollHeight + "px";
+                }
+
+                textarea.addEventListener("input", function () {
+                    autogrow();
+                    refreshSendState();
+                });
+                textarea.addEventListener("keydown", function (e) {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        if (!sendBtn.disabled) { form.requestSubmit(); }
+                    }
+                });
+                if (fileInput) { fileInput.addEventListener("change", refreshSendState); }
+
+                // The form itself is never replaced (only #notesMessages is,
+                // on every add/delete) - unlike Chat's send form, which gets
+                // a fresh instance every time via a full #activitySidebar
+                // swap. Clear it manually after a successful submit instead.
+                form.addEventListener("htmx:afterRequest", function (e) {
+                    if (!e.detail.successful) { return; }
+                    textarea.value = "";
+                    if (fileInput) { fileInput.value = ""; }
+                    autogrow();
+                    refreshSendState();
+                });
+
+                autogrow();
+                refreshSendState();
+            })();
+        </script>
+        {% endif %}
     </div>
 
     <script>
