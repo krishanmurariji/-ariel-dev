@@ -108,7 +108,12 @@
         <hr style="margin: 1.75rem 0; border-color: #ececec;">
 
         <h2 class="oh-swz__section-title">{% trans "Emergency Contacts" %}</h2>
-        <p class="oh-swz__section-sub">{% trans "Optional, but recommended - who should we reach in an emergency?" %}</p>
+        <p class="oh-swz__section-sub">{% trans "Required - please add at least one person we can reach in an emergency." %}</p>
+        {% if emergency_contact_formset.non_form_errors %}
+        <div class="oh-alert oh-alert--danger mb-2">
+            {{ emergency_contact_formset.non_form_errors|join:" " }}
+        </div>
+        {% endif %}
         {{ emergency_contact_formset.management_form }}
         <div id="emergencyContactRows">
             {% for contact_form in emergency_contact_formset %}

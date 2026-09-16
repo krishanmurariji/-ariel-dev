@@ -1530,7 +1530,10 @@ def employee_creation(request, token):
             }
             for contact in candidate.emergency_contact_set.all()
         ]
-        emergency_extra = len(emergency_initial)
+        # At least one contact is required on this step - render one blank
+        # row up front rather than an empty section the person has to know
+        # to click "Add Contact" on first.
+        emergency_extra = len(emergency_initial) or 1
 
     EmergencyContactFormSet = build_employee_emergency_contact_formset(
         extra=emergency_extra

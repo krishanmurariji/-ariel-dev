@@ -654,6 +654,31 @@ def build_employee_experience_formset(extra=0):
     )
 
 
+class EmployeeEmergencyContactBaseFormSet(forms.BaseInlineFormSet):
+    """
+    Requires at least one emergency contact - previously a new hire could
+    clear/skip this section entirely and continue onboarding with zero
+    emergency contacts on file.
+    """
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        has_contact = False
+        for form in self.forms:
+            if not hasattr(form, "cleaned_data") or not form.cleaned_data:
+                continue
+            if form.cleaned_data.get("DELETE"):
+                continue
+            if form.cleaned_data.get("name") and form.cleaned_data.get("phone"):
+                has_contact = True
+        if not has_contact:
+            raise ValidationError(
+                _("Please add at least one emergency contact.")
+            )
+
+
 def build_employee_emergency_contact_formset(extra=0):
     """
     See build_employee_education_formset docstring re: extra - a fixed
@@ -664,6 +689,7 @@ def build_employee_emergency_contact_formset(extra=0):
         Employee,
         EmployeeEmergencyContact,
         fields=["name", "phone", "relation"],
+        formset=EmployeeEmergencyContactBaseFormSet,
         widgets={
             "name": forms.TextInput(attrs={"class": _TEXT_INPUT_CLASS}),
             "phone": forms.TextInput(attrs={"class": _TEXT_INPUT_CLASS}),

@@ -41,6 +41,11 @@ from onboarding.forms import (
     RolesResponsibilityForm,
     WelcomeMessageForm,
 )
+from onboarding.mailers import (
+    notify_onboarding_buddy_assigned,
+    notify_reporting_manager_assigned,
+    notify_reporting_manager_removed,
+)
 from onboarding.models import (
     CandidateChecklistTask,
     CandidateStage,
@@ -369,7 +374,15 @@ def finalize_onboarding(request, pk):
                 request, _("Please complete every step before finishing configuration.")
             )
             return redirect(reverse("onboarding-stepper-page", kwargs={"pk": candidate.pk}))
+        # Reporting Manager/Buddy assignment mails only go out the first
+        # time this candidate's configuration is finalized - re-finalizing
+        # (not currently possible from the UI once start_onboard is set,
+        # but guarded here regardless) must never re-send them.
+        is_first_finalize = not candidate.start_onboard
         Candidate.objects.filter(pk=candidate.pk).update(start_onboard=True)
+        if is_first_finalize:
+            notify_reporting_manager_assigned(candidate, detail.reporting_manager_id)
+            notify_onboarding_buddy_assigned(candidate, detail.buddy_id)
         try:
             stage = candidate.recruitment_id.onboarding_stage.first()
             CandidateStage.objects.get_or_create(
@@ -472,6 +485,7 @@ def _save_step(request, candidate, detail, step_key):
             if data["job_role_id"]
             else None
         )
+        previous_reporting_manager = detail.reporting_manager_id
         detail.reporting_manager_id = (
             Employee.objects.filter(pk=data["reporting_manager_id"]).first()
             if data["reporting_manager_id"]
@@ -498,6 +512,17 @@ def _save_step(request, candidate, detail, step_key):
             else None
         )
         detail.save()
+
+        # Only notify on a change made *after* the initial finalize (which
+        # already sent its own assignment mail) - re-saving this step
+        # during the first-time setup, before finalize, must stay silent
+        # even if the reporting manager is picked, cleared, and re-picked
+        # a few times along the way.
+        if candidate.start_onboard and previous_reporting_manager != detail.reporting_manager_id:
+            if previous_reporting_manager:
+                notify_reporting_manager_removed(candidate, previous_reporting_manager)
+            if detail.reporting_manager_id:
+                notify_reporting_manager_assigned(candidate, detail.reporting_manager_id)
         return None
 
     if step_key in ("pre_joining", "post_joining", "employee_checklist"):
