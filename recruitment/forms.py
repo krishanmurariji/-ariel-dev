@@ -1397,6 +1397,61 @@ class CandidateMovePipelineForm(ModelForm):
             self.fields["stage_id"].empty_label = _("---Choose job opening first---")
 
 
+class CandidateUpdateStatusForm(CandidateMovePipelineForm):
+    """
+    "Update Status" - the Move to Pipeline fields, plus an "Add to Reject"
+    checkbox that reveals the same reason/description fields as the
+    separate Add to Rejected action used to have. Submitting always moves
+    the candidate; checking the box also creates/updates their
+    RejectedCandidate row in the same action.
+    """
+
+    add_to_reject = forms.BooleanField(required=False, label=_("Add to Reject"))
+    reject_reason_id = forms.ModelMultipleChoiceField(
+        queryset=RejectReason.objects.all(),
+        required=False,
+        label=_("Reject Reason"),
+        widget=forms.SelectMultiple(attrs={"class": "oh-select oh-select-2 w-100"}),
+    )
+    description = forms.CharField(
+        required=False,
+        label=_("Description"),
+        widget=forms.Textarea(attrs={"class": "oh-input w-100", "rows": 3}),
+    )
+
+    cols = {
+        "recruitment_id": 12,
+        "stage_id": 12,
+        "add_to_reject": 12,
+        "reject_reason_id": 12,
+        "description": 12,
+    }
+
+    def __init__(self, *args, existing_rejection=None, reject_eligible=True, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not reject_eligible:
+            # Already converted to a platform user (an Employee login
+            # exists for their email) - rejecting them doesn't make sense
+            # anymore. Drop the fields entirely rather than just hiding
+            # them, so there's nothing to bypass via a direct POST either.
+            del self.fields["add_to_reject"]
+            del self.fields["reject_reason_id"]
+            del self.fields["description"]
+        elif existing_rejection is not None:
+            self.fields["add_to_reject"].initial = True
+            self.fields["reject_reason_id"].initial = existing_rejection.reject_reason_id.all()
+            self.fields["description"].initial = existing_rejection.description
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("add_to_reject") and not cleaned_data.get("reject_reason_id"):
+            self.add_error(
+                "reject_reason_id",
+                _("Choose at least one reject reason, or uncheck Add to Reject."),
+            )
+        return cleaned_data
+
+
 class CandidateExportForm(forms.Form):
     model_fields = Candidate._meta.get_fields()
     field_choices = [

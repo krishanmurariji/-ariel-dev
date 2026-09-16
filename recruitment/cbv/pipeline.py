@@ -365,18 +365,6 @@ class CandidateList(HorillaListView):
             """,
         },
         {
-            "action": _("Reject Candidate"),
-            "icon": "thumbs-down-outline",
-            "attrs": """
-                class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100"
-                data-toggle="oh-modal-toggle"
-                hx-get="{get_rejected_candidate_url}"
-                {rejected_candidate_class}
-                data-target="#genericModal"
-                hx-target="#genericModalBody"
-            """,
-        },
-        {
             "action": _("Chat"),
             "icon": "chatbubbles-outline",
             "attrs": """
@@ -407,11 +395,12 @@ class CandidateList(HorillaListView):
             """,
         },
         {
-            "action": _("Move to Pipeline"),
+            "action": _("Update Status"),
             "icon": "swap-horizontal-outline",
             "attrs": """
                 class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100"
-                hx-get="{get_move_pipeline_url}"
+                hx-get="{get_update_status_url}"
+                {rejected_candidate_class}
                 data-toggle="oh-modal-toggle"
                 data-target="#genericModal"
                 hx-target="#genericModalBody"
@@ -610,26 +599,13 @@ class CandidateCard(HorillaKanbanView):
             """,
         },
         {
-            "action": "Add to Rejected",
-            "accessibility": "recruitment.cbv.accessibility.add_reject",
+            "action": _("Update Status"),
             "attrs": """
                 hx-target="#genericModalBody"
                 hx-swap="innerHTML"
                 data-toggle="oh-modal-toggle"
                 data-target="#genericModal"
-                hx-get="{get_add_to_reject}"
-                class="oh-dropdown__link"
-            """,
-        },
-        {
-            "action": "Edit Rejected Candidate",
-            "accessibility": "recruitment.cbv.accessibility.edit_reject",
-            "attrs": """
-                hx-target="#genericModalBody"
-                hx-swap="innerHTML"
-                data-toggle="oh-modal-toggle"
-                data-target="#genericModal"
-                hx-get="{get_add_to_reject}"
+                hx-get="{get_update_status_url}"
                 class="oh-dropdown__link"
             """,
         },
@@ -646,16 +622,6 @@ class CandidateCard(HorillaKanbanView):
             "action": _("Resume"),
             "attrs": """
                 href="{get_resume_url}" target="_blank"
-            """,
-        },
-        {
-            "action": _("Move to Pipeline"),
-            "attrs": """
-                data-toggle="oh-modal-toggle"
-                data-target="#genericModal"
-                hx-get="{get_move_pipeline_url}"
-                hx-target="#genericModalBody"
-                class="oh-dropdown__link"
             """,
         },
         {
@@ -707,6 +673,102 @@ def recruitment_stage_options(request, rec_id):
     )
 
 
+def _candidate_reject_eligible(candidate) -> bool:
+    """
+    Mirrors recruitment.cbv.accessibility.add_reject/edit_reject's core
+    condition - a candidate who has already been converted to a platform
+    user (an Employee login exists for their email) can't sensibly be
+    rejected anymore. Used to hide the Add to Reject section in the
+    Update Status modal, and to reject the submission server-side too if
+    someone gets past that regardless (a stale page, a direct POST).
+    """
+    from horilla_auth.models import HorillaUser
+
+    return not HorillaUser.objects.filter(username=candidate.email).exists()
+
+
+def _apply_candidate_move(request, candidate, target_recruitment, target_stage) -> bool:
+    """
+    Shared by CandidateMovePipelineFormView and CandidateUpdateStatusFormView:
+    moves `candidate` to `target_recruitment`/`target_stage`, handling
+    authorization, job-position reassignment, AI-suggestion bookkeeping,
+    pipeline cache invalidation, and AI re-scoring. Returns True on success;
+    on failure it has already set a messages.error() and the caller should
+    just return its own HttpResponse without doing anything further.
+    """
+    is_authorized = (
+        request.user.is_superuser
+        or is_stagemanager(request)[1].filter(recruitment_id=target_recruitment).exists()
+        or is_recruitmentmanager(request, rec_id=target_recruitment.id)[0]
+    )
+    if not is_authorized:
+        messages.error(request, _("You don't have manager access to the target job."))
+        return False
+
+    # Candidate.save() requires job_position_id to be one of the target
+    # recruitment's open_positions whenever recruitment_id changes -
+    # without reassigning it here, the save below raises a
+    # ValidationError that htmx silently swallows. recruitment.job_position_id
+    # is frequently unset even for non-event-based postings (only
+    # open_positions gets filled in when the recruitment is created), so
+    # that field can't be trusted on its own - fall back to open_positions.
+    target_job_position = target_recruitment.job_position_id
+    if (
+        target_job_position is None
+        or not target_recruitment.open_positions.filter(pk=target_job_position.pk).exists()
+    ):
+        target_job_position = target_recruitment.open_positions.first()
+
+    if target_job_position is None:
+        messages.error(
+            request,
+            _(
+                "%(job)s has no open job position configured, so no "
+                "candidate can be moved into it. Add one under Open "
+                "Positions on that recruitment first."
+            )
+            % {"job": target_recruitment},
+        )
+        return False
+
+    candidate.job_position_id = target_job_position
+    candidate.stage_id = target_stage
+    candidate.hired = bool(target_stage and target_stage.stage_type == "hired")
+    candidate.canceled = bool(target_stage and target_stage.stage_type == "cancelled")
+    candidate.start_onboard = False
+    candidate.has_better_job_suggestion = False
+    try:
+        candidate.save()
+    except DjangoValidationError as exc:
+        messages.error(request, _("Could not move candidate: %(error)s") % {"error": exc})
+        return False
+
+    # Keep the AI Job Match card's "already moved" state in sync,
+    # regardless of whether the move happened via this generic modal
+    # or the AI-suggestion-specific flow.
+    from recruitment.models import CandidateJobSuggestion
+
+    CandidateJobSuggestion.objects.filter(
+        candidate=candidate,
+        status="suggested",
+        acted_on=False,
+        suggested_recruitment=target_recruitment,
+    ).update(acted_on=True)
+
+    # The Pipeline board caches its candidate queryset per session (see
+    # RecruitmentTabView/GetStages above) - without clearing it here,
+    # the old recruitment's board keeps showing this candidate under
+    # their old stage until that cache naturally expires.
+    if request.session.session_key:
+        CACHE.delete(request.session.session_key + "pipeline")
+
+    # The AI Score was computed against the job the candidate just
+    # left - refresh it in the background so it doesn't keep showing
+    # a score against a job they're no longer applying for.
+    ai_scoring.kick_off_rescoring(candidate.pk)
+    return True
+
+
 @method_decorator(login_required, name="dispatch")
 @method_decorator(
     manager_can_enter(perm="recruitment.change_candidate"), name="dispatch"
@@ -740,91 +802,89 @@ class CandidateMovePipelineFormView(HorillaFormView):
         target_recruitment = form.cleaned_data["recruitment_id"]
         target_stage = form.cleaned_data["stage_id"]
 
-        is_authorized = (
-            self.request.user.is_superuser
-            or is_stagemanager(self.request)[1]
-            .filter(recruitment_id=target_recruitment)
-            .exists()
-            or is_recruitmentmanager(self.request, rec_id=target_recruitment.id)[0]
-        )
-        if not is_authorized:
-            messages.error(
-                self.request, _("You don't have manager access to the target job.")
-            )
+        if not _apply_candidate_move(self.request, candidate, target_recruitment, target_stage):
             return self.HttpResponse()
-
-        # Candidate.save() requires job_position_id to be one of the target
-        # recruitment's open_positions whenever recruitment_id changes -
-        # without reassigning it here, the save below raises a
-        # ValidationError that htmx silently swallows. recruitment.job_position_id
-        # is frequently unset even for non-event-based postings (only
-        # open_positions gets filled in when the recruitment is created), so
-        # that field can't be trusted on its own - fall back to open_positions.
-        target_job_position = target_recruitment.job_position_id
-        if (
-            target_job_position is None
-            or not target_recruitment.open_positions.filter(
-                pk=target_job_position.pk
-            ).exists()
-        ):
-            target_job_position = target_recruitment.open_positions.first()
-
-        if target_job_position is None:
-            messages.error(
-                self.request,
-                _(
-                    "%(job)s has no open job position configured, so no "
-                    "candidate can be moved into it. Add one under Open "
-                    "Positions on that recruitment first."
-                )
-                % {"job": target_recruitment},
-            )
-            return self.HttpResponse()
-
-        candidate.job_position_id = target_job_position
-        candidate.stage_id = target_stage
-        candidate.hired = bool(target_stage and target_stage.stage_type == "hired")
-        candidate.canceled = bool(
-            target_stage and target_stage.stage_type == "cancelled"
-        )
-        candidate.start_onboard = False
-        candidate.has_better_job_suggestion = False
-        try:
-            candidate.save()
-        except DjangoValidationError as exc:
-            messages.error(
-                self.request, _("Could not move candidate: %(error)s") % {"error": exc}
-            )
-            return self.HttpResponse()
-
-        # Keep the AI Job Match card's "already moved" state in sync,
-        # regardless of whether the move happened via this generic modal
-        # or the AI-suggestion-specific flow.
-        from recruitment.models import CandidateJobSuggestion
-
-        CandidateJobSuggestion.objects.filter(
-            candidate=candidate,
-            status="suggested",
-            acted_on=False,
-            suggested_recruitment=target_recruitment,
-        ).update(acted_on=True)
-
-        # The Pipeline board caches its candidate queryset per session (see
-        # RecruitmentTabView/GetStages above) - without clearing it here,
-        # the old recruitment's board keeps showing this candidate under
-        # their old stage until that cache naturally expires.
-        if self.request.session.session_key:
-            CACHE.delete(self.request.session.session_key + "pipeline")
-
-        # The AI Score was computed against the job the candidate just
-        # left - refresh it in the background so it doesn't keep showing
-        # a score against a job they're no longer applying for.
-        ai_scoring.kick_off_rescoring(candidate.pk)
 
         messages.success(
             self.request,
             _("Candidate moved to %(job)s.") % {"job": target_recruitment},
         )
+        return self.HttpResponse()
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(
+    manager_can_enter(perm="recruitment.change_candidate"), name="dispatch"
+)
+class CandidateUpdateStatusFormView(HorillaFormView):
+    """
+    "Update Status" - combines what used to be two separate pipeline
+    actions (Move to Pipeline, Add to Rejected) into one: dispositioning a
+    candidate (advance them, reject them, or both at once - e.g. rejecting
+    them from one job while leaving them moved into a different one they're
+    a better fit for) is a single decision in practice, not two unrelated
+    ones. The reject fields stay hidden client-side until "Add to Reject"
+    is checked (see candidate/update_status_form.html); this view re-uses
+    the exact same move-candidate logic as CandidateMovePipelineFormView so
+    both actions keep behaving identically where they overlap.
+    """
+
+    model = models.Candidate
+    form_class = forms.CandidateUpdateStatusForm
+    new_display_title = _("Update Status")
+    template_name = "candidate/update_status_form.html"
+
+    def init_form(self, *args, data={}, files={}, instance=None, **kwargs):
+        # HorillaFormView builds the form itself (see get_form() above) -
+        # this is its actual extension point, not Django's usual
+        # get_form_kwargs(). `instance` is already the Candidate resolved
+        # from the URL's pk by the time this runs.
+        existing_rejection = None
+        reject_eligible = bool(instance and instance.pk and _candidate_reject_eligible(instance))
+        if reject_eligible:
+            existing_rejection = models.RejectedCandidate.objects.filter(
+                candidate_id=instance
+            ).first()
+        return self.form_class(
+            data,
+            files,
+            instance=instance,
+            initial=self.get_initial(),
+            existing_rejection=existing_rejection,
+            reject_eligible=reject_eligible,
+        )
+
+    def form_valid(self, form: "forms.CandidateUpdateStatusForm") -> HttpResponse:
+        if not form.is_valid():
+            return super().form_valid(form)
+
+        candidate = form.instance
+        target_recruitment = form.cleaned_data["recruitment_id"]
+        target_stage = form.cleaned_data["stage_id"]
+
+        if not _apply_candidate_move(self.request, candidate, target_recruitment, target_stage):
+            return self.HttpResponse()
+
+        rejected = False
+        if form.cleaned_data.get("add_to_reject") and _candidate_reject_eligible(candidate):
+            rejected_candidate, _created = models.RejectedCandidate.objects.update_or_create(
+                candidate_id=candidate,
+                defaults={"description": form.cleaned_data.get("description", "")},
+            )
+            rejected_candidate.reject_reason_id.set(form.cleaned_data["reject_reason_id"])
+            rejected = True
+
+        if rejected:
+            messages.success(
+                self.request,
+                _("Candidate moved to %(job)s and marked as rejected.")
+                % {"job": target_recruitment},
+            )
+        else:
+            messages.success(
+                self.request,
+                _("Candidate moved to %(job)s.") % {"job": target_recruitment},
+            )
         return self.HttpResponse()
 
 

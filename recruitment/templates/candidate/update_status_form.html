@@ -1,0 +1,74 @@
+{% load i18n %}
+{% include "generic/horilla_form.html" %}
+<script>
+(function () {
+    function reloadStages(selectedStageId) {
+        var recId = $('#id_recruitment_id').val();
+        var $stageSelect = $('#id_stage_id');
+        if (!recId) {
+            $stageSelect.html('<option value="">{% trans "---Choose job opening first---" %}</option>');
+            return;
+        }
+        var url = "{% url 'recruitment-stage-options' 0 %}".replace('0', recId);
+        $.get(url, function (data) {
+            var options = '<option value="">{% trans "---Choose Stage---" %}</option>';
+            (data.stages || []).forEach(function (s) {
+                var pick = selectedStageId ? (String(s.id) === String(selectedStageId)) : s.initial;
+                options += '<option value="' + s.id + '"' + (pick ? ' selected' : '') + '>' + s.stage + '</option>';
+            });
+            $stageSelect.html(options);
+        });
+    }
+
+    $(document).off('change.movePipeline', '#id_recruitment_id')
+        .on('change.movePipeline', '#id_recruitment_id', function () {
+            reloadStages(null);
+        });
+
+    // Same pre-select-current-stage behavior as the plain Move to Pipeline
+    // modal - see that template's matching comment for why.
+    var currentRecruitmentId = '{{ form.instance.recruitment_id_id|default_if_none:"" }}';
+    var currentStageId = '{{ form.instance.stage_id_id|default_if_none:"" }}';
+    if ($('#id_recruitment_id').val()) {
+        var isCurrentJobOpening = currentRecruitmentId
+            && String($('#id_recruitment_id').val()) === currentRecruitmentId;
+        reloadStages(isCurrentJobOpening ? currentStageId : null);
+    }
+
+    // Reject reason/description stay hidden until "Add to Reject" is
+    // checked - pre-checked (via the form's `existing_rejection` initial)
+    // when this candidate already has a rejection on file, so editing one
+    // shows the fields open immediately instead of hidden behind an
+    // already-ticked-but-collapsed box.
+    var $rejectReasonRow = $('#id_reject_reason_id_parent_div');
+    var $descriptionRow = $('#id_description_parent_div');
+    var $addToRejectRow = $('#id_add_to_reject_parent_div');
+
+    function syncRejectFieldsVisibility() {
+        var checked = $('#id_add_to_reject').is(':checked');
+        $rejectReasonRow.toggle(checked);
+        $descriptionRow.toggle(checked);
+    }
+
+    $(document).off('change.updateStatusReject', '#id_add_to_reject')
+        .on('change.updateStatusReject', '#id_add_to_reject', syncRejectFieldsVisibility);
+
+    // Visually group the checkbox with the fields it reveals.
+    $addToRejectRow.css('border-top', '1px solid #eceeee').css('padding-top', '12px').css('margin-top', '8px');
+
+    syncRejectFieldsVisibility();
+
+    // Same modal-close-on-success detector as the plain Move to Pipeline
+    // modal (see that template's matching comment).
+    var modalBody = document.getElementById('genericModalBody');
+    if (modalBody && window.MutationObserver) {
+        var updateStatusObserver = new MutationObserver(function () {
+            if (!document.getElementById('id_recruitment_id')) {
+                $('#genericModal').removeClass('oh-modal--show');
+                updateStatusObserver.disconnect();
+            }
+        });
+        updateStatusObserver.observe(modalBody, { childList: true, subtree: true });
+    }
+})();
+</script>

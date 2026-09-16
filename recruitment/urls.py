@@ -1090,6 +1090,11 @@ urlpatterns = [
         name="candidate-move-pipeline-form",
     ),
     path(
+        "candidate-update-status-form/<int:pk>/",
+        pipeline.CandidateUpdateStatusFormView.as_view(),
+        name="candidate-update-status-form",
+    ),
+    path(
         "recruitment-stage-options/<int:rec_id>/",
         pipeline.recruitment_stage_options,
         name="recruitment-stage-options",

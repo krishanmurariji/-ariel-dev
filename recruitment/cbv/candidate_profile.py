@@ -75,6 +75,17 @@ class CandidateProfileView(HorillaProfileView):
                     """,
         },
         {
+            "title": _("Update Status"),
+            "src": f"/{settings.STATIC_URL}images/ui/arrow-right-line.svg",
+            "attrs": """
+                data-toggle="oh-modal-toggle"
+                data-target="#genericModal"
+                hx-get="{get_update_status_url}"
+                hx-target="#genericModalBody"
+                class="oh-dropdown__link"
+            """,
+        },
+        {
             "title": _("View candidate self tracking"),
             "src": f"/{settings.STATIC_URL}images/ui/exit-outline.svg",
             "accessibility": "recruitment.cbv.accessibility.view_candidate_self_tracking",

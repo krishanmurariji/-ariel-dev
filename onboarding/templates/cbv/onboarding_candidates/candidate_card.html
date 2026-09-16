@@ -33,7 +33,7 @@
               <a
                 class="block w-full text-left px-3 py-1.5 hover:text-primary-600 transition duration-300"
                 href="{% url 'email-send' %}?ids={{candidate.id}}"
-                onclick="event.preventDefault(); $('select[name=ids]').val('{{candidate.id}}');"
+                onclick="event.preventDefault(); $('select[name=ids]').val('{{candidate.id}}'); $('#sendPortalStatusContainer').html(''); $.get('{% url 'onboarding-send-portal-status' candidate.id %}', function(html){ $('#sendPortalStatusContainer').html(html); });"
                 data-target="#addAttachments"
                 data-toggle="oh-modal-toggle">
                 {% trans "Send Onboarding Portal" %}
