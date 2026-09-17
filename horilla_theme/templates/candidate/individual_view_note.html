@@ -137,6 +137,22 @@
             if (!window.WebSocket) { return; }
 
             window.__ohChat = window.__ohChat || {};
+
+            // Shares the window.__ohChat registry with the staff-facing
+            // pipeline chat card - if that panel (or this same tab, for a
+            // different candidate) left a stale connection registered,
+            // drop it now rather than let it keep running forever. See
+            // that template's matching comment for the full story.
+            Object.keys(window.__ohChat).forEach(function (id) {
+                if (String(id) === String(candidateId)) { return; }
+                var stale = window.__ohChat[id];
+                if (stale && stale.socket) {
+                    stale.closedIntentionally = true;
+                    stale.socket.close();
+                }
+                delete window.__ohChat[id];
+            });
+
             if (window.__ohChat[candidateId]) { return; }
             var state = window.__ohChat[candidateId] = {
                 clientId: Math.random().toString(36).slice(2) + Date.now(),
@@ -144,6 +160,7 @@
                 typingEl: null,
                 typingHideTimer: null,
                 lastTypingSentAt: 0,
+                closedIntentionally: false,
             };
 
             var protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -190,6 +207,7 @@
                     }
                 });
                 state.socket.addEventListener("close", function () {
+                    if (state.closedIntentionally) { return; }
                     setTimeout(connect, 3000);
                 });
             }

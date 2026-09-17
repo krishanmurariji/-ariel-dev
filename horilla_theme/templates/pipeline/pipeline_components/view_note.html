@@ -33,7 +33,7 @@
     <div class="oh-chat-header">
         <a
             style="cursor: pointer"
-            onclick="$('.oh-activity-sidebar--show').removeClass('oh-activity-sidebar--show')"
+            onclick="$('.oh-activity-sidebar--show').removeClass('oh-activity-sidebar--show'); if (window.__ohChatCloseCurrent) { window.__ohChatCloseCurrent(); }"
         >
             <ion-icon
                 name="chevron-forward-outline"
@@ -195,6 +195,24 @@
             if (!window.WebSocket) { return; }
 
             window.__ohChat = window.__ohChat || {};
+
+            // Only one chat panel is ever visibly open at a time, so there's
+            // never a reason to keep more than one live socket around.
+            // Without this, opening Chat for candidate A then candidate B
+            // (without ever using the panel's own close button in between)
+            // left A's connection running forever - candidateId only guards
+            // against a duplicate for the SAME candidate, not against a
+            // stale one left over from a previous, different candidate.
+            Object.keys(window.__ohChat).forEach(function (id) {
+                if (String(id) === String(candidateId)) { return; }
+                var stale = window.__ohChat[id];
+                if (stale && stale.socket) {
+                    stale.closedIntentionally = true;
+                    stale.socket.close();
+                }
+                delete window.__ohChat[id];
+            });
+
             if (window.__ohChat[candidateId]) { return; }
             var state = window.__ohChat[candidateId] = {
                 clientId: Math.random().toString(36).slice(2) + Date.now(),
@@ -202,6 +220,19 @@
                 typingEl: null,
                 typingHideTimer: null,
                 lastTypingSentAt: 0,
+                closedIntentionally: false,
+            };
+
+            // The panel's own close (back-arrow) button calls this to drop
+            // the connection immediately instead of leaving it open and
+            // idle for as long as the browser tab stays open.
+            window.__ohChatCloseCurrent = function () {
+                var current = window.__ohChat[candidateId];
+                if (current && current.socket) {
+                    current.closedIntentionally = true;
+                    current.socket.close();
+                }
+                delete window.__ohChat[candidateId];
             };
 
             var protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -248,6 +279,7 @@
                     }
                 });
                 state.socket.addEventListener("close", function () {
+                    if (state.closedIntentionally) { return; }
                     setTimeout(connect, 3000);
                 });
             }

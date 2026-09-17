@@ -914,6 +914,25 @@
                                 if (!window.WebSocket) { return; }
 
                                 window.__ohChat = window.__ohChat || {};
+
+                                // This page only ever concerns the one candidate
+                                // viewing it, but the registry is shared with the
+                                // other two chat surfaces (recruitment/consumers.py
+                                // groups by candidate id, not by which template
+                                // opened the connection) - dropping anything stale
+                                // here too keeps all three consistent. See
+                                // view_note.html's matching comment for the full
+                                // story on why this exists.
+                                Object.keys(window.__ohChat).forEach(function (id) {
+                                    if (String(id) === String(candidateId)) { return; }
+                                    var stale = window.__ohChat[id];
+                                    if (stale && stale.socket) {
+                                        stale.closedIntentionally = true;
+                                        stale.socket.close();
+                                    }
+                                    delete window.__ohChat[id];
+                                });
+
                                 if (window.__ohChat[candidateId]) { return; }
                                 var state = window.__ohChat[candidateId] = {
                                     clientId: Math.random().toString(36).slice(2) + Date.now(),
@@ -921,6 +940,7 @@
                                     typingEl: null,
                                     typingHideTimer: null,
                                     lastTypingSentAt: 0,
+                                    closedIntentionally: false,
                                 };
 
                                 var protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -972,6 +992,7 @@
                                     // Reconnect on drop - the 10s poll already covers delivery
                                     // in the meantime, this just restores instant delivery.
                                     state.socket.addEventListener("close", function () {
+                                        if (state.closedIntentionally) { return; }
                                         setTimeout(connect, 3000);
                                     });
                                 }
