@@ -7,6 +7,7 @@ import re
 
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Count
 from django.http import HttpResponse, JsonResponse
 from django.urls import reverse, reverse_lazy
 from django.utils.decorators import method_decorator
@@ -115,10 +116,36 @@ class RecruitmentTabView(HorillaTabView):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        recruitments = onboarding_filters.RecruitmentFilter(self.request.GET).qs.filter(
-            is_active=True
+        recruitments = list(
+            onboarding_filters.RecruitmentFilter(self.request.GET).qs.filter(
+                is_active=True
+            )
         )
         view_type = self.request.GET.get("view", "list")
+
+        # This is an unpaginated tab bar (every open recruitment gets a
+        # tab), so the two queries below used to run once PER recruitment
+        # instead of once total - a stage count and a manager check, each
+        # re-issued for every tab on every page load. Bulk-fetch both up
+        # front into plain dicts/sets, looked up in the loop below with no
+        # further queries.
+        rec_ids = [rec.pk for rec in recruitments]
+        stage_counts = dict(
+            onboarding_models.OnboardingStage.objects.filter(
+                recruitment_id__in=rec_ids, is_active=True
+            )
+            .values_list("recruitment_id")
+            .annotate(cnt=Count("id"))
+        )
+        employee = getattr(self.request.user, "employee_get", None)
+        managed_rec_ids = set()
+        if employee is not None:
+            managed_rec_ids = set(
+                recruitment_models.Recruitment.objects.filter(
+                    id__in=rec_ids, recruitment_managers=employee
+                ).values_list("id", flat=True)
+            )
+
         self.tabs = []
         for rec in recruitments:
             tab = {}
@@ -131,11 +158,11 @@ class RecruitmentTabView(HorillaTabView):
             tab["url"] = url
 
             tab["badge_label"] = _("Stages")
-            tab["badge"] = rec.onboarding_stage.filter(is_active=True).count()
+            tab["badge"] = stage_counts.get(rec.pk, 0)
             tab["actions"] = []
             if self.request.user.has_perm(
                 "onboarding.add_onboardingstage"
-            ) or recruitment_manages(self.request, rec):
+            ) or rec.pk in managed_rec_ids:
                 tab["actions"].append(
                     {
                         "action": _("Add Stage"),

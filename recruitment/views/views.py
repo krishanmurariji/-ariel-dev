@@ -2112,15 +2112,41 @@ def candidate_view_individual(request, cand_id, **kwargs):
     """
     This method is used to view profile of candidate.
     """
-    candidate_obj = get_object_or_404(Candidate, pk=cand_id)
+    # individual.html walks job_position_id.department_id, skills,
+    # education_set, experience_set, recruitmentsurveyanswer_set and
+    # candidate_task off this one object - each of the last four is
+    # actually referenced twice in the template (an {% if %} existence
+    # check, then the {% for %} loop), so without this it was 9-10 queries
+    # per profile view instead of the 6 below (1 for the object itself +
+    # 1 join for the department chain + 5 prefetches, each of the latter
+    # correctly reused by both the {% if %} and the {% for %} since
+    # they're now cached rather than re-querying on every .all()).
+    candidate_obj = get_object_or_404(
+        Candidate.objects.select_related("job_position_id__department_id").prefetch_related(
+            "skills",
+            "education_set",
+            "experience_set",
+            "recruitmentsurveyanswer_set",
+            "candidate_task",
+        ),
+        pk=cand_id,
+    )
 
     # Candidate.find(cand_id) (the previous version of this call) isn't a
     # real method on Candidate - get_object_or_404 is the equivalent
     # lookup already used elsewhere in this file.
-    mails = list(Candidate.objects.values_list("email", flat=True))
-    # Query the HorillaUser model to check if any email is present
+    #
+    # individual.html (the only template this view renders) only ever
+    # checks `candidate.email in emp_list` for THIS one candidate - the
+    # list/card views that check other candidates' emails against
+    # emp_list are separate views with their own such list. This used to
+    # fetch every candidate's email in the entire table, then cross-
+    # reference all of them against HorillaUser, to answer a question
+    # about one single candidate.
     existing_emails = list(
-        HorillaUser.objects.filter(username__in=mails).values_list("email", flat=True)
+        HorillaUser.objects.filter(username=candidate_obj.email).values_list(
+            "email", flat=True
+        )
     )
     documents = CandidateDocument.objects.filter(candidate_id=cand_id)
 

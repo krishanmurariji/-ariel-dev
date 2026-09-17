@@ -1416,14 +1416,27 @@ class Candidate(HorillaModel):
     def get_last_sent_mail(self):
         """
         This method is used to get last send mail
-        """
-        from base.models import EmailLog
 
-        return (
-            EmailLog.objects.filter(to__icontains=self.email)
-            .order_by("-created_at")
-            .first()
-        )
+        Memoized per-instance: the pipeline card/list templates that show
+        the mail status dot call this 3 times per candidate (once for the
+        icon's visibility check, once for its tooltip, once for its color),
+        which without caching ran the same query 3 times per row on every
+        page load. The query itself (an icontains scan of EmailLog.to,
+        which isn't indexed for that lookup) is still one full-table-style
+        scan per candidate - reducing 3x to 1x here is the safe part;
+        making that one query itself index-friendly needs either an exact
+        lookup (only safe if `to` never holds more than one address) or a
+        trigram index, which is a separate, bigger change.
+        """
+        if not hasattr(self, "_last_sent_mail_cache"):
+            from base.models import EmailLog
+
+            self._last_sent_mail_cache = (
+                EmailLog.objects.filter(to__icontains=self.email)
+                .order_by("-created_at")
+                .first()
+            )
+        return self._last_sent_mail_cache
 
     def get_schedule_interview(self):
         url = reverse_lazy("interview-schedule", kwargs={"cand_id": self.pk})

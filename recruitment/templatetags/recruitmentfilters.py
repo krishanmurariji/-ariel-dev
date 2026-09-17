@@ -16,7 +16,6 @@ from django.utils.formats import date_format
 from django.utils.translation import gettext as _
 
 from horilla_auth.models import HorillaUser
-from recruitment.models import CandidateRating
 
 # from django.forms.boundfield
 
@@ -120,28 +119,50 @@ def generate_id(element, label=""):
     return element
 
 
+def _find_rating_for_candidate(candidate_ratings, cand_id):
+    """
+    candidate_ratings is a queryset the caller already has in hand (e.g.
+    request.user.employee_get.candidate_rating.all or
+    instance.candidate_rating.all), shared across every row on a list/kanban
+    page via one {% with %} block. Calling .filter() on it here would clone
+    it into a brand new queryset and issue a fresh query every single call -
+    once per row, sometimes once per star (5x/row). Iterating it in plain
+    Python instead means the first iteration populates Django's own
+    queryset result cache, and every call after that (for every other row
+    on the page) reads from that cache with no further queries at all.
+    """
+    for candidate_rating in candidate_ratings:
+        if candidate_rating.candidate_id_id == cand_id:
+            return candidate_rating
+    return None
+
+
 @register.filter(name="has_candidate_rating")
 def has_candidate_rating(candidate_ratings, cand):
-    candidate_rating = candidate_ratings.filter(candidate_id=cand.id).first()
-    return candidate_rating
+    return _find_rating_for_candidate(candidate_ratings, cand.id)
 
 
 @register.filter(name="rating")
 def rating(candidate_ratings, cand):
-    rating = candidate_ratings.filter(candidate_id=cand.id).first().rating
-    return str(rating)
+    found = _find_rating_for_candidate(candidate_ratings, cand.id)
+    return str(found.rating) if found else ""
 
 
 @register.filter(name="avg_rating")
 def avg_rating(candidate_ratings, cand):
-    ratings = CandidateRating.objects.filter(candidate_id=cand.id)
-    rating_list = []
-    avg_rate = 0
-    for rating in ratings:
-        rating_list.append(rating.rating)
-    if len(rating_list) != 0:
-        avg_rate = round(sum(rating_list) / len(rating_list))
-
+    """
+    candidate_ratings is expected to be cand's own candidate_rating.all
+    (every rating this specific candidate has received, from any
+    employee) - unlike the two filters above, there's no per-candidate
+    filtering left to do here, so this just averages whatever was passed
+    in instead of re-querying CandidateRating from scratch, which is what
+    it used to do (ignoring candidate_ratings entirely and issuing a fresh
+    query - previously the single biggest cost on the candidate list page,
+    since it runs once per row and used to double as a second, redundant
+    query on top of evaluating candidate_ratings in the first place).
+    """
+    rating_list = [candidate_rating.rating for candidate_rating in candidate_ratings]
+    avg_rate = round(sum(rating_list) / len(rating_list)) if rating_list else 0
     return str(avg_rate)
 
 

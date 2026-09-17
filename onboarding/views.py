@@ -994,11 +994,39 @@ def email_send(request):
     return HorillaRedirect(request, redirect_to=next_url)
 
 
+def _add_recruitments_from_own_tasks(request, recruitments, filter_obj):
+    """
+    Union in any recruitment the current employee has an onboarding task
+    in, even if it wouldn't otherwise match the page's own recruitment
+    filters/permissions (used identically by onboarding_view and
+    kanban_view). Was previously doing `task.stage_id.recruitment_id not
+    in recruitments` inside the loop - `in`/`not in` on an unevaluated
+    queryset re-runs it against the database on every single check, once
+    per task, instead of once total.
+    """
+    employee_tasks = request.user.employee_get.onboarding_task.select_related(
+        "stage_id__recruitment_id"
+    ).all()
+    existing_ids = set(recruitments.values_list("id", flat=True))
+    extra_ids = {
+        task.stage_id.recruitment_id_id
+        for task in employee_tasks
+        if task.stage_id and task.stage_id.recruitment_id_id not in existing_ids
+    }
+    if extra_ids:
+        recruitments = recruitments | filter_obj.qs.filter(id__in=extra_ids)
+    return recruitments
+
+
 def onboarding_query_grouper(request, queryset):
     """
     This method is used to make group of the onboarding records
     """
     groups = []
+    # queryset is a Paginator Page here (from both call sites), not a bare
+    # queryset - prefetch_related has to be applied to the underlying
+    # recruitments queryset before it's paginated (see onboarding_view/
+    # kanban_view), since a Page object has no prefetch_related of its own.
     for rec in queryset:
         employees = []
         stages = OnboardingStageFilter(
@@ -1023,9 +1051,16 @@ def onboarding_query_grouper(request, queryset):
                 page_name,
             ).object_list
             data["stages"] = data["stages"] + grouper
-            employees = employees + [
-                employee.candidate_id.id for employee in stage.candidate.all()
-            ]
+            # Deliberately a second, differently-filtered query from
+            # stage_candidates above (no is_active/request.GET filtering
+            # here) - but there's no reason for it to hydrate a full
+            # CandidateStage+Candidate row per candidate just to read one
+            # id. candidate_id_id reads the FK column directly, so this is
+            # one lightweight query instead of one query per candidate in
+            # the stage.
+            employees = employees + list(
+                stage.candidate.values_list("candidate_id_id", flat=True)
+            )
         ordered_data = []
         # combining un used groups in to the grouper
         groupers = data["stages"]
@@ -1068,12 +1103,7 @@ def onboarding_view(request):
         ) | recruitments.filter(
             onboarding_stage__employee_id__in=[request.user.employee_get]
         )
-    employee_tasks = request.user.employee_get.onboarding_task.all()
-    for task in employee_tasks:
-        if task.stage_id and task.stage_id.recruitment_id not in recruitments:
-            recruitments = recruitments | filter_obj.qs.filter(
-                id=task.stage_id.recruitment_id.id
-            )
+    recruitments = _add_recruitments_from_own_tasks(request, recruitments, filter_obj)
     recruitments = recruitments.filter(is_active=True).distinct()
     status = request.GET.get("closed")
     if not status:
@@ -1082,7 +1112,13 @@ def onboarding_view(request):
     onboarding_stages = OnboardingStage.objects.all()
     choices = CandidateTask.choice
     previous_data = request.GET.urlencode()
-    paginator = Paginator(recruitments.order_by("id"), 4)
+    # Attached here, before pagination, so it survives the Paginator's
+    # slicing - onboarding_query_grouper's rec.onboarding_stage.all() then
+    # reuses this one prefetch instead of running one query per
+    # recruitment on the page.
+    paginator = Paginator(
+        recruitments.order_by("id").prefetch_related("onboarding_stage"), 4
+    )
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
     groups = onboarding_query_grouper(request, page_obj)
@@ -1123,12 +1159,7 @@ def kanban_view(request):
         ) | recruitments.filter(
             onboarding_stage__employee_id__in=[request.user.employee_get]
         )
-    employee_tasks = request.user.employee_get.onboarding_task.all()
-    for task in employee_tasks:
-        if task.stage_id and task.stage_id.recruitment_id not in recruitments:
-            recruitments = recruitments | filter_obj.qs.filter(
-                id=task.stage_id.recruitment_id.id
-            )
+    recruitments = _add_recruitments_from_own_tasks(request, recruitments, filter_obj)
     recruitments = recruitments.filter(is_active=True).distinct()
 
     status = request.GET.get("closed")
@@ -1142,7 +1173,10 @@ def kanban_view(request):
     previous_data = request.GET.urlencode()
 
     filter_obj = RecruitmentFilter(request.GET, queryset=recruitments)
-    paginator = Paginator(recruitments, 4)
+    # See onboarding_view's matching comment - attached before pagination
+    # so onboarding_query_grouper's rec.onboarding_stage.all() reuses this
+    # prefetch instead of one query per recruitment on the page.
+    paginator = Paginator(recruitments.prefetch_related("onboarding_stage"), 4)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
     groups = onboarding_query_grouper(request, page_obj)

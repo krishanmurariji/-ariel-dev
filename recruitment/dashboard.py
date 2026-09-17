@@ -4,9 +4,12 @@ Modern recruitment dashboard views — KPI summary + ApexCharts.
 Accessible at /recruitment/dashboard/modern/ alongside the existing dashboard.
 """
 
+import json
 from datetime import date, timedelta
+from functools import wraps
 
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.db.models import Avg, Count, Q
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -15,6 +18,17 @@ from django.utils.translation import gettext_lazy as _
 from employee.models import Employee
 from horilla.methods import handle_no_permission
 from recruitment.models import Recruitment, Stage
+
+# Every widget on this dashboard recomputed its numbers from scratch on
+# every single load or auto-refresh, for every viewer - a real cost on its
+# own, and one that multiplies badly under concurrent load, since 50
+# people opening the same dashboard within a few seconds of each other ran
+# the exact same expensive queries 50 times over for numbers that hadn't
+# changed. A short cache means that many concurrent viewers now trigger the
+# real computation once, not once each - the tradeoff is dashboard numbers
+# can lag up to this many seconds behind a just-created candidate/hire,
+# which is fine for a summary dashboard.
+DASHBOARD_CACHE_TTL = 45
 
 
 def _has_recruitment_permission(request):
@@ -27,6 +41,51 @@ def _has_recruitment_permission(request):
         Stage.objects.filter(stage_managers=employee).exists()
         or Recruitment.objects.filter(recruitment_managers=employee).exists()
     )
+
+
+def cache_dashboard_json(prefix, ttl=DASHBOARD_CACHE_TTL):
+    """
+    Cache a dashboard JSON endpoint's response for `ttl` seconds, keyed by
+    the endpoint, the active company scope, and the exact query string
+    (which covers the from_date/to_date period filter every one of these
+    endpoints accepts).
+
+    Permission is re-checked on every single request, before the cache is
+    even consulted, using the exact same _has_recruitment_permission check
+    the wrapped view also runs internally - so a viewer who lacks access
+    can never be served a cached response computed for someone who has it,
+    regardless of what's sitting in the cache. The wrapped view re-running
+    that same cheap check on a cache hit's absence is redundant but
+    harmless; nothing about the expensive part of any of these views runs
+    before this decorator has already confirmed access.
+    """
+
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            if not _has_recruitment_permission(request):
+                return JsonResponse({"no_permission": True})
+
+            company = request.session.get("selected_company", "all")
+            cache_key = f"rec_dash:{prefix}:{company}:{request.GET.urlencode()}"
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return JsonResponse(cached)
+
+            response = view_func(request, *args, **kwargs)
+            if (
+                isinstance(response, JsonResponse)
+                and response.status_code == 200
+            ):
+                try:
+                    cache.set(cache_key, json.loads(response.content), ttl)
+                except (ValueError, TypeError):
+                    pass
+            return response
+
+        return wrapper
+
+    return decorator
 
 
 def _platform_conversion_widget_enabled(request):
@@ -94,6 +153,7 @@ def recruitment_dashboard_view(request):
 
 
 @login_required
+@cache_dashboard_json("kpi")
 def recruitment_kpi_data(request):
     """Return recruitment KPI summary data as JSON."""
     if not _has_recruitment_permission(request):
@@ -148,6 +208,7 @@ def recruitment_kpi_data(request):
 
 
 @login_required
+@cache_dashboard_json("offer_status")
 def recruitment_offer_status(request):
     """Candidate offer letter status breakdown."""
     if not _has_recruitment_permission(request):
@@ -166,6 +227,7 @@ def recruitment_offer_status(request):
 
 
 @login_required
+@cache_dashboard_json("stage_summary")
 def recruitment_stage_summary(request):
     """Candidates grouped by stage type across all active recruitments."""
     if not _has_recruitment_permission(request):
@@ -186,6 +248,7 @@ def recruitment_stage_summary(request):
 
 
 @login_required
+@cache_dashboard_json("pipeline")
 def recruitment_pipeline_data(request):
     """Hiring pipeline — candidates per stage per recruitment."""
     if not _has_recruitment_permission(request):
@@ -219,6 +282,7 @@ def recruitment_pipeline_data(request):
 
 
 @login_required
+@cache_dashboard_json("source_quality")
 def recruitment_source_quality(request):
     """Top recruitments by hire rate."""
     if not _has_recruitment_permission(request):
@@ -255,6 +319,7 @@ def recruitment_source_quality(request):
 
 
 @login_required
+@cache_dashboard_json("time_to_hire")
 def recruitment_time_to_hire(request):
     """Average time from candidate creation to hired stage, per recruitment."""
     if not _has_recruitment_permission(request):
@@ -297,6 +362,7 @@ def recruitment_time_to_hire(request):
 
 
 @login_required
+@cache_dashboard_json("managers")
 def recruitment_managers_data(request):
     """Ongoing recruitments with their managers."""
     if not _has_recruitment_permission(request):
@@ -322,6 +388,7 @@ def recruitment_managers_data(request):
 
 
 @login_required
+@cache_dashboard_json("upcoming_interviews")
 def recruitment_upcoming_interviews(request):
     """Interviews scheduled within the selected period."""
     if not _has_recruitment_permission(request):
@@ -366,6 +433,7 @@ def recruitment_upcoming_interviews(request):
 
 
 @login_required
+@cache_dashboard_json("open_by_department")
 def recruitment_open_by_department(request):
     """Open positions grouped by department, scoped to recruitments active in the selected period."""
     if not _has_recruitment_permission(request):
@@ -423,6 +491,7 @@ def recruitment_open_by_department(request):
 
 
 @login_required
+@cache_dashboard_json("stage_conversion")
 def recruitment_stage_conversion(request):
     """Funnel conversion rates between stages."""
     if not _has_recruitment_permission(request):
@@ -475,6 +544,7 @@ PLATFORM_CONVERSION_TOP_N = 6
 
 
 @login_required
+@cache_dashboard_json("platform_conversion")
 def recruitment_platform_conversion(request):
     """Hire rate per candidate source (LinkedIn, Indeed, Manual Entry, etc.).
     Powers the "Source Conversion Rate" dashboard widget."""
@@ -554,6 +624,7 @@ def recruitment_platform_conversion(request):
 
 
 @login_required
+@cache_dashboard_json("joinings_monthly")
 def recruitment_joinings_monthly(request):
     """Employee joinings grouped by month within the selected period."""
     if not _has_recruitment_permission(request):
@@ -617,6 +688,7 @@ def recruitment_joinings_monthly(request):
 
 
 @login_required
+@cache_dashboard_json("candidates_by_date")
 def recruitment_candidates_by_date(request):
     """Candidates applied, bucketed by day within the selected period."""
     if not _has_recruitment_permission(request):
@@ -659,6 +731,7 @@ def _candidate_is_assisted(candidate):
 
 
 @login_required
+@cache_dashboard_json("response_status")
 def recruitment_response_status(request):
     """Assisted vs. not-yet-assisted candidates within the period, plus a
     list of the not-yet-assisted ones so recruiters can see exactly who's

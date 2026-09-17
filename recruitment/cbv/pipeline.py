@@ -7,7 +7,7 @@ from typing import Any
 from django.contrib import messages
 from django.core.cache import cache as CACHE
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db.models import F
+from django.db.models import Count, F
 from django.http import HttpResponse, JsonResponse
 from django.urls import reverse, reverse_lazy
 from django.utils.decorators import method_decorator
@@ -29,10 +29,6 @@ from horilla_views.generic.cbv.views import (
 from recruitment import filters, forms, models
 from recruitment.cbv_decorators import manager_can_enter
 from recruitment.decorators import manager_can_enter as fbv_manager_can_enter
-from recruitment.templatetags.recruitmentfilters import (
-    recruitment_manages,
-    stage_manages,
-)
 from recruitment.views import ai_scoring
 from recruitment.views.views import is_recruitmentmanager, is_stagemanager
 
@@ -62,8 +58,10 @@ class RecruitmentTabView(HorillaTabView):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        recruitments = self.filter_class(self.request.GET).qs.filter(
-            is_active=True, closed=False
+        recruitments = list(
+            self.filter_class(self.request.GET).qs.filter(
+                is_active=True, closed=False
+            )
         )
         view_type = self.request.GET.get("view", "card")
         CACHE.set(
@@ -83,9 +81,36 @@ class RecruitmentTabView(HorillaTabView):
         add_cand_perm = self.request.user.has_perm("recruitment.add_candidate")
         delete_perm = self.request.user.has_perm("recruitment.delete_recruitment")
         add_stage_perm = self.request.user.has_perm("recruitment.add_stage")
+
+        # This tab bar isn't paginated (every open recruitment is a tab), so
+        # recruitment_manages/stage_manages/stage count used to run 3-4
+        # queries EACH, per recruitment, on every single load. Bulk-fetch
+        # all three into plain dicts/sets up front instead - 3 queries
+        # total no matter how many recruitments there are.
+        rec_ids = [rec.pk for rec in recruitments]
+        employee = getattr(self.request.user, "employee_get", None)
+        managed_rec_ids = set()
+        stage_managed_rec_ids = set()
+        if employee is not None:
+            managed_rec_ids = set(
+                models.Recruitment.objects.filter(
+                    id__in=rec_ids, recruitment_managers=employee
+                ).values_list("id", flat=True)
+            )
+            stage_managed_rec_ids = set(
+                models.Stage.objects.filter(
+                    recruitment_id__in=rec_ids, stage_managers=employee
+                ).values_list("recruitment_id", flat=True)
+            )
+        stage_counts = dict(
+            models.Stage.objects.filter(recruitment_id__in=rec_ids, is_active=True)
+            .values_list("recruitment_id")
+            .annotate(cnt=Count("id"))
+        )
+
         for rec in recruitments:
-            rec_manager_perm = recruitment_manages(self.request.user, rec)
-            stage_manage_perm = stage_manages(self.request.user, rec)
+            rec_manager_perm = rec.pk in managed_rec_ids
+            stage_manage_perm = rec.pk in stage_managed_rec_ids or rec_manager_perm
             tab = {}
             tab["title"] = rec
             url = reverse("candidate-card-cbv", kwargs={"pk": rec.pk})
@@ -99,7 +124,7 @@ class RecruitmentTabView(HorillaTabView):
 
             self.query_params["view"] = view_type
             tab["badge_label"] = _("Stages")
-            tab["badge"] = rec.stage_set.filter(is_active=True).count()
+            tab["badge"] = stage_counts.get(rec.pk, 0)
             tab["actions"] = []
             if rec_manager_perm or change_perm:
                 if add_stage_perm or rec_manager_perm or change_perm:

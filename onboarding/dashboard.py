@@ -10,14 +10,22 @@ CandidateTask / OnboardingStage / OnboardingTask), which is still fully
 functional but no longer surfaced in the sidebar.
 """
 
+import json
 from datetime import date, timedelta
+from functools import wraps
 
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.shortcuts import render
 
 from horilla.methods import handle_no_permission
+
+# See recruitment/dashboard.py's matching constant/decorator for the full
+# rationale - same problem (every widget recomputed from scratch on every
+# load, multiplying badly under concurrent viewers), same fix.
+DASHBOARD_CACHE_TTL = 45
 
 
 def _has_onboarding_permission(request):
@@ -38,6 +46,53 @@ def _has_onboarding_permission(request):
         )
     except Exception:
         return False
+
+
+def cache_dashboard_json(prefix, ttl=DASHBOARD_CACHE_TTL, per_user=False):
+    """
+    Same approach as recruitment/dashboard.py's cache_dashboard_json:
+    permission is re-checked on every request before the cache is ever
+    consulted, so a viewer without access can never be served a cached
+    response meant for someone who has it.
+
+    Set per_user=True for an endpoint whose data itself (not just the
+    permission to view it) depends on which user is asking - e.g.
+    onboarding_task_managers, which returns the requesting user's own
+    assigned tasks. Getting this wrong the other way (leaving it False for
+    a per-user endpoint) would serve one user's personal data to another,
+    so it isn't just a cache-hit-rate knob.
+    """
+
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            if not _has_onboarding_permission(request):
+                return JsonResponse({"no_permission": True})
+
+            company = request.session.get("selected_company", "all")
+            user_part = f":u{request.user.pk}" if per_user else ""
+            cache_key = (
+                f"onb_dash:{prefix}:{company}{user_part}:"
+                f"{request.GET.urlencode()}"
+            )
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return JsonResponse(cached)
+
+            response = view_func(request, *args, **kwargs)
+            if (
+                isinstance(response, JsonResponse)
+                and response.status_code == 200
+            ):
+                try:
+                    cache.set(cache_key, json.loads(response.content), ttl)
+                except (ValueError, TypeError):
+                    pass
+            return response
+
+        return wrapper
+
+    return decorator
 
 
 def _parse_period(request):
@@ -77,6 +132,7 @@ def onboarding_dashboard_view(request):
 
 
 @login_required
+@cache_dashboard_json("kpi")
 def onboarding_kpi_data(request):
     """Return onboarding KPI summary data as JSON."""
     if not _has_onboarding_permission(request):
@@ -161,6 +217,7 @@ def onboarding_kpi_data(request):
 
 
 @login_required
+@cache_dashboard_json("stage_distribution")
 def onboarding_stage_distribution(request):
     """Candidates by furthest-reached stepper step ("Stepper Progress")."""
     if not _has_onboarding_permission(request):
@@ -191,6 +248,7 @@ def onboarding_stage_distribution(request):
 
 
 @login_required
+@cache_dashboard_json("task_status")
 def onboarding_task_status(request):
     """Task status breakdown."""
     if not _has_onboarding_permission(request):
@@ -211,6 +269,7 @@ def onboarding_task_status(request):
 
 
 @login_required
+@cache_dashboard_json("by_recruitment")
 def onboarding_by_recruitment(request):
     """Candidates onboarding per recruitment."""
     if not _has_onboarding_permission(request):
@@ -236,6 +295,7 @@ def onboarding_by_recruitment(request):
 
 
 @login_required
+@cache_dashboard_json("by_job_position")
 def onboarding_by_job_position(request):
     """Candidates onboarding per job position."""
     if not _has_onboarding_permission(request):
@@ -264,6 +324,7 @@ def onboarding_by_job_position(request):
 
 
 @login_required
+@cache_dashboard_json("candidates_list")
 def onboarding_candidates_list(request):
     """Current onboarding candidates with progress."""
     if not _has_onboarding_permission(request):
@@ -315,6 +376,7 @@ def onboarding_candidates_list(request):
 
 
 @login_required
+@cache_dashboard_json("task_managers", per_user=True)
 def onboarding_task_managers(request):
     """The logged-in user's own assigned checklist tasks, grouped by task title."""
     if not _has_onboarding_permission(request):
@@ -361,6 +423,7 @@ def onboarding_task_managers(request):
 
 
 @login_required
+@cache_dashboard_json("completion_trend")
 def onboarding_completion_trend(request):
     """Monthly onboarding completions within the selected period."""
     if not _has_onboarding_permission(request):
@@ -392,6 +455,7 @@ def onboarding_completion_trend(request):
 
 
 @login_required
+@cache_dashboard_json("portal_status")
 def onboarding_portal_status(request):
     """Portal access status for onboarding candidates within the selected period."""
     if not _has_onboarding_permission(request):

@@ -5,9 +5,12 @@
     {% with avg=instance.candidate_rating.all|avg_rating:instance %}
         {% with avg_int=avg|floatformat:"0" %}
             <div class="d-block mb-0">
-                {# Hidden checked input to extract value #}
+                {# Hidden checked input to extract value - avg is already
+                   computed above, so this reuses it instead of the 5
+                   duplicate avg_rating calls (and the queries each one
+                   used to make) this loop ran before. #}
                 {% for i in "54321" %}
-                    {% if instance.candidate_rating.all|avg_rating:instance == i %}
+                    {% if avg == i %}
                         <input type="hidden" id="final-rating" value="{{ i }}">
                     {% endif %}
                 {% endfor %}

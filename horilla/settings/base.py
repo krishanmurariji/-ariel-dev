@@ -194,6 +194,19 @@ else:
         }
     }
 
+# Reuse a database connection across requests instead of opening (and
+# tearing down) a brand new one for every single request, which is
+# Django's default (CONN_MAX_AGE=0) - a fixed per-request cost that adds
+# up directly with concurrent traffic. setdefault so a DATABASE_URL that
+# already encodes its own conn_max_age (a `?conn_max_age=...` query param)
+# isn't overridden. 0 for sqlite: a single-file DB has no real connection
+# handshake cost to amortize, and long-lived connections don't play well
+# with Django's sqlite backend under concurrent test runs.
+DATABASES["default"].setdefault(
+    "CONN_MAX_AGE",
+    0 if DATABASES["default"]["ENGINE"].endswith("sqlite3") else 600,
+)
+
 # ========================================
 # STATIC & MEDIA FILES
 # ========================================
