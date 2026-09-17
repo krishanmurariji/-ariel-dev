@@ -15,7 +15,7 @@ from datetime import date, timedelta
 from functools import wraps
 
 from django.contrib.auth.decorators import login_required
-from django.core.cache import cache
+from django.core.cache import caches
 from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -63,6 +63,8 @@ def cache_dashboard_json(prefix, ttl=DASHBOARD_CACHE_TTL, per_user=False):
     so it isn't just a cache-hit-rate knob.
     """
 
+    dashboard_cache = caches["dashboard"]
+
     def decorator(view_func):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
@@ -75,7 +77,7 @@ def cache_dashboard_json(prefix, ttl=DASHBOARD_CACHE_TTL, per_user=False):
                 f"onb_dash:{prefix}:{company}{user_part}:"
                 f"{request.GET.urlencode()}"
             )
-            cached = cache.get(cache_key)
+            cached = dashboard_cache.get(cache_key)
             if cached is not None:
                 return JsonResponse(cached)
 
@@ -85,7 +87,7 @@ def cache_dashboard_json(prefix, ttl=DASHBOARD_CACHE_TTL, per_user=False):
                 and response.status_code == 200
             ):
                 try:
-                    cache.set(cache_key, json.loads(response.content), ttl)
+                    dashboard_cache.set(cache_key, json.loads(response.content), ttl)
                 except (ValueError, TypeError):
                     pass
             return response

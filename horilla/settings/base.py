@@ -3,6 +3,7 @@ base.py — Main Django settings for Horilla
 """
 
 import os
+import sys
 from datetime import timedelta
 from os.path import join
 from pathlib import Path
@@ -206,6 +207,52 @@ DATABASES["default"].setdefault(
     "CONN_MAX_AGE",
     0 if DATABASES["default"]["ENGINE"].endswith("sqlite3") else 600,
 )
+
+# ========================================
+# CACHE
+# ========================================
+# No CACHES setting previously existed anywhere in this project, so every
+# cache.get()/cache.set() call was silently falling back to Django's own
+# default - LocMemCache, a real, persistent, process-wide cache - with
+# nothing actually saying so anywhere. Made explicit here so the behavior
+# is visible instead of implicit, and so it can be swapped out for a
+# shared backend (e.g. Redis) later without hunting for where "the
+# cache" is configured, since currently it isn't, anywhere.
+#
+# Two aliases, not one, because the "default" cache isn't only used as an
+# optional speed-up elsewhere in this codebase - some existing code (poll
+# guards, concurrent-trigger guards, login-attempt throttling) uses
+# cache.add() as an actual mutual-exclusion lock, where whether the key
+# already exists is the entire mechanism, not a nice-to-have. That code
+# needs a real, working cache under `manage.py test` same as in
+# production, or its own tests (which deliberately exercise "second
+# caller is blocked while the first still holds the lock") stop meaning
+# anything.
+#
+# The new recruitment/onboarding dashboard.py caching (cache_dashboard_json)
+# is different: purely a performance optimization with no correctness
+# dependency on it actually storing anything, so it gets its own
+# "dashboard" alias that becomes DummyCache under test - implements the
+# full cache API and runs every real code path a request would, it just
+# never actually stores anything, so every get() is a genuine miss and
+# every test computes its own fresh answer. Without this separate alias,
+# a dashboard endpoint's cached response from one test leaked straight
+# into the next test's assertions, which set up entirely different data
+# and expected an entirely different, freshly-computed answer (found via
+# recruitment.tests.test_platform_conversion failing only when run as
+# part of the full suite, never in isolation) - and simply switching
+# "default" itself to DummyCache to fix that broke the lock-style tests
+# instead, the same way it would break the real locks in production.
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    "dashboard": {
+        "BACKEND": (
+            "django.core.cache.backends.dummy.DummyCache"
+            if "test" in sys.argv
+            else "django.core.cache.backends.locmem.LocMemCache"
+        ),
+    },
+}
 
 # ========================================
 # STATIC & MEDIA FILES

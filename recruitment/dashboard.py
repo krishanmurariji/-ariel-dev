@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from functools import wraps
 
 from django.contrib.auth.decorators import login_required
-from django.core.cache import cache
+from django.core.cache import caches
 from django.db.models import Avg, Count, Q
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -60,6 +60,8 @@ def cache_dashboard_json(prefix, ttl=DASHBOARD_CACHE_TTL):
     before this decorator has already confirmed access.
     """
 
+    dashboard_cache = caches["dashboard"]
+
     def decorator(view_func):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
@@ -68,7 +70,7 @@ def cache_dashboard_json(prefix, ttl=DASHBOARD_CACHE_TTL):
 
             company = request.session.get("selected_company", "all")
             cache_key = f"rec_dash:{prefix}:{company}:{request.GET.urlencode()}"
-            cached = cache.get(cache_key)
+            cached = dashboard_cache.get(cache_key)
             if cached is not None:
                 return JsonResponse(cached)
 
@@ -78,7 +80,7 @@ def cache_dashboard_json(prefix, ttl=DASHBOARD_CACHE_TTL):
                 and response.status_code == 200
             ):
                 try:
-                    cache.set(cache_key, json.loads(response.content), ttl)
+                    dashboard_cache.set(cache_key, json.loads(response.content), ttl)
                 except (ValueError, TypeError):
                     pass
             return response
