@@ -1480,11 +1480,21 @@ class CandidateUpdateStatusForm(CandidateMovePipelineForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        if cleaned_data.get("add_to_reject") and not cleaned_data.get("reject_reason_id"):
-            self.add_error(
-                "reject_reason_id",
-                _("Choose at least one reject reason, or uncheck Add to Reject."),
-            )
+        if cleaned_data.get("add_to_reject"):
+            # Both fields stay required=False at the field level (see above)
+            # so a plain move-only submission with Add to Reject unchecked
+            # never trips these - the checkbox itself is what makes them
+            # mandatory, so the check has to live here, not on the fields.
+            if not cleaned_data.get("reject_reason_id"):
+                self.add_error(
+                    "reject_reason_id",
+                    _("Choose at least one reject reason, or uncheck Add to Reject."),
+                )
+            if not cleaned_data.get("description", "").strip():
+                self.add_error(
+                    "description",
+                    _("Add a description, or uncheck Add to Reject."),
+                )
         return cleaned_data
 
 

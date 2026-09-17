@@ -48,6 +48,17 @@
         var checked = $('#id_add_to_reject').is(':checked');
         $rejectReasonRow.toggle(checked);
         $descriptionRow.toggle(checked);
+
+        // Reason/description are required=False at the Django field level
+        // (a plain move-only submit must never be blocked by them), so the
+        // mandatory asterisk and the native browser "required" enforcement
+        // both have to be applied here instead, in sync with the checkbox -
+        // the actual save-blocking check lives server-side in the form's
+        // clean(), this is the matching client-side UX for it.
+        $('label[for="id_reject_reason_id"]').toggleClass('required-star', checked);
+        $('label[for="id_description"]').toggleClass('required-star', checked);
+        $('#id_reject_reason_id').prop('required', checked);
+        $('#id_description').prop('required', checked);
     }
 
     $(document).off('change.updateStatusReject', '#id_add_to_reject')
