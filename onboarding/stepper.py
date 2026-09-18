@@ -815,7 +815,6 @@ def candidate_tasks_tab(request, pk, **kwargs):
 
 
 @login_required
-@hx_request_required
 @permission_required("recruitment.change_candidate")
 def send_portal_status(request, pk):
     """
@@ -825,6 +824,11 @@ def send_portal_status(request, pk):
     manager/buddy/checklist tasks exist at all), or, once it has, a
     Pre-Joining Checklist progress bar - so whoever's about to notify the
     candidate can see what state things are actually in first.
+
+    Called via plain jQuery $.get() (see actions.html / send_mail.html),
+    not htmx, so this deliberately has no @hx_request_required - that
+    decorator would 405 every one of these calls since none of them ever
+    carry an HX-Request header.
     """
     candidate = get_object_or_404(Candidate, pk=pk)
     configured = OnboardingCandidateDetail.objects.filter(candidate_id=candidate).exists()

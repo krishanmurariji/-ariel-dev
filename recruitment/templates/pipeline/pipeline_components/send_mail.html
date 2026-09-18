@@ -1,6 +1,15 @@
 {% load i18n %}
 <div id="ack-message-{{cand.id}}"></div>
 
+{% if cand.hired or cand.stage_id.stage_type == "hired" %}
+<div id="sendMailPortalStatus-{{cand.id}}"></div>
+<script>
+    $.get("{% url 'onboarding-send-portal-status' cand.id %}", function (html) {
+        $("#sendMailPortalStatus-{{cand.id}}").html(html);
+    });
+</script>
+{% endif %}
+
 <div class="oh-modal__dialog-header">
     <span class="oh-modal__dialog-title" id="sendMailModalLabel">
         <h5>{% if cand %}

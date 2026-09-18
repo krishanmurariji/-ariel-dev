@@ -330,7 +330,6 @@
             hx-post="{% url 'add-candidate-note' cand.id %}"
             hx-target="#notesMessages"
             hx-swap="innerHTML"
-            hx-encoding="multipart/form-data"
             id="noteCommentForm"
         >
             {% csrf_token %}
@@ -342,10 +341,6 @@
                 autocomplete="off"
                 placeholder="{% trans 'Add an internal note...' %}"
             ></textarea>
-            <label for="noteFileInput" class="oh-chat-attach" title="{% trans 'Attach file' %}">
-                <i class="fas fa-paperclip"></i>
-            </label>
-            <input type="file" name="note_files" id="noteFileInput" multiple style="display:none;">
             <button type="submit" id="noteCommentButton" class="oh-chat-send" aria-label="{% trans 'Add note' %}" disabled>
                 <i class="fas fa-paper-plane"></i>
             </button>
@@ -355,12 +350,10 @@
                 var textarea = document.getElementById("noteCommentInput");
                 var sendBtn = document.getElementById("noteCommentButton");
                 var form = document.getElementById("noteCommentForm");
-                var fileInput = document.getElementById("noteFileInput");
                 if (!textarea || !form) { return; }
 
                 function refreshSendState() {
-                    var hasFiles = fileInput && fileInput.files && fileInput.files.length > 0;
-                    sendBtn.disabled = textarea.value.trim().length === 0 && !hasFiles;
+                    sendBtn.disabled = textarea.value.trim().length === 0;
                 }
 
                 function autogrow() {
@@ -378,7 +371,6 @@
                         if (!sendBtn.disabled) { form.requestSubmit(); }
                     }
                 });
-                if (fileInput) { fileInput.addEventListener("change", refreshSendState); }
 
                 // The form itself is never replaced (only #notesMessages is,
                 // on every add/delete) - unlike Chat's send form, which gets
@@ -387,7 +379,6 @@
                 form.addEventListener("htmx:afterRequest", function (e) {
                     if (!e.detail.successful) { return; }
                     textarea.value = "";
-                    if (fileInput) { fileInput.value = ""; }
                     autogrow();
                     refreshSendState();
                 });

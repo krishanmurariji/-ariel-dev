@@ -30,12 +30,12 @@
                     <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#333;">
                         {% trans "Your message" %}
                     </p>
-                    <div style="background:#f8f9fb;border-radius:8px;padding:16px 18px;">
-                        <p style="margin:0 0 10px;color:#333;">{% trans "Dear" %} {{ candidate.name }},</p>
+                    <div style="background:#f8f9fb;border-radius:8px;padding:16px 18px;height:480px;display:flex;flex-direction:column;">
+                        <p style="margin:0 0 10px;color:#333;flex:none;">{% trans "Dear" %} {{ candidate.name }},</p>
 
-                        <textarea id="loiMessageInput-{{ candidate.id }}" name="message" required rows="10"
+                        <textarea id="loiMessageInput-{{ candidate.id }}" name="message" required
                             placeholder="{% trans 'Write your message to the candidate here...' %}"
-                            class="oh-input oh-input--textarea w-100" style="resize:vertical;"></textarea>
+                            class="oh-input oh-input--textarea w-100" style="resize:vertical;flex:1 1 auto;min-height:0;"></textarea>
                     </div>
                 </div>
 

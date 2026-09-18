@@ -277,10 +277,8 @@ def _notify_sender_of_response(request, loi_resp):
     job_position = getattr(candidate.job_position_id, "job_position", "") or ""
 
     if accepted:
-        badge_bg, badge_fg, badge_text = "#dcfce7", "#166534", _("Accepted")
         headline = _("Good news - the candidate has accepted")
     else:
-        badge_bg, badge_fg, badge_text = "#fef2f2", "#b91c1c", _("Declined")
         headline = _("The candidate has declined")
 
     details_rows = (
@@ -298,11 +296,7 @@ def _notify_sender_of_response(request, loi_resp):
     )
 
     body_html = (
-        f'<span style="display:inline-block;font-size:11px;font-weight:700;'
-        f'letter-spacing:0.04em;text-transform:uppercase;color:{badge_fg};'
-        f'background:{badge_bg};padding:4px 12px;border-radius:12px;">'
-        f"{badge_text}</span>"
-        f'<h2 style="margin:16px 0 8px;font-size:19px;color:#1a1a1a;">{headline}</h2>'
+        f'<h2 style="margin:0 0 8px;font-size:19px;color:#1a1a1a;">{headline}</h2>'
         f'<p style="margin:0 0 20px;color:#555;">{_("Hi")} '
         f"{escape(sender.get_full_name())}, "
         f'{_("here is a summary of the response to the Letter of Intent you sent.")}</p>'

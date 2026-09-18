@@ -1663,6 +1663,16 @@ class Candidate(HorillaModel):
             context={"instance": self},
         )
 
+    def onboarding_configured_badge(self):
+        """
+        for onboarding configured column - shows whether Configure
+        Onboarding has been done for this candidate yet.
+        """
+        return render_template(
+            path="cbv/onboarding_candidates/onboarding_configured_badge.html",
+            context={"instance": self},
+        )
+
     def rejected_candidate_class(self):
         """
         Returns the appropriate style and title attributes for rejected candidates.

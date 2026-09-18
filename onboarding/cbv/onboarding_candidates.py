@@ -89,6 +89,7 @@ class OnboardingCandidatesList(HorillaListView):
         (_("Job position"), "job_position_id"),
         (_("Recruitment"), "recruitment_id"),
         (_("Offer letter"), "offer_letter"),
+        (_("Onboarding"), "onboarding_configured_badge"),
     ]
     header_attrs = {
         "action": "style='width: 350px;'",
