@@ -669,9 +669,6 @@ class ApplicationForm(RegistrationForm):
         return name
 
     def clean(self, *args, **kwargs):
-        name = self.cleaned_data.get("name")
-        request = getattr(_thread_locals, "request", None)
-
         errors = {}
         profile = self.cleaned_data.get("profile")
         resume = self.cleaned_data.get("resume")
@@ -704,14 +701,6 @@ class ApplicationForm(RegistrationForm):
 
         if errors:
             raise ValidationError(errors)
-
-        if (
-            not profile
-            and request
-            and request.user.has_perm("recruitment.add_candidate")
-        ):
-            profile_pic_url = f"https://ui-avatars.com/api/?name={name}"
-            self.cleaned_data["profile"] = profile_pic_url
 
         super().clean()
         return self.cleaned_data
