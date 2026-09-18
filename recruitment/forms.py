@@ -453,10 +453,6 @@ class CandidateCreationForm(BaseModelForm):
     """
 
     load = forms.CharField(widget=widgets.RecruitmentAjaxWidget, required=False)
-    new_platform = forms.CharField(
-        required=False,
-        label=_("Or type a new source name (e.g. LinkedIn, Indeed)"),
-    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -504,16 +500,14 @@ class CandidateCreationForm(BaseModelForm):
         widgets = {
             "scheduled_date": forms.DateInput(attrs={"type": "date"}),
             "dob": forms.DateInput(attrs={"type": "date"}),
+            "resume": forms.FileInput(),
+        }
+        labels = {
+            "canceled": _("Rejected"),
         }
 
     def save(self, commit: bool = ...):
         candidate = self.instance
-        new_platform = (self.cleaned_data.get("new_platform") or "").strip()
-        if new_platform:
-            platform_obj, _created = Platform.objects.get_or_create(
-                title__iexact=new_platform, defaults={"title": new_platform}
-            )
-            candidate.platform = platform_obj
         recruitment = candidate.recruitment_id
         stage = candidate.stage_id
         candidate.hired = False
@@ -542,13 +536,10 @@ class CandidateCreationForm(BaseModelForm):
 
     def clean(self):
         errors = {}
-        profile = self.cleaned_data["profile"]
         resume = self.cleaned_data["resume"]
         recruitment: Recruitment = self.cleaned_data["recruitment_id"]
         if not resume and not recruitment.optional_resume:
             errors["resume"] = _("This field is required")
-        if not profile and not recruitment.optional_profile_image:
-            errors["profile"] = _("This field is required")
         if self.instance.name is not None:
             self.errors.pop("job_position_id", None)
             if (

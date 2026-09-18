@@ -3,7 +3,7 @@
 
 <div class="row">
     {% for field in form %}
-        {% if field.name != 'profile' and field.name != 'country' and field.name != 'state' and field.name != 'badge_id' %}
+        {% if field.name != 'profile' and field.name != 'country' and field.name != 'state' and field.name != 'badge_id' and field.name != 'resume' %}
             <div class="col-lg-6">
                 <div class="oh-input__group">
                     <label class="oh-label {% if field.field.required %}required-star{% endif %}" for="{{field.id_for_label}}"
@@ -17,6 +17,22 @@
                         {{ field|add_class:'form-control' }}
                     {% endif %}
 
+                    {{ field.errors }}
+                </div>
+            </div>
+        {% elif field.name == 'resume' %}
+            <div class="col-lg-6">
+                <div class="oh-input__group">
+                    <label class="oh-label {% if field.field.required %}required-star{% endif %}" for="{{field.id_for_label}}"
+                        title="{{ field.help_text }}">
+                        {{ field.label }}
+                        {% if form.instance.resume %}
+                            <a href="{{ form.instance.resume.url }}" target="_blank" rel="noopener" title="{% trans 'View resume' %}">
+                                <ion-icon name="eye-outline"></ion-icon>
+                            </a>
+                        {% endif %}
+                    </label>
+                    {{ field|add_class:'form-control' }}
                     {{ field.errors }}
                 </div>
             </div>
@@ -42,38 +58,3 @@
         {% endif %}
     {% endfor %}
 </div>
-<script>
-  (function () {
-    var CREATE_VALUE = "__create_new__";
-    var platformSelect = document.getElementById("{{ form.platform.id_for_label }}");
-    var newPlatformInput = document.getElementById("{{ form.new_platform.id_for_label }}");
-    if (!platformSelect || !newPlatformInput) {
-      return;
-    }
-    var newPlatformGroup = newPlatformInput.closest(".oh-input__group") || newPlatformInput.closest(".col-lg-6");
-
-    if (!platformSelect.querySelector('option[value="' + CREATE_VALUE + '"]')) {
-      var createOption = document.createElement("option");
-      createOption.value = CREATE_VALUE;
-      createOption.textContent = "{% trans 'Create New Source' %}";
-      platformSelect.appendChild(createOption);
-    }
-
-    function syncPlatformMode() {
-      var isCreate = platformSelect.value === CREATE_VALUE;
-      if (newPlatformGroup) {
-        newPlatformGroup.style.display = isCreate ? "" : "none";
-      }
-      // A real Platform pk must reach the "platform" field, so the select
-      // is only submitted under that name when it holds a real choice -
-      // otherwise "__create_new__" would fail ModelChoiceField validation.
-      platformSelect.name = isCreate ? "" : "platform";
-      if (isCreate) {
-        newPlatformInput.value = "";
-      }
-    }
-
-    platformSelect.addEventListener("change", syncPlatformMode);
-    syncPlatformMode();
-  })();
-</script>
