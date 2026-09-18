@@ -21,7 +21,18 @@
        (colors, the dotted background, bubble styling) are left to
        chat.css - a delay there is invisible, never a broken layout. */
     .oh-chat-card { display: flex; flex-direction: column; overflow: hidden; }
-    .oh-chat-header-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 auto; }
+    .oh-chat-header { justify-content: space-between; }
+    .oh-chat-header-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
+    .oh-chat-header-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex: none; }
+    .oh-chat-header-avatar--initials {
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.8rem; font-weight: 700; color: var(--oh-chat-accent, #E54F38);
+        background: color-mix(in srgb, var(--oh-chat-accent, #E54F38) 15%, #fff);
+    }
+    .oh-chat-header-name { font-size: 0.9rem; font-weight: 700; color: #1c1c1c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .oh-chat-header-right { display: flex; align-items: center; gap: 16px; flex: none; }
+    .oh-chat-header-close { cursor: pointer; color: #8a8f98; display: flex; align-items: center; font-size: 1.2rem; }
+    .oh-chat-header-close:hover { color: var(--oh-chat-accent, #E54F38); }
     .oh-chat-tabs { display: flex; align-items: center; gap: 16px; }
     .oh-chat-tab { border: none; background: transparent; padding: 0; margin: 0; font-size: 0.92rem; font-weight: 700; color: #9aa0a6; cursor: pointer; }
     .oh-chat-tab--active { color: var(--oh-chat-accent, #E54F38); }
@@ -31,18 +42,15 @@
 </style>
 <div class="oh-chat-card" id="pipelineChatCard" style="height: calc(100vh - 90px); --oh-chat-accent: {{ theme_obj.primary_600|default:'#E54F38' }}; --oh-chat-accent-hover: {{ theme_obj.primary_700|default:'#cf4530' }};">
     <div class="oh-chat-header">
-        <a
-            style="cursor: pointer"
-            onclick="$('.oh-activity-sidebar--show').removeClass('oh-activity-sidebar--show'); if (window.__ohChatCloseCurrent) { window.__ohChatCloseCurrent(); }"
-        >
-            <ion-icon
-                name="chevron-forward-outline"
-                class="oh-activity-sidebar__header-icon me-2 oh-activity-sidebar__close"
-                data-target="#activitySidebar"
-            ></ion-icon>
-        </a>
-        <i class="fas fa-comments"></i>
-        <div class="oh-chat-header-info">
+        <div class="oh-chat-header-left">
+            {% if cand.profile_thumbnail or cand.profile %}
+            <img src="{{ cand.get_avatar }}" alt="{{ cand }}" class="oh-chat-header-avatar">
+            {% else %}
+            <span class="oh-chat-header-avatar oh-chat-header-avatar--initials">{{ cand.name|initials }}</span>
+            {% endif %}
+            <span class="oh-chat-header-name">{{ cand }}</span>
+        </div>
+        <div class="oh-chat-header-right">
             <div class="oh-chat-tabs" role="tablist">
                 <button type="button" class="oh-chat-tab oh-chat-tab--active" id="chatTabBtn" role="tab" aria-selected="true" onclick="showCandidateChatTab('chat')">
                     {% trans "Chat" %}
@@ -59,7 +67,16 @@
                 </button>
                 {% endif %}
             </div>
-            <span>{{ cand }}</span>
+            <a
+                class="oh-chat-header-close"
+                onclick="$('.oh-activity-sidebar--show').removeClass('oh-activity-sidebar--show'); if (window.__ohChatCloseCurrent) { window.__ohChatCloseCurrent(); }"
+            >
+                <ion-icon
+                    name="close-outline"
+                    class="oh-activity-sidebar__close"
+                    data-target="#activitySidebar"
+                ></ion-icon>
+            </a>
         </div>
     </div>
 
@@ -300,7 +317,7 @@
 
     <div class="oh-chat-pane" id="notesPane" style="display:none;">
         <div class="oh-chat-body" id="notesBody">
-            <div id="notesMessages">
+            <div id="notesMessages" class="oh-chat-messages">
                 <div class="oh-chat-empty">
                     <h6>{% trans "Loading notes..." %}</h6>
                 </div>

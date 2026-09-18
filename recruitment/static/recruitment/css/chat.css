@@ -51,16 +51,25 @@ color.
 .oh-chat-header h3 { margin: 0; font-size: 0.98rem; font-weight: 700; color: #1c1c1c; }
 .oh-chat-header span { font-size: 0.74rem; color: #8a8f98; }
 
-/* Chat/Notes live in the header itself, next to the candidate's name,
-   rather than as a second full-width row below it - one compact block,
-   not two stacked bars competing for the panel's limited height. */
-.oh-chat-header-info {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    min-width: 0;
-    flex: 1 1 auto;
+/* Recruiter pipeline chat/notes header only (view_note.html) - the other
+   two chat surfaces (candidate portal, candidate profile tab) use the
+   plain icon+h3+span layout above and never render these classes, so
+   .oh-chat-header itself keeps its shared align-items/gap rule above;
+   justify-content: space-between for this two-half layout is set locally
+   in view_note.html's own <style> block instead of here, since setting
+   it on the shared selector would push those other two surfaces' icon
+   and text apart with a gap neither of them wants. */
+.oh-chat-header-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
+.oh-chat-header-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex: none; }
+.oh-chat-header-avatar--initials {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; font-weight: 700; color: var(--oh-chat-accent, #E54F38);
+    background: color-mix(in srgb, var(--oh-chat-accent, #E54F38) 15%, #fff);
 }
+.oh-chat-header-name { font-size: 0.9rem; font-weight: 700; color: #1c1c1c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.oh-chat-header-right { display: flex; align-items: center; gap: 16px; flex: none; }
+.oh-chat-header-close { cursor: pointer; color: #8a8f98; display: flex; align-items: center; font-size: 1.2rem; }
+.oh-chat-header-close:hover { color: var(--oh-chat-accent, #E54F38); }
 .oh-chat-tabs {
     display: flex;
     align-items: center;

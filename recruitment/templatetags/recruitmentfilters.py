@@ -221,3 +221,17 @@ def chat_date_label(value):
     if delta == 1:
         return _("Yesterday")
     return date_format(message_date, "d M Y")
+
+
+@register.filter(name="initials")
+def initials(name):
+    """
+    Up to 2 uppercase initials from a display name (first + last word),
+    for a text-avatar fallback when there's no profile photo.
+    """
+    words = (name or "").split()
+    if not words:
+        return ""
+    if len(words) == 1:
+        return words[0][:2].upper()
+    return (words[0][0] + words[-1][0]).upper()
