@@ -1,0 +1,27 @@
+{% load i18n %}
+<form
+    hx-post="{% url 'candidate-bulk-add-to-skill-zone' %}"
+    hx-target="#genericModalBody"
+    hx-swap="innerHTML"
+>
+    {% csrf_token %}
+    <input type="hidden" name="ids" value='{{ ids }}'>
+    {% if candidates %}
+    <p class="oh-help-text mb-3">
+        {% blocktrans count counter=candidates|length %}
+        Adding {{ counter }} selected candidate to the chosen skill zone(s).
+        {% plural %}
+        Adding {{ counter }} selected candidates to the chosen skill zone(s).
+        {% endblocktrans %}
+    </p>
+    {% endif %}
+    {{ form.as_p }}
+    <div class="d-flex flex-row-reverse">
+        <button type="submit" class="oh-btn oh-btn--secondary mt-2">
+            {% trans "Save" %}
+        </button>
+    </div>
+</form>
+<script>
+    $("#genericModalBody select").select2({ width: "100%" });
+</script>

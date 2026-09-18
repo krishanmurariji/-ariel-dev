@@ -95,18 +95,20 @@ class CurrentHiringList(HorillaListView):
 
     columns = [
         (_("Job Positions"), "job_position"),
-        (_("Initial"), "initial_count"),
-        (_("Test"), "test_count"),
+        (_("Applied"), "applied_count"),
+        (_("Screening"), "screening_count"),
         (_("Interview"), "interview_count"),
+        (_("Offered"), "offered_count"),
         (_("Hired"), "hired_count"),
-        (_("Cancelled"), "cancelled_count"),
+        (_("Rejected & Cancelled"), "cancelled_count"),
     ]
 
     header_attrs = {
         "job_position": """ style = "width:100px !important " """,
-        "initial_count": """ style = "width:55px !important" """,
-        "test_count": """ style = "width:55px !important;" """,
+        "applied_count": """ style = "width:55px !important" """,
+        "screening_count": """ style = "width:55px !important;" """,
         "interview_count": """ style = "width:60px !important" """,
+        "offered_count": """ style = "width:55px !important" """,
         "hired_count": """ style = "width:55px !important" """,
         "cancelled_count": """ style = "width:65px !important" """,
     }
@@ -114,14 +116,17 @@ class CurrentHiringList(HorillaListView):
     def get_queryset(self):
         queryset = super().get_queryset()
         queryset = queryset.annotate(
-            initial_count=Count(
-                "candidate", filter=Q(candidate__stage_id__stage_type="initial")
+            applied_count=Count(
+                "candidate", filter=Q(candidate__stage_id__stage_type="applied")
             ),
-            test_count=Count(
-                "candidate", filter=Q(candidate__stage_id__stage_type="test")
+            screening_count=Count(
+                "candidate", filter=Q(candidate__stage_id__stage_type="screening")
             ),
             interview_count=Count(
                 "candidate", filter=Q(candidate__stage_id__stage_type="interview")
+            ),
+            offered_count=Count(
+                "candidate", filter=Q(candidate__stage_id__stage_type="offered")
             ),
             hired_count=Count(
                 "candidate", filter=Q(candidate__stage_id__stage_type="hired")

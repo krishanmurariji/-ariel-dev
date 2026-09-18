@@ -83,7 +83,7 @@ class StageList(HorillaListView):
         ),
         (
             "cancelled--dot",
-            _("Cancelled"),
+            _("Rejected & Cancelled"),
             """
             onclick="
                  $('#applyFilter').closest('form').find('[name=stage_type]').val('cancelled');
@@ -101,19 +101,19 @@ class StageList(HorillaListView):
             """,
         ),
         (
-            "test--dot",
-            _("Test"),
+            "offered--dot",
+            _("Offered"),
             """
-            onclick=" $('#applyFilter').closest('form').find('[name=stage_type]').val('test');
+            onclick=" $('#applyFilter').closest('form').find('[name=stage_type]').val('offered');
                 $('#applyFilter').click();
             "
             """,
         ),
         (
-            "initial--dot",
-            _("Initial"),
+            "screening--dot",
+            _("Screening"),
             """
-            onclick=" $('#applyFilter').closest('form').find('[name=stage_type]').val('initial');
+            onclick=" $('#applyFilter').closest('form').find('[name=stage_type]').val('screening');
                 $('#applyFilter').click();
             "
             """,

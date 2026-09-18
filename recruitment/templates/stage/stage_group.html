@@ -41,7 +41,7 @@
       class="oh-dot oh-dot--small me-1"
       style="background-color: red"
     ></span>
-    {% trans "cancelled" %}
+    {% trans "Rejected & Cancelled" %}
   </span>
   <span
     class="m-1"
@@ -56,25 +56,25 @@
   </span>
   <span
     class="m-1"
-    onclick="$('[name=stage_type]').val('test'); $('[name=stage_type]').first().change(); $('.filterButton').click()"
+    onclick="$('[name=stage_type]').val('offered'); $('[name=stage_type]').first().change(); $('.filterButton').click()"
     style="cursor: pointer; margin-left: 10px"
   >
     <span
       class="oh-dot oh-dot--small me-1"
-      style="background-color: blue"
+      style="background-color: gold"
     ></span>
-    {% trans "Test" %}
+    {% trans "Offered" %}
   </span>
   <span
     class="m-1"
-    onclick="$('[name=stage_type]').val('initial'); $('[name=stage_type]').first().change(); $('.filterButton').click()"
+    onclick="$('[name=stage_type]').val('screening'); $('[name=stage_type]').first().change(); $('.filterButton').click()"
     style="cursor: pointer; margin-left: 10px"
   >
     <span
       class="oh-dot oh-dot--small me-1"
-      style="background-color: cyan"
+      style="background-color: teal"
     ></span>
-    {% trans "Initial" %}
+    {% trans "Screening" %}
   </span>
 </div>
 <!-- end of quick filters -->

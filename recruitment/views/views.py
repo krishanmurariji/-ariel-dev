@@ -1657,7 +1657,7 @@ def candidate(request):
             candidate_obj.start_onboard = False
             if candidate_obj.stage_id is None:
                 candidate_obj.stage_id = Stage.objects.filter(
-                    recruitment_id=candidate_obj.recruitment_id, stage_type="initial"
+                    recruitment_id=candidate_obj.recruitment_id, stage_type="applied"
                 ).first()
             # when creating new candidate from onboarding view
             if request.GET.get("onboarding") == "True":
@@ -2226,7 +2226,7 @@ def candidate_update(request, cand_id, **kwargs):
                 if candidate_obj.stage_id is None:
                     candidate_obj.stage_id = Stage.objects.filter(
                         recruitment_id=candidate_obj.recruitment_id,
-                        stage_type="initial",
+                        stage_type="applied",
                     ).first()
                 if candidate_obj.stage_id is not None:
                     if (
@@ -2235,7 +2235,7 @@ def candidate_update(request, cand_id, **kwargs):
                     ):
                         candidate_obj.stage_id = (
                             candidate_obj.recruitment_id.stage_set.filter(
-                                stage_type="initial"
+                                stage_type="applied"
                             ).first()
                         )
                 if _query_param_truthy(request.GET, "onboarding"):
@@ -2510,6 +2510,7 @@ def interview_schedule(request, cand_id):
         if form.is_valid():
             form.save()
             emp_ids = form.cleaned_data["employee_id"]
+            optional_emp_ids = form.cleaned_data.get("optional_interviewers") or []
             cand_id = form.cleaned_data["candidate_id"]
             interview_date = form.cleaned_data["interview_date"]
             interview_time = form.cleaned_data["interview_time"]
@@ -2525,6 +2526,21 @@ def interview_schedule(request, cand_id):
                 icon="people-circle",
                 redirect=reverse("interview-view"),
             )
+            optional_users = [
+                employee.employee_user_id for employee in optional_emp_ids
+            ]
+            if optional_users:
+                notify.send(
+                    request.user.employee_get,
+                    recipient=optional_users,
+                    verb=f"You are added as an optional interviewer for an interview with {cand_id.name} on {interview_date} at {interview_time}.",
+                    verb_ar=f"تمت إضافتك كمقابل اختياري لمقابلة مع {cand_id.name} يوم {interview_date} في توقيت {interview_time}.",
+                    verb_de=f"Sie wurden als optionaler Interviewer für ein Interview mit {cand_id.name} am {interview_date} um {interview_time} hinzugefügt.",
+                    verb_es=f"Has sido añadido como entrevistador opcional para una entrevista con {cand_id.name} el {interview_date} a las {interview_time}.",
+                    verb_fr=f"Vous avez été ajouté comme intervieweur optionnel pour un entretien avec {cand_id.name} le {interview_date} à {interview_time}.",
+                    icon="people-circle",
+                    redirect=reverse("interview-view"),
+                )
 
             messages.success(request, "Interview Scheduled successfully.")
             return HorillaRedirect(request)
@@ -2549,6 +2565,7 @@ def create_interview_schedule(request):
         if form.is_valid():
             form.save()
             emp_ids = form.cleaned_data["employee_id"]
+            optional_emp_ids = form.cleaned_data.get("optional_interviewers") or []
             cand_id = form.cleaned_data["candidate_id"]
             interview_date = form.cleaned_data["interview_date"]
             interview_time = form.cleaned_data["interview_time"]
@@ -2564,6 +2581,21 @@ def create_interview_schedule(request):
                 icon="people-circle",
                 redirect=reverse("interview-view"),
             )
+            optional_users = [
+                employee.employee_user_id for employee in optional_emp_ids
+            ]
+            if optional_users:
+                notify.send(
+                    request.user.employee_get,
+                    recipient=optional_users,
+                    verb=f"You are added as an optional interviewer for an interview with {cand_id.name} on {interview_date} at {interview_time}.",
+                    verb_ar=f"تمت إضافتك كمقابل اختياري لمقابلة مع {cand_id.name} يوم {interview_date} في توقيت {interview_time}.",
+                    verb_de=f"Sie wurden als optionaler Interviewer für ein Interview mit {cand_id.name} am {interview_date} um {interview_time} hinzugefügt.",
+                    verb_es=f"Has sido añadido como entrevistador opcional para una entrevista con {cand_id.name} el {interview_date} a las {interview_time}.",
+                    verb_fr=f"Vous avez été ajouté comme intervieweur optionnel pour un entretien avec {cand_id.name} le {interview_date} à {interview_time}.",
+                    icon="people-circle",
+                    redirect=reverse("interview-view"),
+                )
 
             messages.success(request, "Interview Scheduled successfully.")
     return render(request, template, {"form": form})

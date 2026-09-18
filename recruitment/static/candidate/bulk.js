@@ -184,6 +184,31 @@ $("#unArchiveCandidates").click(function (e) {
     }
 });
 
+$("#addToSkillZoneCandidates").click(function (e) {
+    e.preventDefault();
+
+    ids = [];
+    ids.push($("#selectedInstances").attr("data-ids"));
+    ids = JSON.parse($("#selectedInstances").attr("data-ids"));
+    if (ids.length === 0) {
+        Swal.fire({
+            text: i18nMessages.noRowsSelected,
+            icon: "warning",
+            confirmButtonText: i18nMessages.close,
+        });
+    } else {
+        $.ajax({
+            type: "GET",
+            url: "/recruitment/candidate-bulk-add-to-skill-zone/",
+            data: { ids: JSON.stringify(ids) },
+            success: function (response) {
+                $("#genericModalBody").html(response);
+                $("#genericModal").addClass("oh-modal--show");
+            },
+        });
+    }
+});
+
 $("#deleteCandidates").click(function (e) {
     e.preventDefault();
 

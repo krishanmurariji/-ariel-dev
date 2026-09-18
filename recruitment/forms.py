@@ -1737,6 +1737,7 @@ class ScheduleInterviewForm(BaseModelForm):
         "candidate_id": 12,
         "description": 12,
         "employee_id": 12,
+        "optional_interviewers": 12,
         "interview_mode": 12,
     }
 
@@ -1759,6 +1760,25 @@ class ScheduleInterviewForm(BaseModelForm):
             "widgets/interview_mode_radio.html"
         )
         self.fields["interview_mode"].initial = "online"
+        # Unlike "Interviewer" (employee_id), which is narrowed to this
+        # candidate's recruitment/stage managers via the htmx-refreshed
+        # candidate/interview_form.html partial, this is meant to let the
+        # scheduler pull in anyone else in the company (e.g. a hiring
+        # manager who wants visibility but isn't a required interviewer),
+        # so it stays a full, searchable employee picker instead.
+        self.fields["optional_interviewers"] = HorillaMultiSelectField(
+            queryset=Employee.objects.filter(is_active=True),
+            required=False,
+            widget=HorillaMultiSelectWidget(
+                filter_route_name="employee-widget-filter",
+                filter_class=EmployeeFilter,
+                filter_instance_context_name="f",
+                filter_template_path="employee_filters.html",
+                required=False,
+            ),
+            label=_("Optional Interviewers"),
+        )
+        self.fields["optional_interviewers"].required = False
         if self.instance.pk:
             # Update mode: keep this permissive and normalize manually in clean()
             # so unchanged browser values do not fail with "Enter a valid time".
@@ -1791,6 +1811,8 @@ class ScheduleInterviewForm(BaseModelForm):
         self.fields["candidate_id"].widget.attrs.update(candidate_attr)
 
     def clean(self):
+        if isinstance(self.fields.get("optional_interviewers"), HorillaMultiSelectField):
+            self.errors.pop("optional_interviewers", None)
 
         instance = self.instance
         cleaned_data = super().clean() or {}
@@ -1861,6 +1883,28 @@ class ScheduleInterviewForm(BaseModelForm):
         context = {"form": self}
         table_html = render_to_string("common_form.html", context)
         return table_html
+
+
+class BulkToSkillZoneForm(forms.Form):
+    """
+    Adds every candidate selected on the candidate list to one or more
+    skill zones at once, mirroring ToSkillZoneForm's fields for a single
+    candidate.
+    """
+
+    verbose_name = "Add To Skill Zone"
+    skill_zone_ids = forms.ModelMultipleChoiceField(
+        queryset=SkillZone.objects.all(),
+        label=_("Skill Zones"),
+        widget=forms.SelectMultiple(attrs={"class": "oh-select oh-select-2 w-100"}),
+    )
+    reason = forms.CharField(
+        required=False,
+        label=_("Reason"),
+        widget=forms.Textarea(attrs={"class": "oh-input w-100", "rows": 3}),
+    )
+
+    cols = {"reason": 12, "skill_zone_ids": 12}
 
 
 class SkillsForm(ModelForm):

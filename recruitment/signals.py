@@ -13,25 +13,32 @@ from recruitment.models import (
 )
 
 
+DEFAULT_STAGES = [
+    ("Applied", "applied"),
+    ("Screening", "screening"),
+    ("1 Round Interview", "interview"),
+    ("2 Round Interview", "interview"),
+    ("3 Round Interview", "interview"),
+    ("Offered", "offered"),
+    ("Hired", "hired"),
+    ("Rejected", "cancelled"),
+]
+
+
 @receiver(post_save, sender=Recruitment)
 def create_initial_stage(sender, instance, created, **kwargs):
     """
-    This is post save method, used to create initial stage for the recruitment
+    This is post save method, used to create the default pipeline stages
+    for a newly created recruitment.
     """
     if created:
-        applied_stage = Stage()
-        applied_stage.sequence = 0
-        applied_stage.recruitment_id = instance
-        applied_stage.stage = "Applied"
-        applied_stage.stage_type = "applied"
-        applied_stage.save()
-
-        initial_stage = Stage()
-        initial_stage.sequence = 1
-        initial_stage.recruitment_id = instance
-        initial_stage.stage = "Initial"
-        initial_stage.stage_type = "initial"
-        initial_stage.save()
+        for sequence, (stage_name, stage_type) in enumerate(DEFAULT_STAGES):
+            Stage.objects.create(
+                sequence=sequence,
+                recruitment_id=instance,
+                stage=stage_name,
+                stage_type=stage_type,
+            )
 
 
 @receiver(post_save, sender=Candidate)

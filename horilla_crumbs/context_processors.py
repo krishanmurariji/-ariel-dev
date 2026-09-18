@@ -48,6 +48,7 @@ BREADCRUMB_URL_NAMES = {
     "pay-revisions": "Pay Revisions",
     "run": "Run Payroll",
     "my-finance": "My Finance",
+    "cbv-pipeline": "Recruitment Pipeline",
 }
 
 sidebar_urls = [

@@ -532,12 +532,12 @@ class Stage(HorillaModel):
     """
 
     stage_types = [
-        ("initial", _("Initial")),
         ("applied", _("Applied")),
-        ("test", _("Test")),
+        ("screening", _("Screening")),
         ("interview", _("Interview")),
-        ("cancelled", _("Cancelled")),
+        ("offered", _("Offered")),
         ("hired", _("Hired")),
+        ("cancelled", _("Rejected & Cancelled")),
     ]
     recruitment_id = models.ForeignKey(
         Recruitment,
@@ -647,15 +647,7 @@ class Stage(HorillaModel):
         """
         Display type
         """
-        stage_types = [
-            ("initial", _("Initial")),
-            ("test", _("Test")),
-            ("interview", _("Interview")),
-            ("cancelled", _("Cancelled")),
-            ("hired", _("Hired")),
-        ]
-
-        return dict(stage_types).get(self.stage_type)
+        return dict(Stage.stage_types).get(self.stage_type)
 
     def get_stage_update_url(self):
         """
@@ -2397,6 +2389,16 @@ class InterviewSchedule(HorillaModel):
         on_delete=models.CASCADE,
     )
     employee_id = models.ManyToManyField(Employee, verbose_name=_("Interviewer"))
+    optional_interviewers = models.ManyToManyField(
+        Employee,
+        blank=True,
+        related_name="optional_interview_schedules",
+        verbose_name=_("Optional Interviewers"),
+        help_text=_(
+            "Anyone else who should be looped in on this interview without "
+            "being a required interviewer."
+        ),
+    )
     interview_date = models.DateField(verbose_name=_("Interview Date"))
     interview_time = models.TimeField(verbose_name=_("Interview Time"))
     interview_mode = models.CharField(

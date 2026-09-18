@@ -51,6 +51,20 @@ class HorillaMultiSelectWidget(forms.Widget):
 
     template_name = "horilla_widgets/horilla_multiselect_widget.html"
 
+    def value_from_datadict(self, data, files, name):
+        # The rendered widget is a real <select multiple>, which submits one
+        # name=value pair per selected option - plain Widget.value_from_datadict
+        # (inherited by default) only ever returns the LAST one via data.get(),
+        # so ModelMultipleChoiceField.clean() always saw a bare string instead
+        # of a list and rejected it as invalid, silently dropping every
+        # selection (masked by the "pop the error" pattern every form using
+        # this widget already applies in its own clean()). getlist() is what
+        # forms.SelectMultiple itself uses for exactly this reason.
+        getter = getattr(data, "getlist", None)
+        if getter is not None:
+            return getter(name)
+        return data.get(name)
+
     def get_context(self, name, value, attrs):
         # Get the default context from the parent class
         context = super().get_context(name, value, attrs)

@@ -432,6 +432,11 @@ urlpatterns = [
         name="candidate-bulk-archive",
     ),
     path(
+        "candidate-bulk-add-to-skill-zone/",
+        actions.candidate_bulk_add_to_skill_zone,
+        name="candidate-bulk-add-to-skill-zone",
+    ),
+    path(
         "candidate-history/<int:cand_id>/",
         views.candidate_history,
         name="candidate-history",

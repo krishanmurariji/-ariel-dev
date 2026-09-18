@@ -155,19 +155,20 @@ class RecruitmentTabView(HorillaTabView):
                         },
                     )
 
-                if add_cand_perm or rec_manager_perm or change_perm:
-                    tab["actions"].append(
-                        {
-                            "action": _("Resume Shortlisting"),
-                            "attrs": f"""
-                                data-toggle="oh-modal-toggle"
-                                data-target="#bulkResumeUpload"
-                                hx-get="{reverse('view-bulk-resume')}?rec_id={rec.pk}"
-                                hx-target="#bulkResumeUploadBody"
-                                style="cursor: pointer;"
-                            """,
-                        },
-                    )
+                # Resume Shortlisting is disabled - not currently in use.
+                # if add_cand_perm or rec_manager_perm or change_perm:
+                #     tab["actions"].append(
+                #         {
+                #             "action": _("Resume Shortlisting"),
+                #             "attrs": f"""
+                #                 data-toggle="oh-modal-toggle"
+                #                 data-target="#bulkResumeUpload"
+                #                 hx-get="{reverse('view-bulk-resume')}?rec_id={rec.pk}"
+                #                 hx-target="#bulkResumeUploadBody"
+                #                 style="cursor: pointer;"
+                #             """,
+                #         },
+                #     )
 
                 if add_stage_perm or rec_manager_perm or change_perm:
                     tab["actions"].append(
@@ -357,17 +358,6 @@ class CandidateList(HorillaListView):
             """,
         },
         {
-            "action": _("Send Mail"),
-            "icon": "mail-open-outline",
-            "attrs": """
-                class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100"
-                hx-get = "{get_send_mail}"
-                data-toggle="oh-modal-toggle"
-                data-target="#objectDetailsModal"
-                hx-target="#objectDetailsModalTarget"
-            """,
-        },
-        {
             "action": _("Send LOI"),
             "icon": "document-text-outline",
             "attrs": """
@@ -379,29 +369,7 @@ class CandidateList(HorillaListView):
             """,
         },
         {
-            "action": _("Add to Skill Zone"),
-            "icon": "heart-circle-outline",
-            "attrs": """
-                class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100 disabled"
-                data-toggle="oh-modal-toggle"
-                hx-get="{get_skill_zone_url}"
-                data-target="#genericModal"
-                hx-target="#genericModalBody"
-            """,
-        },
-        {
-            "action": _("Chat"),
-            "icon": "chatbubbles-outline",
-            "attrs": """
-                class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100 oh-activity-sidebar__open"
-                hx-get="{get_view_note_url}"
-                data-target="#activitySidebar"
-                hx-target="#activitySidebar"
-                onclick="$('#activitySidebar').addClass('oh-activity-sidebar--show')"
-            """,
-        },
-        {
-            "action": _("Document Request"),
+            "action": _("Request Document"),
             "icon": "document-attach-outline",
             "attrs": """
                 hx-get="{get_document_request}"
@@ -409,14 +377,6 @@ class CandidateList(HorillaListView):
                 hx-target="#genericModalBody"
                 class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100"
                 data-toggle="oh-modal-toggle"
-            """,
-        },
-        {
-            "action": _("Resume"),
-            "icon": "document-outline",
-            "attrs": """
-                class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100"
-                href="{get_resume_url}" target="_blank"
             """,
         },
         {
@@ -429,6 +389,17 @@ class CandidateList(HorillaListView):
                 data-toggle="oh-modal-toggle"
                 data-target="#genericModal"
                 hx-target="#genericModalBody"
+            """,
+        },
+        {
+            "action": _("Chat & Notes"),
+            "icon": "chatbubbles-outline",
+            "attrs": """
+                class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100 oh-activity-sidebar__open"
+                hx-get="{get_view_note_url}"
+                data-target="#activitySidebar"
+                hx-target="#activitySidebar"
+                onclick="$('#activitySidebar').addClass('oh-activity-sidebar--show')"
             """,
         },
     ]
@@ -575,15 +546,6 @@ class CandidateCard(HorillaKanbanView):
             """,
         },
         {
-            "action": _("Send Mail"),
-            "attrs": """
-                hx-get = "{get_send_mail}"
-                data-toggle="oh-modal-toggle"
-                data-target="#objectDetailsModal"
-                hx-target="#objectDetailsModalTarget"
-            """,
-        },
-        {
             "action": _("Send LOI"),
             "attrs": """
                 hx-get="{get_send_loi_url}"
@@ -593,27 +555,7 @@ class CandidateCard(HorillaKanbanView):
             """,
         },
         {
-            "action": "Add to Skill Zone",
-            "accessibility": "recruitment.cbv.accessibility.add_skill_zone",
-            "attrs": """
-                data-toggle="oh-modal-toggle"
-                data-target="#genericModal"
-                hx-get="{get_add_to_skill}"
-                hx-target="#genericModalBody"
-                class="oh-dropdown__link"
-
-            """,
-        },
-        {
-            "action": "View candidate self tracking",
-            "accessibility": "recruitment.cbv.accessibility.check_candidate_self_tracking",
-            "attrs": """
-                href="{get_self_tracking_url}"
-                class="oh-dropdown__link"
-            """,
-        },
-        {
-            "action": "Request Document",
+            "action": _("Request Document"),
             "accessibility": "recruitment.cbv.accessibility.request_document",
             "attrs": """
                 data-toggle="oh-modal-toggle"
@@ -635,33 +577,12 @@ class CandidateCard(HorillaKanbanView):
             """,
         },
         {
-            "action": _("Chat"),
+            "action": _("Chat & Notes"),
             "attrs": """
                 hx-get="{get_view_note_url}"
                 data-target="#activitySidebar"
                 hx-target="#activitySidebar"
                 onclick="$('#activitySidebar').addClass('oh-activity-sidebar--show')"
-            """,
-        },
-        {
-            "action": _("Resume"),
-            "attrs": """
-                href="{get_resume_url}" target="_blank"
-            """,
-        },
-        {
-            "action": "archive_status",
-            "attrs": """
-                class="oh-dropdown__link"
-                onclick="archiveCandidate({get_archive_url});"
-            """,
-        },
-        {
-            "action": "Delete",
-            "attrs": """
-                class="oh-dropdown__link oh-dropdown__link--danger"
-                onclick="event.stopPropagation();
-                deleteCandidate('{get_delete_url}'); "
             """,
         },
     ]
@@ -690,7 +611,7 @@ def recruitment_stage_options(request, rec_id):
                 {
                     "id": stage.pk,
                     "stage": stage.stage,
-                    "initial": stage.stage_type == "initial",
+                    "initial": stage.stage_type == "applied",
                 }
                 for stage in stages
             ]

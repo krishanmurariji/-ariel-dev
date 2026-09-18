@@ -221,6 +221,16 @@ class ListCandidates(HorillaListView):
             """,
         },
         {
+            "action": _("View Candidate Self Tracking"),
+            "accessibility": "recruitment.cbv.accessibility.check_candidate_self_tracking",
+            "icon": "footsteps-outline",
+            "attrs": """
+                class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100"
+                href="{get_self_tracking_url}"
+                onclick="event.stopPropagation();"
+            """,
+        },
+        {
             "action": _("Archive"),
             "accessibility": "recruitment.cbv.accessibility.archive_status",
             "icon": "archive",
@@ -536,6 +546,13 @@ class CandidateNav(HorillaNavView):
                 data-target="#objectCreateModal"
                 hx-get="{reverse('candidate-document-request')}"
                 hx-target="#objectCreateModalTarget"
+                """,
+            },
+            {
+                "action": _("Add to Skill Zone"),
+                "attrs": """
+                id="addToSkillZoneCandidates"
+
                 """,
             },
             {

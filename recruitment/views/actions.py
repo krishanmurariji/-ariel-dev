@@ -34,8 +34,14 @@ from recruitment.decorators import (
     recruitment_manager_can_enter,
 )
 from recruitment.filters import StageFilter
-from recruitment.forms import StageCreationForm
-from recruitment.models import Candidate, Recruitment, Stage, StageNote
+from recruitment.forms import BulkToSkillZoneForm, StageCreationForm
+from recruitment.models import (
+    Candidate,
+    Recruitment,
+    SkillZoneCandidate,
+    Stage,
+    StageNote,
+)
 from recruitment.views.linkedin import delete_post
 from recruitment.views.paginator_qry import paginator_qry
 
@@ -225,7 +231,7 @@ def stage_delete(request, stage_id):
             if len(all_this_manger) == 1:
                 view_recruitment = Permission.objects.get(codename="view_recruitment")
                 manager.employee_user_id.user_permissions.remove(view_recruitment.id)
-            initial_stage_manager = all_this_manger.filter(stage_type="initial")
+            initial_stage_manager = all_this_manger.filter(stage_type="applied")
             if len(initial_stage_manager) == 1:
                 add_candidate = Permission.objects.get(codename="add_candidate")
                 change_candidate = Permission.objects.get(codename="change_candidate")
@@ -382,6 +388,52 @@ def candidate_bulk_archive(request):
             ),
         )
     return JsonResponse({"message": "Success"})
+
+
+@login_required
+@manager_can_enter(perm="recruitment.change_candidate")
+def candidate_bulk_add_to_skill_zone(request):
+    """
+    Adds every candidate id passed in (the candidate list's checkbox
+    selection) to one or more skill zones at once - the bulk-list
+    equivalent of ToSkillZoneFormView, which only ever handles one
+    candidate at a time.
+    """
+    ids = json.loads(request.POST.get("ids", "[]"))
+    candidates = list(Candidate.objects.filter(id__in=ids))
+    if request.method == "POST" and request.POST.get("skill_zone_ids"):
+        form = BulkToSkillZoneForm(request.POST)
+        if form.is_valid():
+            skill_zones = form.cleaned_data["skill_zone_ids"]
+            reason = form.cleaned_data["reason"]
+            added = 0
+            for candidate in candidates:
+                for skill_zone in skill_zones:
+                    _obj, created = SkillZoneCandidate.objects.get_or_create(
+                        candidate_id=candidate,
+                        skill_zone_id=skill_zone,
+                        defaults={"reason": reason},
+                    )
+                    if created:
+                        added += 1
+            messages.success(
+                request,
+                _("%(count)d candidate(s) added to the selected skill zone(s).")
+                % {"count": added},
+            )
+            return HttpResponse("<script>window.location.reload();</script>")
+        return render(
+            request,
+            "pipeline/pipeline_components/bulk_skill_zone.html",
+            {"form": form, "ids": request.POST.get("ids", "[]")},
+        )
+
+    form = BulkToSkillZoneForm()
+    return render(
+        request,
+        "pipeline/pipeline_components/bulk_skill_zone.html",
+        {"form": form, "ids": request.GET.get("ids", "[]"), "candidates": candidates},
+    )
 
 
 @login_required
