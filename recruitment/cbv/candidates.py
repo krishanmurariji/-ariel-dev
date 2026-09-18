@@ -824,6 +824,20 @@ class RejectReasonFormView(HorillaFormView):
         if form.is_valid():
             message = "Candidate reject reason saved"
             messages.success(self.request, _(message))
+            candidate = form.cleaned_data.get("candidate_id")
+            if candidate:
+                # This flow never moves stage_id, so it's already the
+                # candidate's true stage at rejection - but the mail
+                # automation still reads this snapshot rather than
+                # stage_id.stage_type directly, since the same field has
+                # to work for both this flow and Update Status's
+                # add-to-reject checkbox (see that view for why). Save
+                # first so it's committed before the RejectedCandidate
+                # row's own save kicks off the (async) mail automation.
+                candidate.stage_type_at_rejection = (
+                    candidate.stage_id.stage_type if candidate.stage_id else None
+                )
+                candidate.save()
             form.save()
             return self.HttpResponse()
         return super().form_valid(form)

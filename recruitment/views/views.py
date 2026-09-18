@@ -2510,7 +2510,6 @@ def interview_schedule(request, cand_id):
         if form.is_valid():
             form.save()
             emp_ids = form.cleaned_data["employee_id"]
-            optional_emp_ids = form.cleaned_data.get("optional_interviewers") or []
             cand_id = form.cleaned_data["candidate_id"]
             interview_date = form.cleaned_data["interview_date"]
             interview_time = form.cleaned_data["interview_time"]
@@ -2526,21 +2525,6 @@ def interview_schedule(request, cand_id):
                 icon="people-circle",
                 redirect=reverse("interview-view"),
             )
-            optional_users = [
-                employee.employee_user_id for employee in optional_emp_ids
-            ]
-            if optional_users:
-                notify.send(
-                    request.user.employee_get,
-                    recipient=optional_users,
-                    verb=f"You are added as an optional interviewer for an interview with {cand_id.name} on {interview_date} at {interview_time}.",
-                    verb_ar=f"تمت إضافتك كمقابل اختياري لمقابلة مع {cand_id.name} يوم {interview_date} في توقيت {interview_time}.",
-                    verb_de=f"Sie wurden als optionaler Interviewer für ein Interview mit {cand_id.name} am {interview_date} um {interview_time} hinzugefügt.",
-                    verb_es=f"Has sido añadido como entrevistador opcional para una entrevista con {cand_id.name} el {interview_date} a las {interview_time}.",
-                    verb_fr=f"Vous avez été ajouté comme intervieweur optionnel pour un entretien avec {cand_id.name} le {interview_date} à {interview_time}.",
-                    icon="people-circle",
-                    redirect=reverse("interview-view"),
-                )
 
             messages.success(request, "Interview Scheduled successfully.")
             return HorillaRedirect(request)
@@ -2565,7 +2549,6 @@ def create_interview_schedule(request):
         if form.is_valid():
             form.save()
             emp_ids = form.cleaned_data["employee_id"]
-            optional_emp_ids = form.cleaned_data.get("optional_interviewers") or []
             cand_id = form.cleaned_data["candidate_id"]
             interview_date = form.cleaned_data["interview_date"]
             interview_time = form.cleaned_data["interview_time"]
@@ -2581,21 +2564,6 @@ def create_interview_schedule(request):
                 icon="people-circle",
                 redirect=reverse("interview-view"),
             )
-            optional_users = [
-                employee.employee_user_id for employee in optional_emp_ids
-            ]
-            if optional_users:
-                notify.send(
-                    request.user.employee_get,
-                    recipient=optional_users,
-                    verb=f"You are added as an optional interviewer for an interview with {cand_id.name} on {interview_date} at {interview_time}.",
-                    verb_ar=f"تمت إضافتك كمقابل اختياري لمقابلة مع {cand_id.name} يوم {interview_date} في توقيت {interview_time}.",
-                    verb_de=f"Sie wurden als optionaler Interviewer für ein Interview mit {cand_id.name} am {interview_date} um {interview_time} hinzugefügt.",
-                    verb_es=f"Has sido añadido como entrevistador opcional para una entrevista con {cand_id.name} el {interview_date} a las {interview_time}.",
-                    verb_fr=f"Vous avez été ajouté comme intervieweur optionnel pour un entretien avec {cand_id.name} le {interview_date} à {interview_time}.",
-                    icon="people-circle",
-                    redirect=reverse("interview-view"),
-                )
 
             messages.success(request, "Interview Scheduled successfully.")
     return render(request, template, {"form": form})

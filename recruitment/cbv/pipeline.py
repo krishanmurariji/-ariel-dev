@@ -807,12 +807,36 @@ class CandidateUpdateStatusFormView(HorillaFormView):
         candidate = form.instance
         target_recruitment = form.cleaned_data["recruitment_id"]
         target_stage = form.cleaned_data["stage_id"]
+        adding_to_reject = form.cleaned_data.get(
+            "add_to_reject"
+        ) and _candidate_reject_eligible(candidate)
+
+        if adding_to_reject:
+            # Capture the candidate's real (pre-submission) stage type -
+            # not candidate.stage_id here, since Django's own ModelForm
+            # _post_clean() already rewrote form.instance.stage_id to the
+            # new target stage during form.is_valid() above, before this
+            # method even started. A fresh DB read is the only way left
+            # to see what stage they were actually in. This has to happen
+            # before _apply_candidate_move() saves the move below - the
+            # rejection mail automation fires on a background thread off
+            # RejectedCandidate.save() and re-reads stage_id.stage_type
+            # fresh from the DB at that point, so without this snapshot
+            # it would always see the post-move (Rejected) stage, never
+            # the one they were actually rejected from. See
+            # Candidate.stage_type_at_rejection.
+            previous_stage = (
+                models.Candidate.objects.filter(pk=candidate.pk)
+                .values_list("stage_id__stage_type", flat=True)
+                .first()
+            )
+            candidate.stage_type_at_rejection = previous_stage
 
         if not _apply_candidate_move(self.request, candidate, target_recruitment, target_stage):
             return self.HttpResponse()
 
         rejected = False
-        if form.cleaned_data.get("add_to_reject") and _candidate_reject_eligible(candidate):
+        if adding_to_reject:
             rejected_candidate, _created = models.RejectedCandidate.objects.update_or_create(
                 candidate_id=candidate,
                 defaults={"description": form.cleaned_data.get("description", "")},

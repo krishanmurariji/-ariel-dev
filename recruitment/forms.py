@@ -1720,6 +1720,7 @@ class RejectedCandidateForm(ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["reject_reason_id"].empty_label = None
+        self.fields["reject_reason_id"].required = True
         self.fields["candidate_id"].widget = self.fields["candidate_id"].hidden_widget()
         reject_reason_widget = self.fields["reject_reason_id"].widget
         existing_class = reject_reason_widget.attrs.get("class", "")
@@ -1737,7 +1738,6 @@ class ScheduleInterviewForm(BaseModelForm):
         "candidate_id": 12,
         "description": 12,
         "employee_id": 12,
-        "optional_interviewers": 12,
         "interview_mode": 12,
     }
 
@@ -1760,25 +1760,6 @@ class ScheduleInterviewForm(BaseModelForm):
             "widgets/interview_mode_radio.html"
         )
         self.fields["interview_mode"].initial = "online"
-        # Unlike "Interviewer" (employee_id), which is narrowed to this
-        # candidate's recruitment/stage managers via the htmx-refreshed
-        # candidate/interview_form.html partial, this is meant to let the
-        # scheduler pull in anyone else in the company (e.g. a hiring
-        # manager who wants visibility but isn't a required interviewer),
-        # so it stays a full, searchable employee picker instead.
-        self.fields["optional_interviewers"] = HorillaMultiSelectField(
-            queryset=Employee.objects.filter(is_active=True),
-            required=False,
-            widget=HorillaMultiSelectWidget(
-                filter_route_name="employee-widget-filter",
-                filter_class=EmployeeFilter,
-                filter_instance_context_name="f",
-                filter_template_path="employee_filters.html",
-                required=False,
-            ),
-            label=_("Optional Interviewers"),
-        )
-        self.fields["optional_interviewers"].required = False
         if self.instance.pk:
             # Update mode: keep this permissive and normalize manually in clean()
             # so unchanged browser values do not fail with "Enter a valid time".
@@ -1811,9 +1792,6 @@ class ScheduleInterviewForm(BaseModelForm):
         self.fields["candidate_id"].widget.attrs.update(candidate_attr)
 
     def clean(self):
-        if isinstance(self.fields.get("optional_interviewers"), HorillaMultiSelectField):
-            self.errors.pop("optional_interviewers", None)
-
         instance = self.instance
         cleaned_data = super().clean() or {}
         interview_date = cleaned_data.get("interview_date")

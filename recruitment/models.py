@@ -859,6 +859,24 @@ class Candidate(HorillaModel):
     hired = models.BooleanField(default=False, verbose_name=_("Hired"))
     canceled = models.BooleanField(default=False, verbose_name=_("Canceled"))
     converted = models.BooleanField(default=False, verbose_name=_("Converted"))
+    stage_type_at_rejection = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        verbose_name=_("Stage Type At Rejection"),
+        help_text=_(
+            "Snapshot of stage_id.stage_type taken at the moment this "
+            "candidate was rejected. The 'Application Status - Not "
+            "Selected' mail automation fires on RejectedCandidate.save() "
+            "in a background thread, and re-fetches the candidate fresh "
+            "from the DB - by then, the Update Status flow may have "
+            "already moved stage_id to the Rejected stage in the same "
+            "request, so reading stage_id.stage_type at send-time would "
+            "always see 'cancelled', never the interview/non-interview "
+            "stage the candidate was actually rejected from. Set once, "
+            "synchronously, wherever a RejectedCandidate row is created."
+        ),
+    )
     joining_date = models.DateField(
         blank=True, null=True, verbose_name=_("Joining Date")
     )
@@ -2399,16 +2417,6 @@ class InterviewSchedule(HorillaModel):
         on_delete=models.CASCADE,
     )
     employee_id = models.ManyToManyField(Employee, verbose_name=_("Interviewer"))
-    optional_interviewers = models.ManyToManyField(
-        Employee,
-        blank=True,
-        related_name="optional_interview_schedules",
-        verbose_name=_("Optional Interviewers"),
-        help_text=_(
-            "Anyone else who should be looped in on this interview without "
-            "being a required interviewer."
-        ),
-    )
     interview_date = models.DateField(verbose_name=_("Interview Date"))
     interview_time = models.TimeField(verbose_name=_("Interview Time"))
     interview_mode = models.CharField(
