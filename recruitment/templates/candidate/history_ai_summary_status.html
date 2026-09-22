@@ -2,7 +2,7 @@
 <div
   id="historyAiSummaryStatus"
   hx-get="{% url 'candidate-history-summary-status' candidate_id %}"
-  hx-trigger="every 5s"
+  {% if running %}hx-trigger="every 5s"{% endif %}
   hx-swap="outerHTML"
 >
   <div class="border border-dark-50 rounded-md p-4 bg-white">

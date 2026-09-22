@@ -11,7 +11,7 @@
 
     <div class="oh-chat-body" id="chatBody"
         hx-get="{% url 'add-note' candidate.id %}"
-        hx-trigger="every 10s"
+        hx-trigger="every 10s [window.__ohChatNeedsPolling && window.__ohChatNeedsPolling({{ candidate.id }})]"
         hx-select="#chatMessages"
         hx-target="#chatMessages"
         hx-swap="outerHTML"
@@ -134,6 +134,14 @@
         // second, independent typing bubble on top of the first.
         (function () {
             var candidateId = {{ candidate.id }};
+
+            // Backs the hx-trigger filter on #chatBody above - see
+            // view_note.html's matching comment for the full story.
+            window.__ohChatNeedsPolling = function (id) {
+                var entry = window.__ohChat && window.__ohChat[id];
+                return !entry || !entry.wsHealthy;
+            };
+
             if (!window.WebSocket) { return; }
 
             window.__ohChat = window.__ohChat || {};
@@ -161,6 +169,8 @@
                 typingHideTimer: null,
                 lastTypingSentAt: 0,
                 closedIntentionally: false,
+                wsHealthy: false,
+                reconnectDelay: 3000,
             };
 
             var protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -194,8 +204,15 @@
                 if (state.typingEl) { state.typingEl.remove(); state.typingEl = null; }
             }
 
+            var MAX_RECONNECT_DELAY = 30000;
+
             function connect() {
                 state.socket = new WebSocket(protocol + "//" + window.location.host + "/ws/chat/" + candidateId + "/");
+                state.socket.addEventListener("open", function () {
+                    state.wsHealthy = true;
+                    state.reconnectDelay = 3000;
+                    refetchMessages();
+                });
                 state.socket.addEventListener("message", function (event) {
                     var data;
                     try { data = JSON.parse(event.data); } catch (e) { return; }
@@ -207,8 +224,10 @@
                     }
                 });
                 state.socket.addEventListener("close", function () {
+                    state.wsHealthy = false;
                     if (state.closedIntentionally) { return; }
-                    setTimeout(connect, 3000);
+                    setTimeout(connect, state.reconnectDelay);
+                    state.reconnectDelay = Math.min(state.reconnectDelay * 2, MAX_RECONNECT_DELAY);
                 });
             }
             connect();

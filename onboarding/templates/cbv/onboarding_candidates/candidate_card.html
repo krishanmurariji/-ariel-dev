@@ -90,7 +90,6 @@
               </a>
             </li>
             {% endif %}
-            {% if candidate.get_probation_months %}
             {% if candidate.probation_feedback_cycle %}
             <li>
               <a
@@ -123,7 +122,6 @@
             </li>
             {% endif %}
             {% endif %}
-            {% endif %}
             <li>
               <a
                 class="block w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50 transition duration-300"
@@ -149,18 +147,24 @@
             <span class="inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#e3ecf7] text-[#3e6b99]">{{ candidate.stage_id.stage_title }}</span>
             {% endif %}
             {% if candidate.onboarding_completed_at %}
-            <span class="inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-success-light text-success-dark">{% trans "Onboarding Completed" %}</span>
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full" style="background:#e6f4ea;color:#1e7e34;" title="{% trans 'Onboarding Completed' %}">
+              <ion-icon name="ribbon-outline" style="font-size:14px;"></ion-icon>
+            </span>
             {% elif candidate.onboarding_detail.configuration_finalized_at %}
-            <span class="inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full" style="background:#e6f4ea;color:#1e7e34;">{% trans "Onboarding Configured" %}</span>
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full" style="background:#e6f4ea;color:#1e7e34;" title="{% trans 'Onboarding Configured' %}">
+              <ion-icon name="checkmark-circle-outline" style="font-size:14px;"></ion-icon>
+            </span>
             {% else %}
-            <span class="inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full" style="background:#fff4e5;color:#b25e09;">{% trans "Onboarding Not Configured" %}</span>
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full" style="background:#fff4e5;color:#b25e09;" title="{% trans 'Onboarding Not Configured' %}">
+              <ion-icon name="construct-outline" style="font-size:14px;"></ion-icon>
+            </span>
             {% endif %}
             <span
-              class="inline-flex items-center justify-center w-4 h-4 rounded-full"
+              class="inline-flex items-center justify-center w-6 h-6 rounded-full"
               style="{% if candidate.onboarding_detail.portal_sent_at %}background:#e6f4ea;color:#1e7e34;{% else %}background:#eef1f1;color:#9AA1AC;{% endif %}"
-              title="{% if candidate.onboarding_detail.portal_sent_at %}{% trans 'Onboarding portal sent' %}{% else %}{% trans 'Onboarding portal not sent yet' %}{% endif %}"
+              title="{% if candidate.onboarding_detail.portal_sent_at %}{% trans 'Onboarding Portal Sent' %}{% else %}{% trans 'Onboarding Portal Not Sent' %}{% endif %}"
             >
-              <ion-icon name="{% if candidate.onboarding_detail.portal_sent_at %}checkmark-done-outline{% else %}ellipse-outline{% endif %}" style="font-size:10px;"></ion-icon>
+              <ion-icon name="{% if candidate.onboarding_detail.portal_sent_at %}paper-plane-outline{% else %}time-outline{% endif %}" style="font-size:14px;"></ion-icon>
             </span>
           </div>
         </div>

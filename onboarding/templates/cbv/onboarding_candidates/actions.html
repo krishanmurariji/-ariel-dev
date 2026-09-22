@@ -106,13 +106,13 @@
 		<ion-icon name="layers-outline"></ion-icon>
 	</button>
 
-	{% if perms.recruitment.change_candidate and instance.get_probation_months %}
+	{% if perms.recruitment.change_candidate %}
 		<span
 			class="oh-btn oh-btn--light-bkg w-100"
 			style="pointer-events:auto;cursor:default;{% if instance.onboarding_detail.portal_sent_at %}color:#2f9e44;{% else %}color:#9AA1AC;{% endif %}"
-			title="{% if instance.onboarding_detail.portal_sent_at %}{% trans 'Onboarding portal sent' %}{% else %}{% trans 'Onboarding portal not sent yet' %}{% endif %}"
+			title="{% if instance.onboarding_detail.portal_sent_at %}{% trans 'Onboarding Portal Sent' %}{% else %}{% trans 'Onboarding Portal Not Sent' %}{% endif %}"
 		>
-			<ion-icon name="{% if instance.onboarding_detail.portal_sent_at %}checkmark-done-outline{% else %}ellipse-outline{% endif %}"></ion-icon>
+			<ion-icon name="{% if instance.onboarding_detail.portal_sent_at %}paper-plane-outline{% else %}time-outline{% endif %}"></ion-icon>
 		</span>
 
 		{% if instance.probation_feedback_cycle %}

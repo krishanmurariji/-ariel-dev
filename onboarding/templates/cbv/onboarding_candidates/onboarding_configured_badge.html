@@ -1,8 +1,14 @@
 {% load i18n %}
 {% if instance.onboarding_detail.onboarding_completed_at %}
-<span class="inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-success-light text-success-dark">{% trans "Onboarding Completed" %}</span>
+<span class="inline-flex items-center justify-center w-6 h-6 rounded-full" style="background:#e6f4ea;color:#1e7e34;" title="{% trans 'Onboarding Completed' %}">
+  <ion-icon name="ribbon-outline" style="font-size:14px;"></ion-icon>
+</span>
 {% elif instance.onboarding_detail.configuration_finalized_at %}
-<span class="inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full" style="background:#e6f4ea;color:#1e7e34;">{% trans "Onboarding Configured" %}</span>
+<span class="inline-flex items-center justify-center w-6 h-6 rounded-full" style="background:#e6f4ea;color:#1e7e34;" title="{% trans 'Onboarding Configured' %}">
+  <ion-icon name="checkmark-circle-outline" style="font-size:14px;"></ion-icon>
+</span>
 {% else %}
-<span class="inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full" style="background:#fff4e5;color:#b25e09;">{% trans "Onboarding Not Configured" %}</span>
+<span class="inline-flex items-center justify-center w-6 h-6 rounded-full" style="background:#fff4e5;color:#b25e09;" title="{% trans 'Onboarding Not Configured' %}">
+  <ion-icon name="construct-outline" style="font-size:14px;"></ion-icon>
+</span>
 {% endif %}
