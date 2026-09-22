@@ -1,7 +1,7 @@
 {% load i18n %}
-{% if instance.onboarding_completed_at %}
+{% if instance.onboarding_detail.onboarding_completed_at %}
 <span class="inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-success-light text-success-dark">{% trans "Onboarding Completed" %}</span>
-{% elif instance.onboarding_detail %}
+{% elif instance.onboarding_detail.configuration_finalized_at %}
 <span class="inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full" style="background:#e6f4ea;color:#1e7e34;">{% trans "Onboarding Configured" %}</span>
 {% else %}
 <span class="inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full" style="background:#fff4e5;color:#b25e09;">{% trans "Onboarding Not Configured" %}</span>

@@ -604,6 +604,19 @@ class OnboardingCandidateDetail(HorillaModel):
             "past without going through each step in order."
         ),
     )
+    configuration_finalized_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_("Configuration Finalized At"),
+        help_text=_(
+            "Set once, the first time this candidate's Configure Onboarding "
+            "stepper is actually finished via its Finish Configuration "
+            "button (stepper.finalize_onboarding) - unlike this row's own "
+            "existence, which is created the moment the stepper is merely "
+            "opened, this is what 'Onboarding Configured' should actually "
+            "mean anywhere that status is shown to a user."
+        ),
+    )
     onboarding_completed_at = models.DateTimeField(
         null=True,
         blank=True,

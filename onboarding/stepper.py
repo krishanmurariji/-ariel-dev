@@ -380,6 +380,9 @@ def finalize_onboarding(request, pk):
         # but guarded here regardless) must never re-send them.
         is_first_finalize = not candidate.start_onboard
         Candidate.objects.filter(pk=candidate.pk).update(start_onboard=True)
+        if not detail.configuration_finalized_at:
+            detail.configuration_finalized_at = timezone.now()
+            detail.save(update_fields=["configuration_finalized_at"])
         if is_first_finalize:
             notify_reporting_manager_assigned(candidate, detail.reporting_manager_id)
             notify_onboarding_buddy_assigned(candidate, detail.buddy_id)
