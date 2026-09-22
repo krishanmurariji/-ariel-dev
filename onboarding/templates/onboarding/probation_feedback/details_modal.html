@@ -1,0 +1,75 @@
+{% load i18n %}
+<style>
+  @keyframes ohPfFadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+  .oh-pfd-row { animation: ohPfFadeUp .3s ease both; display:flex; align-items:center; gap:12px; padding:12px 0; border-top:1px solid #eceeee; }
+  .oh-pfd-row:first-child { border-top:none; }
+  .oh-pfd-row__icon { flex:none; width:34px; height:34px; border-radius:8px; background:#eef4f2; color:#0f6e5c; display:flex; align-items:center; justify-content:center; font-size:16px; }
+  .oh-pfd-row__body { flex:1; min-width:0; }
+  .oh-pfd-row__title { font-size:13.5px; font-weight:600; color:#2d2d2d; }
+  .oh-pfd-row__date { font-size:12px; color:#8a9490; }
+  .oh-pfd-pill { font-size:11px; font-weight:600; padding:3px 10px; border-radius:9px; white-space:nowrap; }
+  .oh-pfd-pill--not-started { background:#eef1f1; color:#5b6472; }
+  .oh-pfd-pill--on-track { background:#e6f4ea; color:#1e7e34; }
+  .oh-pfd-pill--behind { background:#fff4e5; color:#b25e09; }
+  .oh-pfd-pill--at-risk { background:#f3ddd7; color:#b3402f; }
+  .oh-pfd-pill--closed { background:#e3ecf7; color:#3e6b99; }
+  .oh-pf-info-row { display:flex; gap:24px; flex-wrap:wrap; }
+  .oh-pf-info-item label { display:block; font-size:11px; color:#8a9490; text-transform:uppercase; letter-spacing:.03em; margin-bottom:3px; }
+  .oh-pf-info-item span { font-size:14px; font-weight:600; color:#2d2d2d; }
+  .oh-pf-card { background:#fafbfb; border:1px solid #eceeee; border-radius:10px; padding:16px 18px; margin-bottom:14px; }
+  .oh-pf-card__title { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:#2d2d2d; margin-bottom:12px; }
+  .oh-pf-card__title ion-icon { font-size:16px; color:#0f6e5c; }
+</style>
+
+<div class="oh-modal__dialog-header">
+  <span class="oh-modal__dialog-title">{% trans "Probation Feedback Cycle" %}</span>
+  <div style="font-size:12.5px;color:#8a9490;margin-top:2px;">{{ candidate.name }} — {{ cycle.months_completed }}/{{ cycle.total_months }} {% trans "months completed" %}</div>
+  <button class="oh-modal__close" aria-label="Close" onclick="$(this).closest('.oh-modal').removeClass('oh-modal--show');">
+    <ion-icon name="close-outline"></ion-icon>
+  </button>
+</div>
+<div class="oh-modal__dialog-body">
+
+  <div class="oh-pf-card">
+    <div class="oh-pf-card__title"><ion-icon name="people-outline"></ion-icon>{% trans "Reviewers" %}</div>
+    <div class="oh-pf-info-row">
+      <div class="oh-pf-info-item">
+        <label>{% trans "Reporting Manager" %}</label>
+        <span>{{ cycle.reporting_manager_id.get_full_name|default:"—" }}</span>
+      </div>
+      <div class="oh-pf-info-item">
+        <label>{% trans "Buddy" %}</label>
+        <span>{{ cycle.buddy_id.get_full_name|default:"—" }}</span>
+      </div>
+      <div class="oh-pf-info-item">
+        <label>{% trans "Colleague" %}</label>
+        <span>{{ cycle.colleague_id.get_full_name|default:"—" }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="oh-pf-card">
+    <div class="oh-pf-card__title"><ion-icon name="document-text-outline"></ion-icon>{% trans "Monthly Reviews" %}</div>
+    {% if not feedbacks %}
+    <div style="font-size:12.5px;color:#8a9490;">{% trans "No reviews generated yet - the first one appears once this candidate is converted to an employee and their first review date arrives." %}</div>
+    {% else %}
+    {% for feedback in feedbacks %}
+    <div class="oh-pfd-row" style="animation-delay:{{ forloop.counter0|add:1 }}0ms;">
+      <div class="oh-pfd-row__icon"><ion-icon name="chatbox-ellipses-outline"></ion-icon></div>
+      <div class="oh-pfd-row__body">
+        <div class="oh-pfd-row__title">{{ feedback.review_cycle }}</div>
+        <div class="oh-pfd-row__date">{% trans "Opened" %} {{ feedback.start_date|date:"M d, Y" }}</div>
+      </div>
+      <span class="oh-pfd-pill oh-pfd-pill--{{ feedback.status|lower|cut:" " }}">{{ feedback.status }}</span>
+      <a href="{% url 'feedback-detailed-view' feedback.pk %}" target="_blank" class="oh-btn oh-btn--light-bkg oh-btn--small" title="{% trans 'See all answers' %}">
+        <ion-icon name="eye-outline"></ion-icon>
+      </a>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+
+</div>
+<div class="oh-modal__dialog-footer">
+  <button type="button" class="oh-btn oh-btn--light" onclick="$(this).closest('.oh-modal').removeClass('oh-modal--show');">{% trans "Close" %}</button>
+</div>

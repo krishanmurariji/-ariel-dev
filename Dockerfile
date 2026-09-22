@@ -82,4 +82,8 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health/ || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["gunicorn", "horilla.wsgi:application", "--config", "docker/gunicorn.conf.py"]
+# horilla.asgi:application (not .wsgi) + the uvicorn worker class, so the
+# chat WebSocket (Channels, recruitment/consumers.py) actually gets served
+# instead of hitting a plain WSGI worker that can never upgrade a
+# connection - see docker/gunicorn.conf.py for the worker_class setting.
+CMD ["gunicorn", "horilla.asgi:application", "--config", "docker/gunicorn.conf.py"]

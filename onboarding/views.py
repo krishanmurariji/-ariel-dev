@@ -19,6 +19,8 @@ import random
 import secrets
 from urllib.parse import parse_qs
 
+from dateutil.relativedelta import relativedelta
+
 from django import template
 from django.contrib import messages
 from django.contrib.auth import login
@@ -30,6 +32,7 @@ from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.translation import gettext as __
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_http_methods, require_POST
@@ -78,6 +81,7 @@ from onboarding.self_onboarding_steps import STEPS, sidebar_context
 from onboarding.models import (
     CandidateStage,
     CandidateTask,
+    OnboardingCandidateDetail,
     OnboardingPortal,
     OnboardingStage,
     OnboardingTask,
@@ -96,56 +100,197 @@ from recruitment.pipeline_grouper import group_by_queryset
 logger = logging.getLogger(__name__)
 
 
+def _probation_setup_context(request, candidate):
+    """
+    Shared GET/invalid-POST context for the Probation Feedback Cycle setup
+    modal: prefilled reviewers, available choices, and a preview of the
+    exact review dates this cycle would generate.
+    """
+    from onboarding.stepper import _assignable_employees
+    from pms.models import QuestionTemplate
+
+    detail = getattr(candidate, "onboarding_detail", None)
+    total_months = candidate.get_probation_months()
+    cycle_dates = (
+        [candidate.joining_date + relativedelta(months=i) for i in range(total_months)]
+        if total_months and candidate.joining_date
+        else []
+    )
+    return {
+        "candidate": candidate,
+        "detail": detail,
+        "employees": _assignable_employees(candidate),
+        "question_templates": QuestionTemplate.objects.all(),
+        "total_months": total_months,
+        "cycle_dates": cycle_dates,
+        "initial_reporting_manager_id": detail.reporting_manager_id_id if detail else None,
+        "initial_buddy_id": detail.buddy_id_id if detail else None,
+        "search_url": request.GET.get("search_url") or request.POST.get("search_url", ""),
+        "view_id": request.GET.get("view_id") or request.POST.get("view_id", ""),
+    }
+
+
 @login_required
 @permission_required("recruitment.change_candidate")
-def start_feedback_cycle(request, pk):
+def probation_feedback_setup(request, pk):
     """
-    Starts a monthly Probation Feedback Cycle for this candidate. The
-    number of months is derived from Date of Joining -> Probation End
-    (Candidate.get_probation_months(), both already captured on the Job
-    Profile onboarding step) - not a separately hand-entered count, since
-    those two dates are the actual source of truth for how long
-    probation runs. Buddy comes from OnboardingCandidateDetail. Safe to
-    call even before the candidate has been converted to an employee -
-    the actual Feedback records only start appearing once conversion
-    happens (see pms.scheduler.probation_feedback_creation).
+    GET renders the Probation Feedback Cycle setup modal (reviewers,
+    question templates, and a preview of the exact monthly review dates);
+    POST validates and creates the cycle, then emails everyone involved -
+    the candidate, reporting manager, buddy, and colleague (if picked) -
+    the full schedule up front. Safe to call even before the candidate has
+    been converted to an employee - the actual Feedback records only
+    start appearing once conversion happens (see
+    pms.scheduler.probation_feedback_creation).
     """
+    from employee.models import Employee
+    from onboarding.mailers import notify_probation_feedback_cycle_started
+    from onboarding.stepper import _assignable_employees
     from pms.models import ProbationFeedbackCycle, QuestionTemplate
 
     candidate = get_object_or_404(Candidate, pk=pk)
-    if request.method == "POST":
-        detail = getattr(candidate, "onboarding_detail", None)
-        total_months = candidate.get_probation_months()
-        if not total_months:
-            messages.error(
-                request,
-                _(
-                    "Set a Date of Joining and a Probation End date after "
-                    "it for this candidate first (Job Profile step)."
-                ),
+    detail = getattr(candidate, "onboarding_detail", None)
+
+    if request.method != "POST":
+        return render(
+            request,
+            "onboarding/probation_feedback/setup_modal.html",
+            _probation_setup_context(request, candidate),
+        )
+
+    context = _probation_setup_context(request, candidate)
+    errors = []
+
+    if not context["total_months"] or not candidate.joining_date:
+        errors.append(
+            _(
+                "Set a Date of Joining and a Probation End date after it "
+                "for this candidate first (Job Profile step)."
             )
-        elif ProbationFeedbackCycle.objects.filter(candidate_id=candidate).exists():
-            messages.info(
-                request, _("A feedback cycle is already running for this candidate.")
-            )
-        else:
-            question_template = QuestionTemplate.objects.filter(
-                question_template="Probation Review"
-            ).first()
-            if not question_template:
-                messages.error(
-                    request, _("No 'Probation Review' question template found.")
-                )
-            else:
-                ProbationFeedbackCycle.objects.create(
-                    candidate_id=candidate,
-                    buddy_id=detail.buddy_id if detail else None,
-                    question_template_id=question_template,
-                    start_date=candidate.joining_date,
-                    total_months=total_months,
-                )
-                messages.success(request, _("Probation feedback cycle started."))
-    return HorillaRedirect(request)
+        )
+    if ProbationFeedbackCycle.objects.filter(candidate_id=candidate).exists():
+        errors.append(_("A feedback cycle is already running for this candidate."))
+    if not detail or not detail.portal_sent_at:
+        errors.append(
+            _("Send the onboarding portal to this candidate before starting a feedback cycle.")
+        )
+
+    assignable_ids = set(context["employees"].values_list("pk", flat=True))
+
+    def _clean_employee(field_name, required):
+        raw = request.POST.get(field_name)
+        if not raw:
+            if required:
+                errors.append(_("%(field)s is required.") % {"field": field_name})
+            return None
+        try:
+            emp_pk = int(raw)
+        except ValueError:
+            errors.append(_("Invalid value for %(field)s.") % {"field": field_name})
+            return None
+        if emp_pk not in assignable_ids:
+            errors.append(_("Invalid value for %(field)s.") % {"field": field_name})
+            return None
+        return Employee.objects.filter(pk=emp_pk).first()
+
+    reporting_manager = _clean_employee("reporting_manager_id", required=True)
+    buddy = _clean_employee("buddy_id", required=True)
+    colleague = _clean_employee("colleague_id", required=False)
+
+    template_ids = set(QuestionTemplate.objects.values_list("pk", flat=True))
+
+    def _clean_template(field_name):
+        raw = request.POST.get(field_name)
+        if not raw:
+            errors.append(_("%(field)s is required.") % {"field": field_name})
+            return None
+        try:
+            tpl_pk = int(raw)
+        except ValueError:
+            tpl_pk = None
+        if tpl_pk not in template_ids:
+            errors.append(_("Invalid value for %(field)s.") % {"field": field_name})
+            return None
+        return QuestionTemplate.objects.filter(pk=tpl_pk).first()
+
+    question_template = _clean_template("question_template_id")
+    employee_question_template = _clean_template("employee_question_template_id")
+
+    if errors:
+        for error in errors:
+            messages.error(request, error)
+        context.update(
+            posted=request.POST,
+        )
+        return render(request, "onboarding/probation_feedback/setup_modal.html", context)
+
+    cycle = ProbationFeedbackCycle.objects.create(
+        candidate_id=candidate,
+        reporting_manager_id=reporting_manager,
+        buddy_id=buddy,
+        colleague_id=colleague,
+        question_template_id=question_template,
+        employee_question_template_id=employee_question_template,
+        start_date=candidate.joining_date,
+        total_months=context["total_months"],
+    )
+    notify_probation_feedback_cycle_started(
+        candidate, cycle, reporting_manager, buddy, colleague
+    )
+    messages.success(request, _("Probation feedback cycle started."))
+    # actions.html (list view) has no search_url/view_id in its context (its
+    # rows render from Candidate.actions() with just {"instance": self}), so
+    # it refreshes via the page's #applyFilter button instead - candidate_card.html
+    # DOES have both, so it gets the more targeted htmx refresh. $('#applyFilter')
+    # is a harmless no-op when it isn't on the page.
+    refresh_js = "$('#applyFilter').click();"
+    if context["search_url"] and context["view_id"]:
+        refresh_js += (
+            f"htmx.ajax('GET', '{context['search_url']}', "
+            f"{{target: '#{context['view_id']}', swap: 'outerHTML'}});"
+        )
+    return HttpResponse(
+        "<script>"
+        "$('.oh-modal').removeClass('oh-modal--show');"
+        f"{refresh_js}"
+        "$('#reloadMessagesButton').click();"
+        "</script>"
+    )
+
+
+@login_required
+@permission_required("recruitment.change_candidate")
+def probation_feedback_details(request, pk):
+    """
+    Read-only overview of a running/completed Probation Feedback Cycle -
+    the reviewers and schedule it was set up with, and every Feedback
+    generated for it so far, each linking to the existing feedback detail
+    page (pms.views.feedback_detailed_view) for its full set of answers.
+    """
+    from onboarding.stepper import _candidate_own_employee_id
+    from pms.models import Feedback, ProbationFeedbackCycle
+
+    candidate = get_object_or_404(Candidate, pk=pk)
+    cycle = get_object_or_404(ProbationFeedbackCycle, candidate_id=candidate)
+    employee_id = _candidate_own_employee_id(candidate)
+    feedbacks = (
+        Feedback.objects.filter(
+            review_cycle__startswith="Probation Review - Month",
+            employee_id=employee_id,
+        ).order_by("id")
+        if employee_id
+        else Feedback.objects.none()
+    )
+    return render(
+        request,
+        "onboarding/probation_feedback/details_modal.html",
+        {
+            "candidate": candidate,
+            "cycle": cycle,
+            "feedbacks": feedbacks,
+            "cycle_dates": cycle.cycle_dates(),
+        },
+    )
 
 
 @login_required
@@ -969,6 +1114,12 @@ def email_send(request):
         try:
             email.send()
             messages.success(request, "Portal link sent to the candidate")
+            detail, _created = OnboardingCandidateDetail.objects.get_or_create(
+                candidate_id=candidate
+            )
+            if not detail.portal_sent_at:
+                detail.portal_sent_at = timezone.now()
+                detail.save(update_fields=["portal_sent_at"])
         except Exception as e:
             logger.error(e)
             messages.error(request, f"Mail not sent to {candidate.name}")

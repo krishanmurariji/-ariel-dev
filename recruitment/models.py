@@ -40,6 +40,7 @@ from base.image_utils import (
 )
 from base.models import Company, JobPosition
 from employee.models import Employee
+from horilla.crypto_fields import EncryptedTextField
 from horilla.horilla_middlewares import _thread_locals
 from horilla.models import HorillaModel, upload_path
 from horilla_audit.methods import get_diff
@@ -2657,13 +2658,11 @@ class LinkedInAccount(HorillaModel):
     client_id = models.CharField(
         max_length=250, blank=True, verbose_name=_("Client ID")
     )
-    client_secret = models.CharField(
-        max_length=500, blank=True, verbose_name=_("Client Secret")
-    )
+    client_secret = EncryptedTextField(blank=True, verbose_name=_("Client Secret"))
     # Populated automatically by the OAuth "Connect with LinkedIn" flow
     # (recruitment/views/linkedin.py linkedin_login/linkedin_callback) —
     # no longer entered manually.
-    api_token = models.CharField(max_length=500, blank=True, null=True)
+    api_token = EncryptedTextField(blank=True, null=True)
     sub_id = models.CharField(max_length=250, unique=True, blank=True, null=True)
     # Temporary CSRF/lookup value for one in-flight OAuth authorization.
     oauth_state = models.CharField(max_length=250, blank=True, null=True)
@@ -3232,8 +3231,7 @@ class AISettings(models.Model):
         default="ollama",
         verbose_name=_("AI Provider"),
     )
-    openai_api_key = models.CharField(
-        max_length=255,
+    openai_api_key = EncryptedTextField(
         blank=True,
         verbose_name=_("OpenAI API Key"),
     )

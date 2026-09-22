@@ -9,6 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from datetime import datetime, timezone as dt_timezone
 
 from base.models import Company
+from horilla.crypto_fields import EncryptedJSONField, EncryptedTextField
 from horilla_views.cbv_methods import render_template
 from outlook_auth.methods import sec_to_hm
 
@@ -39,15 +40,12 @@ class GoogleApi(models.Model):
     "v1", credentials=...) resolves the Gmail API endpoint internally, so
     there's nothing to configure there.
 
-    Like AzureApi, the client secret and token are stored in plaintext -
-    this is a known, pre-existing limitation shared with the Outlook
-    integration, not something specific to Gmail.
+    Like AzureApi, the client secret and token are encrypted at rest via
+    horilla.crypto_fields (see outlook_auth.AzureApi for the original).
     """
 
     google_client_id = models.CharField(max_length=200, verbose_name=_("Client ID"))
-    google_client_secret = models.CharField(
-        max_length=200, verbose_name=_("Client Secret")
-    )
+    google_client_secret = EncryptedTextField(verbose_name=_("Client Secret"))
     google_project_id = models.CharField(
         max_length=200,
         blank=True,
@@ -72,7 +70,7 @@ class GoogleApi(models.Model):
     # Stores the fields needed to reconstruct a
     # google.oauth2.credentials.Credentials object: token, refresh_token,
     # token_uri, client_id, client_secret, scopes, expiry (ISO 8601 string).
-    token = models.JSONField(editable=False, default=dict)
+    token = EncryptedJSONField(editable=False, default=dict)
     oauth_state = models.CharField(editable=False, max_length=100, null=True)
     # google-auth-oauthlib's Flow auto-generates a PKCE code_verifier per
     # authorization_url() call and only keeps it on that in-memory Flow

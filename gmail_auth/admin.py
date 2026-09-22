@@ -2,15 +2,7 @@
 gmail_auth/admin.py
 """
 
-from django.contrib import admin
-
-from gmail_auth import models
-
-# Register your models here.
-
-
-admin.site.register(
-    [
-        models.GoogleApi,
-    ]
-)
+# GoogleApi deliberately isn't registered here - it holds the Google client
+# secret and OAuth token, and the default ModelAdmin would show both in
+# plaintext, unmasked, to anyone with Django-admin access to it. The app's
+# own permission-gated "Mail Servers" settings page is the only UI for it.

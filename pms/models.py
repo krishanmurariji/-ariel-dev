@@ -1253,16 +1253,17 @@ class Feedback(HorillaModel):
 
 class ProbationFeedbackCycle(HorillaModel):
     """
-    Tracks a candidate's month-by-month probation review schedule, started
-    manually from the Onboarding candidate list/card (onboarding/views.py:
-    start_feedback_cycle). total_months is derived from the candidate's
+    Tracks a candidate's month-by-month probation review schedule, set up
+    from the Onboarding candidate list/card (onboarding/views.py:
+    probation_feedback_setup). total_months is derived from the candidate's
     Date of Joining and Probation End dates (Candidate.get_probation_months,
-    both set on the Job Profile onboarding step), and buddy comes from
-    OnboardingCandidateDetail. A daily background job (pms/scheduler.py:
+    both set on the Job Profile onboarding step); reporting manager, buddy,
+    colleague and both question templates are chosen explicitly at setup
+    time instead of being inferred. A daily background job (pms/scheduler.py:
     probation_feedback_creation) walks active rows here, resolves the
     actual Employee once conversion has happened, and generates one
-    Feedback per elapsed month - buddy only on month 1, the employee's
-    current reporting manager every month.
+    Feedback per elapsed month - buddy and colleague only on month 1, the
+    reporting manager captured here every month.
     """
 
     candidate_id = models.OneToOneField(
@@ -1270,6 +1271,19 @@ class ProbationFeedbackCycle(HorillaModel):
         on_delete=models.CASCADE,
         related_name="probation_feedback_cycle",
         verbose_name=_("Candidate"),
+    )
+    reporting_manager_id = models.ForeignKey(
+        Employee,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="probation_feedback_cycles_managed",
+        verbose_name=_("Reporting Manager"),
+        help_text=_(
+            "Captured at cycle start and used as the reviewing manager for "
+            "every month - independent of whoever the employee's actual "
+            "reporting manager is changed to later."
+        ),
     )
     buddy_id = models.ForeignKey(
         Employee,
@@ -1282,11 +1296,33 @@ class ProbationFeedbackCycle(HorillaModel):
             "Captured at cycle start; only added as a reviewer for month 1."
         ),
     )
+    colleague_id = models.ForeignKey(
+        Employee,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="probation_feedback_colleague_for",
+        verbose_name=_("Colleague"),
+        help_text=_(
+            "Optional peer reviewer, captured at cycle start; only added "
+            "as a reviewer for month 1, alongside the buddy."
+        ),
+    )
     question_template_id = models.ForeignKey(
         QuestionTemplate,
         on_delete=models.PROTECT,
         related_name="probation_feedback_cycles",
-        verbose_name=_("Question Template"),
+        verbose_name=_("Reviewer Question Template"),
+        help_text=_("Asked of the reporting manager, buddy, and colleague."),
+    )
+    employee_question_template_id = models.ForeignKey(
+        QuestionTemplate,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="probation_feedback_cycles_self",
+        verbose_name=_("Employee Self-Assessment Template"),
+        help_text=_("Asked of the employee themselves, every month."),
     )
     start_date = models.DateField(verbose_name=_("Probation Start Date"))
     total_months = models.PositiveIntegerField(
@@ -1298,6 +1334,18 @@ class ProbationFeedbackCycle(HorillaModel):
 
     def __str__(self):
         return f"{self.candidate_id} - month {self.months_completed}/{self.total_months}"
+
+    def cycle_dates(self):
+        """
+        One date per month of the cycle - month 1 is start_date itself,
+        each later month is one calendar month after the previous one.
+        Used both for the setup preview (before any row exists) and for
+        showing the schedule on an already-running cycle.
+        """
+        return [
+            self.start_date + relativedelta(months=i)
+            for i in range(self.total_months)
+        ]
 
 
 class AnonymousFeedback(models.Model):

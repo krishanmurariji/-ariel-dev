@@ -50,20 +50,6 @@
                 {% trans "Allocations" %}
               </a>
             </li>
-            {% if perms.pms.add_feedback %}
-            <li>
-              <a
-                class="block w-full text-left px-3 py-1.5 hover:text-primary-600 transition duration-300"
-                href="#"
-                hx-get="{% url 'feedback-creation' %}?modal=1&candidate_id={{ candidate.id }}"
-                hx-target="#feedbackSetupModalTarget"
-                hx-swap="innerHTML"
-                data-toggle="oh-modal-toggle"
-                data-target="#feedbackSetupModal">
-                {% trans "Setup Feedback" %}
-              </a>
-            </li>
-            {% endif %}
             {% if perms.recruitment.change_candidate %}
             <li>
               <a
@@ -104,23 +90,38 @@
               </a>
             </li>
             {% endif %}
+            {% if candidate.get_probation_months %}
             {% if candidate.probation_feedback_cycle %}
-            <li>
-              <span class="block w-full px-3 py-1.5 text-[#9AA1AC]">{% trans "Probation feedback cycle running" %}</span>
-            </li>
-            {% elif candidate.get_probation_months %}
             <li>
               <a
                 class="block w-full text-left px-3 py-1.5 hover:text-primary-600 transition duration-300"
                 href="#"
-                hx-post="{% url 'onboarding-start-feedback-cycle' candidate.pk %}"
-                hx-target="#messages"
+                hx-get="{% url 'onboarding-probation-feedback-details' candidate.pk %}"
+                hx-target="#feedbackSetupModalTarget"
                 hx-swap="innerHTML"
-                hx-confirm="{% trans 'Start a monthly probation feedback cycle for this candidate, based on Date of Joining and Probation End? Month 1 goes to the Reporting Manager and Buddy, later months go to the Reporting Manager only.' %}"
-                hx-on:htmx:after-request="if(event.detail.successful){htmx.ajax('GET', '{{ search_url }}', {target: '#{{ view_id }}', swap: 'outerHTML'});$('#reloadMessagesButton').click();}">
+                data-toggle="oh-modal-toggle"
+                data-target="#feedbackSetupModal">
+                {% trans "See Feedback Details" %}
+              </a>
+            </li>
+            {% elif candidate.onboarding_detail.portal_sent_at %}
+            <li>
+              <a
+                class="block w-full text-left px-3 py-1.5 hover:text-primary-600 transition duration-300"
+                href="#"
+                hx-get="{% url 'onboarding-probation-feedback-setup' candidate.pk %}?search_url={{ search_url|urlencode }}&view_id={{ view_id }}"
+                hx-target="#feedbackSetupModalTarget"
+                hx-swap="innerHTML"
+                data-toggle="oh-modal-toggle"
+                data-target="#feedbackSetupModal">
                 {% trans "Start Probation Feedback Cycle" %}
               </a>
             </li>
+            {% else %}
+            <li>
+              <span class="block w-full px-3 py-1.5 text-[#9AA1AC]" title="{% trans 'Send the onboarding portal first to unlock this' %}">{% trans "Start Probation Feedback Cycle" %}</span>
+            </li>
+            {% endif %}
             {% endif %}
             {% endif %}
             <li>
@@ -154,6 +155,13 @@
             {% else %}
             <span class="inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full" style="background:#fff4e5;color:#b25e09;">{% trans "Onboarding Not Configured" %}</span>
             {% endif %}
+            <span
+              class="inline-flex items-center justify-center w-4 h-4 rounded-full"
+              style="{% if candidate.onboarding_detail.portal_sent_at %}background:#e6f4ea;color:#1e7e34;{% else %}background:#eef1f1;color:#9AA1AC;{% endif %}"
+              title="{% if candidate.onboarding_detail.portal_sent_at %}{% trans 'Onboarding portal sent' %}{% else %}{% trans 'Onboarding portal not sent yet' %}{% endif %}"
+            >
+              <ion-icon name="{% if candidate.onboarding_detail.portal_sent_at %}checkmark-done-outline{% else %}ellipse-outline{% endif %}" style="font-size:10px;"></ion-icon>
+            </span>
           </div>
         </div>
       </div>

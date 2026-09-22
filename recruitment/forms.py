@@ -2009,8 +2009,22 @@ class LinkedInAccountForm(BaseModelForm):
             "company_id",
         ]
         widgets = {
-            "client_secret": forms.PasswordInput(render_value=True),
+            "client_secret": forms.PasswordInput(render_value=False),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["client_secret"].required = False
+            self.fields["client_secret"].help_text = _(
+                "Leave blank to keep the current secret unchanged."
+            )
+
+    def clean_client_secret(self):
+        value = self.cleaned_data.get("client_secret")
+        if not value and self.instance.pk:
+            return self.instance.client_secret
+        return value
 
 
 class CandidateIntakeMailboxForm(BaseModelForm):
@@ -2072,6 +2086,7 @@ class AISettingsForm(BaseModelForm):
     openai_api_key = forms.CharField(
         required=False,
         label=_("OpenAI API Key"),
+        help_text=_("Leave blank to keep the current key unchanged."),
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
     )
 
@@ -2087,3 +2102,9 @@ class AISettingsForm(BaseModelForm):
         widgets = {
             "provider": forms.Select(attrs={"onchange": "aiProviderChange($(this))"}),
         }
+
+    def clean_openai_api_key(self):
+        value = self.cleaned_data.get("openai_api_key")
+        if not value and self.instance.pk:
+            return self.instance.openai_api_key
+        return value

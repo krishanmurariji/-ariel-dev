@@ -84,25 +84,19 @@ body.onboarding-list-hide-toolbar #onboardingCandidatesNavBar {
     </div>
   </div>
 
-  {% if perms.pms.add_feedback %}
+  {% if perms.recruitment.change_candidate %}
   <div class="oh-modal" id="feedbackSetupModal" role="dialog" aria-labelledby="feedbackSetupModalLabel" aria-hidden="true">
     <div class="oh-modal__dialog" style="max-width: 900px">
-      <div class="oh-modal__dialog-header">
-        <span class="oh-modal__dialog-title" id="feedbackSetupModalLabel">{% trans "Setup Feedback" %}</span>
-        <button type="button" class="oh-modal__close" aria-label="Close" onclick="$('#feedbackSetupModal').removeClass('oh-modal--show');">
-          <ion-icon name="close-outline"></ion-icon>
-        </button>
-      </div>
-      <div class="oh-modal__dialog-body" id="feedbackSetupModalTarget"></div>
+      <div id="feedbackSetupModalTarget"></div>
     </div>
   </div>
   {% endif %}
 
   <div class="oh-modal" id="addAttachments" role="dialog" aria-labelledby="addAttachments" aria-hidden="true">
-    <div class="oh-modal__dialog">
+    <div class="oh-modal__dialog" style="max-width:760px;">
       <div class="oh-modal__dialog-header">
-        <span class="oh-modal__dialog-title" id="addEmployeeModalLabel">{% trans "Attachments" %} <span
-            style="color: #80808080;font-size: 14px;">({% trans "Optional" %})</span></span>
+        <span class="oh-modal__dialog-title" id="addEmployeeModalLabel">{% trans "Send Onboarding Portal" %}</span>
+        <div style="font-size:12.5px;color:#8a9490;margin-top:2px;">{% trans "Review where things stand, then send the portal link to the candidate." %}</div>
         <button class="oh-modal__close" aria-label="Close">
           <ion-icon name="close-outline"></ion-icon>
         </button>
@@ -114,8 +108,13 @@ body.onboarding-list-hide-toolbar #onboardingCandidatesNavBar {
           <div id="sendPortalStatusContainer"></div>
           <section>
             <div id="keyResultsContainer">
-              <div class="my-3" id="keyResultCard">
-                <div class="oh-card oh-card--no-shadow oh-card__body">
+              <div id="keyResultCard">
+                <div style="background:#fafbfb;border:1px solid #eceeee;border-radius:10px;padding:16px 18px;">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                    <ion-icon name="attach-outline" style="font-size:17px;color:#0f6e5c;"></ion-icon>
+                    <span style="font-size:13px;font-weight:600;color:#2d2d2d;">{% trans "Attachments" %}
+                      <span style="color:#8a9490;font-weight:400;">({% trans "Optional" %})</span></span>
+                  </div>
 
                   <div class="oh-input__group">
                     <select name="ids" id="hired_candidates" multiple class="w-100" hidden >

@@ -82,21 +82,6 @@
 		><ion-icon name="rocket-outline"></ion-icon
 	></a>
 
-	{% if perms.pms.add_feedback %}
-		<button
-			type="button"
-			class="oh-btn oh-btn--light-bkg w-100"
-			title="{% trans 'Setup Feedback' %}"
-			hx-get="{% url 'feedback-creation' %}?modal=1&candidate_id={{ instance.id }}"
-			hx-target="#feedbackSetupModalTarget"
-			hx-swap="innerHTML"
-			data-toggle="oh-modal-toggle"
-			data-target="#feedbackSetupModal"
-		>
-			<ion-icon name="chatbox-outline"></ion-icon>
-		</button>
-	{% endif %}
-
 	<button
 		type="button"
 		class="oh-btn oh-btn--light-bkg w-100"
@@ -121,53 +106,49 @@
 		<ion-icon name="layers-outline"></ion-icon>
 	</button>
 
-	{% if perms.recruitment.change_candidate %}
+	{% if perms.recruitment.change_candidate and instance.get_probation_months %}
+		<span
+			class="oh-btn oh-btn--light-bkg w-100"
+			style="pointer-events:auto;cursor:default;{% if instance.onboarding_detail.portal_sent_at %}color:#2f9e44;{% else %}color:#9AA1AC;{% endif %}"
+			title="{% if instance.onboarding_detail.portal_sent_at %}{% trans 'Onboarding portal sent' %}{% else %}{% trans 'Onboarding portal not sent yet' %}{% endif %}"
+		>
+			<ion-icon name="{% if instance.onboarding_detail.portal_sent_at %}checkmark-done-outline{% else %}ellipse-outline{% endif %}"></ion-icon>
+		</span>
+
 		{% if instance.probation_feedback_cycle %}
-			<a
-				class="oh-btn w-100"
-				title="{% trans 'Probation feedback cycle running' %}"
-				href="#"
-				onclick="
-					event.preventDefault();
-					Swal.fire({
-						icon: 'info',
-						title: `{% trans 'Already Running' %}`,
-						text: `{% trans 'A probation feedback cycle is already running for this candidate.' %}`,
-						confirmButtonText: `{% trans 'OK' %}`,
-					});
-				"
-				style="background-color: #2f9e44; color: white; pointer-events: auto; cursor: default;"
+			<button
+				type="button"
+				class="oh-btn oh-btn--light-bkg w-100"
+				title="{% trans 'See Feedback Details' %}"
+				hx-get="{% url 'onboarding-probation-feedback-details' instance.pk %}"
+				hx-target="#feedbackSetupModalTarget"
+				hx-swap="innerHTML"
+				data-toggle="oh-modal-toggle"
+				data-target="#feedbackSetupModal"
 			>
-				<ion-icon name="checkmark-circle-outline"></ion-icon>
-			</a>
-		{% elif instance.get_probation_months %}
-			<form
-				hx-post="{% url 'onboarding-start-feedback-cycle' instance.pk %}"
-				hx-target="#reloadMessages"
+				<ion-icon name="bar-chart-outline"></ion-icon>
+			</button>
+		{% elif instance.onboarding_detail.portal_sent_at %}
+			<button
+				type="button"
+				class="oh-btn oh-btn--light-bkg w-100"
+				title="{% trans 'Start Probation Feedback Cycle' %}"
+				hx-get="{% url 'onboarding-probation-feedback-setup' instance.pk %}"
+				hx-target="#feedbackSetupModalTarget"
+				hx-swap="innerHTML"
+				data-toggle="oh-modal-toggle"
+				data-target="#feedbackSetupModal"
 			>
-				<a
-					class="oh-btn oh-btn--light-bkg w-100"
-					onclick="
-						event.preventDefault();
-						Swal.fire({
-							title: `{% trans 'Start probation feedback cycle?' %}`,
-							text: `{% trans 'Generates one review each month for' %} {{ instance.get_probation_months }} {% trans 'month(s), based on Date of Joining and Probation End - month 1 goes to the Reporting Manager and Buddy, later months go to the Reporting Manager only.' %}`,
-							icon: 'question',
-							showCancelButton: true,
-							confirmButtonText: `{% trans 'Yes' %}`,
-							cancelButtonText: `{% trans 'Cancel' %}`,
-						}).then((result) => {
-							if (result.isConfirmed) {
-								$(this).closest('form').find('[type=submit]').click();
-							}
-						});
-					"
-					title="{% trans 'Start Probation Feedback Cycle' %}"
-				>
-					<ion-icon name="chatbox-ellipses-outline"></ion-icon>
-				</a>
-				<input type="submit" hidden />
-			</form>
+				<ion-icon name="chatbox-ellipses-outline"></ion-icon>
+			</button>
+		{% else %}
+			<span
+				class="oh-btn oh-btn--light-bkg w-100"
+				style="opacity:.45;pointer-events:auto;cursor:not-allowed;"
+				title="{% trans 'Send the onboarding portal first to unlock the probation feedback cycle' %}"
+			>
+				<ion-icon name="chatbox-ellipses-outline"></ion-icon>
+			</span>
 		{% endif %}
 	{% endif %}
 

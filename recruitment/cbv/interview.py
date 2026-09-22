@@ -347,15 +347,16 @@ class InterviewForm(HorillaFormView):
                     or (
                         _(
                             "Interview saved, but the meeting link could "
-                            "not be generated: the meeting provider isn't "
-                            "connected yet. Use 'Send Meeting Link' from the "
-                            "interview once it's connected."
+                            "not be generated: your account isn't connected "
+                            "to the meeting provider yet. Click 'Send "
+                            "Meeting Link' on this interview to connect it."
                         )
                         if is_online
                         else _(
                             "Interview saved, but it could not be added to "
-                            "the calendar: the meeting provider isn't "
-                            "connected yet."
+                            "the calendar: your account isn't connected to "
+                            "the meeting provider yet. Click 'Send Meeting "
+                            "Link' on this interview to connect it."
                         )
                     ),
                 )

@@ -64,12 +64,30 @@ class BiometricDeviceForm(ModelForm):
                     "onchange": "machineTypeChange($(this))",
                 }
             ),
+            # zk_password/api_key/api_secret/api_token now use an
+            # EncryptedTextField (a TextField subclass), which would
+            # otherwise auto-render as a multi-line <textarea> - pin them
+            # back to single-line inputs, matching bio_password.
             "bio_password": forms.TextInput(
                 attrs={
                     "class": "oh-input oh-input--password w-100",
                     "type": "password",
                 }
             ),
+            "zk_password": forms.TextInput(
+                attrs={
+                    "class": "oh-input oh-input--password w-100",
+                    "type": "password",
+                }
+            ),
+            "api_key": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "api_secret": forms.TextInput(
+                attrs={
+                    "class": "oh-input oh-input--password w-100",
+                    "type": "password",
+                }
+            ),
+            "api_token": forms.TextInput(attrs={"class": "oh-input w-100"}),
         }
 
     def __init__(self, *args, **kwargs):

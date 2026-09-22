@@ -7,6 +7,7 @@ bleach
 certifi
 cffi
 channels
+channels_redis
 chardet
 charset-normalizer
 click
@@ -72,6 +73,7 @@ tzlocal
 uritools
 urllib3
 utils
+uvicorn[standard]
 webencodings
 xhtml2pdf
 XlsxWriter

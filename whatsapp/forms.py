@@ -1,8 +1,10 @@
 # forms.py
 from typing import Any
 
+from django import forms
 from django.forms import ValidationError
 from django.template.loader import render_to_string
+from django.utils.translation import gettext_lazy as _
 
 from base.forms import ModelForm
 from whatsapp.models import WhatsappCredientials
@@ -15,6 +17,34 @@ class WhatsappForm(ModelForm):
         model = WhatsappCredientials
         fields = "__all__"
         exclude = ["is_active", "created_templates"]
+        widgets = {
+            "meta_token": forms.PasswordInput(render_value=False),
+            "meta_webhook_token": forms.PasswordInput(render_value=False),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ("meta_token", "meta_webhook_token"):
+            self.fields[field_name].widget.attrs.update(
+                {"class": "oh-input w-100 form-control"}
+            )
+            if self.instance.pk:
+                self.fields[field_name].required = False
+                self.fields[field_name].help_text = _(
+                    "Leave blank to keep the current value unchanged."
+                )
+
+    def clean_meta_token(self):
+        value = self.cleaned_data.get("meta_token")
+        if not value and self.instance.pk:
+            return self.instance.meta_token
+        return value
+
+    def clean_meta_webhook_token(self):
+        value = self.cleaned_data.get("meta_webhook_token")
+        if not value and self.instance.pk:
+            return self.instance.meta_webhook_token
+        return value
 
     def as_p(self):
         """

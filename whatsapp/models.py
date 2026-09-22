@@ -4,18 +4,18 @@ from django.utils.translation import gettext_lazy as _
 
 from base.horilla_company_manager import HorillaCompanyManager
 from base.models import Company
+from horilla.crypto_fields import EncryptedTextField
 from horilla.models import HorillaModel
 from horilla_views.cbv_methods import render_template
 
 
 class WhatsappCredientials(HorillaModel):
-    meta_token = models.TextField()
+    meta_token = EncryptedTextField()
     meta_business_id = models.CharField(max_length=255)
     meta_phone_number_id = models.CharField(max_length=255)
     meta_phone_number = models.CharField(max_length=20)
     created_templates = models.BooleanField(default=False)
-    meta_webhook_token = models.CharField(
-        max_length=50,
+    meta_webhook_token = EncryptedTextField(
         verbose_name="Webhook Token",
         help_text=_("This token is used to connect webhook to the server"),
     )
@@ -28,31 +28,12 @@ class WhatsappCredientials(HorillaModel):
         return f"WhatsApp Business {self.meta_business_id} ({self.meta_phone_number})"
 
     def token_render(self):
-
-        alert = """
-                    Swal.fire({
-                    text: "Token copied",
-                    icon: "success",
-                    showConfirmButton: false,
-                    timer: 2000,
-                    timerProgressBar: true,
-                    });
-                """
-
-        html = f"""
-        <span onclick="copyToken()" title={self.meta_token}>{self.meta_token[:20]}...</span>
-        <script>
-            function copyToken() {{
-                var token = "{self.meta_token}";
-                navigator.clipboard.writeText(token).then(function() {{
-                    {alert}
-                }}, function(err) {{
-                    console.error('Could not copy text: ', err);
-                }});
-            }}
-        </script>
-        """
-        return html
+        # Always masked - never puts the real access token in the page's
+        # HTML/JS. It used to embed it directly (title attribute + an
+        # inline "copy to clipboard" script), which meant anyone with
+        # page/view-source access could read this WhatsApp Business token
+        # straight out of the DOM, encrypted at rest or not.
+        return "<span>••••••••••••••••••••</span>"
 
     def get_update_url(self):
         url = reverse("whatsapp-credential-update", kwargs={"pk": self.pk})
@@ -87,22 +68,10 @@ class WhatsappCredientials(HorillaModel):
         return url
 
     def get_webhook_token(self):
-        placeholder = "•" * len(self.meta_webhook_token)
-        html = f"""
-            <style>
-                .editable-span {{
-                    cursor: pointer;
-                }}
-                .editable-span::after {{
-                    content: '{placeholder}';
-                }}
-                .editable-span:hover::after {{
-                    content: '{self.meta_webhook_token}';
-                }}
-            </style>
-            <span class="editable-span"></span>
-            """
-        return html
+        # Always masked - a "reveal on hover" here used to put the real
+        # webhook verify token in the page's CSS, readable straight out of
+        # the DOM/view-source by anyone with page access.
+        return "<span>••••••••••••••••••••</span>"
 
 
 class WhatsappFlowDetails(models.Model):

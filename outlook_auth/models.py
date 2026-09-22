@@ -11,6 +11,7 @@ from base.models import Company
 from employee.models import Employee
 from horilla.models import HorillaModel, NoPermissionModel
 from horilla_views.cbv_methods import render_template
+from outlook_auth.crypto_fields import EncryptedJSONField, EncryptedTextField
 from outlook_auth.methods import sec_to_hm
 
 # Create your models here.
@@ -22,9 +23,7 @@ class AzureApi(models.Model):
     """
 
     outlook_client_id = models.CharField(max_length=200, verbose_name=_("Client ID"))
-    outlook_client_secret = models.CharField(
-        max_length=200, verbose_name=_("Client Secret")
-    )
+    outlook_client_secret = EncryptedTextField(verbose_name=_("Client Secret"))
     outlook_tenant_id = models.CharField(max_length=200, verbose_name=_("Tenant ID"))
     outlook_email = models.EmailField(verbose_name=_("Email"))
     outlook_display_name = models.CharField(
@@ -45,7 +44,7 @@ class AzureApi(models.Model):
     )
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
     is_primary = models.BooleanField(default=False)
-    token = models.JSONField(editable=False, default=dict)
+    token = EncryptedJSONField(editable=False, default=dict)
     oauth_state = models.CharField(editable=False, max_length=100, null=True)
     last_refreshed = models.DateTimeField(null=True, editable=False)
 

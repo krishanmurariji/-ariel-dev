@@ -15,6 +15,15 @@ services:
       - DATABASE_URL=postgres://horilla_user:horilla_pass@db:5432/horilla_db
       - DB_INIT_PASSWORD=dev-init-password-change-in-production
       - REDIS_URL=redis://:horilla_pass@redis:6379/0
+      # Shared channel layer for the chat WebSocket (recruitment/consumers.py,
+      # horilla/settings/base.py) - gunicorn runs multiple worker PROCESSES
+      # (docker/gunicorn.conf.py), and the default in-memory channel layer
+      # doesn't cross process boundaries, so a chat message sent via a
+      # request handled by one worker would never reach a socket accepted
+      # by another. DB index 1, separate from REDIS_URL's 0 above, even
+      # though nothing else claims that one yet.
+      - CHANNEL_LAYER_BACKEND=redis
+      - CHANNEL_LAYER_REDIS_URL=redis://:horilla_pass@redis:6379/1
       - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_INTAKE_MODEL=llama3.2:3b
     depends_on:

@@ -217,9 +217,14 @@ urlpatterns = [
         name="undo-rejected-candidate",
     ),
     path(
-        "candidate/<int:pk>/start-feedback-cycle/",
-        views.start_feedback_cycle,
-        name="onboarding-start-feedback-cycle",
+        "candidate/<int:pk>/probation-feedback-setup/",
+        views.probation_feedback_setup,
+        name="onboarding-probation-feedback-setup",
+    ),
+    path(
+        "candidate/<int:pk>/probation-feedback-details/",
+        views.probation_feedback_details,
+        name="onboarding-probation-feedback-details",
     ),
     path(
         "candidate-select-filter-onboarding/",
@@ -404,6 +409,11 @@ urlpatterns = [
         "candidate/<int:pk>/onboard-document-upload/",
         stepper.document_upload,
         name="onboarding-stepper-document-upload",
+    ),
+    path(
+        "candidate/<int:pk>/onboard-document/<int:doc_id>/remind/",
+        stepper.send_document_reminder,
+        name="onboarding-stepper-document-remind",
     ),
     path(
         "candidate/<int:pk>/onboard-document/<int:doc_id>/<str:action>/",

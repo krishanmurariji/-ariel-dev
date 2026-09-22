@@ -13,6 +13,7 @@ from google.oauth2.credentials import Credentials
 from base.horilla_company_manager import HorillaCompanyManager
 from base.models import Company
 from employee.models import Employee
+from horilla.crypto_fields import EncryptedTextField
 from horilla.horilla_middlewares import _thread_locals
 from horilla.models import HorillaModel, NoPermissionModel
 from horilla_views.cbv_methods import render_template
@@ -28,7 +29,7 @@ class GoogleCloudCredential(models.Model):
 
     project_id = models.CharField(max_length=255, blank=True, null=True)
     client_id = models.CharField(max_length=255)
-    client_secret = models.CharField(max_length=255)
+    client_secret = EncryptedTextField()
     redirect_uris = models.TextField(help_text=_("Comma separated URIs"))
     company_id = models.ForeignKey(
         Company,
@@ -103,16 +104,16 @@ class GoogleCloudCredential(models.Model):
 
     def get_client_secret_col(self):
         """
-        Returns an HTML snippet that hides the actual client secret value and displays
-        a placeholder (masked version) for the client secret in a UI table column.
+        Always-masked placeholder for the client secret in a UI table
+        column - unlike get_client_id_col, this never puts the real value
+        in the page's HTML (a "reveal on hover" there would mean anyone
+        with page/view-source access could read the secret straight out
+        of the DOM, encrypted-at-rest or not).
 
         Returns:
             str: An HTML string to represent a masked client secret.
         """
-        col = f"""
-        <span class="oh-hidden-item" data-value={self.client_secret}>********************</span>
-        """
-        return col
+        return "<span>********************</span>"
 
     def get_redirect_url(self):
         """
@@ -148,11 +149,11 @@ class GoogleCredential(HorillaModel, NoPermissionModel):
     employee_id = models.OneToOneField(
         Employee, on_delete=models.CASCADE, related_name="google_credential"
     )
-    token = models.TextField()
-    refresh_token = models.TextField()
+    token = EncryptedTextField()
+    refresh_token = EncryptedTextField()
     token_uri = models.CharField(max_length=255)
     client_id = models.CharField(max_length=255)
-    client_secret = models.CharField(max_length=255)
+    client_secret = EncryptedTextField()
     scopes = models.TextField()
     expires_at = models.DateTimeField()
 

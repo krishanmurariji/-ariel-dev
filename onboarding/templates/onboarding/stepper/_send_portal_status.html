@@ -1,4 +1,35 @@
 {% load i18n %}
+<style>
+  .oh-ps-card { background:#fafbfb; border:1px solid #eceeee; border-radius:10px; padding:16px 18px; margin-bottom:14px; }
+  .oh-ps-grid { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:4px; }
+  .oh-ps-grid .oh-ps-card { flex:1 1 220px; margin-bottom:0; }
+  .oh-ps-card__head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .oh-ps-card__head ion-icon { font-size:17px; color:#0f6e5c; }
+  .oh-ps-card__title { font-size:13px; font-weight:600; color:#2d2d2d; }
+  .oh-ps-progress-row { display:flex; justify-content:space-between; align-items:baseline; font-size:12px; color:#7a828d; margin-bottom:6px; }
+  .oh-ps-progress-row strong { font-size:13px; color:#2d2d2d; }
+  .oh-ps-bar { background:#e9ebeb; border-radius:6px; height:7px; overflow:hidden; }
+  .oh-ps-bar__fill { height:100%; border-radius:6px; transition:width .3s; }
+  .oh-ps-doc-row { display:flex; align-items:center; gap:12px; padding:10px 0; border-top:1px solid #eceeee; }
+  .oh-ps-doc-row:first-child { border-top:none; padding-top:2px; }
+  .oh-ps-doc-row__icon { flex:none; width:32px; height:32px; border-radius:8px; background:#eef4f2; color:#0f6e5c; display:flex; align-items:center; justify-content:center; font-size:16px; }
+  .oh-ps-doc-row__body { flex:1; min-width:0; }
+  .oh-ps-doc-row__title { font-size:13px; color:#2d2d2d; font-weight:500; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .oh-ps-tag { font-size:10px; font-weight:700; letter-spacing:.02em; padding:2px 7px; border-radius:9px; }
+  .oh-ps-tag--required { background:#fbe4e6; color:#b02a37; }
+  .oh-ps-pill { font-size:11px; font-weight:600; padding:3px 9px; border-radius:9px; white-space:nowrap; }
+  .oh-ps-pill--pending { background:#fff4e5; color:#b25e09; }
+  .oh-ps-pill--submitted { background:#e3ecf7; color:#3e6b99; }
+  .oh-ps-pill--under_verification { background:#f3e6cc; color:#a6672e; }
+  .oh-ps-pill--approved { background:#e6f4ea; color:#1e7e34; }
+  .oh-ps-pill--rejected { background:#f3ddd7; color:#b3402f; }
+  .oh-ps-remind-btn { flex:none; font-size:12px; padding:5px 12px; border-radius:6px; border:1px solid #0f6e5c; color:#0f6e5c; background:#fff; cursor:pointer; white-space:nowrap; transition:all .15s; }
+  .oh-ps-remind-btn:hover { background:#0f6e5c; color:#fff; }
+  .oh-ps-remind-btn:disabled { cursor:default; border-color:#cfd6d4; color:#8a9490; background:#fff; }
+  .oh-ps-empty { font-size:12px; color:#8a9490; padding:6px 0; }
+  .oh-ps-summary-chip { font-size:11px; font-weight:600; color:#565e6c; background:#eef1f1; padding:3px 10px; border-radius:9px; }
+</style>
+
 {% if not configured %}
 <div class="oh-alert oh-alert--warning" style="margin-bottom:14px;">
     <strong>{% trans "Onboarding has not been configured for this candidate yet." %}</strong>
@@ -7,19 +38,120 @@
     </div>
 </div>
 {% else %}
-<div style="margin-bottom:14px;">
-    <div style="display:flex;justify-content:space-between;font-size:13px;color:#565e6c;margin-bottom:5px;">
-        <span>{% trans "Pre-Joining Checklist" %}</span>
-        <span>
-            {% if total %}
-                {{ done }}/{{ total }} {% trans "complete" %}
-            {% else %}
-                {% trans "No pre-joining tasks set up" %}
-            {% endif %}
-        </span>
+
+<div class="oh-ps-grid">
+  <div class="oh-ps-card">
+    <div class="oh-ps-card__head">
+      <ion-icon name="checkbox-outline"></ion-icon>
+      <span class="oh-ps-card__title">{% trans "Pre-Joining Checklist" %}</span>
     </div>
-    <div style="background:#eceeee;border-radius:6px;height:8px;overflow:hidden;">
-        <div style="background:{% if percent == 100 %}#2f9e44{% else %}#f59f00{% endif %};height:100%;width:{{ percent }}%;transition:width .3s;"></div>
+    {% if pre_total %}
+    <div class="oh-ps-progress-row"><span>{% trans "Progress" %}</span><strong>{{ pre_done }}/{{ pre_total }} {% trans "done" %}</strong></div>
+    <div class="oh-ps-bar"><div class="oh-ps-bar__fill" style="background:{% if pre_percent == 100 %}#2f9e44{% else %}#f59f00{% endif %};width:{{ pre_percent }}%;"></div></div>
+    {% else %}
+    <div class="oh-ps-empty">{% trans "No pre-joining tasks set up" %}</div>
+    {% endif %}
+  </div>
+
+  <div class="oh-ps-card">
+    <div class="oh-ps-card__head">
+      <ion-icon name="briefcase-outline"></ion-icon>
+      <span class="oh-ps-card__title">{% trans "Post-Joining Tasks" %}</span>
     </div>
+    {% if post_total %}
+    <div class="oh-ps-progress-row"><span>{% trans "Progress" %}</span><strong>{{ post_done }}/{{ post_total }} {% trans "done" %}</strong></div>
+    <div class="oh-ps-bar"><div class="oh-ps-bar__fill" style="background:{% if post_percent == 100 %}#2f9e44{% else %}#f59f00{% endif %};width:{{ post_percent }}%;"></div></div>
+    {% else %}
+    <div class="oh-ps-empty">{% trans "No post-joining tasks set up" %}</div>
+    {% endif %}
+  </div>
 </div>
+
+<div class="oh-ps-card">
+  <div class="oh-ps-card__head" style="justify-content:space-between;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <ion-icon name="document-attach-outline"></ion-icon>
+      <span class="oh-ps-card__title">{% trans "Document Details" %}</span>
+    </div>
+    {% if documents_total %}
+    <span class="oh-ps-summary-chip">
+      {% if documents_pending %}
+        {{ documents_pending }} {% trans "pending" %} / {{ documents_total }}
+      {% else %}
+        {% trans "All submitted" %}
+      {% endif %}
+    </span>
+    {% endif %}
+  </div>
+
+  {% if not documents %}
+  <div class="oh-ps-empty">{% trans "No documents requested yet" %}</div>
+  {% else %}
+  {% for document in documents %}
+  {% with req=document.document_request_id %}
+  <div class="oh-ps-doc-row">
+    <div class="oh-ps-doc-row__icon">
+      {% if req.format == "pdf" %}<ion-icon name="document-text-outline"></ion-icon>
+      {% elif req.format == "jpg" or req.format == "png" or req.format == "jpeg" %}<ion-icon name="image-outline"></ion-icon>
+      {% elif req.format == "xlsx" %}<ion-icon name="grid-outline"></ion-icon>
+      {% elif req.format == "docx" or req.format == "txt" %}<ion-icon name="document-outline"></ion-icon>
+      {% else %}<ion-icon name="attach-outline"></ion-icon>{% endif %}
+    </div>
+    <div class="oh-ps-doc-row__body">
+      <div class="oh-ps-doc-row__title">
+        <span>{{ req.title|default:document.title }}</span>
+        {% if req.is_mandatory %}<span class="oh-ps-tag oh-ps-tag--required">{% trans "Required" %}</span>{% endif %}
+      </div>
+    </div>
+    {% if document.status == "approved" %}
+    <span class="oh-ps-pill oh-ps-pill--approved">{% trans "Verified" %}</span>
+    {% elif document.status == "rejected" %}
+    <span class="oh-ps-pill oh-ps-pill--rejected">{% trans "Rejected" %}</span>
+    {% elif document.document %}
+    <span class="oh-ps-pill oh-ps-pill--{{ document.status }}">
+      {% if document.status == "under_verification" %}{% trans "Under Verification" %}{% else %}{% trans "Submitted" %}{% endif %}
+    </span>
+    {% else %}
+    <span class="oh-ps-pill oh-ps-pill--pending">{% trans "Pending" %}</span>
+    <button
+      type="button"
+      class="oh-ps-remind-btn"
+      data-url="{% url 'onboarding-stepper-document-remind' candidate.pk document.pk %}"
+      onclick="ohSendDocReminder(this)"
+    >{% trans "Send Reminder" %}</button>
+    {% endif %}
+  </div>
+  {% endwith %}
+  {% endfor %}
+  {% endif %}
+</div>
+
+<script>
+  function ohSendDocReminder(btn) {
+    btn.disabled = true;
+    var originalText = btn.textContent;
+    btn.textContent = "{% trans 'Sending...' %}";
+    $.ajax({
+      type: "POST",
+      url: btn.dataset.url,
+      data: { csrfmiddlewaretoken: getCookie("csrftoken") },
+      success: function (response) {
+        if (response && response.success) {
+          btn.textContent = "{% trans 'Reminder Sent' %} ✓";
+        } else {
+          btn.disabled = false;
+          btn.textContent = originalText;
+        }
+      },
+      error: function (xhr) {
+        btn.disabled = false;
+        btn.textContent = originalText;
+        var message = "{% trans 'Could not send reminder' %}";
+        try { message = xhr.responseJSON.error || message; } catch (e) {}
+        Swal.fire({ icon: "error", title: message });
+      }
+    });
+  }
+</script>
+
 {% endif %}

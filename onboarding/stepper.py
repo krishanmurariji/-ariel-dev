@@ -19,11 +19,13 @@ left column (step list) persists across navigation, and any step can be
 jumped to directly, up to the furthest one actually reached.
 """
 
+import secrets
 from datetime import timedelta
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -42,6 +44,7 @@ from onboarding.forms import (
     WelcomeMessageForm,
 )
 from onboarding.mailers import (
+    notify_candidate_document_reminder,
     notify_onboarding_buddy_assigned,
     notify_reporting_manager_assigned,
     notify_reporting_manager_removed,
@@ -50,6 +53,7 @@ from onboarding.models import (
     CandidateChecklistTask,
     CandidateStage,
     OnboardingCandidateDetail,
+    OnboardingPortal,
     TaskTemplate,
     TaskTemplateTask,
 )
@@ -791,6 +795,46 @@ def document_upload(request, pk):
     )
 
 
+@login_required
+@permission_required("recruitment.change_candidate")
+def send_document_reminder(request, pk, doc_id):
+    """
+    Emails the candidate a reminder for one specific still-pending document
+    request. Called via plain jQuery $.post() from the "Send Onboarding
+    Portal" modal (see send_portal_status's docstring for why that modal's
+    fragments avoid htmx/@hx_request_required), so this returns JSON
+    instead of an HTML fragment.
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": str(_("Invalid request"))}, status=405)
+    candidate = get_object_or_404(Candidate, pk=pk)
+    document = get_object_or_404(CandidateDocument, pk=doc_id, candidate_id=candidate)
+    if document.document or document.status in ("approved", "rejected"):
+        return JsonResponse(
+            {"error": str(_("This document is no longer pending."))}, status=400
+        )
+    if not candidate.email:
+        return JsonResponse(
+            {"error": str(_("This candidate has no email address on file."))},
+            status=400,
+        )
+    portal, created = OnboardingPortal.objects.get_or_create(candidate_id=candidate)
+    if created or portal.used:
+        # No portal link yet, or the candidate already finished the whole
+        # self-onboarding flow with it (used=True blocks re-entry) - either
+        # way the old token (if any) won't get them in, so mint a fresh one
+        # exactly like the main "Send Portal Link" action does.
+        portal.token = secrets.token_hex(15)
+        portal.used = False
+        portal.save(update_fields=["token", "used"])
+    protocol = "https" if request.is_secure() else "http"
+    portal_url = (
+        f"{protocol}://{request.get_host()}/onboarding/document-upload/{portal.token}/"
+    )
+    notify_candidate_document_reminder(candidate, document, portal_url)
+    return JsonResponse({"success": True})
+
+
 def _candidate_tasks_context(candidate):
     tasks = list(
         candidate.checklist_tasks.select_related("assignee_id", "template_task_id").order_by(
@@ -838,12 +882,34 @@ def send_portal_status(request, pk):
     context = {"candidate": candidate, "configured": configured}
     if configured:
         pre_joining_tasks = candidate.checklist_tasks.filter(phase="pre_joining")
-        total = pre_joining_tasks.count()
-        done = pre_joining_tasks.filter(status="done").count()
+        pre_total = pre_joining_tasks.count()
+        pre_done = pre_joining_tasks.filter(status="done").count()
+
+        post_joining_tasks = candidate.checklist_tasks.filter(phase="post_joining")
+        post_total = post_joining_tasks.count()
+        post_done = post_joining_tasks.filter(status="done").count()
+
+        documents = list(
+            CandidateDocument.objects.filter(candidate_id=candidate)
+            .select_related("document_request_id")
+            .order_by("-id")
+        )
+        pending_documents = [
+            doc
+            for doc in documents
+            if not doc.document and doc.status not in ("approved", "rejected")
+        ]
         context.update(
-            total=total,
-            done=done,
-            percent=round(done / total * 100) if total else 0,
+            pre_total=pre_total,
+            pre_done=pre_done,
+            pre_percent=round(pre_done / pre_total * 100) if pre_total else 0,
+            post_total=post_total,
+            post_done=post_done,
+            post_percent=round(post_done / post_total * 100) if post_total else 0,
+            documents=documents,
+            pending_documents=pending_documents,
+            documents_total=len(documents),
+            documents_pending=len(pending_documents),
         )
     return render(request, "onboarding/stepper/_send_portal_status.html", context)
 

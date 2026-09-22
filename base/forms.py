@@ -2632,6 +2632,9 @@ class DynamicMailConfForm(ModelForm):
         model = DynamicEmailConfiguration
         fields = "__all__"
         exclude = ["is_active"]
+        widgets = {
+            "password": forms.PasswordInput(render_value=False),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -2641,6 +2644,19 @@ class DynamicMailConfForm(ModelForm):
         # values just to save the form.
         for field_name in ("host", "port", "username", "password"):
             self.fields[field_name].required = False
+        self.fields["password"].widget.attrs.update(
+            {"class": "oh-input w-100 form-control"}
+        )
+        if self.instance.pk:
+            self.fields["password"].help_text = _(
+                "Leave blank to keep the current password unchanged."
+            )
+
+    def clean_password(self):
+        value = self.cleaned_data.get("password")
+        if not value and self.instance.pk:
+            return self.instance.password
+        return value
 
     def clean(self):
         cleaned_data = super().clean()

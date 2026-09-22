@@ -49,11 +49,13 @@ def cyclic_feedback_creation():
 def probation_feedback_creation():
     """
     Walks active ProbationFeedbackCycle rows and generates the next month's
-    Feedback once it's due - buddy is added as a reviewer for month 1 only,
-    every month gets the employee's *current* reporting manager. A cycle
-    started on a candidate before they're converted to an employee (or
-    before they have a reporting manager set) is simply retried the next
-    day, rather than erroring or giving up.
+    Feedback once it's due - the reporting manager, buddy, and colleague
+    are whoever was chosen at setup time (ProbationFeedbackCycle), not
+    re-resolved from the employee's current work info; buddy and colleague
+    are added as reviewers for month 1 only, the reporting manager every
+    month. A cycle started on a candidate before they're converted to an
+    employee is simply retried the next day, rather than erroring or
+    giving up.
     """
     from employee.models import Employee
     from onboarding.stepper import _candidate_own_employee_id
@@ -61,7 +63,12 @@ def probation_feedback_creation():
 
     today = date.today()
     cycles = ProbationFeedbackCycle.objects.filter(is_active=True).select_related(
-        "candidate_id", "buddy_id", "question_template_id"
+        "candidate_id",
+        "reporting_manager_id",
+        "buddy_id",
+        "colleague_id",
+        "question_template_id",
+        "employee_question_template_id",
     )
     for cycle in cycles:
         due_date = cycle.start_date + relativedelta(months=cycle.months_completed + 1)
@@ -72,31 +79,27 @@ def probation_feedback_creation():
         if not employee_id:
             continue  # not converted to an employee yet - try again next day
 
-        employee = (
-            Employee.objects.filter(pk=employee_id)
-            .select_related("employee_work_info")
-            .first()
-        )
-        work_info = getattr(employee, "employee_work_info", None) if employee else None
-        reporting_manager = (
-            getattr(work_info, "reporting_manager_id", None) if work_info else None
-        )
-        if not reporting_manager:
-            continue  # no reporting manager set yet - try again next day
+        employee = Employee.objects.filter(pk=employee_id).first()
+        if not cycle.reporting_manager_id:
+            continue  # no reporting manager captured - try again next day
 
         month_number = cycle.months_completed + 1
         feedback = Feedback(
             review_cycle=f"Probation Review - Month {month_number}",
             employee_id=employee,
-            manager_id=reporting_manager,
+            manager_id=cycle.reporting_manager_id,
             question_template_id=cycle.question_template_id,
+            employee_question_template_id=cycle.employee_question_template_id,
             start_date=today,
             end_date=today + relativedelta(days=7),
         )
         feedback.save()
 
-        if month_number == 1 and cycle.buddy_id:
-            feedback.others_id.add(cycle.buddy_id)
+        if month_number == 1:
+            if cycle.buddy_id:
+                feedback.others_id.add(cycle.buddy_id)
+            if cycle.colleague_id:
+                feedback.colleague_id.add(cycle.colleague_id)
 
         from pms.views import send_feedback_notifications
 

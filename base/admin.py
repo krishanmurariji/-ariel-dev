@@ -15,7 +15,6 @@ from base.models import (
     CompanyLeaves,
     DashboardEmployeeCharts,
     Department,
-    DynamicEmailConfiguration,
     DynamicPagination,
     EmailLog,
     EmployeeShift,
@@ -58,7 +57,9 @@ admin.site.register(RotatingShiftAssign)
 admin.site.register(ShiftRequest)
 admin.site.register(WorkTypeRequest)
 admin.site.register(Tags)
-admin.site.register(DynamicEmailConfiguration)
+# DynamicEmailConfiguration deliberately isn't registered here - it holds
+# the SMTP authentication password, and the default ModelAdmin would show
+# it in plaintext, unmasked, to anyone with Django-admin access to it.
 admin.site.register(MultipleApprovalManagers)
 admin.site.register(ShiftRequestComment)
 admin.site.register(WorkTypeRequestComment)

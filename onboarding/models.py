@@ -617,6 +617,18 @@ class OnboardingCandidateDetail(HorillaModel):
             "mean anywhere that status is shown to a user."
         ),
     )
+    portal_sent_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_("Portal Sent At"),
+        help_text=_(
+            "Set the first time the onboarding portal link is actually "
+            "emailed to this candidate (onboarding.views.email_send) - the "
+            "signal for whether a Probation Feedback Cycle can be started, "
+            "since that cycle assumes the candidate can already reach "
+            "their own portal for their self-assessment."
+        ),
+    )
     onboarding_completed_at = models.DateTimeField(
         null=True,
         blank=True,

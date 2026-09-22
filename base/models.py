@@ -20,6 +20,7 @@ from django.utils.translation import gettext_lazy as _
 
 from base.horilla_company_manager import HorillaCompanyManager
 from horilla import horilla_middlewares
+from horilla.crypto_fields import EncryptedTextField
 from horilla.horilla_middlewares import _thread_locals
 from horilla.methods import get_horilla_model_class
 from horilla.models import HorillaModel, NoPermissionModel, upload_path
@@ -2012,9 +2013,8 @@ class DynamicEmailConfiguration(HorillaModel):
         verbose_name=_("Display Name"),
     )
 
-    password = models.CharField(
+    password = EncryptedTextField(
         null=True,
-        max_length=256,
         verbose_name=_("Email Authentication Password"),
     )
 

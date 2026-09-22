@@ -9,6 +9,7 @@ from django.urls import reverse_lazy
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 
+from horilla.methods import handle_no_permission
 from horilla_views.cbv_methods import login_required, permission_required
 from horilla_views.generic.cbv import views
 from outlook_auth import filters, forms, models
@@ -72,9 +73,6 @@ class ServerList(views.HorillaListView):
 
 
 @method_decorator(login_required, name="dispatch")
-@method_decorator(
-    permission_required(perm="outlook_auth.add_azureapi"), name="dispatch"
-)
 class ServerForm(views.HorillaFormView):
     """
     ServerForm
@@ -83,6 +81,15 @@ class ServerForm(views.HorillaFormView):
     model = models.AzureApi
     form_class = forms.OutlookServerForm
     new_display_title = _("Create Mail Server")
+
+    def dispatch(self, request, *args, **kwargs):
+        # Editing an existing mail server needs change_azureapi, not
+        # add_azureapi - someone granted only "add" shouldn't be able to
+        # repoint or overwrite an already-connected mailbox's credentials.
+        perm = "outlook_auth.change_azureapi" if kwargs.get("pk") else "outlook_auth.add_azureapi"
+        if not request.user.has_perm(perm):
+            return handle_no_permission(request)
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

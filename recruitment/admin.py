@@ -12,7 +12,6 @@ from recruitment.models import (
     CandidateIntakeMailbox,
     CandidateRating,
     InterviewSchedule,
-    LinkedInAccount,
     Recruitment,
     RecruitmentSurvey,
     RecruitmentSurveyAnswer,
@@ -33,6 +32,9 @@ admin.site.register(RecruitmentSurvey)
 admin.site.register(CandidateRating)
 admin.site.register(SkillZone)
 admin.site.register(InterviewSchedule)
-admin.site.register(LinkedInAccount)
+# LinkedInAccount deliberately isn't registered here - it holds the
+# LinkedIn app's client secret and OAuth access token, and the default
+# ModelAdmin would show both in plaintext, unmasked, to anyone with
+# Django-admin access to it.
 admin.site.register(CandidateIntakeMailbox)
 admin.site.register(CandidateIntakeLog)

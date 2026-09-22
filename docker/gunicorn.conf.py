@@ -1,5 +1,6 @@
 # Gunicorn configuration for Horilla-HR
-# This file provides advanced configuration options for the WSGI server
+# Serves horilla.asgi:application via uvicorn workers (not plain WSGI) -
+# see worker_class below for why.
 
 import multiprocessing
 import os
@@ -15,12 +16,17 @@ workers = int(
         "GUNICORN_WORKERS", max(2, min(multiprocessing.cpu_count() * 2 + 1, 8))
     )
 )
-worker_class = "gthread"
-threads = 4
+# uvicorn's worker class (not gthread) - the app being served is
+# horilla.asgi:application, and only an ASGI-capable worker can actually
+# accept/upgrade the chat WebSocket (Channels, recruitment/consumers.py).
+# Each worker still handles regular HTTP requests too via asyncio, so this
+# isn't a tradeoff against normal request throughput.
+worker_class = "uvicorn.workers.UvicornWorker"
 worker_connections = 1000
 max_requests = 1000
 max_requests_jitter = 50
-# preload_app is disabled with gthread workers to avoid ORM connection issues
+# preload_app is disabled to avoid ORM connection issues across the forked
+# worker processes (same reasoning as the old gthread setup).
 preload_app = False
 
 # Timeout settings
