@@ -81,3 +81,6 @@ gunicorn
 psycopg2-binary
 whitenoise
 django-storages[s3]
+channels
+channels_redis
+uvicorn[standard]
