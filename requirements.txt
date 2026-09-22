@@ -81,6 +81,4 @@ gunicorn
 psycopg2-binary
 whitenoise
 django-storages[s3]
-channels
-uvicorn[standard]
 redis==5.2.1
