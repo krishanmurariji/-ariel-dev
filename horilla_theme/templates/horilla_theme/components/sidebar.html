@@ -376,9 +376,8 @@
                     <img
                         src="{% if request.user.employee_get.employee_work_info.company_id.icon %}{{ request.user.employee_get.employee_work_info.company_id.icon.url }}{% else %}/static/horilla_theme/assets/img/horilla-logo.png{% endif %}"
                         alt="{% trans 'Company logo' %}"
-                        class="hidden"
                     >
-                    <div class="oh-sidebar__company-details oh-sidebar-label min-w-0">
+                    <!-- <div class="oh-sidebar__company-details oh-sidebar-label min-w-0">
                         <span
                             class="oh-sidebar__company-title truncate"
                             style="font-size: 13px"
@@ -386,7 +385,7 @@
                         <a href="#" class="oh-sidebar__company-link truncate" style="font-size: 10px">
                             {% trans "My Company" %}
                         </a>
-                    </div>
+                    </div> -->
                 {% endif %}
             </div>
         </div>
