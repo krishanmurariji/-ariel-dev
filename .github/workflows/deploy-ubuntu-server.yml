@@ -30,4 +30,10 @@ jobs:
           DJANGO_SUPERUSER_USERNAME: ${{ secrets.DJANGO_SUPERUSER_USERNAME }}
           DJANGO_SUPERUSER_EMAIL: ${{ secrets.DJANGO_SUPERUSER_EMAIL }}
           DJANGO_SUPERUSER_PASSWORD: ${{ secrets.DJANGO_SUPERUSER_PASSWORD }}
+          # Chat WebSocket channel layer (recruitment/consumers.py) - only
+          # meaningful once Redis is actually installed and reachable on
+          # this server; leave both secrets unset to skip this entirely
+          # and keep the in-memory default.
+          CHANNEL_LAYER_BACKEND: ${{ secrets.CHANNEL_LAYER_BACKEND }}
+          CHANNEL_LAYER_REDIS_URL: ${{ secrets.CHANNEL_LAYER_REDIS_URL }}
 

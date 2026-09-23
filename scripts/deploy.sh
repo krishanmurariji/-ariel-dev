@@ -35,6 +35,21 @@ if [ -n "${DB_HOST:-}" ]; then
   grep -E '^(DATABASE_URL|DB_ENGINE|DB_NAME|DB_USER|DB_HOST|DB_PORT)=' "$APP_DIR/.env" | sed -E 's/=.*/=***/'
 fi
 
+if [ -n "${CHANNEL_LAYER_BACKEND:-}" ]; then
+  echo "==> Updating chat WebSocket channel layer config in .env from pipeline secrets"
+  for VAR in CHANNEL_LAYER_BACKEND CHANNEL_LAYER_REDIS_URL; do
+    VALUE="${!VAR:-}"
+    [ -z "$VALUE" ] && continue
+    if grep -q "^${VAR}=" "$APP_DIR/.env" 2>/dev/null; then
+      sed -i "s|^${VAR}=.*|${VAR}=${VALUE}|" "$APP_DIR/.env"
+    else
+      echo "${VAR}=${VALUE}" >> "$APP_DIR/.env"
+    fi
+  done
+  echo "==> .env channel-layer lines after update (values masked):"
+  grep -E '^(CHANNEL_LAYER_BACKEND|CHANNEL_LAYER_REDIS_URL)=' "$APP_DIR/.env" | sed -E 's/=.*/=***/'
+fi
+
 mkdir -p "$DB_BACKUP_DIR"
 if grep -qE '^(DB_ENGINE=django.db.backends.postgresql|DATABASE_URL=postgres)' "$APP_DIR/.env" 2>/dev/null; then
   echo "==> Backing up Postgres database"
