@@ -143,9 +143,6 @@
           <h5 class="mb-0.5 font-medium text-sm truncate" title="{{ candidate.name }}">{{ candidate.name }}</h5>
           <div class="text-xs text-[#565E6C] truncate" title="{{ candidate.email }}">{{ candidate.email }}</div>
           <div class="flex flex-wrap gap-1 mt-1.5">
-            {% if candidate.stage_id %}
-            <span class="inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#e3ecf7] text-[#3e6b99]">{{ candidate.stage_id.stage_title }}</span>
-            {% endif %}
             {% if candidate.onboarding_completed_at %}
             <span class="inline-flex items-center justify-center w-6 h-6 rounded-full" style="background:#e6f4ea;color:#1e7e34;" title="{% trans 'Onboarding Completed' %}">
               <ion-icon name="ribbon-outline" style="font-size:14px;"></ion-icon>
