@@ -807,9 +807,8 @@ class CandidateUpdateStatusFormView(HorillaFormView):
         candidate = form.instance
         target_recruitment = form.cleaned_data["recruitment_id"]
         target_stage = form.cleaned_data["stage_id"]
-        adding_to_reject = form.cleaned_data.get(
-            "add_to_reject"
-        ) and _candidate_reject_eligible(candidate)
+        reject_eligible = _candidate_reject_eligible(candidate)
+        adding_to_reject = form.cleaned_data.get("add_to_reject") and reject_eligible
 
         if adding_to_reject:
             # Capture the candidate's real (pre-submission) stage type -
@@ -836,6 +835,7 @@ class CandidateUpdateStatusFormView(HorillaFormView):
             return self.HttpResponse()
 
         rejected = False
+        unrejected = False
         if adding_to_reject:
             rejected_candidate, _created = models.RejectedCandidate.objects.update_or_create(
                 candidate_id=candidate,
@@ -843,11 +843,30 @@ class CandidateUpdateStatusFormView(HorillaFormView):
             )
             rejected_candidate.reject_reason_id.set(form.cleaned_data["reject_reason_id"])
             rejected = True
+        elif reject_eligible:
+            # "Add to Reject" started checked (see init_form's
+            # existing_rejection prefill) and was unchecked on submit -
+            # that's the user reverting the rejection, not just leaving an
+            # unrelated field alone, so the RejectedCandidate row has to
+            # actually go, not just stay ignored.
+            deleted_count, _deleted_per_model = models.RejectedCandidate.objects.filter(
+                candidate_id=candidate
+            ).delete()
+            if deleted_count:
+                candidate.stage_type_at_rejection = None
+                candidate.save(update_fields=["stage_type_at_rejection"])
+                unrejected = True
 
         if rejected:
             messages.success(
                 self.request,
                 _("Candidate moved to %(job)s and marked as rejected.")
+                % {"job": target_recruitment},
+            )
+        elif unrejected:
+            messages.success(
+                self.request,
+                _("Candidate moved to %(job)s and removed from rejected candidates.")
                 % {"job": target_recruitment},
             )
         else:
