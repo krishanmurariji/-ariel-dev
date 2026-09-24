@@ -2,10 +2,7 @@
 horilla_api/api_views/onboarding/views.py
 """
 
-from django.contrib.auth.models import AnonymousUser
-from django.db.models import Q
-from django.http import Http404
-from django.shortcuts import get_object_or_404
+from django.db.models import ProtectedError, Q
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
@@ -13,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from base.methods import filtersubordinates
+from horilla.horilla_middlewares import _thread_locals
 from horilla_api.api_serializers.onboarding.serializers import (
     CandidateStageSerializer,
     CandidateTaskSerializer,
@@ -35,19 +32,46 @@ from onboarding.models import (
     OnboardingTask,
 )
 
-from ...api_decorators.base.decorators import (
-    manager_permission_required,
-    permission_required,
-)
+from ...api_decorators.base.decorators import permission_required
 from ...api_methods.base.methods import groupby_queryset, permission_based_queryset
 
 
 def object_check(cls, pk):
     try:
         obj = cls.objects.get(id=pk)
-        return obj
     except cls.DoesNotExist:
         return None
+    # Re-apply the same per-company scoping HorillaCompanyManager does for
+    # session-based (web) requests, keyed off the requesting API user's own
+    # company instead of the session's "selected company" - DRF
+    # authentication runs after the middleware that populates the selected
+    # company, so token/JWT-authenticated API calls would otherwise see
+    # get_selected_company() as unset and fall through to the unfiltered
+    # queryset, letting any caller with the model-level permission fetch
+    # another company's object by pk.
+    get_filter_path = getattr(cls.objects, "get_company_filter_path", None)
+    if callable(get_filter_path):
+        filter_path = get_filter_path()
+        if filter_path:
+            request = getattr(_thread_locals, "request", None)
+            user = getattr(request, "user", None)
+            if user is not None and getattr(user, "is_superuser", False):
+                return obj
+            employee = getattr(user, "employee_get", None)
+            company = employee.get_company() if employee else None
+            if company is None:
+                # Caller has no resolvable company (e.g. no linked Employee
+                # row) - fail closed instead of falling through to the
+                # unfiltered queryset, mirroring
+                # OwnCompanyPrimaryKeyRelatedField.get_queryset().
+                return None
+            in_scope = cls.objects.filter(
+                Q(pk=pk)
+                & (Q(**{filter_path: company}) | Q(**{f"{filter_path}__isnull": True}))
+            ).exists()
+            if not in_scope:
+                return None
+    return obj
 
 
 # Onboarding Stage Views
@@ -73,7 +97,9 @@ class OnboardingStageGetCreateAPIView(APIView):
     def get(self, request, pk=None, recruitment_id=None):
         if pk:
             stage = object_check(OnboardingStage, pk)
-            if stage is None:
+            if stage is None or not self.get_queryset(
+                request, recruitment_id
+            ).filter(pk=pk).exists():
                 return Response({"error": "OnboardingStage not found"}, status=404)
             serializer = OnboardingStageSerializer(stage)
             return Response(serializer.data, status=200)
@@ -108,6 +134,7 @@ class OnboardingStageGetCreateAPIView(APIView):
 class OnboardingStageGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("onboarding.view_onboardingstage")
     def get(self, request, pk):
         stage = object_check(OnboardingStage, pk)
         if stage is None:
@@ -134,8 +161,13 @@ class OnboardingStageGetUpdateDeleteAPIView(APIView):
         try:
             stage.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )
 
 
 # Onboarding Task Views
@@ -161,7 +193,9 @@ class OnboardingTaskGetCreateAPIView(APIView):
     def get(self, request, pk=None, stage_id=None):
         if pk:
             task = object_check(OnboardingTask, pk)
-            if task is None:
+            if task is None or not self.get_queryset(
+                request, stage_id
+            ).filter(pk=pk).exists():
                 return Response({"error": "OnboardingTask not found"}, status=404)
             serializer = OnboardingTaskSerializer(task)
             return Response(serializer.data, status=200)
@@ -196,6 +230,7 @@ class OnboardingTaskGetCreateAPIView(APIView):
 class OnboardingTaskGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("onboarding.view_onboardingtask")
     def get(self, request, pk):
         task = object_check(OnboardingTask, pk)
         if task is None:
@@ -222,8 +257,13 @@ class OnboardingTaskGetUpdateDeleteAPIView(APIView):
         try:
             task.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )
 
 
 # Candidate Stage Views
@@ -251,7 +291,9 @@ class CandidateStageGetCreateAPIView(APIView):
     def get(self, request, pk=None, candidate_id=None, stage_id=None):
         if pk:
             candidate_stage = object_check(CandidateStage, pk)
-            if candidate_stage is None:
+            if candidate_stage is None or not self.get_queryset(
+                request, candidate_id, stage_id
+            ).filter(pk=pk).exists():
                 return Response({"error": "CandidateStage not found"}, status=404)
             serializer = CandidateStageSerializer(candidate_stage)
             return Response(serializer.data, status=200)
@@ -288,6 +330,7 @@ class CandidateStageGetCreateAPIView(APIView):
 class CandidateStageGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("onboarding.view_candidatestage")
     def get(self, request, pk):
         candidate_stage = object_check(CandidateStage, pk)
         if candidate_stage is None:
@@ -316,8 +359,13 @@ class CandidateStageGetUpdateDeleteAPIView(APIView):
         try:
             candidate_stage.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )
 
 
 # Candidate Task Views
@@ -349,7 +397,9 @@ class CandidateTaskGetCreateAPIView(APIView):
     def get(self, request, pk=None, candidate_id=None, task_id=None, stage_id=None):
         if pk:
             candidate_task = object_check(CandidateTask, pk)
-            if candidate_task is None:
+            if candidate_task is None or not self.get_queryset(
+                request, candidate_id, task_id, stage_id
+            ).filter(pk=pk).exists():
                 return Response({"error": "CandidateTask not found"}, status=404)
             serializer = CandidateTaskSerializer(candidate_task)
             return Response(serializer.data, status=200)
@@ -388,6 +438,7 @@ class CandidateTaskGetCreateAPIView(APIView):
 class CandidateTaskGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("onboarding.view_candidatetask")
     def get(self, request, pk):
         candidate_task = object_check(CandidateTask, pk)
         if candidate_task is None:
@@ -416,8 +467,13 @@ class CandidateTaskGetUpdateDeleteAPIView(APIView):
         try:
             candidate_task.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )
 
 
 # Onboarding Portal Views
@@ -441,7 +497,9 @@ class OnboardingPortalGetCreateAPIView(APIView):
     def get(self, request, pk=None, candidate_id=None):
         if pk:
             portal = object_check(OnboardingPortal, pk)
-            if portal is None:
+            if portal is None or not self.get_queryset(
+                request, candidate_id
+            ).filter(pk=pk).exists():
                 return Response({"error": "OnboardingPortal not found"}, status=404)
             serializer = OnboardingPortalSerializer(portal)
             return Response(serializer.data, status=200)
@@ -467,6 +525,7 @@ class OnboardingPortalGetCreateAPIView(APIView):
 class OnboardingPortalGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("onboarding.view_onboardingportal")
     def get(self, request, pk):
         portal = object_check(OnboardingPortal, pk)
         if portal is None:
@@ -493,5 +552,10 @@ class OnboardingPortalGetUpdateDeleteAPIView(APIView):
         try:
             portal.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )

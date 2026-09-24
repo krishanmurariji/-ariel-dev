@@ -2,10 +2,12 @@
 horilla_api/api_serializers/recruitment/serializers.py
 """
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from base.models import Company, JobPosition
 from employee.models import Employee
+from horilla.horilla_middlewares import _thread_locals
 from recruitment.models import (
     Candidate,
     CandidateDocument,
@@ -32,9 +34,31 @@ class SkillSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class OwnCompanyPrimaryKeyRelatedField(serializers.PrimaryKeyRelatedField):
+    """
+    Restricts the field's queryset to the requesting user's own company
+    (superusers keep the full queryset) - a plain
+    PrimaryKeyRelatedField(queryset=Company.objects.all()) lets any caller
+    holding the model's add/change permission attach a Recruitment/
+    SurveyTemplate/LinkedInAccount to a company they don't belong to.
+    """
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        request = getattr(_thread_locals, "request", None)
+        user = getattr(request, "user", None)
+        if user is None or getattr(user, "is_superuser", False):
+            return queryset
+        employee = getattr(user, "employee_get", None)
+        company = employee.get_company() if employee else None
+        if company is None:
+            return queryset.none()
+        return queryset.filter(pk=company.pk)
+
+
 class SurveyTemplateSerializer(serializers.ModelSerializer):
     company_id = serializers.SerializerMethodField()
-    company_id_write = serializers.PrimaryKeyRelatedField(
+    company_id_write = OwnCompanyPrimaryKeyRelatedField(
         queryset=Company.objects.all(),
         source="company_id",
         write_only=True,
@@ -72,7 +96,7 @@ class RecruitmentSerializer(serializers.ModelSerializer):
         required=False,
     )
     company_id = serializers.SerializerMethodField()
-    company_id_write = serializers.PrimaryKeyRelatedField(
+    company_id_write = OwnCompanyPrimaryKeyRelatedField(
         queryset=Company.objects.all(),
         source="company_id",
         write_only=True,
@@ -266,6 +290,19 @@ class CandidateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Candidate
         fields = "__all__"
+        extra_kwargs = {
+            # Pipeline/lifecycle state driven by the stage-change workflow,
+            # not a generic field a client should be able to set directly.
+            # stage_type_at_rejection in particular must only be set
+            # synchronously wherever a RejectedCandidate row is created
+            # (recruitment/models.py) - client control reopens the race
+            # with the rejection-email automation that field exists to
+            # avoid.
+            "hired": {"read_only": True},
+            "canceled": {"read_only": True},
+            "converted": {"read_only": True},
+            "stage_type_at_rejection": {"read_only": True},
+        }
 
     def get_recruitment_id(self, obj):
         if obj.recruitment_id:
@@ -406,6 +443,14 @@ class CandidateRatingSerializer(serializers.ModelSerializer):
     class Meta:
         model = CandidateRating
         fields = "__all__"
+        extra_kwargs = {
+            # The rater - server-set from the requesting user (see the
+            # view's post()), never client-supplied, or any caller with
+            # add/change_candidaterating could forge a rating under a
+            # colleague's name or overwrite theirs via the unique
+            # (employee_id, candidate_id) constraint.
+            "employee_id": {"read_only": True},
+        }
 
     def get_candidate_id(self, obj):
         if obj.candidate_id:
@@ -511,6 +556,27 @@ class CandidateDocumentSerializer(serializers.ModelSerializer):
         model = CandidateDocument
         fields = "__all__"
 
+    def validate(self, attrs):
+        # ModelSerializer.save() never calls the model's clean(), so the
+        # file-size/true-final-extension checks in CandidateDocument.clean()
+        # (added for GHSA-p68r-g665-5cm9) must be re-run explicitly here,
+        # or the API path can accept documents the model would reject.
+        title = attrs.get("title", getattr(self.instance, "title", None))
+        document = attrs.get("document", getattr(self.instance, "document", None))
+        document_request_id = attrs.get(
+            "document_request_id", getattr(self.instance, "document_request_id", None)
+        )
+        temp = CandidateDocument(
+            title=title, document=document, document_request_id=document_request_id
+        )
+        try:
+            temp.clean()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(
+                exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+            )
+        return attrs
+
     def get_candidate_id(self, obj):
         if obj.candidate_id:
             return {
@@ -531,7 +597,7 @@ class CandidateDocumentSerializer(serializers.ModelSerializer):
 
 class LinkedInAccountSerializer(serializers.ModelSerializer):
     company_id = serializers.SerializerMethodField()
-    company_id_write = serializers.PrimaryKeyRelatedField(
+    company_id_write = OwnCompanyPrimaryKeyRelatedField(
         queryset=Company.objects.all(),
         source="company_id",
         write_only=True,
@@ -541,6 +607,11 @@ class LinkedInAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = LinkedInAccount
         fields = "__all__"
+        extra_kwargs = {
+            "client_secret": {"write_only": True},
+            "api_token": {"write_only": True},
+            "oauth_state": {"write_only": True},
+        }
 
     def get_company_id(self, obj):
         if obj.company_id:

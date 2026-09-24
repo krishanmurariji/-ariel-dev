@@ -66,7 +66,7 @@ class AttendanceActivity(HorillaModel):
     shift_day = models.ForeignKey(
         EmployeeShiftDay,
         null=True,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         verbose_name=_("Shift Day"),
     )
     in_datetime = models.DateTimeField(null=True)
@@ -228,7 +228,7 @@ class Attendance(HorillaModel):
     )
     attendance_day = models.ForeignKey(
         EmployeeShiftDay,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         null=True,
         verbose_name=_("Attendance day"),
     )
@@ -1039,7 +1039,7 @@ class AttendanceOverTime(HorillaModel):
         Meta class to add some additional options
         """
 
-        unique_together = [("employee_id"), ("month"), ("year")]
+        unique_together = [("employee_id", "month", "year")]
         ordering = ["-year", "-month_sequence"]
         verbose_name = _("Hour Account")
         verbose_name_plural = _("Hour Accounts")
@@ -1251,7 +1251,7 @@ class AttendanceLateComeEarlyOut(HorillaModel):
     )
     employee_id = models.ForeignKey(
         Employee,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         null=True,
         related_name="late_come_early_out",
         verbose_name=_("Employee"),
@@ -1279,7 +1279,7 @@ class AttendanceLateComeEarlyOut(HorillaModel):
         Meta class to add some additional options
         """
 
-        unique_together = [("attendance_id"), ("type")]
+        unique_together = [("attendance_id", "type")]
         ordering = ["-attendance_id__attendance_date"]
 
     def get_type(self):

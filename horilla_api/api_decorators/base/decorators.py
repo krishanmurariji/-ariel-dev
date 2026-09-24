@@ -140,6 +140,13 @@ def permission_required(function, perm):
         if request.user.has_perm(perm):
             return function(self, *args, **kwargs)
         else:
-            return Response({"message": "No permission"}, status=401)
+            # 403, not 401: the user IS authenticated (IsAuthenticated already
+            # passed) - they simply lack this permission. 401 means
+            # "who are you", which is wrong here and inconsistent with
+            # manager_permission_required/manager_or_owner_permission_required
+            # in this same module, which both correctly use 403.
+            return Response(
+                {"message": "No permission"}, status=status.HTTP_403_FORBIDDEN
+            )
 
     return _function

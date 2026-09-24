@@ -58,7 +58,7 @@ class MailAutomation(HorillaModel):
     # changes in the previous and current value
     mail_template = models.ForeignKey(
         HorillaMailTemplate,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         verbose_name=_("Mail Template"),

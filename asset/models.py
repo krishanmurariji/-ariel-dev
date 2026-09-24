@@ -315,7 +315,7 @@ class AssetReport(HorillaModel):
 
     title = models.CharField(max_length=255, blank=True, null=True)
     asset_id = models.ForeignKey(
-        Asset, related_name="asset_report", on_delete=models.CASCADE
+        Asset, related_name="asset_report", on_delete=models.PROTECT
     )
 
     def __str__(self):

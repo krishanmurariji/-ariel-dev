@@ -205,17 +205,16 @@ class OnboardingViewTaskForm(ModelForm):
         exclude = ["status", "candidate_id", "onboarding_task_id", "is_active"]
 
     def clean(self):
+        cleaned_data = super().clean()
         for field_name, field_instance in self.fields.items():
             if isinstance(field_instance, HorillaMultiSelectField):
                 self.errors.pop(field_name, None)
                 if len(self.data.getlist(field_name)) < 1:
                     raise forms.ValidationError({field_name: "Thif field is required"})
-                cleaned_data = super().clean()
                 employee_data = self.fields[field_name].queryset.filter(
                     id__in=self.data.getlist(field_name)
                 )
                 cleaned_data[field_name] = employee_data
-        cleaned_data = super().clean()
         return cleaned_data
 
     def __init__(self, *args, **kwargs):

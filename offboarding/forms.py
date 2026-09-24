@@ -7,6 +7,8 @@ This module is used to register forms for offboarding app
 import contextlib
 from typing import Any
 
+import bleach
+from bleach.css_sanitizer import CSSSanitizer
 from django import forms
 from django.contrib import messages
 from django.template.loader import render_to_string
@@ -234,6 +236,28 @@ class TaskForm(ModelForm):
                 )
 
 
+# Allowlist for the Summernote-edited ResignationLetter.description field,
+# shown unescaped (|safe) to HR/managers reviewing resignations - mirrors
+# the bleach.clean() pattern already used for other Summernote fields
+# (recruitment/forms.py RecruitmentCreationForm.clean_description,
+# onboarding/forms.py _sanitize_rich_text) so stored HTML can't carry a
+# stored-XSS payload.
+_DESCRIPTION_ALLOWED_TAGS = [
+    "p", "br", "b", "strong", "i", "em", "u", "s", "strike",
+    "ul", "ol", "li", "a", "span", "blockquote",
+    "h1", "h2", "h3", "h4", "h5", "h6",
+]
+_DESCRIPTION_ALLOWED_ATTRIBUTES = {
+    "a": ["href", "title", "target"],
+    "span": ["style"],
+    "p": ["style"],
+}
+_DESCRIPTION_ALLOWED_CSS_PROPERTIES = [
+    "color", "background-color", "font-size", "font-weight",
+    "text-align", "text-decoration",
+]
+
+
 class ResignationLetterForm(ModelForm):
     """
     Resignation Letter
@@ -257,6 +281,20 @@ class ResignationLetterForm(ModelForm):
         model = ResignationLetter
         fields = "__all__"
         exclude = ["is_active"]
+
+    def clean_description(self):
+        description = self.cleaned_data.get("description")
+        if not description:
+            return description
+        return bleach.clean(
+            description,
+            tags=_DESCRIPTION_ALLOWED_TAGS,
+            attributes=_DESCRIPTION_ALLOWED_ATTRIBUTES,
+            css_sanitizer=CSSSanitizer(
+                allowed_css_properties=_DESCRIPTION_ALLOWED_CSS_PROPERTIES
+            ),
+            strip=True,
+        )
 
     def as_p(self):
         """

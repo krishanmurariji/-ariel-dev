@@ -889,7 +889,7 @@ class EmployeeKeyResult(models.Model):
         super().save(*args, **kwargs)
         self.employee_objective_id.update_objective_progress()
 
-    class meta:
+    class Meta:
         """
         Meta class to add some additional options
         """
@@ -1770,16 +1770,28 @@ class EmployeeBonusPoint(HorillaModel):
         )
 
     def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if not BonusPoint.objects.filter(employee_id=self.employee_id).exists():
-            bonus_point = BonusPoint.objects.create(
-                employee_id=self.employee_id,
-                points=self.bonus_point,
-                reason=self.based_on,
+        # Only the *change* in this entry's own point value should ever be
+        # applied to the employee's running BonusPoint total - previously
+        # this unconditionally added self.bonus_point on every save,
+        # including edits to an already-persisted row (and even
+        # double-added it on first creation, since BonusPoint.objects
+        # .create(points=self.bonus_point, ...) already set the initial
+        # value before the unconditional += ran again below it).
+        previous_points = 0
+        if self.pk:
+            previous_points = (
+                EmployeeBonusPoint.objects.filter(pk=self.pk)
+                .values_list("bonus_point", flat=True)
+                .first()
+                or 0
             )
-        else:
-            bonus_point = BonusPoint.objects.get(employee_id=self.employee_id)
-        bonus_point.points += self.bonus_point
+        super().save(*args, **kwargs)
+        delta = self.bonus_point - previous_points
+        bonus_point, _created = BonusPoint.objects.get_or_create(
+            employee_id=self.employee_id,
+            defaults={"points": 0, "reason": self.based_on},
+        )
+        bonus_point.points += delta
         bonus_point.reason = self.based_on
         bonus_point.save()
 

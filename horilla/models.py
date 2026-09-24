@@ -168,10 +168,45 @@ class HorillaModel(models.Model, metaclass=HorillaModelBase):
         super(HorillaModel, self).save(*args, **kwargs)
 
     def clean_fields(self, exclude=None):
+        """
+        Runs each field's own validators=[...] (MinValueValidator,
+        RegexValidator, format checks, etc.) and then the extra XSS scan
+        below.
+
+        This used to skip straight to the XSS scan and never run any
+        field's validators=[...] at all, which meant they were silently
+        never enforced by full_clean()/ModelForm.is_valid() on any
+        HorillaModel subclass, app-wide - only ever caught if a model's
+        own clean()/save() happened to duplicate the check manually. Found
+        during an audit (recruitment.CandidateRating.rating was the first
+        confirmed case) and traced to this override.
+
+        Deliberately NOT calling Django's own clean_fields() wholesale
+        (which also enforces required/blank and does to_python coercion):
+        several fields across the app are declared without blank=True
+        despite every real creation path legitimately leaving them empty
+        (e.g. Candidate.profile - recruitment/intake.py's email-intake
+        candidate creation never sets a photo, and neither does the
+        public application form in every case). Turning that on too
+        would need its own audit of which fields are genuinely required
+        first, rather than being folded into this fix.
+        """
         errors = {}
 
         # Get the list of fields to exclude from validation
         total_exclude = set(exclude or []).union(getattr(self, "xss_exempt_fields", []))
+
+        for field in self._meta.get_fields():
+            validators = getattr(field, "validators", None)
+            if not validators or field.name in total_exclude:
+                continue
+            value = getattr(self, field.attname, None)
+            if value in field.empty_values:
+                continue
+            try:
+                field.run_validators(value)
+            except ValidationError as e:
+                errors.setdefault(field.name, []).extend(e.error_list)
 
         for field in self._meta.get_fields():
             if (
@@ -180,8 +215,8 @@ class HorillaModel(models.Model, metaclass=HorillaModelBase):
             ):
                 value = getattr(self, field.name, None)
                 if value and has_xss(value):
-                    errors[field.name] = ValidationError(
-                        "Potential XSS content detected."
+                    errors.setdefault(field.name, []).append(
+                        ValidationError("Potential XSS content detected.")
                     )
 
         if errors:

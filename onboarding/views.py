@@ -1482,7 +1482,7 @@ def profile_view(request, token):
     POST : validate and save the profile step, then move to the next step
     """
     onboarding_portal = OnboardingPortal.objects.filter(token=token).first()
-    if onboarding_portal is None:
+    if onboarding_portal is None or onboarding_portal.used:
         return render(request, "404.html")
     candidate = onboarding_portal.candidate_id
     form = ProfileSetupForm(instance=candidate)
@@ -1523,7 +1523,7 @@ def roles_responsibility(request, token):
     POST : advance to the next step
     """
     onboarding_portal = OnboardingPortal.objects.filter(token=token).first()
-    if onboarding_portal is None:
+    if onboarding_portal is None or onboarding_portal.used:
         return render(request, "404.html")
     candidate = onboarding_portal.candidate_id
     if request.method == "POST":
@@ -1566,7 +1566,7 @@ def document_upload(request, token):
     POST : save uploaded files, then advance to the next step
     """
     onboarding_portal = OnboardingPortal.objects.filter(token=token).first()
-    if onboarding_portal is None:
+    if onboarding_portal is None or onboarding_portal.used:
         return render(request, "404.html")
     candidate = onboarding_portal.candidate_id
     document_requests = list(candidate.candidatedocumentrequest_set.all())
@@ -1660,7 +1660,7 @@ def employee_creation(request, token):
     POST : redirect to the Education step.
     """
     onboarding_portal = OnboardingPortal.objects.filter(token=token).first()
-    if onboarding_portal is None:
+    if onboarding_portal is None or onboarding_portal.used:
         return render(request, "404.html")
     candidate = onboarding_portal.candidate_id
     initial = {
@@ -1814,7 +1814,7 @@ def employee_education(request, token):
     POST : save the formset, then redirect to the Experience step.
     """
     onboarding_portal = OnboardingPortal.objects.filter(token=token).first()
-    if onboarding_portal is None:
+    if onboarding_portal is None or onboarding_portal.used:
         return render(request, "404.html")
     candidate = onboarding_portal.candidate_id
     employee = Employee.objects.filter(employee_user_id__username=candidate.email).first()
@@ -1886,7 +1886,7 @@ def employee_experience(request, token):
     POST : save the formset, finish onboarding, redirect to Welcome Aboard.
     """
     onboarding_portal = OnboardingPortal.objects.filter(token=token).first()
-    if onboarding_portal is None:
+    if onboarding_portal is None or onboarding_portal.used:
         return render(request, "404.html")
     candidate = onboarding_portal.candidate_id
     employee = Employee.objects.filter(employee_user_id__username=candidate.email).first()
@@ -2118,6 +2118,20 @@ def candidate_stage_update(request, candidate_id, recruitment_id):
     stage = OnboardingStage.objects.get(id=stage_id)
     candidate = Candidate.objects.get(id=candidate_id)
     candidate_stage = CandidateStage.objects.get(candidate_id=candidate)
+    old_stage = candidate_stage.onboarding_stage_id
+    if old_stage and old_stage.sequence is not None and stage.sequence is not None:
+        pending_tasks = candidate_stage.pending_required_tasks(old_stage)
+        if pending_tasks.exists():
+            task_titles = ", ".join(pending_tasks.values_list("task_title", flat=True))
+            messages.error(
+                request,
+                _(
+                    "Complete the following required task(s) before "
+                    "moving to the next stage: %(tasks)s"
+                )
+                % {"tasks": task_titles},
+            )
+            return JsonResponse({"type": "danger"}, status=400)
     candidate_stage.onboarding_stage_id = stage
     candidate_stage.save()
     onboarding_stages = OnboardingStage.objects.all()
@@ -2163,20 +2177,47 @@ def candidate_stage_bulk_update(request):
     candiate_ids = request.POST["ids"]
     recrutment_id = request.POST["recruitment"]
     candidate_id_list = json.loads(candiate_ids)
-    stage = request.POST["stage"]
+    stage_id = request.POST["stage"]
+    stage = OnboardingStage.objects.filter(id=stage_id).first()
     onboarding_stages = OnboardingStage.objects.all()
     recruitments = Recruitment.objects.filter(id=int(recrutment_id))
 
     choices = CandidateTask.choice
 
-    CandidateStage.objects.filter(candidate_id__id__in=candidate_id_list).update(
-        onboarding_stage_id=stage
-    )
+    blocked_count = 0
+    allowed_candidate_ids = []
+    for candidate_stage in CandidateStage.objects.filter(
+        candidate_id__id__in=candidate_id_list
+    ):
+        old_stage = candidate_stage.onboarding_stage_id
+        if (
+            stage
+            and old_stage
+            and old_stage.sequence is not None
+            and stage.sequence is not None
+            and candidate_stage.pending_required_tasks(old_stage).exists()
+        ):
+            blocked_count += 1
+            continue
+        allowed_candidate_ids.append(candidate_stage.candidate_id_id)
+
+    if allowed_candidate_ids:
+        CandidateStage.objects.filter(
+            candidate_id__id__in=allowed_candidate_ids
+        ).update(onboarding_stage_id=stage_id)
+
     type = "info"
     message = "No candidates selected"
-    if candidate_id_list:
+    if allowed_candidate_ids:
         type = "success"
         message = "Candidate stage updated successfully"
+        if blocked_count:
+            message += (
+                f" ({blocked_count} skipped - pending required task(s))"
+            )
+    elif blocked_count:
+        type = "danger"
+        message = "Complete required task(s) before moving to the next stage"
     groups = onboarding_query_grouper(request, recruitments)
     for item in groups:
         setattr(item["recruitment"], "stages", item["stages"])
@@ -2405,6 +2446,7 @@ def stage_sequence_update(request):
 @login_required
 @require_http_methods(["POST"])
 @hx_request_required
+@stage_manager_can_enter("recruitment.change_stage")
 def stage_name_update(request, stage_id):
     """
     This method is used to update the name of recruitment stage

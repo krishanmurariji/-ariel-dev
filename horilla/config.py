@@ -25,46 +25,55 @@ def import_method(accessibility):
     return accessibility_method
 
 
-ALL_MENUS = {}
-
-
 def sidebar(request):
+    """
+    Build the sidebar menu list for the requesting user.
 
+    Returns it directly rather than stashing it in module-level state
+    keyed by session id - this used to be cached in a plain dict
+    (`ALL_MENUS[session_key] = ...`) that was never purged, so every
+    session id a long-running process ever saw stayed in memory forever.
+    It also recomputed on every single call anyway (get_MENUS is a
+    per-request template context processor), so that "cache" never
+    actually saved any work - it only leaked. A session-keyed global also
+    meant a request with no session yet (session_key is None) shared one
+    entry across every such request, which could momentarily leak one
+    user's permission-scoped menu into another's response under
+    concurrency. Returning the value directly avoids all of that.
+    """
     base_dir_apps = get_apps_in_base_dir()
+    menus = []
 
     if not request.user.is_anonymous:
-        request.MENUS = []
-        MENUS = request.MENUS
-
         for app in base_dir_apps:
             if apps.is_installed(app):
                 try:
-                    sidebar = importlib.import_module(app + ".sidebar")
+                    sidebar_module = importlib.import_module(app + ".sidebar")
 
                 except Exception as e:
                     logger.error(e)
                     continue
 
-                if sidebar:
+                if sidebar_module:
                     accessibility = None
-                    if getattr(sidebar, "ACCESSIBILITY", None):
-                        accessibility = import_method(sidebar.ACCESSIBILITY)
+                    if getattr(sidebar_module, "ACCESSIBILITY", None):
+                        accessibility = import_method(sidebar_module.ACCESSIBILITY)
 
-                    if hasattr(sidebar, "MENU") and (
+                    if hasattr(sidebar_module, "MENU") and (
                         not accessibility
                         or accessibility(
                             request,
-                            sidebar.MENU,
+                            sidebar_module.MENU,
                             PermWrapper(request.user),
                         )
                     ):
                         MENU = {}
-                        MENU["menu"] = sidebar.MENU
+                        MENU["menu"] = sidebar_module.MENU
                         MENU["app"] = app
-                        MENU["img_src"] = sidebar.IMG_SRC
+                        MENU["img_src"] = sidebar_module.IMG_SRC
                         MENU["submenu"] = []
-                        MENUS.append(MENU)
-                        for submenu in sidebar.SUBMENUS:
+                        menus.append(MENU)
+                        for submenu in sidebar_module.SUBMENUS:
 
                             accessibility = None
 
@@ -80,13 +89,11 @@ def sidebar(request):
                                 PermWrapper(request.user),
                             ):
                                 MENU["submenu"].append(submenu)
-        ALL_MENUS[request.session.session_key] = MENUS
+    return menus
 
 
 def get_MENUS(request):
-    ALL_MENUS[request.session.session_key] = []
-    sidebar(request)
-    return {"sidebar": ALL_MENUS.get(request.session.session_key)}
+    return {"sidebar": sidebar(request)}
 
 
 def load_ldap_settings():
@@ -100,7 +107,7 @@ def load_ldap_settings():
 
         # Ensure DB is ready before querying
         if not connection.introspection.table_names():
-            print("⚠️ Database is empty. Using default LDAP settings.")
+            print("Warning: Database is empty. Using default LDAP settings.")
             return settings.DEFAULT_LDAP_CONFIG
 
         ldap_config = LDAPSettings.objects.first()
@@ -112,7 +119,7 @@ def load_ldap_settings():
                 "BASE_DN": ldap_config.base_dn,
             }
     except Exception as e:
-        print(f"⚠️ Warning: Could not load LDAP settings ({e})")
+        print(f"Warning: Could not load LDAP settings ({e})")
         return settings.DEFAULT_LDAP_CONFIG  # Return default on error
 
     return settings.DEFAULT_LDAP_CONFIG  # Fallback in case of an issue

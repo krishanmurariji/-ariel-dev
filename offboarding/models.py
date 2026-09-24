@@ -157,7 +157,7 @@ class OffboardingEmployee(HorillaModel):
         Employee, on_delete=models.CASCADE, verbose_name="Employee"
     )
     stage_id = models.ForeignKey(
-        OffboardingStage, on_delete=models.CASCADE, verbose_name="Stage", null=True
+        OffboardingStage, on_delete=models.PROTECT, verbose_name="Stage", null=True
     )
     notice_period = models.IntegerField(null=True)
     unit = models.CharField(max_length=10, choices=UNIT, default="month", null=True)
@@ -373,7 +373,7 @@ class ResignationLetter(HorillaModel):
         ("rejected", _("Rejected")),
     ]
     employee_id = models.ForeignKey(
-        Employee, on_delete=models.CASCADE, verbose_name="Employee"
+        Employee, on_delete=models.PROTECT, verbose_name="Employee"
     )
     title = models.CharField(max_length=100, null=True)
     description = models.TextField(null=True, max_length=255)

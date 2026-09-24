@@ -1010,7 +1010,7 @@ class EmployeeWorkInformation(models.Model):
     )
     shift_id = models.ForeignKey(
         EmployeeShift,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         null=True,
         blank=True,
         verbose_name=_("Shift"),
@@ -1434,7 +1434,7 @@ class DisciplinaryAction(HorillaModel):
 
     choices = [("days", _("Days")), ("hours", _("Hours"))]
     employee_id = models.ManyToManyField(Employee, verbose_name=_("Employees"))
-    action = models.ForeignKey(Actiontype, on_delete=models.CASCADE)
+    action = models.ForeignKey(Actiontype, on_delete=models.PROTECT)
     description = models.TextField(max_length=255)
     unit_in = models.CharField(max_length=10, choices=choices, default="days")
     days = models.IntegerField(null=True, default=1)

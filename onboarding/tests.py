@@ -15,7 +15,7 @@ from django.urls import reverse
 
 from base.models import Company, Department, JobPosition
 from employee.models import Employee, EmployeeWorkInformation
-from onboarding.models import OnboardingCandidateDetail
+from onboarding.models import OnboardingCandidateDetail, OnboardingStage
 from onboarding.stepper import STEP_KEYS
 from recruitment.models import Candidate, CandidateDocumentRequest, Recruitment, Stage
 
@@ -372,3 +372,45 @@ class StepUnlockBypassTests(OnboardingAccessTestBase):
             self.candidate_a.start_onboard,
             "finalize must not succeed before the candidate has reached the finalize step",
         )
+
+
+class StageNameUpdatePermissionTests(OnboardingAccessTestBase):
+    """
+    stage_name_update (onboarding/views.py) only had @login_required -
+    unlike every sibling stage view (e.g. stage_sequence_update), it had
+    no permission/manager check at all, so any authenticated employee
+    could rename any onboarding stage. Fixed by adding
+    stage_manager_can_enter("recruitment.change_stage"), matching
+    stage_sequence_update.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.onboarding_stage = OnboardingStage.objects.create(
+            stage_title="Original Title", recruitment_id=self.recruitment_a, sequence=0
+        )
+
+    def test_employee_with_no_stage_role_cannot_rename_a_stage(self):
+        client = self.login_as(self.emp_a)
+        client.post(
+            reverse("stage-name-update", kwargs={"stage_id": self.onboarding_stage.pk}),
+            data={"stage": "Hijacked Title"},
+            HTTP_HX_REQUEST="true",
+        )
+        self.onboarding_stage.refresh_from_db()
+        self.assertEqual(
+            self.onboarding_stage.stage_title, "Original Title",
+            "an employee with no change_stage permission and no stage/"
+            "recruitment manager role must not be able to rename a stage",
+        )
+
+    def test_stage_manager_can_rename_a_stage(self):
+        self.onboarding_stage.employee_id.add(self.emp_a)
+        client = self.login_as(self.emp_a)
+        client.post(
+            reverse("stage-name-update", kwargs={"stage_id": self.onboarding_stage.pk}),
+            data={"stage": "Renamed By Stage Manager"},
+            HTTP_HX_REQUEST="true",
+        )
+        self.onboarding_stage.refresh_from_db()
+        self.assertEqual(self.onboarding_stage.stage_title, "Renamed By Stage Manager")

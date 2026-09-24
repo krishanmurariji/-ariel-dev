@@ -26,9 +26,15 @@ RATE_LIMIT_WINDOW_SECONDS = 600
 
 
 def _client_ip(request):
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    # X-Forwarded-For's first hop is whatever the client sent - trivially
+    # spoofable to get a fresh rate-limit bucket per request. X-Real-IP is
+    # nginx's own view of the connecting peer (docker/nginx.conf sets it to
+    # $remote_addr, always overwriting any client-supplied value), so it's
+    # the one header here a client can't forge. Fall back to REMOTE_ADDR
+    # for local/dev setups that don't sit behind that proxy.
+    real_ip = request.META.get("HTTP_X_REAL_IP")
+    if real_ip:
+        return real_ip.strip()
     return request.META.get("REMOTE_ADDR", "unknown")
 
 

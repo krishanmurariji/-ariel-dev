@@ -200,7 +200,11 @@ def to_json(value):
     ordered_list = [
         {"id": val.id, "stage": val.stage, "type": val.stage_type} for val in value
     ]
-    return json.dumps(ordered_list)
+    # Callers render this with |safe inside a single-quoted HTML attribute,
+    # but json.dumps only escapes double quotes - an HR-editable Stage
+    # title containing a single quote would otherwise break out of the
+    # attribute (stored XSS).
+    return json.dumps(ordered_list).replace("'", "\\u0027")
 
 
 @register.filter(name="chat_date_label")

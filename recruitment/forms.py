@@ -28,6 +28,8 @@ from ast import Dict
 from datetime import date, datetime
 from typing import Any
 
+import bleach
+from bleach.css_sanitizer import CSSSanitizer
 from django import forms
 from django.apps import apps
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
@@ -282,6 +284,27 @@ class DropDownForm(forms.ModelForm):
                 field.widget.attrs.update({"class": "oh-switch__checkbox "})
 
 
+# Allowlist for the Summernote-edited Recruitment.description field, shown
+# unescaped (|safe) on the public job-application page - mirrors the
+# bleach.clean() pattern already used for onboarding rich-text fields
+# (onboarding/forms.py _sanitize_rich_text) so stored HTML can't carry a
+# stored-XSS payload.
+_DESCRIPTION_ALLOWED_TAGS = [
+    "p", "br", "b", "strong", "i", "em", "u", "s", "strike",
+    "ul", "ol", "li", "a", "span", "blockquote",
+    "h1", "h2", "h3", "h4", "h5", "h6",
+]
+_DESCRIPTION_ALLOWED_ATTRIBUTES = {
+    "a": ["href", "title", "target"],
+    "span": ["style"],
+    "p": ["style"],
+}
+_DESCRIPTION_ALLOWED_CSS_PROPERTIES = [
+    "color", "background-color", "font-size", "font-weight",
+    "text-align", "text-decoration",
+]
+
+
 class RecruitmentCreationForm(BaseModelForm):
     """
     Form for Recruitment model
@@ -306,6 +329,20 @@ class RecruitmentCreationForm(BaseModelForm):
             "end_date": forms.DateInput(attrs={"type": "date"}),
             "description": forms.Textarea(attrs={"data-summernote": ""}),
         }
+
+    def clean_description(self):
+        description = self.cleaned_data.get("description")
+        if not description:
+            return description
+        return bleach.clean(
+            description,
+            tags=_DESCRIPTION_ALLOWED_TAGS,
+            attributes=_DESCRIPTION_ALLOWED_ATTRIBUTES,
+            css_sanitizer=CSSSanitizer(
+                allowed_css_properties=_DESCRIPTION_ALLOWED_CSS_PROPERTIES
+            ),
+            strip=True,
+        )
 
     def as_p(self, *args, **kwargs):
         """

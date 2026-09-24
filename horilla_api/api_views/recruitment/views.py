@@ -2,10 +2,7 @@
 horilla_api/api_views/recruitment/views.py
 """
 
-from django.contrib.auth.models import AnonymousUser
-from django.db.models import Q
-from django.http import Http404
-from django.shortcuts import get_object_or_404
+from django.db.models import ProtectedError, Q
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
@@ -13,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from base.methods import filtersubordinates
+from horilla.horilla_middlewares import _thread_locals
 from horilla_api.api_serializers.recruitment.serializers import (
     CandidateDocumentRequestSerializer,
     CandidateDocumentSerializer,
@@ -60,7 +57,7 @@ from recruitment.models import (
 )
 
 from ...api_decorators.base.decorators import (
-    manager_permission_required,
+    manager_or_owner_permission_required,
     permission_required,
 )
 from ...api_methods.base.methods import groupby_queryset, permission_based_queryset
@@ -69,9 +66,39 @@ from ...api_methods.base.methods import groupby_queryset, permission_based_query
 def object_check(cls, pk):
     try:
         obj = cls.objects.get(id=pk)
-        return obj
     except cls.DoesNotExist:
         return None
+    # Re-apply the same per-company scoping HorillaCompanyManager does for
+    # session-based (web) requests, keyed off the requesting API user's own
+    # company instead of the session's "selected company" - DRF
+    # authentication runs after the middleware that populates the selected
+    # company, so token/JWT-authenticated API calls would otherwise see
+    # get_selected_company() as unset and fall through to the unfiltered
+    # queryset, letting any caller with the model-level permission fetch
+    # another company's object by pk.
+    get_filter_path = getattr(cls.objects, "get_company_filter_path", None)
+    if callable(get_filter_path):
+        filter_path = get_filter_path()
+        if filter_path:
+            request = getattr(_thread_locals, "request", None)
+            user = getattr(request, "user", None)
+            if user is not None and getattr(user, "is_superuser", False):
+                return obj
+            employee = getattr(user, "employee_get", None)
+            company = employee.get_company() if employee else None
+            if company is None:
+                # Caller has no resolvable company (e.g. no linked Employee
+                # row) - fail closed instead of falling through to the
+                # unfiltered queryset, mirroring
+                # OwnCompanyPrimaryKeyRelatedField.get_queryset().
+                return None
+            in_scope = cls.objects.filter(
+                Q(pk=pk)
+                & (Q(**{filter_path: company}) | Q(**{f"{filter_path}__isnull": True}))
+            ).exists()
+            if not in_scope:
+                return None
+    return obj
 
 
 # Recruitment Views
@@ -95,7 +122,7 @@ class RecruitmentGetCreateAPIView(APIView):
     def get(self, request, pk=None):
         if pk:
             recruitment = object_check(Recruitment, pk)
-            if recruitment is None:
+            if recruitment is None or not self.get_queryset(request).filter(pk=pk).exists():
                 return Response({"error": "Recruitment not found"}, status=404)
             serializer = RecruitmentSerializer(recruitment)
             return Response(serializer.data, status=200)
@@ -127,6 +154,7 @@ class RecruitmentGetCreateAPIView(APIView):
 class RecruitmentGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("recruitment.view_recruitment")
     def get(self, request, pk):
         recruitment = object_check(Recruitment, pk)
         if recruitment is None:
@@ -153,8 +181,13 @@ class RecruitmentGetUpdateDeleteAPIView(APIView):
         try:
             recruitment.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )
 
 
 # Stage Views
@@ -180,7 +213,7 @@ class StageGetCreateAPIView(APIView):
     def get(self, request, pk=None, recruitment_id=None):
         if pk:
             stage = object_check(Stage, pk)
-            if stage is None:
+            if stage is None or not self.get_queryset(request).filter(pk=pk).exists():
                 return Response({"error": "Stage not found"}, status=404)
             serializer = StageSerializer(stage)
             return Response(serializer.data, status=200)
@@ -219,6 +252,7 @@ class StageGetCreateAPIView(APIView):
 class StageGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("recruitment.view_stage")
     def get(self, request, pk):
         stage = object_check(Stage, pk)
         if stage is None:
@@ -245,8 +279,13 @@ class StageGetUpdateDeleteAPIView(APIView):
         try:
             stage.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )
 
 
 # Candidate Views
@@ -274,7 +313,9 @@ class CandidateGetCreateAPIView(APIView):
     def get(self, request, pk=None, recruitment_id=None, stage_id=None):
         if pk:
             candidate = object_check(Candidate, pk)
-            if candidate is None:
+            if candidate is None or not self.get_queryset(
+                request, recruitment_id, stage_id
+            ).filter(pk=pk).exists():
                 return Response({"error": "Candidate not found"}, status=404)
             serializer = CandidateSerializer(candidate)
             return Response(serializer.data, status=200)
@@ -315,6 +356,7 @@ class CandidateGetCreateAPIView(APIView):
 class CandidateGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("recruitment.view_candidate")
     def get(self, request, pk):
         candidate = object_check(Candidate, pk)
         if candidate is None:
@@ -341,8 +383,13 @@ class CandidateGetUpdateDeleteAPIView(APIView):
         try:
             candidate.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )
 
 
 # Interview Schedule Views
@@ -368,7 +415,9 @@ class InterviewScheduleGetCreateAPIView(APIView):
     def get(self, request, pk=None, candidate_id=None):
         if pk:
             interview = object_check(InterviewSchedule, pk)
-            if interview is None:
+            if interview is None or not self.get_queryset(
+                request, candidate_id
+            ).filter(pk=pk).exists():
                 return Response({"error": "InterviewSchedule not found"}, status=404)
             serializer = InterviewScheduleSerializer(interview)
             return Response(serializer.data, status=200)
@@ -407,6 +456,7 @@ class InterviewScheduleGetCreateAPIView(APIView):
 class InterviewScheduleGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("recruitment.view_interviewschedule")
     def get(self, request, pk):
         interview = object_check(InterviewSchedule, pk)
         if interview is None:
@@ -435,8 +485,13 @@ class InterviewScheduleGetUpdateDeleteAPIView(APIView):
         try:
             interview.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )
 
 
 # Skill Views
@@ -455,7 +510,7 @@ class SkillGetCreateAPIView(APIView):
     def get(self, request, pk=None):
         if pk:
             skill = object_check(Skill, pk)
-            if skill is None:
+            if skill is None or not self.get_queryset(request).filter(pk=pk).exists():
                 return Response({"error": "Skill not found"}, status=404)
             serializer = SkillSerializer(skill)
             return Response(serializer.data, status=200)
@@ -481,6 +536,7 @@ class SkillGetCreateAPIView(APIView):
 class SkillGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("recruitment.view_skill")
     def get(self, request, pk):
         skill = object_check(Skill, pk)
         if skill is None:
@@ -507,8 +563,13 @@ class SkillGetUpdateDeleteAPIView(APIView):
         try:
             skill.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )
 
 
 # Survey Template Views
@@ -532,7 +593,7 @@ class SurveyTemplateGetCreateAPIView(APIView):
     def get(self, request, pk=None):
         if pk:
             template = object_check(SurveyTemplate, pk)
-            if template is None:
+            if template is None or not self.get_queryset(request).filter(pk=pk).exists():
                 return Response({"error": "SurveyTemplate not found"}, status=404)
             serializer = SurveyTemplateSerializer(template)
             return Response(serializer.data, status=200)
@@ -558,6 +619,7 @@ class SurveyTemplateGetCreateAPIView(APIView):
 class SurveyTemplateGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("recruitment.view_surveytemplate")
     def get(self, request, pk):
         template = object_check(SurveyTemplate, pk)
         if template is None:
@@ -584,8 +646,13 @@ class SurveyTemplateGetUpdateDeleteAPIView(APIView):
         try:
             template.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )
 
 
 # Skill Zone Views
@@ -609,7 +676,7 @@ class SkillZoneGetCreateAPIView(APIView):
     def get(self, request, pk=None):
         if pk:
             skill_zone = object_check(SkillZone, pk)
-            if skill_zone is None:
+            if skill_zone is None or not self.get_queryset(request).filter(pk=pk).exists():
                 return Response({"error": "SkillZone not found"}, status=404)
             serializer = SkillZoneSerializer(skill_zone)
             return Response(serializer.data, status=200)
@@ -635,6 +702,7 @@ class SkillZoneGetCreateAPIView(APIView):
 class SkillZoneGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("recruitment.view_skillzone")
     def get(self, request, pk):
         skill_zone = object_check(SkillZone, pk)
         if skill_zone is None:
@@ -661,8 +729,13 @@ class SkillZoneGetUpdateDeleteAPIView(APIView):
         try:
             skill_zone.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )
 
 
 # Skill Zone Candidate Views
@@ -690,7 +763,9 @@ class SkillZoneCandidateGetCreateAPIView(APIView):
     def get(self, request, pk=None, candidate_id=None, skill_zone_id=None):
         if pk:
             skill_zone_candidate = object_check(SkillZoneCandidate, pk)
-            if skill_zone_candidate is None:
+            if skill_zone_candidate is None or not self.get_queryset(
+                request, candidate_id, skill_zone_id
+            ).filter(pk=pk).exists():
                 return Response({"error": "SkillZoneCandidate not found"}, status=404)
             serializer = SkillZoneCandidateSerializer(skill_zone_candidate)
             return Response(serializer.data, status=200)
@@ -735,6 +810,7 @@ class SkillZoneCandidateGetCreateAPIView(APIView):
 class SkillZoneCandidateGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("recruitment.view_skillzonecandidate")
     def get(self, request, pk):
         skill_zone_candidate = object_check(SkillZoneCandidate, pk)
         if skill_zone_candidate is None:
@@ -763,8 +839,13 @@ class SkillZoneCandidateGetUpdateDeleteAPIView(APIView):
         try:
             skill_zone_candidate.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )
 
 
 # Candidate Rating Views
@@ -788,7 +869,9 @@ class CandidateRatingGetCreateAPIView(APIView):
     def get(self, request, pk=None, candidate_id=None):
         if pk:
             rating = object_check(CandidateRating, pk)
-            if rating is None:
+            if rating is None or not self.get_queryset(
+                request, candidate_id
+            ).filter(pk=pk).exists():
                 return Response({"error": "CandidateRating not found"}, status=404)
             serializer = CandidateRatingSerializer(rating)
             return Response(serializer.data, status=200)
@@ -801,6 +884,11 @@ class CandidateRatingGetCreateAPIView(APIView):
 
     @permission_required("recruitment.add_candidaterating")
     def post(self, request, candidate_id=None, **kwargs):
+        employee = getattr(request.user, "employee_get", None)
+        if employee is None:
+            return Response(
+                {"error": "No employee profile linked to this user"}, status=400
+            )
         data = request.data.copy()
         if (
             candidate_id
@@ -810,7 +898,7 @@ class CandidateRatingGetCreateAPIView(APIView):
             data["candidate_id_write"] = candidate_id
         serializer = CandidateRatingSerializer(data=data)
         if serializer.is_valid():
-            serializer.save()
+            serializer.save(employee_id=employee)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -818,6 +906,7 @@ class CandidateRatingGetCreateAPIView(APIView):
 class CandidateRatingGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("recruitment.view_candidaterating")
     def get(self, request, pk):
         rating = object_check(CandidateRating, pk)
         if rating is None:
@@ -825,7 +914,7 @@ class CandidateRatingGetUpdateDeleteAPIView(APIView):
         serializer = CandidateRatingSerializer(rating)
         return Response(serializer.data, status=200)
 
-    @permission_required("recruitment.change_candidaterating")
+    @manager_or_owner_permission_required(CandidateRating, "recruitment.change_candidaterating")
     def put(self, request, pk):
         rating = object_check(CandidateRating, pk)
         if rating is None:
@@ -836,7 +925,7 @@ class CandidateRatingGetUpdateDeleteAPIView(APIView):
             return Response(serializer.data, status=200)
         return Response(serializer.errors, status=400)
 
-    @permission_required("recruitment.delete_candidaterating")
+    @manager_or_owner_permission_required(CandidateRating, "recruitment.delete_candidaterating")
     def delete(self, request, pk):
         rating = object_check(CandidateRating, pk)
         if rating is None:
@@ -844,8 +933,11 @@ class CandidateRatingGetUpdateDeleteAPIView(APIView):
         try:
             rating.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {"error": "This rating can't be deleted because other records depend on it."},
+                status=409,
+            )
 
 
 # Reject Reason Views
@@ -869,7 +961,7 @@ class RejectReasonGetCreateAPIView(APIView):
     def get(self, request, pk=None):
         if pk:
             reason = object_check(RejectReason, pk)
-            if reason is None:
+            if reason is None or not self.get_queryset(request).filter(pk=pk).exists():
                 return Response({"error": "RejectReason not found"}, status=404)
             serializer = RejectReasonSerializer(reason)
             return Response(serializer.data, status=200)
@@ -895,6 +987,7 @@ class RejectReasonGetCreateAPIView(APIView):
 class RejectReasonGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("recruitment.view_rejectreason")
     def get(self, request, pk):
         reason = object_check(RejectReason, pk)
         if reason is None:
@@ -921,8 +1014,13 @@ class RejectReasonGetUpdateDeleteAPIView(APIView):
         try:
             reason.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )
 
 
 # Rejected Candidate Views
@@ -946,7 +1044,9 @@ class RejectedCandidateGetCreateAPIView(APIView):
     def get(self, request, pk=None, candidate_id=None):
         if pk:
             rejected = object_check(RejectedCandidate, pk)
-            if rejected is None:
+            if rejected is None or not self.get_queryset(
+                request, candidate_id
+            ).filter(pk=pk).exists():
                 return Response({"error": "RejectedCandidate not found"}, status=404)
             serializer = RejectedCandidateSerializer(rejected)
             return Response(serializer.data, status=200)
@@ -976,6 +1076,7 @@ class RejectedCandidateGetCreateAPIView(APIView):
 class RejectedCandidateGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("recruitment.view_rejectedcandidate")
     def get(self, request, pk):
         rejected = object_check(RejectedCandidate, pk)
         if rejected is None:
@@ -1004,8 +1105,13 @@ class RejectedCandidateGetUpdateDeleteAPIView(APIView):
         try:
             rejected.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )
 
 
 # Candidate Document Request Views
@@ -1029,7 +1135,9 @@ class CandidateDocumentRequestGetCreateAPIView(APIView):
     def get(self, request, pk=None, candidate_id=None):
         if pk:
             doc_request = object_check(CandidateDocumentRequest, pk)
-            if doc_request is None:
+            if doc_request is None or not self.get_queryset(
+                request, candidate_id
+            ).filter(pk=pk).exists():
                 return Response(
                     {"error": "CandidateDocumentRequest not found"}, status=404
                 )
@@ -1061,6 +1169,7 @@ class CandidateDocumentRequestGetCreateAPIView(APIView):
 class CandidateDocumentRequestGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("recruitment.view_candidatedocumentrequest")
     def get(self, request, pk):
         doc_request = object_check(CandidateDocumentRequest, pk)
         if doc_request is None:
@@ -1089,8 +1198,13 @@ class CandidateDocumentRequestGetUpdateDeleteAPIView(APIView):
         try:
             doc_request.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )
 
 
 # Candidate Document Views
@@ -1116,7 +1230,9 @@ class CandidateDocumentGetCreateAPIView(APIView):
     def get(self, request, pk=None, candidate_id=None, document_request_id=None):
         if pk:
             document = object_check(CandidateDocument, pk)
-            if document is None:
+            if document is None or not self.get_queryset(
+                request, candidate_id, document_request_id
+            ).filter(pk=pk).exists():
                 return Response({"error": "CandidateDocument not found"}, status=404)
             serializer = CandidateDocumentSerializer(document)
             return Response(serializer.data, status=200)
@@ -1152,6 +1268,7 @@ class CandidateDocumentGetCreateAPIView(APIView):
 class CandidateDocumentGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("recruitment.view_candidatedocument")
     def get(self, request, pk):
         document = object_check(CandidateDocument, pk)
         if document is None:
@@ -1180,8 +1297,13 @@ class CandidateDocumentGetUpdateDeleteAPIView(APIView):
         try:
             document.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )
 
 
 # LinkedIn Account Views
@@ -1205,7 +1327,7 @@ class LinkedInAccountGetCreateAPIView(APIView):
     def get(self, request, pk=None):
         if pk:
             account = object_check(LinkedInAccount, pk)
-            if account is None:
+            if account is None or not self.get_queryset(request).filter(pk=pk).exists():
                 return Response({"error": "LinkedInAccount not found"}, status=404)
             serializer = LinkedInAccountSerializer(account)
             return Response(serializer.data, status=200)
@@ -1231,6 +1353,7 @@ class LinkedInAccountGetCreateAPIView(APIView):
 class LinkedInAccountGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @permission_required("recruitment.view_linkedinaccount")
     def get(self, request, pk):
         account = object_check(LinkedInAccount, pk)
         if account is None:
@@ -1257,5 +1380,10 @@ class LinkedInAccountGetUpdateDeleteAPIView(APIView):
         try:
             account.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except ProtectedError:
+            return Response(
+                {
+                    "error": "This record can't be deleted because other records depend on it."
+                },
+                status=409,
+            )

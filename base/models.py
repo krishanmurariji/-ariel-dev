@@ -1309,7 +1309,7 @@ class Roster(HorillaModel):
     )
     department = models.ForeignKey(
         "base.Department",
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="roster_entries",
         verbose_name=_("Department"),
     )
@@ -1356,7 +1356,7 @@ class RosterPublishLog(models.Model):
 
     department = models.ForeignKey(
         "base.Department",
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="roster_publish_logs",
         verbose_name=_("Department"),
     )

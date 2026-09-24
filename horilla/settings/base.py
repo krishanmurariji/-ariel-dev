@@ -24,6 +24,8 @@ env = environ.Env(
     SECRET_KEY=(str, "django-insecure-default-key"),
     ALLOWED_HOSTS=(list, ["*"]),
     CSRF_TRUSTED_ORIGINS=(list, ["http://localhost:8000"]),
+    CORS_ALLOWED_ORIGINS=(list, []),
+    CORS_ALLOW_ALL_ORIGINS=(bool, False),
 )
 
 env.read_env(os.path.join(BASE_DIR, ".env"), overwrite=True)
@@ -35,6 +37,17 @@ SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
+
+# corsheaders is installed and in MIDDLEWARE (below) but was never actually
+# configured anywhere - django-cors-headers' own defaults for both of
+# these are the same empty/False values used here, so this changes
+# nothing about current behavior (no cross-origin requests are allowed).
+# It's made explicit, env-driven, so a deployment that needs the API
+# consumed from a separate origin (e.g. a mobile app or external SPA) can
+# opt in via .env without a code change, instead of the middleware being
+# silently inert.
+CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
+CORS_ALLOW_ALL_ORIGINS = env("CORS_ALLOW_ALL_ORIGINS")
 
 # Only require HTTPS for these cookies when DEBUG is off - local dev
 # (DEBUG=True) serves plain http://localhost, and browsers silently drop

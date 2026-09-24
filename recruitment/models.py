@@ -770,7 +770,7 @@ class Candidate(HorillaModel):
     )
     referral = models.ForeignKey(
         Employee,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="candidate_referral",

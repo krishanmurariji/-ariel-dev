@@ -12,10 +12,13 @@ production) while every other app imports this shared copy instead.
 import base64
 import hashlib
 import json
+import logging
 
 from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
 from django.db import models
+
+logger = logging.getLogger(__name__)
 
 
 def _get_fernet() -> Fernet:
@@ -43,6 +46,20 @@ class EncryptedTextField(models.TextField):
         try:
             return _get_fernet().decrypt(value.encode()).decode()
         except InvalidToken:
+            # Either a legacy plaintext row written before this field
+            # existed, or ciphertext that no longer decrypts under the
+            # current SECRET_KEY (e.g. after a key rotation) - the two are
+            # indistinguishable from here, so we still return the raw value
+            # rather than raising, but log it so a rotation that silently
+            # blanks out every stored credential doesn't go unnoticed.
+            logger.warning(
+                "%s.%s: stored value failed to decrypt - returning it "
+                "unchanged. Expected for legacy plaintext rows written "
+                "before this field existed; unexpected (and a sign "
+                "SECRET_KEY was rotated) for anything written since.",
+                getattr(getattr(self, "model", None), "__name__", "?"),
+                getattr(self, "name", "?"),
+            )
             return value
 
 
@@ -62,6 +79,17 @@ class EncryptedJSONField(EncryptedTextField):
         try:
             return json.loads(value)
         except (TypeError, ValueError):
+            # Almost always means the InvalidToken branch above already
+            # fired and handed back undecrypted ciphertext (not valid
+            # JSON) rather than this being genuinely malformed JSON - log
+            # here too since that warning alone doesn't say the caller is
+            # about to silently lose the whole stored config to `{}`.
+            logger.warning(
+                "%s.%s: decrypted value is not valid JSON - returning {} "
+                "instead of the stored data.",
+                getattr(getattr(self, "model", None), "__name__", "?"),
+                getattr(self, "name", "?"),
+            )
             return {}
 
     def to_python(self, value):

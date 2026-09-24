@@ -812,7 +812,7 @@ def recruitment_ai_effectiveness(request):
     company_scope = _company_scope_kwargs(request)
 
     intake_logs = CandidateIntakeLog.objects.filter(
-        received_at__date__gte=from_date, received_at__date__lte=to_date
+        received_at__date__gte=from_date, received_at__date__lte=to_date, **company_scope
     )
     intake_total = intake_logs.count()
     intake_created = intake_logs.filter(status="created").count()

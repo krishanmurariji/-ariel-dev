@@ -11,16 +11,40 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
+from django.urls import reverse
 
 from base.models import Company, Department, JobPosition
-from recruitment.models import Candidate, CandidateDocument, Recruitment, Stage
+from employee.models import Employee, EmployeeWorkInformation
+from recruitment.models import Candidate, CandidateDocument, CandidateRating, Recruitment, Stage
 from recruitment.views.views import CANDIDATE_LOGIN_MAX_ATTEMPTS
+
+PASSWORD = "123qwe"
 
 
 def _make_company(name):
     return Company.objects.create(
         company=name, address="x", country="x", state="x", city="x", zip="00000"
     )
+
+
+def _make_recruitment_manager(company, recruitment, first_name, email, phone):
+    """
+    An employee who satisfies manager_can_enter/manager_or_owner-style
+    checks for `recruitment` via recruitment_managers, without needing to
+    hand out blanket Django permissions - mirrors how a real interviewer
+    would be scoped to just the recruitments they're assigned to.
+    """
+    employee = Employee.objects.create(
+        employee_first_name=first_name, email=email, phone=phone
+    )
+    EmployeeWorkInformation.objects.filter(employee_id=employee).update(company_id=company)
+    employee = Employee.objects.get(pk=employee.pk)
+    user = employee.employee_user_id
+    user.is_new_employee = False
+    user.set_password(PASSWORD)
+    user.save()
+    recruitment.recruitment_managers.add(employee)
+    return employee
 
 
 class RecruitmentStrSideEffectTests(TestCase):
@@ -255,3 +279,221 @@ class CandidatePortalLoginThrottlingTests(TestCase):
             data={"email": other_candidate.email, "phone": other_candidate.mobile},
         )
         self.assertEqual(client.session.get("candidate_id"), other_candidate.pk)
+
+    def test_ip_wide_lockout_after_many_distinct_email_failures(self):
+        """
+        The per-email counter alone doesn't stop an attacker cycling
+        through many known candidate emails from the same source. Fixed
+        by pairing it with a coarser per-IP cap
+        (CANDIDATE_LOGIN_MAX_ATTEMPTS_PER_IP) in candidate_login.
+        """
+        from recruitment.views.views import CANDIDATE_LOGIN_MAX_ATTEMPTS_PER_IP
+
+        client = Client()
+        for i in range(CANDIDATE_LOGIN_MAX_ATTEMPTS_PER_IP):
+            other = Candidate.objects.create(
+                name=f"IP Sweep Target {i}", email=f"ip.sweep.{i}@example.com",
+                mobile="5550000000", recruitment_id=self.recruitment,
+                job_position_id=self.job, stage_id=self.stage,
+            )
+            client.post(
+                "/recruitment/candidate-login/",
+                data={"email": other.email, "phone": "0000000000"},
+            )
+        # Even a brand-new candidate's CORRECT credentials must now be
+        # rejected - the IP itself is locked, not just each individual
+        # email's own counter.
+        response = client.post(
+            "/recruitment/candidate-login/",
+            data={"email": self.candidate.email, "phone": self.candidate.mobile},
+        )
+        self.assertNotIn("candidate_id", client.session)
+        self.assertIn("Too many failed login attempts", response.content.decode())
+
+
+class DragDropHireFlagTests(TestCase):
+    """
+    update_candidate_stage_and_sequence (recruitment/views/views.py) is the
+    pipeline drag-and-drop endpoint - it moved candidates via a queryset
+    .update() call, which bypasses Candidate.save() and never set
+    hired=True, unlike the sibling update_candidate_sequence endpoint
+    three lines away that does. A candidate dragged into a "hired"-type
+    stage via drag-and-drop kept hired=False, undercounting
+    Recruitment.total_hires() on the Recruitment list/card. Fixed by
+    setting hired on the same .update() call.
+    """
+
+    def setUp(self):
+        from horilla.horilla_middlewares import set_selected_company
+
+        set_selected_company(None)
+        self.company = _make_company("DragDropHireCo")
+        self.dept = Department.objects.create(department="DragDropHireDept")
+        self.job = JobPosition.objects.create(
+            job_position="DragDropHireRole", department_id=self.dept
+        )
+        self.recruitment = Recruitment.objects.create(
+            title="DragDropHireRecruitment", company_id=self.company, job_position_id=self.job
+        )
+        self.recruitment.open_positions.add(self.job)
+        self.applied_stage = Stage.objects.filter(
+            recruitment_id=self.recruitment, stage_type="applied"
+        ).first()
+        self.hired_stage = Stage.objects.filter(
+            recruitment_id=self.recruitment, stage_type="hired"
+        ).first()
+        self.candidate = Candidate.objects.create(
+            name="Drag Drop Candidate", email="dragdrop.candidate@example.com",
+            recruitment_id=self.recruitment, job_position_id=self.job,
+            stage_id=self.applied_stage,
+        )
+        self.manager = _make_recruitment_manager(
+            self.company, self.recruitment,
+            "DragDropMgr", "dragdrop.mgr@example.com", "9990000001",
+        )
+
+    def tearDown(self):
+        from horilla.horilla_middlewares import _thread_locals
+
+        _thread_locals.request = None
+        super().tearDown()
+
+    def test_drag_and_drop_into_hired_stage_sets_hired_flag(self):
+        client = Client()
+        assert client.login(username=self.manager.email, password=PASSWORD)
+        session = client.session
+        session["selected_company"] = str(self.company.pk)
+        session.save()
+
+        # Populate the per-session pipeline cache the drag-and-drop
+        # endpoint reads from - it's filter_pipeline ("pipeline-search"),
+        # the HX-only endpoint the pipeline page's JS calls after load,
+        # not the plain "pipeline" page shell itself.
+        client.get(reverse("pipeline-search"), HTTP_HX_REQUEST="true")
+
+        response = client.get(
+            reverse("update-candidate-stage-and-sequence"),
+            {"order": [self.candidate.pk], "stage_id": self.hired_stage.pk},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.candidate.refresh_from_db()
+        self.assertEqual(self.candidate.stage_id_id, self.hired_stage.pk)
+        self.assertTrue(
+            self.candidate.hired,
+            "dragging a candidate into a 'hired' stage must set hired=True, "
+            "matching update_candidate_sequence's behavior",
+        )
+
+
+class CandidateRatingPermissionAndValidationTests(TestCase):
+    """
+    create_candidate_rating/update_candidate_rating (recruitment/views/
+    views.py) only had @login_required - any authenticated employee,
+    regardless of recruitment role, could rate any candidate, and the raw
+    POST "rating" value was passed straight to .create()/int(rating) with
+    no validation, bypassing the model's MinValueValidator(0)/
+    MaxValueValidator(5). Fixed by adding manager_can_enter and running
+    full_clean() before save.
+    """
+
+    def setUp(self):
+        from horilla.horilla_middlewares import set_selected_company
+
+        set_selected_company(None)
+        self.company = _make_company("RatingPermCo")
+        self.dept = Department.objects.create(department="RatingPermDept")
+        self.job = JobPosition.objects.create(
+            job_position="RatingPermRole", department_id=self.dept
+        )
+        self.recruitment = Recruitment.objects.create(
+            title="RatingPermRecruitment", company_id=self.company, job_position_id=self.job
+        )
+        self.recruitment.open_positions.add(self.job)
+        self.stage = Stage.objects.filter(recruitment_id=self.recruitment).order_by("sequence").first()
+        self.candidate = Candidate.objects.create(
+            name="Rating Perm Candidate", email="rating.perm.candidate@example.com",
+            recruitment_id=self.recruitment, job_position_id=self.job, stage_id=self.stage,
+        )
+        self.outsider = Employee.objects.create(
+            employee_first_name="Outsider", email="rating.outsider@example.com", phone="9990000002"
+        )
+        EmployeeWorkInformation.objects.filter(employee_id=self.outsider).update(
+            company_id=self.company
+        )
+        self.outsider = Employee.objects.get(pk=self.outsider.pk)
+        self.outsider.employee_user_id.is_new_employee = False
+        self.outsider.employee_user_id.set_password(PASSWORD)
+        self.outsider.employee_user_id.save()
+        self.manager = _make_recruitment_manager(
+            self.company, self.recruitment,
+            "RatingMgr", "rating.mgr@example.com", "9990000003",
+        )
+
+    def tearDown(self):
+        from horilla.horilla_middlewares import _thread_locals
+
+        _thread_locals.request = None
+        super().tearDown()
+
+    def _login(self, employee):
+        client = Client()
+        assert client.login(username=employee.email, password=PASSWORD)
+        session = client.session
+        session["selected_company"] = str(self.company.pk)
+        session.save()
+        return client
+
+    def test_employee_with_no_recruitment_role_cannot_create_a_rating(self):
+        client = self._login(self.outsider)
+        client.post(
+            reverse("create-candidate-rating", args=[self.candidate.pk]),
+            data={"rating": 4},
+        )
+        self.assertFalse(
+            CandidateRating.objects.filter(candidate_id=self.candidate).exists(),
+            "an employee with no recruitment_managers/stage_managers role "
+            "and no add_candidaterating permission must not be able to "
+            "rate a candidate",
+        )
+
+    def test_recruitment_manager_can_create_a_valid_rating(self):
+        client = self._login(self.manager)
+        client.post(
+            reverse("create-candidate-rating", args=[self.candidate.pk]),
+            data={"rating": 4},
+        )
+        rating = CandidateRating.objects.get(candidate_id=self.candidate)
+        self.assertEqual(rating.rating, 4)
+
+    def test_out_of_range_rating_is_rejected_not_saved(self):
+        client = self._login(self.manager)
+        client.post(
+            reverse("create-candidate-rating", args=[self.candidate.pk]),
+            data={"rating": 99},
+        )
+        self.assertFalse(
+            CandidateRating.objects.filter(candidate_id=self.candidate).exists(),
+            "a rating outside the model's 0-5 range must be rejected by "
+            "full_clean(), not silently saved",
+        )
+
+    def test_non_numeric_rating_does_not_crash(self):
+        client = self._login(self.manager)
+        response = client.post(
+            reverse("create-candidate-rating", args=[self.candidate.pk]),
+            data={"rating": "not-a-number"},
+        )
+        self.assertNotEqual(response.status_code, 500)
+        self.assertFalse(CandidateRating.objects.filter(candidate_id=self.candidate).exists())
+
+    def test_update_rejects_out_of_range_value_and_keeps_old_rating(self):
+        CandidateRating.objects.create(
+            candidate_id=self.candidate, employee_id=self.manager, rating=3
+        )
+        client = self._login(self.manager)
+        client.post(
+            reverse("update-candidate-rating", args=[self.candidate.pk]),
+            data={"rating": -1},
+        )
+        rating = CandidateRating.objects.get(candidate_id=self.candidate, employee_id=self.manager)
+        self.assertEqual(rating.rating, 3, "an invalid update must not overwrite the existing rating")

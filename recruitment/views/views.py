@@ -146,6 +146,7 @@ from recruitment.models import (
 )
 from recruitment.views.linkedin import delete_post, post_recruitment_in_linkedin
 from recruitment.views.paginator_qry import paginator_qry
+from recruitment.views.resume_autofill import _client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -696,7 +697,9 @@ def update_candidate_stage_and_sequence(request):
 
     for index, cand_id in enumerate(order_list):
         pipeline_cache["candidates"].filter(id=cand_id).update(
-            sequence=index, stage_id=stage
+            sequence=index,
+            stage_id=stage,
+            hired=(stage.stage_type == "hired"),
         )
 
     if stage.stage_type == "hired" and stage.recruitment_id.is_vacancy_filled():
@@ -818,8 +821,6 @@ def change_candidate_stage(request):
                         if stage.recruitment_id.is_vacancy_filled():
                             context["message"] = _("Vacancy is filled")
                             context["vacancy"] = stage.recruitment_id.vacancy
-                    candidate.stage_id = stage
-                    candidate.save()
                     messages.success(request, _("Candidate stage updated"))
             except Candidate.DoesNotExist:
                 messages.error(request, _("Candidate not found."))
@@ -2955,6 +2956,7 @@ def candidate_select_filter(request):
 
 
 @login_required
+@manager_can_enter(perm="recruitment.add_candidaterating")
 def create_candidate_rating(request, cand_id):
     """
     This method is used to create rating for the candidate
@@ -2964,10 +2966,30 @@ def create_candidate_rating(request, cand_id):
     candidate = Candidate.find(cand_id)
     if candidate:
         employee_id = request.user.employee_get
-        rating = request.POST.get("rating")
-        CandidateRating.objects.create(
-            candidate_id=candidate, rating=rating, employee_id=employee_id
+        try:
+            rating_value = int(request.POST.get("rating"))
+        except (TypeError, ValueError):
+            messages.error(request, _("Invalid rating value."))
+            return redirect(recruitment_pipeline)
+        # full_clean() below does NOT enforce CandidateRating.rating's own
+        # MinValueValidator(0)/MaxValueValidator(5): HorillaModel overrides
+        # clean_fields() (horilla/models.py) to only run an XSS check on
+        # Char/TextFields, and never calls super() or a field's own
+        # validators - so an IntegerField's range validators are silently
+        # never invoked by full_clean() on any HorillaModel subclass.
+        # Checked explicitly here instead of relying on it.
+        if not 0 <= rating_value <= 5:
+            messages.error(request, _("Rating must be between 0 and 5."))
+            return redirect(recruitment_pipeline)
+        rating = CandidateRating(
+            candidate_id=candidate, rating=rating_value, employee_id=employee_id
         )
+        try:
+            rating.full_clean()
+        except DjangoValidationError as e:
+            messages.error(request, " ".join(e.messages))
+            return redirect(recruitment_pipeline)
+        rating.save()
     else:
         messages.error(request, _("No Candidate found matching the query"))
 
@@ -3445,6 +3467,7 @@ def to_skill_zone(request, cand_id):
 
 
 @login_required
+@manager_can_enter(perm="recruitment.change_candidaterating")
 def update_candidate_rating(request, cand_id):
     """
     This method is used to update the candidate rating
@@ -3454,11 +3477,30 @@ def update_candidate_rating(request, cand_id):
     candidate = Candidate.find(cand_id)
     if candidate:
         employee_id = request.user.employee_get
-        rating = request.POST.get("rating")
-        rate = CandidateRating.objects.get(
-            candidate_id=candidate, employee_id=employee_id
-        )
-        rate.rating = int(rating)
+        try:
+            rating_value = int(request.POST.get("rating"))
+        except (TypeError, ValueError):
+            messages.error(request, _("Invalid rating value."))
+            return redirect(recruitment_pipeline)
+        # See create_candidate_rating for why this can't rely on
+        # full_clean() alone (HorillaModel.clean_fields() doesn't run
+        # field-level validators).
+        if not 0 <= rating_value <= 5:
+            messages.error(request, _("Rating must be between 0 and 5."))
+            return redirect(recruitment_pipeline)
+        try:
+            rate = CandidateRating.objects.get(
+                candidate_id=candidate, employee_id=employee_id
+            )
+        except CandidateRating.DoesNotExist:
+            messages.error(request, _("Rating not found."))
+            return redirect(recruitment_pipeline)
+        rate.rating = rating_value
+        try:
+            rate.full_clean()
+        except DjangoValidationError as e:
+            messages.error(request, " ".join(e.messages))
+            return redirect(recruitment_pipeline)
         rate.save()
     else:
         messages.error(request, _("No Candidate found matching the query"))
@@ -4053,7 +4095,13 @@ def platform_conversion_widget_setting(request):
 # number is low-entropy and often known to third parties - so this login
 # is throttled per-email to make brute-forcing the phone number
 # impractical, the way a generated/emailed secret wouldn't need to be.
+# Per-email alone doesn't stop an attacker who cycles through many known
+# candidate emails (public on resumes/job boards) from the same source, so
+# it's paired with a coarser per-IP cap - high enough not to lock out a
+# shared office/campus NAT under normal use, low enough to make that
+# distributed-guessing pattern impractical too.
 CANDIDATE_LOGIN_MAX_ATTEMPTS = 5
+CANDIDATE_LOGIN_MAX_ATTEMPTS_PER_IP = 20
 CANDIDATE_LOGIN_LOCKOUT_SECONDS = 15 * 60
 
 
@@ -4062,8 +4110,11 @@ def candidate_login(request):
         email = request.POST.get("email", "").strip()
         mobile = request.POST.get("phone", "").strip()
         attempts_key = f"candidate_login_attempts:{email.lower()}"
+        ip_attempts_key = f"candidate_login_attempts_ip:{_client_ip(request)}"
 
-        if email and CACHE.get(attempts_key, 0) >= CANDIDATE_LOGIN_MAX_ATTEMPTS:
+        if (email and CACHE.get(attempts_key, 0) >= CANDIDATE_LOGIN_MAX_ATTEMPTS) or (
+            CACHE.get(ip_attempts_key, 0) >= CANDIDATE_LOGIN_MAX_ATTEMPTS_PER_IP
+        ):
             return render(
                 request,
                 "candidate/self_login.html",
@@ -4099,6 +4150,11 @@ def candidate_login(request):
                     CACHE.get(attempts_key, 0) + 1,
                     CANDIDATE_LOGIN_LOCKOUT_SECONDS,
                 )
+            CACHE.set(
+                ip_attempts_key,
+                CACHE.get(ip_attempts_key, 0) + 1,
+                CANDIDATE_LOGIN_LOCKOUT_SECONDS,
+            )
             return render(
                 request, "candidate/self_login.html", {"error": "Invalid credentials"}
             )

@@ -264,7 +264,7 @@
     {% if resume %}
         $("#resume").val(resume)
     {% endif %}
-    var description = `{{form.instance.recruitment_id.description|safe}}`
+    var description = "{{form.instance.recruitment_id.description|escapejs}}"
     var formattedDescription = description.replace(/\n/g, "<br>");
     $("#recruitmentInfoBody").html(formattedDescription);
 

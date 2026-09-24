@@ -1,5 +1,6 @@
 from collections import Counter
 
+from django.core.exceptions import FieldDoesNotExist
 from django.db.models import Q
 from django.http import QueryDict
 from rest_framework.pagination import PageNumberPagination
@@ -52,6 +53,15 @@ def permission_based_queryset(user, perm, queryset, user_obj=None):
 
     if user.has_perm(perm):
         return queryset
+
+    try:
+        queryset.model._meta.get_field("employee_id")
+    except FieldDoesNotExist:
+        # Written for employee-owned models (leave, attendance, ...); a
+        # model with no employee_id field (Candidate, Recruitment, Stage,
+        # ...) has no per-employee ownership to fall back to, so deny
+        # rather than crash on the filter below with a FieldError.
+        return queryset.none()
 
     employee = user.employee_get
     is_manager = EmployeeWorkInformation.objects.filter(

@@ -21,6 +21,7 @@ from datetime import date
 
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import ProtectedError
 from django.utils.translation import gettext_lazy as _
 
 from base.horilla_company_manager import HorillaCompanyManager
@@ -622,6 +623,21 @@ class PayrollRun(HorillaModel):
     @property
     def is_locked(self) -> bool:
         return self.status == "completed"
+
+    def delete(self, *args, **kwargs):
+        # Nothing at the FK level (PayrollRunRecord.run_id is CASCADE, by
+        # design - see that model's docstring) stopped a completed run
+        # from being deleted outright, silently destroying every frozen
+        # payslip snapshot it holds. This is the model-level equivalent of
+        # the is_locked guards the views already apply to edits.
+        if self.is_locked:
+            raise ProtectedError(
+                "A completed payroll run can't be deleted - its records "
+                "are the frozen source of truth for already-generated "
+                "payslips. Reopen it first if it genuinely needs to go.",
+                self.records.all(),
+            )
+        return super().delete(*args, **kwargs)
 
 
 class PayrollRunRecord(HorillaModel):

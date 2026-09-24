@@ -2,6 +2,8 @@
 horilla_api/api_serializers/offboarding/serializers.py
 """
 
+import bleach
+from bleach.css_sanitizer import CSSSanitizer
 from rest_framework import serializers
 
 from base.models import Company
@@ -164,6 +166,25 @@ class OffboardingEmployeeSerializer(serializers.ModelSerializer):
         return None
 
 
+# Same allowlist/rationale as offboarding.forms.ResignationLetterForm
+# .clean_description() - the API is a second write path onto the same
+# Summernote-edited, |safe-rendered field, so it needs the same sanitizer.
+_DESCRIPTION_ALLOWED_TAGS = [
+    "p", "br", "b", "strong", "i", "em", "u", "s", "strike",
+    "ul", "ol", "li", "a", "span", "blockquote",
+    "h1", "h2", "h3", "h4", "h5", "h6",
+]
+_DESCRIPTION_ALLOWED_ATTRIBUTES = {
+    "a": ["href", "title", "target"],
+    "span": ["style"],
+    "p": ["style"],
+}
+_DESCRIPTION_ALLOWED_CSS_PROPERTIES = [
+    "color", "background-color", "font-size", "font-weight",
+    "text-align", "text-decoration",
+]
+
+
 class ResignationLetterSerializer(serializers.ModelSerializer):
     employee_id = serializers.SerializerMethodField()
     employee_id_write = serializers.PrimaryKeyRelatedField(
@@ -183,6 +204,19 @@ class ResignationLetterSerializer(serializers.ModelSerializer):
     class Meta:
         model = ResignationLetter
         fields = "__all__"
+
+    def validate_description(self, value):
+        if not value:
+            return value
+        return bleach.clean(
+            value,
+            tags=_DESCRIPTION_ALLOWED_TAGS,
+            attributes=_DESCRIPTION_ALLOWED_ATTRIBUTES,
+            css_sanitizer=CSSSanitizer(
+                allowed_css_properties=_DESCRIPTION_ALLOWED_CSS_PROPERTIES
+            ),
+            strip=True,
+        )
 
     def get_employee_id(self, obj):
         if obj.employee_id:
