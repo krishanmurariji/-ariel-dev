@@ -63,3 +63,11 @@ jobs:
         run: ps aux | grep gunicorn | grep -v grep
         shell: bash
         continue-on-error: true
+
+      - name: Non-secret .env values (masked) - verifies DEBUG/ALLOWED_HOSTS before the C-3 settings hardening ships
+        working-directory: /opt/arielhr
+        run: |
+          grep -E '^(DEBUG|ALLOWED_HOSTS|CSRF_TRUSTED_ORIGINS)=' .env || echo "none of DEBUG/ALLOWED_HOSTS/CSRF_TRUSTED_ORIGINS found in .env"
+          echo "SECRET_KEY is set: $(grep -q '^SECRET_KEY=.' .env && echo yes || echo no)"
+        shell: bash
+        continue-on-error: true
