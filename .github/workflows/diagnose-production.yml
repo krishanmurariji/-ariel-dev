@@ -1,0 +1,42 @@
+name: Diagnose Production (read-only)
+
+on:
+  workflow_dispatch: {}   # Run from: repo -> Actions tab -> this workflow -> "Run workflow"
+
+jobs:
+  diagnose:
+    # Same self-hosted runner the deploy workflow uses - this server has no
+    # public SSH access (only 80/443 are forwarded), so this is the only
+    # channel available to inspect it. Read-only: nothing here restarts,
+    # stops, or modifies the app, the database, or any files.
+    runs-on: self-hosted
+
+    steps:
+      - name: Recent application log (last 200 lines)
+        run: sudo journalctl -u arielhr -n 200 --no-pager
+        shell: bash
+
+      - name: Service status
+        run: sudo systemctl status arielhr --no-pager
+        shell: bash
+
+      - name: Database connections vs. configured limit
+        run: |
+          sudo -u postgres psql -c "SELECT count(*) FROM pg_stat_activity;" || echo "(could not query pg_stat_activity this way)"
+          sudo -u postgres psql -c "SHOW max_connections;" || echo "(could not query max_connections this way)"
+        shell: bash
+
+      - name: Connections broken down by state (idle, active, idle in transaction)
+        run: |
+          sudo -u postgres psql -c "SELECT state, count(*) FROM pg_stat_activity GROUP BY state ORDER BY count(*) DESC;" || true
+        shell: bash
+
+      - name: Disk and memory snapshot
+        run: |
+          df -h
+          free -h
+        shell: bash
+
+      - name: Gunicorn process list
+        run: ps aux | grep gunicorn | grep -v grep
+        shell: bash
