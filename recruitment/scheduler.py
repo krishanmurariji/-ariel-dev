@@ -6,10 +6,13 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from dateutil.relativedelta import relativedelta
 
+from horilla.background_utils import with_db_cleanup
+
 END_DATE_REMINDER_DAYS_BEFORE = 5
 CLOSING_REMINDER_MAIL_TEMPLATE_TITLE = "Job Opening Closing Reminder"
 
 
+@with_db_cleanup
 def recruitment_close():
     """
     Closes recruitment campaigns that have reached their end date.
@@ -65,6 +68,7 @@ def _send_closing_reminder_mail(rec, template_body, email_backend):
         )
 
 
+@with_db_cleanup
 def recruitment_end_date_reminder():
     """
     Notifies (in-app) and emails every recruitment head assigned to a
@@ -122,6 +126,7 @@ def recruitment_end_date_reminder():
         rec.save()
 
 
+@with_db_cleanup
 def candidate_convert():
     """
     Converts candidates to a "converted" state if they already exist as users.
@@ -142,6 +147,7 @@ def candidate_convert():
     ).update(converted=True)
 
 
+@with_db_cleanup
 def poll_candidate_intake_mailboxes():
     """
     Polls every active CandidateIntakeMailbox for new application emails

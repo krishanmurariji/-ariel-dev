@@ -8,8 +8,10 @@ from django.conf import settings
 from django.utils import timezone
 
 from base.backends import logger
+from horilla.background_utils import with_db_cleanup
 
 
+@with_db_cleanup
 def auto_punch_out():
     from attendance.methods.utils import Request
     from attendance.models import Attendance, AttendanceActivity
@@ -65,6 +67,7 @@ def auto_punch_out():
                         logger.error(f"auto_punch_out error: {e}")
 
 
+@with_db_cleanup
 def create_work_record():
     from attendance.models import WorkRecords
     from employee.models import Employee

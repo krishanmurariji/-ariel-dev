@@ -15,6 +15,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from base.models import Announcement, IntegrationApps
 from employee.models import Employee
+from horilla.background_utils import with_db_cleanup
 from horilla.decorators import check_integration_enabled, login_required
 from horilla.horilla_middlewares import _thread_locals
 from notifications.signals import notify
@@ -326,6 +327,7 @@ def create_flows(cred_id):
     return {"message": "Flows created, updated, and published successfully."}
 
 
+@with_db_cleanup
 def send_notification_task(request, recipient, verb, redirect, icon):
     """
     Background task to send a notification message via WhatsApp.
@@ -370,6 +372,7 @@ def send_notification_on_whatsapp(
     thread.start()
 
 
+@with_db_cleanup
 def send_announcement_task(instance, request):
     """
     Background task to send an announcement message via WhatsApp.

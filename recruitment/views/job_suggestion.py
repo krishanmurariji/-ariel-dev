@@ -15,6 +15,7 @@ from django.core.cache import cache
 from django.shortcuts import render
 from django.utils.translation import gettext_lazy as _
 
+from horilla.background_utils import with_db_cleanup
 from horilla.decorators import login_required, permission_required
 from horilla.http.response import HorillaRedirect
 from recruitment.models import Candidate, CandidateJobSuggestion
@@ -24,6 +25,7 @@ def _running_cache_key(candidate_id):
     return f"candidate_job_suggestion_running_{candidate_id}"
 
 
+@with_db_cleanup
 def _run_suggestion_in_background(candidate_id):
     from recruitment.ai_job_match import suggest_job_match
 

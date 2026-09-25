@@ -31,6 +31,7 @@ from django.utils import timezone as django_timezone
 from django.utils.translation import gettext_lazy as _
 from notifications.signals import notify
 
+from horilla.background_utils import with_db_cleanup
 from horilla.methods import horilla_users_with_perms
 from recruitment import ai_client
 from recruitment.intake_providers import AttachmentTooLargeError, get_provider
@@ -528,6 +529,7 @@ def _release_intake_poll_lock(token: str):
     )
 
 
+@with_db_cleanup
 def run_guarded_poll() -> bool:
     """
     Runs poll_all_mailboxes() unless one is already in progress anywhere
@@ -535,6 +537,11 @@ def run_guarded_poll() -> bool:
     app-server process - the scheduler's automatic interval job and any
     manually-triggered run, on any worker, can never overlap). Returns
     True if it ran, False if skipped.
+
+    Decorated with with_db_cleanup since this is always run outside a
+    normal request cycle (a scheduled job, or a manually-started thread -
+    see recruitment/views/candidate_intake.py) - Django never closes its
+    DB connection on its own in either case.
     """
     token = f"{os.getpid()}-{uuid.uuid4().hex[:8]}"
     if not _claim_intake_poll_lock(token):

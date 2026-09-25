@@ -10,9 +10,11 @@ from datetime import date, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from django.urls import reverse
 
+from horilla.background_utils import with_db_cleanup
 from notifications.signals import notify
 
 
+@with_db_cleanup
 def notify_expiring_assets():
     """
     Finds all Expiring Assets and send a notification on the notify_before date.
@@ -53,6 +55,7 @@ def notify_expiring_assets():
                 )
 
 
+@with_db_cleanup
 def mark_expired_assets():
     """
     Finds all assets past their expiry date and sets their status to Not-Available.
@@ -69,6 +72,7 @@ def mark_expired_assets():
         asset.save()
 
 
+@with_db_cleanup
 def notify_expiring_documents():
     """
     Finds all Expiring Documents and send a notification on the notify_before date.

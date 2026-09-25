@@ -577,6 +577,15 @@ HORILLA_TIME_FORMATS = {
 
 BIO_DEVICE_THREADS = {}
 
+# One BackgroundScheduler per biometric device (keyed by device id) - see
+# biometric/views.py's _start_device_scheduler(). Saving a device's
+# schedule form used to always create a brand-new scheduler with no
+# reference to any scheduler already polling that device, so saving the
+# same device's schedule twice left two (or more, on every further save)
+# independent schedulers running forever in parallel. This registry lets
+# the new one stop the previous one first.
+BIO_DEVICE_SCHEDULERS = {}
+
 DYNAMIC_URL_PATTERNS = []
 
 APP_URLS = [

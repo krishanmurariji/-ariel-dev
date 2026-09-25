@@ -3,9 +3,12 @@ from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
+from horilla.background_utils import with_db_cleanup
+
 from horilla.signals import post_scheduler, pre_scheduler
 
 
+@with_db_cleanup
 def leave_reset():
     pre_scheduler.send(sender=leave_reset)
     from leave.models import LeaveType

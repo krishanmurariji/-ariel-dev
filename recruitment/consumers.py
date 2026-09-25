@@ -1,6 +1,7 @@
 from channels.generic.websocket import JsonWebsocketConsumer
 
 from employee.models import Employee
+from horilla.background_utils import with_db_cleanup
 
 
 class ChatConsumer(JsonWebsocketConsumer):
@@ -22,6 +23,7 @@ class ChatConsumer(JsonWebsocketConsumer):
     def group_name(self):
         return f"chat_candidate_{self.candidate_id}"
 
+    @with_db_cleanup
     def connect(self):
         self.candidate_id = self.scope["url_route"]["kwargs"]["candidate_id"]
 

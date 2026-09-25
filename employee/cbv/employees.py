@@ -25,6 +25,7 @@ from employee.forms import BulkUpdateFieldForm, EmployeeExportExcelForm
 from employee.models import Employee, EmployeeBankDetails, EmployeeWorkInformation
 from employee.templatetags.employee_filter import edit_accessibility
 from employee.views import _check_reporting_manager
+from horilla.background_utils import with_db_cleanup
 from horilla.horilla_middlewares import _thread_locals
 from horilla.signals import post_generic_delete, post_generic_import
 from horilla_auth.models import HorillaUser
@@ -607,6 +608,7 @@ def user_generic_import_or_update(sender, **kwargs):
     """
     records = kwargs["records"]
 
+    @with_db_cleanup
     def _set_password(records):
         # Create a list to store users that need to be updated
         users_to_update = []

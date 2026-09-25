@@ -17,6 +17,7 @@ from django.db.models.query import QuerySet
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 
+from horilla.background_utils import with_db_cleanup
 from horilla.horilla_middlewares import _thread_locals
 from horilla.signals import post_bulk_update, pre_bulk_update
 from notifications.signals import notify
@@ -99,6 +100,7 @@ def start_automation():
 
     def create_post_bulk_update_handler(automation, model_class, query_strings):
         def post_bulk_update_handler(sender, queryset, *args, **kwargs):
+            @with_db_cleanup
             def _bulk_update_thread_handler(
                 queryset, previous_queryset_copy, automation
             ):
@@ -189,6 +191,7 @@ def start_automation():
                         previous_instance,
                     )
 
+                    @with_db_cleanup
                     def _run_automated_mail():
                         # Runs detached from the request thread, so an
                         # uncaught exception here (a misconfigured
@@ -594,6 +597,7 @@ def send_mail(request, automation, instance):
             except Exception as e:
                 logger.error(e)
 
+        @with_db_cleanup
         def _send_notification(text):
             notify.send(
                 sender,

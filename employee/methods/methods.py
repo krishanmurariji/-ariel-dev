@@ -24,6 +24,7 @@ from base.models import (
     WorkType,
 )
 from employee.models import Employee, EmployeeWorkInformation
+from horilla.background_utils import with_db_cleanup
 from horilla_auth.models import HorillaUser
 
 logger = logging.getLogger(__name__)
@@ -506,6 +507,7 @@ def bulk_create_employee_import(success_lists):
     return created_employees
 
 
+@with_db_cleanup
 def set_initial_password(employees):
     """
     method to set initial password
@@ -727,6 +729,7 @@ def bulk_create_employee_types(success_lists):
             )
 
 
+@with_db_cleanup
 def create_contracts_in_thread(new_work_info_list, update_work_info_list):
     """
     Creates employee contracts in bulk based on provided work information.

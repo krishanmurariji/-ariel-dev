@@ -13,6 +13,7 @@ from django.core.cache import cache
 from django.shortcuts import render
 from django.utils.translation import gettext_lazy as _
 
+from horilla.background_utils import with_db_cleanup
 from horilla.config import logger
 from horilla.decorators import login_required
 from horilla.http.response import HorillaRedirect
@@ -24,6 +25,7 @@ def _running_cache_key(candidate_id):
     return f"candidate_history_summary_running_{candidate_id}"
 
 
+@with_db_cleanup
 def _run_summary_in_background(candidate_id):
     from recruitment.ai_history_summary import summarize_candidate_history
 

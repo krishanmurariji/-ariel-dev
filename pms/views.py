@@ -37,6 +37,7 @@ from base.methods import (
 )
 from base.models import Company, DurationPreset
 from employee.models import Employee, EmployeeWorkInformation
+from horilla.background_utils import with_db_cleanup
 from horilla.decorators import (
     hx_request_required,
     login_required,
@@ -1648,6 +1649,7 @@ def _send_feedback_emails(request, feedback):
         if employee and employee.id != reviewed_employee_id
     }
 
+    @with_db_cleanup
     def _send_all():
         for employee in reviewers:
             intro = _(

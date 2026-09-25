@@ -3,7 +3,10 @@ from datetime import date, datetime, time, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
+from horilla.background_utils import with_db_cleanup
 
+
+@with_db_cleanup
 def update_experience():
     from employee.models import EmployeeWorkInformation
 
@@ -17,6 +20,7 @@ def update_experience():
     return
 
 
+@with_db_cleanup
 def block_unblock_disciplinary():
     """
     Scheduled task to apply disciplinary actions and block/unblock employee accounts.

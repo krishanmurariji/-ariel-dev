@@ -4,7 +4,10 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from dateutil.relativedelta import relativedelta
 
+from horilla.background_utils import with_db_cleanup
 
+
+@with_db_cleanup
 def cyclic_feedback_creation():
     from pms.models import Feedback
     from pms.views import send_feedback_notifications
@@ -46,6 +49,7 @@ def cyclic_feedback_creation():
     return
 
 
+@with_db_cleanup
 def probation_feedback_creation():
     """
     Walks active ProbationFeedbackCycle rows and generates the next month's

@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from django.urls import reverse
 
+from horilla.background_utils import with_db_cleanup
 from notifications.signals import notify
 
 
@@ -105,6 +106,7 @@ def work_type_rotate_every(rotating_work_type):
     return
 
 
+@with_db_cleanup
 def rotate_work_type():
     """
     This method will identify the based on condition to the rotating shift assign
@@ -215,6 +217,7 @@ def shift_rotate_every(rotating_shift, today):
     return
 
 
+@with_db_cleanup
 def rotate_shift():
     """
     This method will identify the based on condition to the rotating shift assign
@@ -250,6 +253,7 @@ def rotate_shift():
     return
 
 
+@with_db_cleanup
 def switch_shift():
     """
     This method change employees shift information regards to the shift request
@@ -288,6 +292,7 @@ def switch_shift():
     return
 
 
+@with_db_cleanup
 def undo_shift():
     """
     This method undo previous employees shift information regards to the shift request
@@ -329,6 +334,7 @@ def undo_shift():
     return
 
 
+@with_db_cleanup
 def switch_work_type():
     """
     This method change employees work type information regards to the work type request
@@ -368,6 +374,7 @@ def switch_work_type():
     return
 
 
+@with_db_cleanup
 def undo_work_type():
     """
     This method undo previous employees work type information regards to the work type request
@@ -409,6 +416,7 @@ def undo_work_type():
     return
 
 
+@with_db_cleanup
 def recurring_holiday():
     from .models import Holidays
 
@@ -431,6 +439,7 @@ def recurring_holiday():
         recurring_holiday.save()
 
 
+@with_db_cleanup
 def sync_roster_shifts():
     """
     Daily at 00:05 — sync published roster entries to employee work info.

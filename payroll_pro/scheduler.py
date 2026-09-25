@@ -12,6 +12,8 @@ import sys
 from datetime import date, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
+
+from horilla.background_utils import with_db_cleanup
 from dateutil.relativedelta import relativedelta
 
 logger = logging.getLogger(__name__)
@@ -30,6 +32,7 @@ def _should_run_today(setting, today: date) -> bool:
         return False
 
 
+@with_db_cleanup
 def auto_payroll_run():
     """
     Create + compute (and optionally finalize / email) the previous month's

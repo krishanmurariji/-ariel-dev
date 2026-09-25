@@ -5,6 +5,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from django.core.management import call_command
 
 from horilla import settings
+from horilla.background_utils import with_db_cleanup
 
 from .gdrive import *
 
@@ -84,6 +85,7 @@ scheduler = BackgroundScheduler()
 #     start_backup_job()
 
 
+@with_db_cleanup
 def google_drive_backup():
     # Runs unattended on a background thread (APScheduler), so this is the
     # only place any failure here ever gets recorded - previously an
@@ -134,10 +136,21 @@ def start_gdrive_backup_job():
     if GoogleDriveBackup.objects.exists():
         gdrive_backup = GoogleDriveBackup.objects.first()
 
-        # Remove existing job if it exists
+        # Remove existing job if it exists. This used to look for
+        # "backup_job" - a leftover id from the old local-backup code below
+        # - which never matched the real "gdrive_backup_job" id the jobs
+        # below actually register, so it always silently failed (caught by
+        # the bare except) and never removed anything. Combined with no
+        # replace_existing=True on add_job, saving the backup settings more
+        # than once would have raised a ConflictingIdError from APScheduler
+        # refusing to register a second job under the same id - or, if that
+        # was somehow swallowed upstream, left duplicate jobs (and their
+        # duplicate leaked DB connections, see google_drive_backup) running
+        # side by side. Fixed to match the real id, with replace_existing
+        # as a second line of defense either way.
         try:
-            scheduler.remove_job("backup_job")
-        except:
+            scheduler.remove_job("gdrive_backup_job")
+        except Exception:
             pass
         # Add new job based on Gdrive Backup configuration
         if gdrive_backup.interval:
@@ -146,6 +159,7 @@ def start_gdrive_backup_job():
                 "interval",
                 seconds=gdrive_backup.seconds,
                 id="gdrive_backup_job",
+                replace_existing=True,
             )
         else:
             scheduler.add_job(
@@ -154,6 +168,7 @@ def start_gdrive_backup_job():
                 hour=gdrive_backup.hour,
                 minute=gdrive_backup.minute,
                 id="gdrive_backup_job",
+                replace_existing=True,
             )
 
         # Start the scheduler if it's not already running
