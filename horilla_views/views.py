@@ -979,233 +979,255 @@ def reshape_text(text):
 
 @func_login_required
 def export_data(request, *args, **kwargs):
-
-    # =====================================================
-    # INPUT
-    # =====================================================
-    ids = eval_validate(request.POST.get("ids", "[]"))
-    columns = eval_validate(request.POST.get("columns", "[]"))
-
-    export_format = request.POST.get("format", "csv").lower()
-    file_name = request.POST.get("export_file_name", "quick_export")
-
-    date_range = request.session.get("report_date_range", "")
-
-    # =====================================================
-    # COMPANY
-    # =====================================================
-    company_name = "All Company"
-    logo_path = None
-
-    company = getattr(request, "selected_company_instance", None)
-    if company:
-        company_name = company.company or company_name
-        if company.icon:
-            logo_path = company.icon.path
-
-    # =====================================================
-    # MODEL
-    # =====================================================
-    model_path = request.GET.get("model")
-    if not model_path:
-        return HorillaRedirect(request, message=_("No matching query found."))
-    app_label = model_path.split(".")[0]
-    model_name = model_path.split(".")[-1]
-    model = apps.get_model(app_label, model_name)
-    base_table = model._meta.db_table
-
-    # =====================================================
-    # SQL BUILD
-    # =====================================================
-    headers = []
-    select_sql = [f"{base_table}.id"]
-    method_columns = {}
-    select_index = 1
-
-    for label, field in columns:
-        headers.append(label)
-
-        if not field:
-            select_sql.append("''")
-            select_index += 1
-            continue
-
-        parts = field.split("__")
-
-        if len(parts) == 1:
-            try:
-                f = model._meta.get_field(parts[0])
-                if isinstance(f, (ForeignKey, OneToOneField)):
-                    select_sql.append(f"{base_table}.id")
-                    method_columns[select_index] = parts[0]
-                else:
-                    select_sql.append(f"{base_table}.{f.column}")
-            except FieldDoesNotExist:
-                select_sql.append(f"{base_table}.id")
-                method_columns[select_index] = parts[0]
-
-            select_index += 1
-            continue
-
-        select_sql.append(f"{base_table}.id")
-        method_columns[select_index] = field
-        select_index += 1
-
-    # =====================================================
-    # EXECUTE SQL
-    # =====================================================
-    if not ids:
-        return HttpResponse("No IDs provided")
-
-    placeholders = ", ".join(["%s"] * len(ids))
-
-    query = f"""
-        SELECT {", ".join(select_sql)}
-        FROM {base_table}
-        WHERE {base_table}.id IN ({placeholders})
     """
+    DISABLED - Critical security finding C-1.
 
-    with connection.cursor() as cursor:
-        cursor.execute(query, ids)
-        rows = cursor.fetchall()
+    This endpoint let any logged-in user pick an arbitrary model via
+    ?model=<app_label>.<Model> (no allow-list, no permission check beyond
+    being logged in) and read back raw DB column values for client-supplied
+    ids via hand-built SQL that bypassed the company-scoped ORM manager -
+    letting one company's user export another company's data, or export
+    models never meant to be exported (e.g. horilla_auth.HorillaUser). The
+    entire original implementation is commented out below rather than
+    deleted, so nothing in it can run. Will be redesigned (allow-listed
+    exportable models, a real permission check per model, and ids
+    re-derived from the company-scoped queryset before any query is run)
+    and re-enabled in further development.
+    """
+    return HttpResponse(
+        _("Export is temporarily unavailable. Please contact your administrator."),
+        status=503,
+    )
 
-    # =====================================================
-    # ORM CACHE
-    # =====================================================
-    objs = {o.id: o for o in model.objects.filter(id__in=ids)}
-
-    method_maps = {}
-    for idx, attr in method_columns.items():
-        method_maps[idx] = {}
-        for obj_id, obj in objs.items():
-            value = obj
-            for part in attr.split("__"):
-                if value is None:
-                    break
-                value = getattr(value, part, None)
-                if callable(value):
-                    value = value()
-            method_maps[idx][obj_id] = str(value) if value is not None else ""
-
-    # =====================================================
-    # FINAL ROWS
-    # =====================================================
-    final_rows = []
-
-    for row in rows:
-        row = list(row)
-        obj_id = row[0]
-        for idx, mmap in method_maps.items():
-            row[idx] = mmap.get(obj_id, "")
-        final_rows.append(row[1:])
-
-    # =====================================================
-    # XLSX EXPORT (FIXED WIDTH – PERFORMANCE SAFE)
-    # =====================================================
-    if export_format == "xlsx":
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Quick Export"
-
-        total_columns = len(headers)
-        center = Alignment(horizontal="center", vertical="center")
-        header_fill = PatternFill(start_color="FFD700", fill_type="solid")
-        header_font = Font(bold=True)
-        thin = Side(style="thin")
-        border = Border(left=thin, right=thin, top=thin, bottom=thin)
-
-        # Logo
-        if logo_path and os.path.exists(logo_path):
-            img = Image(logo_path)
-            img.width = 120
-            img.height = 60
-            ws.add_image(img, "A1")
-
-        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_columns)
-        ws.cell(row=1, column=1).value = company_name
-        ws.cell(row=1, column=1).font = Font(size=14, bold=True)
-        ws.cell(row=1, column=1).alignment = center
-
-        ws.merge_cells(start_row=2, start_column=1, end_row=3, end_column=total_columns)
-        ws.cell(row=2, column=1).value = file_name
-        ws.cell(row=2, column=1).font = Font(size=14, bold=True, color="FF0000")
-        ws.cell(row=2, column=1).alignment = center
-
-        ws.merge_cells(start_row=4, start_column=1, end_row=4, end_column=total_columns)
-        ws.cell(row=4, column=1).value = date_range
-        ws.cell(row=4, column=1).alignment = center
-
-        HEADER_ROW = 5
-
-        for col, header in enumerate(headers, start=1):
-            cell = ws.cell(row=HEADER_ROW, column=col)
-            cell.value = header
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.border = border
-            cell.alignment = center
-
-            # ✅ FIXED WIDTH (NO PERFORMANCE HIT)
-            ws.column_dimensions[cell.column_letter].width = 25
-
-        for r_idx, row in enumerate(final_rows, start=HEADER_ROW + 1):
-            for c_idx, val in enumerate(row, start=1):
-                ws.cell(row=r_idx, column=c_idx).value = val
-
-        buf = BytesIO()
-        wb.save(buf)
-
-        response = HttpResponse(
-            buf.getvalue(),
-            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-        response["Content-Disposition"] = f'attachment; filename="{file_name}.xlsx"'
-        return response
-
-    # =====================================================
-    # PDF EXPORT
-    # =====================================================
-    if export_format == "pdf":
-
-        html = render_to_string(
-            "generic/export_pdf.html",
-            {
-                "headers": headers,
-                "rows": [dict(zip(headers, r)) for r in final_rows],
-                "company_name": company_name,
-                "date_range": date_range,
-                "report_title": file_name,
-                "logo_path": (
-                    logo_path if logo_path and os.path.exists(logo_path) else None
-                ),
-                "landscape": len(headers) > 5,
-            },
-        )
-
-        buf = BytesIO()
-        pisa.CreatePDF(html, dest=buf)
-
-        return HttpResponse(
-            buf.getvalue(),
-            content_type="application/pdf",
-            headers={"Content-Disposition": f'attachment; filename="{file_name}.pdf"'},
-        )
-
-    # =====================================================
-    # CSV EXPORT
-    # =====================================================
-    response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = f'attachment; filename="{file_name}.csv"'
-
-    writer = csv.writer(response)
-    writer.writerow([company_name])
-    writer.writerow([file_name])
-    writer.writerow([date_range])
-    writer.writerow([])
-    writer.writerow(headers)
-    writer.writerows(final_rows)
-
-    return response
+    # ------------------------------------------------------------------
+    # Original implementation - disabled, see docstring above.
+    # ------------------------------------------------------------------
+    # # =====================================================
+    # # INPUT
+    # # =====================================================
+    # ids = eval_validate(request.POST.get("ids", "[]"))
+    # columns = eval_validate(request.POST.get("columns", "[]"))
+    #
+    # export_format = request.POST.get("format", "csv").lower()
+    # file_name = request.POST.get("export_file_name", "quick_export")
+    #
+    # date_range = request.session.get("report_date_range", "")
+    #
+    # # =====================================================
+    # # COMPANY
+    # # =====================================================
+    # company_name = "All Company"
+    # logo_path = None
+    #
+    # company = getattr(request, "selected_company_instance", None)
+    # if company:
+    #     company_name = company.company or company_name
+    #     if company.icon:
+    #         logo_path = company.icon.path
+    #
+    # # =====================================================
+    # # MODEL
+    # # =====================================================
+    # model_path = request.GET.get("model")
+    # if not model_path:
+    #     return HorillaRedirect(request, message=_("No matching query found."))
+    # app_label = model_path.split(".")[0]
+    # model_name = model_path.split(".")[-1]
+    # model = apps.get_model(app_label, model_name)
+    # base_table = model._meta.db_table
+    #
+    # # =====================================================
+    # # SQL BUILD
+    # # =====================================================
+    # headers = []
+    # select_sql = [f"{base_table}.id"]
+    # method_columns = {}
+    # select_index = 1
+    #
+    # for label, field in columns:
+    #     headers.append(label)
+    #
+    #     if not field:
+    #         select_sql.append("''")
+    #         select_index += 1
+    #         continue
+    #
+    #     parts = field.split("__")
+    #
+    #     if len(parts) == 1:
+    #         try:
+    #             f = model._meta.get_field(parts[0])
+    #             if isinstance(f, (ForeignKey, OneToOneField)):
+    #                 select_sql.append(f"{base_table}.id")
+    #                 method_columns[select_index] = parts[0]
+    #             else:
+    #                 select_sql.append(f"{base_table}.{f.column}")
+    #         except FieldDoesNotExist:
+    #             select_sql.append(f"{base_table}.id")
+    #             method_columns[select_index] = parts[0]
+    #
+    #         select_index += 1
+    #         continue
+    #
+    #     select_sql.append(f"{base_table}.id")
+    #     method_columns[select_index] = field
+    #     select_index += 1
+    #
+    # # =====================================================
+    # # EXECUTE SQL
+    # # =====================================================
+    # if not ids:
+    #     return HttpResponse("No IDs provided")
+    #
+    # placeholders = ", ".join(["%s"] * len(ids))
+    #
+    # query = f"""
+    #     SELECT {", ".join(select_sql)}
+    #     FROM {base_table}
+    #     WHERE {base_table}.id IN ({placeholders})
+    # """
+    #
+    # with connection.cursor() as cursor:
+    #     cursor.execute(query, ids)
+    #     rows = cursor.fetchall()
+    #
+    # # =====================================================
+    # # ORM CACHE
+    # # =====================================================
+    # objs = {o.id: o for o in model.objects.filter(id__in=ids)}
+    #
+    # method_maps = {}
+    # for idx, attr in method_columns.items():
+    #     method_maps[idx] = {}
+    #     for obj_id, obj in objs.items():
+    #         value = obj
+    #         for part in attr.split("__"):
+    #             if value is None:
+    #                 break
+    #             value = getattr(value, part, None)
+    #             if callable(value):
+    #                 value = value()
+    #         method_maps[idx][obj_id] = str(value) if value is not None else ""
+    #
+    # # =====================================================
+    # # FINAL ROWS
+    # # =====================================================
+    # final_rows = []
+    #
+    # for row in rows:
+    #     row = list(row)
+    #     obj_id = row[0]
+    #     for idx, mmap in method_maps.items():
+    #         row[idx] = mmap.get(obj_id, "")
+    #     final_rows.append(row[1:])
+    #
+    # # =====================================================
+    # # XLSX EXPORT (FIXED WIDTH - PERFORMANCE SAFE)
+    # # =====================================================
+    # if export_format == "xlsx":
+    #     wb = Workbook()
+    #     ws = wb.active
+    #     ws.title = "Quick Export"
+    #
+    #     total_columns = len(headers)
+    #     center = Alignment(horizontal="center", vertical="center")
+    #     header_fill = PatternFill(start_color="FFD700", fill_type="solid")
+    #     header_font = Font(bold=True)
+    #     thin = Side(style="thin")
+    #     border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    #
+    #     # Logo
+    #     if logo_path and os.path.exists(logo_path):
+    #         img = Image(logo_path)
+    #         img.width = 120
+    #         img.height = 60
+    #         ws.add_image(img, "A1")
+    #
+    #     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_columns)
+    #     ws.cell(row=1, column=1).value = company_name
+    #     ws.cell(row=1, column=1).font = Font(size=14, bold=True)
+    #     ws.cell(row=1, column=1).alignment = center
+    #
+    #     ws.merge_cells(start_row=2, start_column=1, end_row=3, end_column=total_columns)
+    #     ws.cell(row=2, column=1).value = file_name
+    #     ws.cell(row=2, column=1).font = Font(size=14, bold=True, color="FF0000")
+    #     ws.cell(row=2, column=1).alignment = center
+    #
+    #     ws.merge_cells(start_row=4, start_column=1, end_row=4, end_column=total_columns)
+    #     ws.cell(row=4, column=1).value = date_range
+    #     ws.cell(row=4, column=1).alignment = center
+    #
+    #     HEADER_ROW = 5
+    #
+    #     for col, header in enumerate(headers, start=1):
+    #         cell = ws.cell(row=HEADER_ROW, column=col)
+    #         cell.value = header
+    #         cell.fill = header_fill
+    #         cell.font = header_font
+    #         cell.border = border
+    #         cell.alignment = center
+    #
+    #         # FIXED WIDTH (NO PERFORMANCE HIT)
+    #         ws.column_dimensions[cell.column_letter].width = 25
+    #
+    #     for r_idx, row in enumerate(final_rows, start=HEADER_ROW + 1):
+    #         for c_idx, val in enumerate(row, start=1):
+    #             ws.cell(row=r_idx, column=c_idx).value = val
+    #
+    #     buf = BytesIO()
+    #     wb.save(buf)
+    #
+    #     response = HttpResponse(
+    #         buf.getvalue(),
+    #         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    #     )
+    #     response["Content-Disposition"] = f'attachment; filename="{file_name}.xlsx"'
+    #     return response
+    #
+    # # =====================================================
+    # # PDF EXPORT
+    # # =====================================================
+    # if export_format == "pdf":
+    #
+    #     html = render_to_string(
+    #         "generic/export_pdf.html",
+    #         {
+    #             "headers": headers,
+    #             "rows": [dict(zip(headers, r)) for r in final_rows],
+    #             "company_name": company_name,
+    #             "date_range": date_range,
+    #             "report_title": file_name,
+    #             "logo_path": (
+    #                 logo_path if logo_path and os.path.exists(logo_path) else None
+    #             ),
+    #             "landscape": len(headers) > 5,
+    #         },
+    #     )
+    #
+    #     buf = BytesIO()
+    #     pisa.CreatePDF(html, dest=buf)
+    #
+    #     return HttpResponse(
+    #         buf.getvalue(),
+    #         content_type="application/pdf",
+    #         headers={"Content-Disposition": f'attachment; filename="{file_name}.pdf"'},
+    #     )
+    #
+    # # =====================================================
+    # # CSV EXPORT
+    # # =====================================================
+    # response = HttpResponse(content_type="text/csv")
+    # response["Content-Disposition"] = f'attachment; filename="{file_name}.csv"'
+    #
+    # writer = csv.writer(response)
+    # writer.writerow([company_name])
+    # writer.writerow([file_name])
+    # writer.writerow([date_range])
+    # writer.writerow([])
+    # writer.writerow(headers)
+    # writer.writerows(final_rows)
+    #
+    # return response
 
 
 @method_decorator(login_required, name="dispatch")

@@ -115,6 +115,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    # DEBUG/SECRET_KEY/ALLOWED_HOSTS no longer have insecure fallback
+    # defaults in horilla/settings/base.py (Critical finding C-3) - settings
+    # import now raises ImproperlyConfigured if SECRET_KEY or ALLOWED_HOSTS
+    # is missing, so this job (the only one here that imports Django
+    # settings outside Docker, where docker-compose.yml already supplies
+    # them) needs its own throwaway, non-secret values.
+    env:
+      DEBUG: "False"
+      SECRET_KEY: "ci-test-only-not-a-real-secret"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4

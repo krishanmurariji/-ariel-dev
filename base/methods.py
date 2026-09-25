@@ -4,6 +4,7 @@ import json
 import os
 import random
 import re
+import secrets
 from datetime import date, datetime, time, timedelta
 from types import SimpleNamespace
 
@@ -1437,4 +1438,20 @@ def generate_otp():
     Returns:
         str: A 6-digit random OTP as a string.
     """
-    return str(random.randint(100000, 999999))
+    # secrets, not random - random.randint() is a Mersenne Twister PRNG,
+    # not safe for anything security-sensitive like an auth code.
+    return str(secrets.randbelow(900000) + 100000)
+
+
+def get_client_ip(request):
+    """
+    Best-effort client IP for rate-limiting. X-Forwarded-For's first hop
+    is client-supplied and trivially spoofed to dodge a rate limit;
+    X-Real-IP is nginx's own view of the connecting peer (docker/nginx.conf
+    always sets it to $remote_addr), so it's the one header a client can't
+    forge. Falls back to REMOTE_ADDR for local/dev setups with no proxy.
+    """
+    real_ip = request.META.get("HTTP_X_REAL_IP")
+    if real_ip:
+        return real_ip.strip()
+    return request.META.get("REMOTE_ADDR", "unknown")

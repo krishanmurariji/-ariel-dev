@@ -87,7 +87,11 @@ class HorillaListView(ListView):
     search_url: str = ""
     bulk_select_option: bool = True
     filter_selected: bool = True
-    quick_export: bool = True
+    # Defaulted off - Critical security finding C-1: the "Quick Export"
+    # button posts to horilla_views.views.export_data, which is disabled
+    # (see that view's docstring). Flipping the default here hides the
+    # button everywhere instead of relying on every subclass to opt out.
+    quick_export: bool = False
     bulk_update: bool = True
     import_fields: list = []
     import_file_name: str = "Quick Import"

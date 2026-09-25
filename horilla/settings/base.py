@@ -10,6 +10,7 @@ from pathlib import Path
 
 import environ
 from django.contrib.messages import constants as messages
+from django.core.exceptions import ImproperlyConfigured
 from django.core.files.storage import FileSystemStorage
 
 # ========================================
@@ -19,10 +20,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # settings.py
 import os
 
+# No schema defaults for DEBUG/SECRET_KEY/ALLOWED_HOSTS here on purpose -
+# see the block below, which gives each its own explicit, considered
+# default (or lack of one) instead of environ's generic schema mechanism.
 env = environ.Env(
-    DEBUG=(bool, True),
-    SECRET_KEY=(str, "django-insecure-default-key"),
-    ALLOWED_HOSTS=(list, ["*"]),
     CSRF_TRUSTED_ORIGINS=(list, ["http://localhost:8000"]),
     CORS_ALLOWED_ORIGINS=(list, []),
     CORS_ALLOW_ALL_ORIGINS=(bool, False),
@@ -33,9 +34,42 @@ env.read_env(os.path.join(BASE_DIR, ".env"), overwrite=True)
 # ========================================
 # CORE DJANGO SETTINGS
 # ========================================
+# DEBUG, SECRET_KEY and ALLOWED_HOSTS used to fall back to
+# (True, "django-insecure-default-key", ["*"]) whenever any of the three
+# was missing from .env/the real environment - so a forgotten var, a lost
+# .env file, or a fresh clone deployed without one would silently run in
+# production with full debug pages, a publicly-known secret key (which
+# also derives the credential-encryption key - see horilla/crypto_fields.py)
+# and no Host header validation, instead of failing to start (Critical
+# finding C-3).
+#
+# These three are treated differently on purpose, not just "require
+# everything":
+#   - DEBUG has one universally safe value when unset: False. There's no
+#     reason to force an operator to type DEBUG=False explicitly, so it
+#     fails *safe* (defaults False) rather than failing loud.
+#   - SECRET_KEY and ALLOWED_HOSTS have no safe generic default - any
+#     value baked into the code would be shared by every install that
+#     forgets to override it, which is exactly the insecure-default
+#     problem this replaces. There's nothing safe to fall back to, so
+#     they fail *loud*: env() with no default raises ImproperlyConfigured
+#     immediately at process startup (before Django even finishes
+#     importing settings) if either is missing.
+DEBUG = env.bool("DEBUG", default=False)
 SECRET_KEY = env("SECRET_KEY")
-DEBUG = env("DEBUG")
-ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
+
+# Belt-and-braces: even with ALLOWED_HOSTS set, refuse to start with a
+# wildcard/empty host allow-list once DEBUG is off - that combination is
+# almost always a leftover dev value that slipped into a prod .env, and
+# open ALLOWED_HOSTS defeats Django's own Host-header validation.
+if not DEBUG and (not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS):
+    raise ImproperlyConfigured(
+        "ALLOWED_HOSTS must list real hostnames when DEBUG=False. "
+        "Refusing to start with an empty or wildcard ('*') host "
+        "allow-list outside of local development."
+    )
+
 CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
 
 # corsheaders is installed and in MIDDLEWARE (below) but was never actually

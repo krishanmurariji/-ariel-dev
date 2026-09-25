@@ -5,6 +5,7 @@ This module is used to map url pattens with django views or methods
 """
 
 import csv
+import hmac
 import json
 import mimetypes
 import os
@@ -27,6 +28,7 @@ from django.contrib.auth.views import PasswordResetConfirmView, PasswordResetVie
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMessage, EmailMultiAlternatives
+from django.core.cache import cache as CACHE
 from django.core.management import call_command
 from django.core.validators import validate_ipv46_address
 from django.db.models import ProtectedError, Q
@@ -125,6 +127,7 @@ from base.methods import (
     format_date,
     generate_colors,
     generate_otp,
+    get_client_ip,
     get_key_instances,
     is_reportingmanager,
     paginator_qry,
@@ -890,31 +893,61 @@ def change_username(request):
     return render(request, "base/auth/username_change.html", {"form": form})
 
 
+OTP_MAX_ATTEMPTS = 3
+OTP_LOCKOUT_SECONDS = 15 * 60
+
+
 def two_factor_auth(request):
     """
     function to handle two-factor authentication for users.
     """
-    # request.session["otp_code"] = None
     try:
         otp = get_otp(request)
     except:
         otp = None
 
     if request.method == "POST":
-        user_otp = request.POST.get("otp")
-        if user_otp == otp:
+        attempts_key = f"otp_attempts_{request.user.pk}"
+        ip_attempts_key = f"otp_attempts_ip_{get_client_ip(request)}"
+
+        if (
+            CACHE.get(attempts_key, 0) >= OTP_MAX_ATTEMPTS
+            or CACHE.get(ip_attempts_key, 0) >= OTP_MAX_ATTEMPTS
+        ):
+            messages.error(
+                request,
+                _(
+                    "Too many failed attempts. Please request a new OTP in a "
+                    "few minutes."
+                ),
+            )
+            return render(request, "base/auth/two_factor_auth.html")
+
+        user_otp = (request.POST.get("otp") or "").strip()
+        # `otp` and `user_otp` must both be a real, non-empty code before
+        # comparing them - previously a bare `user_otp == otp` let two
+        # absent values (None == None) verify an empty POST when no OTP
+        # had ever been issued yet, bypassing 2FA outright. The comparison
+        # itself uses compare_digest to avoid a timing side-channel.
+        if otp and user_otp and hmac.compare_digest(user_otp, otp):
+            CACHE.delete(attempts_key)
+            CACHE.delete(ip_attempts_key)
             request.session["otp_code"] = None
             request.session["otp_code_timestamp"] = None
             request.session["otp_code_verified"] = True
             request.session.save()
             messages.success(request, "OTP verified successfully.")
             return redirect("/")
-        elif otp is None:
+
+        CACHE.set(attempts_key, CACHE.get(attempts_key, 0) + 1, OTP_LOCKOUT_SECONDS)
+        CACHE.set(
+            ip_attempts_key, CACHE.get(ip_attempts_key, 0) + 1, OTP_LOCKOUT_SECONDS
+        )
+        if otp is None:
             messages.error(request, "OTP expired. Please request a new one.")
-            return render(request, "base/auth/two_factor_auth.html")
         else:
             messages.error(request, "Invalid OTP.")
-            return render(request, "base/auth/two_factor_auth.html")
+        return render(request, "base/auth/two_factor_auth.html")
 
     if not settings.TWO_FACTORS_AUTHENTICATION:
         return redirect("/")
