@@ -670,11 +670,12 @@ def login_user(request):
         user = authenticate(request, username=username, password=password)
 
         if not user:
-            user_object = HorillaUser.objects.filter(username=username).first()
-            if user_object and not user_object.is_active:
-                messages.warning(request, _("Access Denied: Your account is blocked."))
-            else:
-                messages.error(request, _("Invalid username or password."))
+            # Always the same message regardless of *why* auth failed
+            # (wrong password vs. a real but blocked account) - previously
+            # showing "your account is blocked" only for real, inactive
+            # accounts let anyone confirm whether a guessed username
+            # exists at all, without needing the correct password.
+            messages.error(request, _("Invalid username or password."))
             return redirect("login")
 
         employee = getattr(user, "employee_get", None)

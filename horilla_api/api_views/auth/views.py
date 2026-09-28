@@ -2,6 +2,7 @@ from django.contrib.auth import authenticate
 from drf_yasg import openapi
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -16,6 +17,8 @@ from ...api_serializers.auth.serializers import (
 
 class LoginAPIView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
 
     @document_api(
         operation_description="Authenticate user and return JWT access token with employee info",
@@ -54,10 +57,14 @@ class LoginAPIView(APIView):
         tags=["auth"],
     )
     def post(self, request):
-        if "username" and "password" in request.data.keys():
+        if request.data.get("username") and request.data.get("password"):
             username = request.data.get("username")
             password = request.data.get("password")
-            user = authenticate(username=username, password=password)
+            # request= is required now that AxesStandaloneBackend is in
+            # AUTHENTICATION_BACKENDS - it needs the request to resolve
+            # the client IP and check/record lockout state, and raises
+            # AxesBackendRequestParameterRequired without it.
+            user = authenticate(request, username=username, password=password)
             if user:
                 refresh = RefreshToken.for_user(user)
                 employee = user.employee_get
@@ -84,6 +91,7 @@ class LoginAPIView(APIView):
                 result = {
                     "employee": GetEmployeeSerializer(employee).data,
                     "access": str(refresh.access_token),
+                    "refresh": str(refresh),
                     "face_detection": face_detection,
                     "face_detection_image": face_detection_image,
                     "geo_fencing": geo_fencing,

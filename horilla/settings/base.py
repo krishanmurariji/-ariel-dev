@@ -114,9 +114,11 @@ INSTALLED_APPS = [
     "django_filters",
     "widget_tweaks",
     "auditlog",
+    "axes",
     "django_apscheduler",
     "rest_framework",
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     "drf_yasg",
     # Core Horilla apps
     "horilla_auth",
@@ -167,10 +169,48 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
     "PAGE_SIZE": 20,
+    # There was previously no rate limiting on any API endpoint at all.
+    # Counters are cache-backed (see CACHES["default"] above, now a shared
+    # DB table instead of a per-worker LocMemCache), so these are real
+    # limits across every gunicorn worker, not per-worker ones.
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "30/min",
+        "user": "300/min",
+        # Scoped throttle applied only to LoginAPIView (throttle_scope =
+        # "login"). Deliberately keyed by IP alone regardless of which
+        # username is being tried - django-axes below locks a specific
+        # (username, IP) pair after repeated failures, which by design
+        # does NOT catch one IP spraying failed guesses across many
+        # different usernames (each pair gets its own budget). This scoped
+        # throttle catches exactly that gap: it caps total login attempts
+        # per IP regardless of username, as a temporary slowdown rather
+        # than axes' harder lockout - gentler on a shared office NAT than
+        # widening axes' own lockout parameters to IP-only would be.
+        "login": "10/min",
+    },
 }
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    # Kept at 60 minutes for now, not shortened - LoginAPIView previously
+    # never returned "refresh" to the client and no refresh/blacklist
+    # endpoint existed at all, so a shorter access lifetime would only
+    # have forced whatever external client consumes this API (no caller
+    # of it exists anywhere in this codebase, so it's an external
+    # integration - most likely a mobile app) to fully re-login more
+    # often, for no real security gain. "refresh" is now included in the
+    # login response (additive, safe for any existing caller that already
+    # ignores unknown keys) and a refresh endpoint + blacklist-on-rotation
+    # is wired up below, so the lifetime can be safely shortened later
+    # once that external client is confirmed to actually use the refresh
+    # flow rather than just the access token.
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
 }
 
 SWAGGER_SETTINGS = {
@@ -214,6 +254,11 @@ MIDDLEWARE = [
     "horilla.horilla_middlewares.SVGSecurityMiddleware",
     "horilla.horilla_middlewares.MissingParameterMiddleware",
     "auditlog.middleware.AuditlogMiddleware",
+    # Must be last - converts the axes_locked_out flag AxesStandaloneBackend
+    # sets during authentication into an actual HTTP 403 response, and is
+    # also what makes lockouts work for DRF views (which use their own
+    # request object AxesStandaloneBackend alone can't see).
+    "axes.middleware.AxesMiddleware",
 ]
 
 ROOT_URLCONF = "horilla.urls"
@@ -290,8 +335,20 @@ DATABASES["default"].setdefault(
 # part of the full suite, never in isolation) - and simply switching
 # "default" itself to DummyCache to fix that broke the lock-style tests
 # instead, the same way it would break the real locks in production.
+# DatabaseCache, not LocMemCache: LocMemCache is per-process, and this app
+# runs multiple gunicorn workers - each worker would get its own
+# independent cache, so a cache.add()-based lock (poll guards, the OTP/
+# candidate-login attempt throttles, the django-axes login lockout, DRF
+# throttling) only ever worked within whichever single worker happened to
+# handle a given request rather than across all of them together. Backed
+# by a real DB table (base/migrations/0016_create_cache_table.py) instead
+# of Redis, since Redis isn't confirmed running in production - everyone
+# already has reliable access to the same Postgres DB.
 CACHES = {
-    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "django_cache_default",
+    },
     "dashboard": {
         "BACKEND": (
             "django.core.cache.backends.dummy.DummyCache"
@@ -657,8 +714,51 @@ DEFAULT_LDAP_CONFIG = {
 }
 
 AUTHENTICATION_BACKENDS = [
+    # Must come first - axes needs to see (and block) an authentication
+    # attempt before ModelBackend gets a chance to check the password, or
+    # a locked-out account could still authenticate successfully.
+    "axes.backends.AxesStandaloneBackend",
     "django.contrib.auth.backends.ModelBackend",
     # "django_auth_ldap.backend.LDAPBackend",
 ]
 
 AUTH_LDAP_ALWAYS_UPDATE_USER = True
+
+# ========================================
+# LOGIN BRUTE-FORCE PROTECTION (django-axes)
+# ========================================
+# Replaces the old base.signals.Fail2BanMiddleware/log_login_failed, which
+# was dead code in practice - it only ever ran if a "security.log" file
+# happened to exist (gated on a LOGGING config that was never set up), and
+# even then it banned by session key, not username or IP, so a client
+# that simply dropped its session cookie got a fresh attempt budget every
+# time. Both the web login (base.views.login_user) and the API login
+# (horilla_api.api_views.auth.views.LoginAPIView) call Django's own
+# authenticate(), which fires the same user_login_failed signal axes
+# listens for, so this covers both without touching either view's
+# authentication logic.
+AXES_HANDLER = "axes.handlers.database.AxesDatabaseHandler"  # DB-backed - no Redis needed
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = timedelta(minutes=30)
+# Locks only the specific (username, IP) pair that failed repeatedly, not
+# the IP alone - so one person mistyping their password can't lock out
+# everyone else on the same office network/NAT. The tradeoff: this does
+# NOT cap an attacker spraying failed guesses across many different
+# usernames from one IP (each username+IP pair gets its own independent
+# budget). Add a second, IP-only entry here
+# (AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"], "ip_address"])
+# to also close that gap, at the cost of a shared-NAT office being able to
+# lock itself out collectively from enough scattered typos.
+AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+# Same reasoning as base.methods.get_client_ip: nginx (docker/nginx.conf)
+# always sets X-Real-IP to $remote_addr itself, so it's the one header a
+# client can't spoof to dodge the lockout - REMOTE_ADDR alone would see
+# nginx's own proxy address for every request. Falls back to REMOTE_ADDR
+# for local/dev setups with no proxy in front.
+AXES_IPWARE_META_PRECEDENCE_ORDER = ("HTTP_X_REAL_IP", "REMOTE_ADDR")
+# Disabled under the test suite - AXES_FAILURE_LIMIT would otherwise trip
+# on tests that deliberately post several wrong-password attempts in a
+# row (e.g. exercising the "invalid credentials" branch of a login view),
+# turning an unrelated later test using the same client/IP into a
+# confusing, seemingly-unrelated failure.
+AXES_ENABLED = "test" not in sys.argv

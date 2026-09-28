@@ -3,6 +3,7 @@ from django.urls import include, path
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
+from rest_framework.authentication import SessionAuthentication
 
 from horilla_api.schema import OrderedTagSchemaGenerator
 
@@ -17,7 +18,26 @@ schema_view = get_schema_view(
         license=openapi.License(name="BSD License"),
     ),
     public=True,
-    permission_classes=(permissions.AllowAny,),
+    # AllowAny exposed the full API surface (every endpoint, every field)
+    # to anyone unauthenticated, unconditionally, in every environment -
+    # not gated by DEBUG or anything else. Left open for DEBUG (local
+    # dev convenience); restricted to staff/superusers otherwise.
+    #
+    # SessionAuthentication is added here (on top of the project-wide
+    # JWTAuthentication default) so a staff member who is simply logged
+    # into the normal web app can open these docs in their browser -
+    # without it, IsAdminUser would only ever recognize a JWT Bearer
+    # token, meaning nobody could view the docs page without first
+    # calling the login API separately and pasting a token into Swagger's
+    # own "Authorize" button just to see the page that button lives on.
+    authentication_classes=(
+        (SessionAuthentication,) if not settings.DEBUG else ()
+    ),
+    permission_classes=(
+        (permissions.AllowAny,)
+        if settings.DEBUG
+        else (permissions.IsAdminUser,)
+    ),
     generator_class=OrderedTagSchemaGenerator,
 )
 
