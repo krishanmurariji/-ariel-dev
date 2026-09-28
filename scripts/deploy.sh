@@ -46,9 +46,6 @@ cp "$APP_DIR/.env" "$BACKUP_ROOT/.env" 2>/dev/null || true
 chmod 600 "$BACKUP_ROOT"/.env "$BACKUP_ROOT"/local_settings.py 2>/dev/null || true
 echo "   commit that was running: $(cat "$BACKUP_ROOT/previous_commit.txt")"
 
-echo "==> Pruning old rollback points (keeping the newest $KEEP_ROLLBACKS)"
-prune_old_rollbacks "$KEEP_ROLLBACKS"
-
 if [ -n "${DB_HOST:-}" ]; then
   if grep -q '^DATABASE_URL=' "$APP_DIR/.env" 2>/dev/null; then
     echo "==> Disabling existing DATABASE_URL in .env (it would override DB_* vars)"
@@ -159,5 +156,12 @@ curl -sf -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:8000 || {
   echo "   sudo systemctl start $SERVICE_NAME"
   exit 1
 }
+
+# Only after the app is confirmed back up (so deleting old rollback points -
+# which can take a while the first time, if a lot have piled up - never
+# extends downtime), and only on success (a failed deploy keeps every
+# rollback point).
+echo "==> Pruning old rollback points (keeping the newest $KEEP_ROLLBACKS)"
+prune_old_rollbacks "$KEEP_ROLLBACKS"
 
 echo "==> Deploy finished successfully: $TIMESTAMP"
