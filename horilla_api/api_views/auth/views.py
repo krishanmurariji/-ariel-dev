@@ -1,12 +1,13 @@
+from axes.handlers.proxy import AxesProxyHandler
 from django.contrib.auth import authenticate
 from drf_yasg import openapi
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from horilla_api.docs import document_api
+from horilla_api.throttling import TrustedScopedRateThrottle
 
 from ...api_serializers.auth.serializers import (
     GetEmployeeSerializer,
@@ -17,7 +18,7 @@ from ...api_serializers.auth.serializers import (
 
 class LoginAPIView(APIView):
     permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [TrustedScopedRateThrottle]
     throttle_scope = "login"
 
     @document_api(
@@ -99,6 +100,21 @@ class LoginAPIView(APIView):
                 }
                 return Response(result, status=200)
             else:
+                # django-axes refuses a locked-out (username, IP) pair by
+                # making authenticate() return None - the same thing a
+                # wrong password does - so without this the caller would
+                # see "Invalid credentials" for the whole lockout even with
+                # the right password. Say so (429), matching the web login.
+                if not AxesProxyHandler.is_allowed(
+                    request, {"username": username, "password": password}
+                ):
+                    return Response(
+                        {
+                            "error": "Too many failed login attempts. "
+                            "Please try again later."
+                        },
+                        status=429,
+                    )
                 return Response({"error": "Invalid credentials"}, status=401)
         else:
             return Response({"error": "Please provide Username and Password"})

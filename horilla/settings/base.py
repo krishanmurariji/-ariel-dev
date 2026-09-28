@@ -173,9 +173,13 @@ REST_FRAMEWORK = {
     # Counters are cache-backed (see CACHES["default"] above, now a shared
     # DB table instead of a per-worker LocMemCache), so these are real
     # limits across every gunicorn worker, not per-worker ones.
+    # The Trusted* subclasses identify a client by the proxy-set X-Real-IP
+    # (via base.methods.get_client_ip) instead of DRF's default of trusting
+    # the client-supplied X-Forwarded-For header, which let a caller dodge
+    # the limit by sending a different fake value with every request.
     "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.AnonRateThrottle",
-        "rest_framework.throttling.UserRateThrottle",
+        "horilla_api.throttling.TrustedAnonRateThrottle",
+        "horilla_api.throttling.TrustedUserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "30/min",
@@ -362,10 +366,18 @@ if "postgresql" in DATABASES["default"]["ENGINE"]:
 # by a real DB table (base/migrations/0016_create_cache_table.py) instead
 # of Redis, since Redis isn't confirmed running in production - everyone
 # already has reliable access to the same Postgres DB.
+#
+# MAX_ENTRIES is raised well above Django's default of 300 on purpose:
+# once the table passes it, DatabaseCache deletes a third of all rows *in
+# cache_key order* (not by age) to make room. Every user session adds a
+# row (accessibility filter cache), so 300 is easy to exceed, and a cull
+# could then delete lockout/attempt counters, DRF throttle counters and
+# cache.add() locks at arbitrary moments.
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.db.DatabaseCache",
         "LOCATION": "django_cache_default",
+        "OPTIONS": {"MAX_ENTRIES": 50000, "CULL_FREQUENCY": 3},
     },
     "dashboard": {
         "BACKEND": (
@@ -768,12 +780,19 @@ AXES_COOLOFF_TIME = timedelta(minutes=30)
 # to also close that gap, at the cost of a shared-NAT office being able to
 # lock itself out collectively from enough scattered typos.
 AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
-# Same reasoning as base.methods.get_client_ip: nginx (docker/nginx.conf)
-# always sets X-Real-IP to $remote_addr itself, so it's the one header a
-# client can't spoof to dodge the lockout - REMOTE_ADDR alone would see
-# nginx's own proxy address for every request. Falls back to REMOTE_ADDR
-# for local/dev setups with no proxy in front.
-AXES_IPWARE_META_PRECEDENCE_ORDER = ("HTTP_X_REAL_IP", "REMOTE_ADDR")
+# Resolve the client IP with base.methods.get_client_ip: it prefers the
+# X-Real-IP header the reverse proxy sets itself (nginx overwrites it with
+# $remote_addr, so a client can't spoof it) and falls back to REMOTE_ADDR
+# with no proxy in front. Behind the proxy REMOTE_ADDR alone is the
+# proxy's own address for every request, which would collapse every
+# client into one bucket - a stranger could then lock any user out.
+#
+# This deliberately does NOT use AXES_IPWARE_META_PRECEDENCE_ORDER: that
+# is only read when the optional django-ipware package is installed, and
+# it isn't - without it axes silently ignores that setting and uses
+# REMOTE_ADDR (found by sending X-Real-IP over a real HTTP request and
+# seeing 127.0.0.1 recorded). A callable needs no extra dependency.
+AXES_CLIENT_IP_CALLABLE = "base.methods.get_client_ip"
 # Disabled under the test suite - AXES_FAILURE_LIMIT would otherwise trip
 # on tests that deliberately post several wrong-password attempts in a
 # row (e.g. exercising the "invalid credentials" branch of a login view),
