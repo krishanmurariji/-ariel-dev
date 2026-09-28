@@ -131,3 +131,57 @@ jobs:
           grep -rnE 'proxy_set_header|client_max_body_size|location +/media|alias |limit_req|ssl_protocols|add_header' /etc/nginx/ 2>&1 | head -60
         shell: bash
         continue-on-error: true
+
+      # ---- Database connection / timeout investigation (all read-only) ----
+
+      - name: Which code is actually running, and how many DB connections this server holds
+        working-directory: /opt/arielhr
+        run: |
+          echo "--- deployed commit ---"
+          git log -1 --format='%H  %cd  %s'
+          echo "background_utils.py force-closes connections (expect 1): $(grep -c 'connections.close_all' horilla/background_utils.py)"
+          echo "--- gunicorn processes: pid, threads, uptime, memory(KB) ---"
+          ps -eo pid,nlwp,etime,rss,cmd | grep '[g]unicorn' | cut -c1-110
+          echo "--- established TCP connections from THIS server to any port 5432, by destination ---"
+          ss -tnH state established '( dport = :5432 )' | awk '{print $4}' | sort | uniq -c
+        shell: bash
+        continue-on-error: true
+
+      - name: Database side - settings in effect, who holds connections, fresh-connection speed
+        working-directory: /opt/arielhr
+        run: |
+          source venv/bin/activate
+          python manage.py shell -c "
+          import time
+          from django.conf import settings
+          from django.db import connection
+          d = dict(settings.DATABASES['default']); d.pop('PASSWORD', None)
+          print('DB settings in effect:', {k: d.get(k) for k in ('ENGINE','HOST','PORT','NAME','USER','CONN_MAX_AGE','CONN_HEALTH_CHECKS','OPTIONS')})
+          with connection.cursor() as c:
+              for name in ('max_connections','superuser_reserved_connections','statement_timeout','idle_in_transaction_session_timeout','tcp_keepalives_idle'):
+                  c.execute('SHOW ' + name); print(name + ':', c.fetchone()[0])
+              c.execute('SELECT datname, usename, client_addr::text, application_name, state, count(*), max(now() - state_change) FROM pg_stat_activity GROUP BY 1,2,3,4,5 ORDER BY 6 DESC')
+              print('connections by database / user / client address / app / state  (count, longest time in that state):')
+              for r in c.fetchall(): print(' ', r)
+              c.execute('SELECT count(*), max(now() - xact_start) FROM pg_stat_activity WHERE state = %s', ['idle in transaction'])
+              print('idle in transaction (count, oldest):', c.fetchone())
+          lat = []
+          for i in range(5):
+              connection.close()
+              t = time.time(); connection.ensure_connection(); lat.append(round((time.time() - t) * 1000))
+          print('time to open a fresh connection, 5 tries (ms):', lat)
+          "
+        shell: bash
+        continue-on-error: true
+
+      - name: Recent application errors related to the database, by hour and by message (last 12 hours)
+        run: |
+          PAT='timeout|timed out|too many clients|OperationalError|could not connect|connection refused|server closed the connection|Internal Server Error|WORKER TIMEOUT|SIGKILL'
+          echo "--- matching lines per hour ---"
+          journalctl -u arielhr --since "12 hours ago" --no-pager 2>&1 | grep -iE "$PAT" | awk '{print $1, $2, substr($3,1,2)":00"}' | sort | uniq -c
+          echo "--- most common messages (timestamps and pids removed) ---"
+          journalctl -u arielhr --since "12 hours ago" --no-pager 2>&1 | grep -iE "$PAT" | sed -E 's/^[A-Za-z]{3} +[0-9]+ [0-9:]{8} [^ ]+ [^ ]+: //' | cut -c1-230 | sort | uniq -c | sort -rn | head -15
+          echo "--- gunicorn worker (re)starts in that window (expect only the ones at deploys) ---"
+          journalctl -u arielhr --since "12 hours ago" --no-pager 2>&1 | grep -c 'Booting worker'
+        shell: bash
+        continue-on-error: true
