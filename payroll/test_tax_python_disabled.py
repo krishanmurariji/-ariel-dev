@@ -13,6 +13,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from employee.models import Employee
+from horilla.horilla_middlewares import _thread_locals
 from horilla_auth.models import HorillaUser
 from payroll.forms.tax_forms import FilingStatusForm
 from payroll.methods.safe_tax_code import TaxCodeValidationError, run_tax_code
@@ -20,7 +21,28 @@ from payroll.methods.tax_calc import calculate_taxable_amount
 from payroll.models.models import FilingStatus
 
 
-class RunTaxCodeIsDisabledTest(TestCase):
+class IsolatedTestCase(TestCase):
+    """
+    CompanyMiddleware stores the current request in a context variable that
+    is never cleared, so in a full-suite run the *previous* test's request
+    (and its user, which no longer exists) is still there when the next
+    test saves a model - HorillaModel.save() then stamps modified_by with
+    that stale user and SQLite rejects the dangling foreign key when the
+    test ends. That made these tests pass alone and fail in the full run.
+    Clear it before each test, and again afterwards so this test's own
+    requests don't poison the next one either.
+    """
+
+    def _pre_setup(self):
+        super()._pre_setup()
+        _thread_locals.request = None
+
+    def _post_teardown(self):
+        _thread_locals.request = None
+        super()._post_teardown()
+
+
+class RunTaxCodeIsDisabledTest(IsolatedTestCase):
     def test_a_harmless_formula_is_not_executed(self):
         code = "def calculate_federal_tax(yearly_income):\n    return 123.0\n"
         with self.assertRaises(TaxCodeValidationError):
@@ -37,7 +59,7 @@ class RunTaxCodeIsDisabledTest(TestCase):
             run_tax_code(code, 100000)
 
 
-class FilingStatusFormTest(TestCase):
+class FilingStatusFormTest(IsolatedTestCase):
     def test_new_form_does_not_offer_the_python_switch_or_editor(self):
         form = FilingStatusForm()
         self.assertNotIn("use_py", form.fields)
@@ -66,7 +88,7 @@ class FilingStatusFormTest(TestCase):
         self.assertFalse(filing.python_code)
 
 
-class UpdatePyCodeEndpointTest(TestCase):
+class UpdatePyCodeEndpointTest(IsolatedTestCase):
     def setUp(self):
         self.user = HorillaUser.objects.create(
             username="tax_admin",
@@ -96,7 +118,7 @@ class UpdatePyCodeEndpointTest(TestCase):
         self.assertEqual(self.filing.python_code, "ORIGINAL")
 
 
-class UsePyFilingStatusUsesBracketsTest(TestCase):
+class UsePyFilingStatusUsesBracketsTest(IsolatedTestCase):
     """calculate_taxable_amount for a filing status with use_py still on."""
 
     def _run(self, use_py):
