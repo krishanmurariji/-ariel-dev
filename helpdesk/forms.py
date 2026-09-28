@@ -26,9 +26,11 @@ from typing import Any
 
 from django import forms
 from django.template.loader import render_to_string
+from django.utils.html import strip_tags
 from django.utils.translation import gettext_lazy as _
 
 from base.forms import ModelForm
+from base.html_sanitizer import sanitize_html
 from base.methods import filtersubordinatesemployeemodel, is_reportingmanager
 from base.models import Department, JobPosition
 from employee.forms import MultipleFileField
@@ -163,6 +165,12 @@ class TicketForm(ModelForm):
         table_html = render_to_string("horilla_form.html", context)
         return table_html
 
+    def clean_description(self):
+        description = sanitize_html(self.cleaned_data.get("description") or "")
+        if not strip_tags(description).strip() and "<img" not in description:
+            raise forms.ValidationError(_("This field is required."))
+        return description
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
@@ -290,6 +298,9 @@ class CommentForm(forms.ModelForm):
         ]
         exclude = ["is_active"]
         widgets = {"employee_id": forms.HiddenInput()}
+
+    def clean_comment(self):
+        return sanitize_html(self.cleaned_data.get("comment") or "")
 
 
 class AttachmentForm(forms.ModelForm):

@@ -390,7 +390,7 @@
                             </p>
                         </div>
                         <p class="text-sm text-[#333]">
-                            {{ ticket.description|safe }}
+                            {{ ticket.description|sanitize_html }}
                         </p>
                     </div>
                     <div class="h-[calc(100vh_-_365px)] overflow-hidden overflow-y-auto p-5" id="ticketContainer">
@@ -420,9 +420,9 @@
                                                 hx-post="{% url 'comment-edit' %}?comment_id={{item.comment.id}}"
                                                 name="new_comment"
                                                 hx-trigger="focusout"
-                                            >{{item.comment.comment}}</textarea>
+                                            >{{item.comment.comment|sanitize_html|force_escape}}</textarea>
                                             <span class="text-sm text-[#333] comment_text">
-                                                {{ item.comment.comment|safe }}
+                                                {{ item.comment.comment|sanitize_html }}
                                             </span>
                                             <div class="oh-btn-group" style="border: none">
                                                 {% if request.user.employee_get|is_department_manager:ticket or perms.helpdesk.change_comment or request.user.employee_get == item.comment.employee_id %}
@@ -493,13 +493,13 @@
                                     <div class="flex flex-wrap items-center justify-between mb-3">
                                         <p class="text-sm">
                                             {{ item.history.updated_by }}
-                                            {% trans "changed the ticket " %}{{ item.history.changes.0.field|safe }}
+                                            {% trans "changed the ticket " %}{{ item.history.changes.0.field|sanitize_html }}
                                             {% trans " from" %}
                                             <strong
-                                            >{{ item.history.pair.0|fk_history:item.history.changes.0|safe }}</strong>
+                                            >{{ item.history.pair.0|fk_history:item.history.changes.0|sanitize_html }}</strong>
                                             {% trans "to" %}
                                             <strong
-                                            >{{ item.history.pair.1|fk_history:item.history.changes.0|safe }}</strong>
+                                            >{{ item.history.pair.1|fk_history:item.history.changes.0|sanitize_html }}</strong>
                                         </p>
                                         <p class="text-sm text-primary-600 font-semibold">
                                             <span
@@ -515,11 +515,11 @@
                                         <p class="text-sm">
                                             <i>{{ item.history.updated_by }}</i>
                                             {% trans "changed the ticket " %}
-                                            {{ item.history.changes.0.field|safe }}
+                                            {{ item.history.changes.0.field|sanitize_html }}
                                             {% trans " from" %}
-                                            <strong>{{ item.history.changes.0.old|safe }}</strong>
+                                            <strong>{{ item.history.changes.0.old|sanitize_html }}</strong>
                                             {% trans "to" %}
-                                            <strong>{{ item.history.changes.0.new|safe }}</strong>
+                                            <strong>{{ item.history.changes.0.new|sanitize_html }}</strong>
                                         </p>
                                         <p class="text-sm text-primary-600 font-semibold">
                                             <span

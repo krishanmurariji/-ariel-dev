@@ -132,7 +132,7 @@
                             <span class="oh-helpdesk__bubble-timestamp">{{ticket.created_date}}</span>
                         </div>
                         <div class="oh-helpdesk__bubble-body">
-                            <p>{{ticket.description|safe}}</p>
+                            <p>{{ticket.description|sanitize_html}}</p>
 
                         </div>
                     </div>
@@ -158,7 +158,7 @@
                                         </div>
                                         <div class="oh-helpdesk__bubble-body">
                                             <span class="oh-helpdesk__comment">
-                                                {{item.comment.comment|safe}}
+                                                {{item.comment.comment|sanitize_html}}
                                             </span>
                                             <div class="oh-scrollable-container">
                                                 <div class="oh-layout--grid-3 mt-2 mb-2 horizontal-scroll">
@@ -208,8 +208,8 @@
                                         <div class="d-flex justify-content-between align-items-center comment_container">
                                             <div>
                                                 <textarea class="bg-transparent border-0 w-100 comment_input"
-                                                    data-comment-id="{{item.comment.id}}">{{item.comment.comment}}</textarea>
-                                                {{item.comment.comment|safe}}
+                                                    data-comment-id="{{item.comment.id}}">{{item.comment.comment|sanitize_html|force_escape}}</textarea>
+                                                {{item.comment.comment|sanitize_html}}
                                             </div>
                                             <div class="oh-btn-group" style="border:none">
                                                 {% if request.user.employee_get|is_department_manager:ticket or perms.helpdesk.change_comment or request.user.employee_get == item.comment.employee_id %}
@@ -263,16 +263,16 @@
                                 </div>
                             {% elif item.history.changes.0.is_fk == True %}
                                 <div class="oh-helpdesk__chat-update">
-                                    <span>{{item.history.updated_by}} {% trans "changed the ticket " %}{{item.history.changes.0.field|safe}} {% trans " from" %}
-                                        <strong>{{item.history.pair.0|fk_history:item.history.changes.0|safe}}</strong> {% trans "to" %}
-                                        <strong>{{item.history.pair.1|fk_history:item.history.changes.0|safe}}</strong></span>
+                                    <span>{{item.history.updated_by}} {% trans "changed the ticket " %}{{item.history.changes.0.field|sanitize_html}} {% trans " from" %}
+                                        <strong>{{item.history.pair.0|fk_history:item.history.changes.0|sanitize_html}}</strong> {% trans "to" %}
+                                        <strong>{{item.history.pair.1|fk_history:item.history.changes.0|sanitize_html}}</strong></span>
                                     <span>{{ item.history.pair.0.history_date}}</span>
                                 </div>
                             {% else %}
                                 <div class="oh-helpdesk__chat-update">
-                                    <span>{{item.history.updated_by}} {% trans "changed the ticket " %}{{item.history.changes.0.field|safe}} {% trans " from" %}
-                                        <strong>{{item.history.changes.0.old|safe}}</strong> {% trans "to" %}
-                                        <strong>{{item.history.changes.0.new|safe}}</strong></span>
+                                    <span>{{item.history.updated_by}} {% trans "changed the ticket " %}{{item.history.changes.0.field|sanitize_html}} {% trans " from" %}
+                                        <strong>{{item.history.changes.0.old|sanitize_html}}</strong> {% trans "to" %}
+                                        <strong>{{item.history.changes.0.new|sanitize_html}}</strong></span>
                                     <span>{{ item.history.pair.0.history_date}}</span>
                                 </div>
                             {% endif %}

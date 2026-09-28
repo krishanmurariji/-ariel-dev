@@ -9,6 +9,7 @@ from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
 
 from base.horilla_company_manager import HorillaCompanyManager
+from base.html_sanitizer import sanitize_html
 from base.models import Company, Department, JobPosition, Tags
 from employee.models import Employee
 from horilla import horilla_middlewares
@@ -415,6 +416,10 @@ class Ticket(HorillaModel):
     def __str__(self):
         return self.title
 
+    def save(self, *args, **kwargs):
+        self.description = sanitize_html(self.description)
+        super().save(*args, **kwargs)
+
     def tracking(self):
         """
         This method is used to return the tracked history of the instance
@@ -462,6 +467,10 @@ class Comment(HorillaModel):
 
     def __str__(self):
         return self.comment
+
+    def save(self, *args, **kwargs):
+        self.comment = sanitize_html(self.comment)
+        super().save(*args, **kwargs)
 
 
 class Attachment(HorillaModel):

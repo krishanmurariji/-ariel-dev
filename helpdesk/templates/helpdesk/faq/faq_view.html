@@ -36,9 +36,10 @@
         aria-hidden="true"
     ></div>
 </div>
+{{ questions|json_script:"faq-questions-data" }}
 <script>
     var get_faqs = () => {
-        var FAQList = {{ questions|safe }};
+        var FAQList = JSON.parse(document.getElementById("faq-questions-data").textContent);
         $(function () {
             $("[name='search']").autocomplete({
                 source: FAQList,
