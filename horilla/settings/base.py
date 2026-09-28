@@ -287,18 +287,36 @@ else:
         }
     }
 
-# Reuse a database connection across requests instead of opening (and
-# tearing down) a brand new one for every single request, which is
-# Django's default (CONN_MAX_AGE=0) - a fixed per-request cost that adds
-# up directly with concurrent traffic. setdefault so a DATABASE_URL that
-# already encodes its own conn_max_age (a `?conn_max_age=...` query param)
-# isn't overridden. 0 for sqlite: a single-file DB has no real connection
-# handshake cost to amortize, and long-lived connections don't play well
-# with Django's sqlite backend under concurrent test runs.
-DATABASES["default"].setdefault(
-    "CONN_MAX_AGE",
-    0 if DATABASES["default"]["ENGINE"].endswith("sqlite3") else 600,
-)
+# CONN_MAX_AGE is 0 (close the connection at the end of every request), NOT
+# a persistent-connection value like 600. This app is served by ASGI
+# (gunicorn + uvicorn workers), and under ASGI every request runs in its
+# own short-lived thread while Django's connections are per-thread. With
+# CONN_MAX_AGE > 0 the connection is deliberately kept open at the end of
+# the request "for reuse", but the thread that owns it is gone, so nothing
+# ever reuses or closes it - it just sits idle on the database until Python
+# happens to garbage-collect it. Measured directly (200 page loads against
+# a local Postgres over the real ASGI server): CONN_MAX_AGE=600 left 72
+# connections open and idle that were still there 20 seconds later;
+# CONN_MAX_AGE=0 left 1. On production this is what steadily ate all 100 of
+# the database's connection slots ("remaining connection slots are reserved
+# for roles with the SUPERUSER attribute") and took the site down until a
+# restart. See also horilla/background_utils.py for the scheduler/thread
+# side of the same problem.
+#
+# setdefault so a DATABASE_URL that already encodes its own conn_max_age (a
+# `?conn_max_age=...` query param) isn't overridden. DB_CONN_MAX_AGE lets a
+# deployment opt back in to a positive value if that is ever moved off
+# ASGI or behind a real connection pool.
+DATABASES["default"].setdefault("CONN_MAX_AGE", env.int("DB_CONN_MAX_AGE", default=0))
+
+# Without a connect timeout, opening a connection to an unreachable or
+# overloaded database server waits on the operating system's TCP timeout
+# (minutes), during which the request - and the worker serving it - just
+# hangs. Fail fast instead. Postgres only; sqlite has no network handshake.
+if "postgresql" in DATABASES["default"]["ENGINE"]:
+    DATABASES["default"].setdefault("OPTIONS", {}).setdefault(
+        "connect_timeout", env.int("DB_CONNECT_TIMEOUT", default=10)
+    )
 
 # ========================================
 # CACHE
