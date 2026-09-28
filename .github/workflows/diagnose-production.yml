@@ -185,3 +185,17 @@ jobs:
           journalctl -u arielhr --since "12 hours ago" --no-pager 2>&1 | grep -c 'Booting worker'
         shell: bash
         continue-on-error: true
+
+      - name: What is using the /home disk, and which part of a deploy copy is big (read-only, can take a few minutes)
+        timeout-minutes: 15
+        run: |
+          echo "--- the app folder's own pieces (this is what old deploys copied), biggest first ---"
+          du -sh /opt/arielhr/* 2>/dev/null | sort -rh | head -12
+          echo "--- inside the newest rollback copy, biggest first ---"
+          NEWEST=$(ls -1d "$HOME"/rollback_* 2>/dev/null | sort -r | head -1)
+          echo "$NEWEST"
+          du -sh "$NEWEST"/* 2>/dev/null | sort -rh | head -10
+          echo "--- everything in the runner user's home, biggest first ---"
+          du -xsh "$HOME"/* "$HOME"/.[!.]* 2>/dev/null | sort -rh | head -25
+        shell: bash
+        continue-on-error: true

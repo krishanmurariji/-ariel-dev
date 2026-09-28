@@ -6,15 +6,48 @@ SERVICE_NAME="arielhr"
 BACKUP_ROOT="$HOME/rollback_$(date +%Y%m%d_%H%M%S)"
 DB_BACKUP_DIR="/opt/arielhr_backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+KEEP_ROLLBACKS=3
+
+# Deletes all but the newest $1 rollback_YYYYMMDD_HHMMSS folders in $HOME. The
+# timestamp in the name sorts chronologically, so newest-first is a reverse
+# sort. Anything that doesn't match that exact name shape, or is a symlink,
+# is left alone.
+prune_old_rollbacks() {
+  local keep="$1" seen=0 d
+  for d in $(ls -1d "$HOME"/rollback_* 2>/dev/null | sort -r); do
+    [[ "$d" =~ /rollback_[0-9]{8}_[0-9]{6}$ ]] || continue
+    [ -d "$d" ] && [ ! -L "$d" ] || continue
+    seen=$((seen + 1))
+    if [ "$seen" -gt "$keep" ]; then
+      echo "   removing old rollback point $d"
+      rm -rf -- "$d"
+    fi
+  done
+}
 
 echo "==> Deploy started: $TIMESTAMP"
 
 echo "==> Stopping $SERVICE_NAME"
 sudo systemctl stop "$SERVICE_NAME"
 
-echo "==> Backing up current code to $BACKUP_ROOT"
-mkdir -p "$BACKUP_ROOT"
-cp -r "$APP_DIR"/* "$APP_DIR/.env" "$BACKUP_ROOT/" 2>/dev/null || true
+# A rollback point is the commit that was running plus the untracked config
+# files - NOT a copy of the whole app folder. The old version copied
+# everything under $APP_DIR (the virtualenv, media, static files, ...) into
+# $HOME on every deploy - about 3.2 GB each, never deleted - which filled
+# the /home disk to 99%. Code is restored from git and dependencies are
+# reinstalled from requirements.txt, so neither needs copying; .env and
+# local_settings.py are untracked (git reset leaves them alone) but are kept
+# here in case they were edited.
+echo "==> Recording the rollback point in $BACKUP_ROOT"
+mkdir -p -m 700 "$BACKUP_ROOT"
+git -C "$APP_DIR" rev-parse HEAD > "$BACKUP_ROOT/previous_commit.txt" 2>/dev/null   || echo "unknown" > "$BACKUP_ROOT/previous_commit.txt"
+cp "$APP_DIR/.env" "$BACKUP_ROOT/.env" 2>/dev/null || true
+[ -f "$APP_DIR/horilla/settings/local_settings.py" ]   && cp "$APP_DIR/horilla/settings/local_settings.py" "$BACKUP_ROOT/local_settings.py" || true
+chmod 600 "$BACKUP_ROOT"/.env "$BACKUP_ROOT"/local_settings.py 2>/dev/null || true
+echo "   commit that was running: $(cat "$BACKUP_ROOT/previous_commit.txt")"
+
+echo "==> Pruning old rollback points (keeping the newest $KEEP_ROLLBACKS)"
+prune_old_rollbacks "$KEEP_ROLLBACKS"
 
 if [ -n "${DB_HOST:-}" ]; then
   if grep -q '^DATABASE_URL=' "$APP_DIR/.env" 2>/dev/null; then
@@ -115,7 +148,9 @@ echo "==> Verifying app responds"
 curl -sf -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:8000 || {
   echo "!! App did not respond after deploy. Consider rollback:"
   echo "   sudo systemctl stop $SERVICE_NAME"
-  echo "   cp -r $BACKUP_ROOT/* $APP_DIR/"
+  echo "   cd $APP_DIR && git reset --hard $(cat "$BACKUP_ROOT/previous_commit.txt")"
+  echo "   source venv/bin/activate && pip install -r requirements.txt"
+  echo "   (the .env from before this deploy is saved at $BACKUP_ROOT/.env)"
   if grep -qE '^(DB_ENGINE=django.db.backends.postgresql|DATABASE_URL=postgres)' "$APP_DIR/.env" 2>/dev/null; then
     echo "   pg_restore --clean --if-exists -h \$DB_HOST -p \$DB_PORT -U \$DB_USER -d \$DB_NAME $DB_BACKUP_DIR/arielhr_predeploy_${TIMESTAMP}.dump"
   else

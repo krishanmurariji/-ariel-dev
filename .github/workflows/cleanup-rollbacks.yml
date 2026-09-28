@@ -1,0 +1,71 @@
+name: Clean up old deploy rollback copies
+
+# Run from: repo -> Actions tab -> this workflow -> "Run workflow".
+#
+# Old versions of scripts/deploy.sh copied the whole app folder (about 3.2 GB)
+# into ~/rollback_<time> on every deploy and never deleted any, which filled
+# the /home disk. This removes all but the newest few.
+#
+# It DEFAULTS TO A DRY RUN: with dry_run=true it only lists what it would
+# delete. Look at that list, then run it again with dry_run=false to delete.
+# Deleting is permanent. Only folders named exactly rollback_YYYYMMDD_HHMMSS
+# directly inside the runner user's home are ever touched (never symlinks,
+# never anything else), and at least 1 is always kept.
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep:
+        description: "How many of the newest rollback folders to keep (minimum 1)"
+        required: true
+        default: "3"
+      dry_run:
+        description: "true = only list what would be deleted; false = really delete"
+        required: true
+        default: "true"
+
+jobs:
+  cleanup:
+    # Same self-hosted runner the deploy workflow uses. Don't run this while a
+    # deploy is in progress.
+    runs-on: self-hosted
+    steps:
+      - name: Remove old rollback copies
+        shell: bash
+        env:
+          KEEP: ${{ inputs.keep }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          case "$KEEP" in ''|*[!0-9]*) echo "keep must be a whole number"; exit 1 ;; esac
+          if [ "$KEEP" -lt 1 ]; then echo "refusing to keep fewer than 1"; exit 1; fi
+          case "$DRY_RUN" in true|false) ;; *) echo "dry_run must be true or false"; exit 1 ;; esac
+
+          echo "Disk before:"
+          df -h /home | tail -2
+          seen=0
+          affected=0
+          # Newest first: the timestamp in the folder name sorts chronologically.
+          for d in $(ls -1d "$HOME"/rollback_* 2>/dev/null | sort -r); do
+            [[ "$d" =~ /rollback_[0-9]{8}_[0-9]{6}$ ]] || continue
+            [ -d "$d" ] && [ ! -L "$d" ] || continue
+            seen=$((seen + 1))
+            if [ "$seen" -le "$KEEP" ]; then
+              echo "KEEP          $d"
+              continue
+            fi
+            affected=$((affected + 1))
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "WOULD DELETE  $d"
+            else
+              echo "DELETING      $d"
+              rm -rf -- "$d"
+            fi
+          done
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "DRY RUN: found $seen rollback folders, keeping $KEEP, would delete $affected. Nothing was changed."
+          else
+            echo "Found $seen rollback folders, kept $KEEP, deleted $affected."
+          fi
+          echo "Disk after:"
+          df -h /home | tail -2
