@@ -113,3 +113,71 @@ class LoginLockoutTest(IsolatedTestCase):
             post(self.client, "lockout_user", "wrong", "198.51.100.7")
         legit = post(self.client, "lockout_user", "CorrectHorse!42", "203.0.113.200")
         self.assertEqual(legit.status_code, 200)
+
+
+class LoginResponseAndTokenTests(IsolatedTestCase):
+    """
+    The login response is consumed by an external client (the mobile app), so
+    the fields it already reads must not change; "refresh" is additive.
+    """
+
+    def setUp(self):
+        cache.clear()
+        self.user = HorillaUser.objects.create(
+            username="token_user",
+            password=make_password("CorrectHorse!42"),
+            is_active=True,
+        )
+        Employee.objects.create(
+            employee_first_name="Tok",
+            employee_last_name="En",
+            employee_user_id=self.user,
+            email="token_user@example.com",
+        )
+        self.client = Client(REMOTE_ADDR="127.0.0.1")
+
+    def _login(self):
+        return post(self.client, "token_user", "CorrectHorse!42", "203.0.113.150")
+
+    def _refresh(self, token):
+        return self.client.post(
+            "/api/auth/refresh/",
+            data=json.dumps({"refresh": token}),
+            content_type="application/json",
+        )
+
+    def test_login_response_keeps_every_field_the_app_already_reads(self):
+        response = self._login()
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        for key in (
+            "employee",
+            "access",
+            "face_detection",
+            "face_detection_image",
+            "geo_fencing",
+            "company_id",
+        ):
+            self.assertIn(key, data)
+        self.assertIn("refresh", data)  # the only addition
+
+    def test_the_access_token_authenticates_an_api_call(self):
+        # 401 = "who are you?" (no/bad token); 403 = "known, but not allowed".
+        # This endpoint needs a permission the test user doesn't have, so a
+        # valid token must produce 403, not 401.
+        url = "/api/base/companies/"
+        self.assertEqual(self.client.get(url).status_code, 401)
+        access = self._login().json()["access"]
+        response = self.client.get(url, HTTP_AUTHORIZATION=f"Bearer {access}")
+        self.assertEqual(response.status_code, 403)
+
+    def test_refresh_issues_a_new_pair_and_revokes_the_old_refresh_token(self):
+        old = self._login().json()["refresh"]
+        first = self._refresh(old)
+        self.assertEqual(first.status_code, 200)
+        self.assertIn("access", first.json())
+        self.assertNotEqual(first.json()["refresh"], old)  # rotated
+        self.assertEqual(self._refresh(old).status_code, 401)  # old one is dead
+
+    def test_a_garbage_refresh_token_is_refused(self):
+        self.assertEqual(self._refresh("not-a-token").status_code, 401)
