@@ -34,6 +34,7 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
+from base.html_sanitizer import sanitize_html
 from base.mail_letterhead import (
     attach_letterhead_images,
     letterhead_context,
@@ -2955,7 +2956,10 @@ class AnnouncementForm(ModelForm):
         }
 
     def clean_description(self):
-        description = self.cleaned_data.get("description", "").strip()
+        # The text is shown to every recipient with |safe, so anything not on
+        # the allow-list (scripts, event handlers, javascript: links, ...) is
+        # removed here before it is ever stored. See base/html_sanitizer.py.
+        description = sanitize_html((self.cleaned_data.get("description") or "").strip())
         # Remove HTML tags and check if there's meaningful content
         text_content = strip_tags(description).strip()
         if not text_content:  # Checks if the field is empty after stripping HTML

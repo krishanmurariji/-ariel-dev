@@ -1,5 +1,6 @@
 {% load i18n static %}
 {% load generic_template_filters %}
+{% load basefilters %}
 
 <style>
     /* Normalize author-entered rich text so oversized headings / inline
@@ -189,7 +190,7 @@
                 {% trans "Description" %}
             </div>
             <div class="announcement-desc text-gray-700 text-sm leading-relaxed max-h-[320px] overflow-auto pr-1">
-                {{ announcement.description|safe }}
+                {{ announcement.description|sanitize_html }}
             </div>
 
             <!-- Attachments -->

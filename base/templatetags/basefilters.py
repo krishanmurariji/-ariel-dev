@@ -3,13 +3,26 @@ import json
 from django import template
 from django.core.paginator import Page, Paginator
 from django.template.defaultfilters import register
+from django.utils.safestring import mark_safe
 
+from base.html_sanitizer import sanitize_html as _sanitize_html
 from base.methods import get_pagination
 from base.models import MultipleApprovalManagers
 from employee.models import Employee, EmployeeWorkInformation
 from horilla.menu.settings_menu import get_settings_menu
 
 register = template.Library()
+
+
+@register.filter(name="sanitize_html")
+def sanitize_html_filter(value):
+    """
+    Rich text written by one user and shown to others: cleaned against an
+    allow-list at display time, then marked safe. Use this instead of
+    ``|safe`` - it also protects text that was stored before the write-time
+    cleaning existed. See base/html_sanitizer.py.
+    """
+    return mark_safe(_sanitize_html(value) or "")
 
 
 @register.filter

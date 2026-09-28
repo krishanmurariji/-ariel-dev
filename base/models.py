@@ -19,6 +19,7 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from base.horilla_company_manager import HorillaCompanyManager
+from base.html_sanitizer import sanitize_html
 from horilla import horilla_middlewares
 from horilla.crypto_fields import EncryptedTextField
 from horilla.horilla_middlewares import _thread_locals
@@ -2495,6 +2496,9 @@ class Announcement(HorillaModel):
         """
         if self.disable_comments:
             self.public_comments = False
+        # AnnouncementForm already cleans the text, but this also covers every
+        # path that doesn't go through it (imports, scripts, the shell).
+        self.description = sanitize_html(self.description)
         super().save(*args, **kwargs)
 
     def __str__(self):
