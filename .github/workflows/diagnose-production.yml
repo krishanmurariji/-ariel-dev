@@ -71,3 +71,63 @@ jobs:
           echo "SECRET_KEY is set: $(grep -q '^SECRET_KEY=.' .env && echo yes || echo no)"
         shell: bash
         continue-on-error: true
+
+      # ---- Pre-flight facts for the next security fixes (all read-only) ----
+      # Only counts, ids and configuration directive lines are printed here -
+      # never email bodies, one-time codes, reset links or secret values.
+
+      - name: Data checks - Python tax formulas, mail backend, announcements, email log (counts and ids only)
+        working-directory: /opt/arielhr
+        run: |
+          source venv/bin/activate
+          python manage.py shell -c "
+          from django.conf import settings
+          print('EMAIL_BACKEND in effect:', settings.EMAIL_BACKEND)
+          from payroll.models.models import FilingStatus
+          fs = FilingStatus._base_manager.all()
+          print('FilingStatus total:', fs.count())
+          print('FilingStatus with use_py=True (id, name):', [(f.id, f.filing_status) for f in fs.filter(use_py=True)])
+          print('FilingStatus with any saved python_code:', fs.exclude(python_code__isnull=True).exclude(python_code='').count())
+          import re
+          from base.models import Announcement, EmailLog
+          pat = re.compile(r'<\s*script|javascript:|<[^>]*\son[a-z]+\s*=', re.I)
+          bad = [a.id for a in Announcement._base_manager.all() if a.description and pat.search(a.description)]
+          print('Announcements total:', Announcement._base_manager.count(), '| ids with script-like content:', bad)
+          from django.db.models import Q
+          sens = EmailLog.objects.filter(Q(subject__icontains='otp') | Q(body__icontains='/reset/'))
+          print('EmailLog total:', EmailLog.objects.count(), '| rows that look like OTP or reset-link mails:', sens.count())
+          "
+        shell: bash
+        continue-on-error: true
+
+      - name: Disk usage of deploy rollback copies, DB dumps and media
+        run: |
+          echo "--- rollback copies in $HOME ---"
+          ls -d "$HOME"/rollback_* 2>/dev/null | wc -l
+          du -sh "$HOME"/rollback_* 2>/dev/null | tail -20
+          echo "--- DB dump folder ---"
+          du -sh /opt/arielhr_backups 2>&1
+          ls -1 /opt/arielhr_backups 2>&1 | wc -l
+          echo "--- app media ---"
+          du -sh /opt/arielhr/media 2>&1
+          echo "--- top-level sizes in /home ---"
+          du -sh /home/* 2>/dev/null
+        shell: bash
+        continue-on-error: true
+
+      - name: Installed package versions and what depends on the odd requirements
+        working-directory: /opt/arielhr
+        run: |
+          source venv/bin/activate
+          python --version
+          pip freeze
+          echo "--- who requires these (empty Required-by means nothing needs it) ---"
+          pip show utils oscrypto responses bs4 2>&1 | grep -E '^(Name|Version|Required-by):|not found'
+        shell: bash
+        continue-on-error: true
+
+      - name: Web server config directives, if readable without sudo (proxy headers, upload limit, /media, rate limits)
+        run: |
+          grep -rnE 'proxy_set_header|client_max_body_size|location +/media|alias |limit_req|ssl_protocols|add_header' /etc/nginx/ 2>&1 | head -60
+        shell: bash
+        continue-on-error: true
