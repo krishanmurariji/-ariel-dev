@@ -6,8 +6,7 @@
         {% endfor %}
     </div>
 {% endif %}
-{% if not filing_status.use_py %}
-    <div class="oh-sticky-table__table">
+<div class="oh-sticky-table__table">
         <div class="oh-sticky-table__thead">
             <div class="oh-sticky-table__tr">
                 <div class="oh-sticky-table__th">{% trans "Tax Rate" %}</div>
@@ -64,7 +63,11 @@
             {% endfor %}
         </div>
     </div>
-{% else %}
+{% comment %}
+Disabled: Python tax formulas no longer run (see payroll/methods/safe_tax_code.py
+run_tax_code), so the embedded third-party code editor (onecompiler.com iframe)
+and its scripts are commented out rather than deleted. Tax is calculated from the
+filing status's tax brackets.
 <div class="col-lg-12 d-flex flex-row-reverse p-2 d-none">
     <button type="submit" class="oh-btn oh-btn--secondary" id="oc-editor-button{{ filing_status.pk }}">
         {% trans "Save" %}
@@ -136,4 +139,4 @@
         });
     });
 </script>
-{% endif %}
+{% endcomment %}

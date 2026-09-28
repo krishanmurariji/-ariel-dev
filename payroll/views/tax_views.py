@@ -292,25 +292,40 @@ def delete_tax_bracket(request, tax_bracket_id):
 @permission_required("payroll.change_taxbracket")
 def update_py_code(request, pk):
     """
-    Ajax method to update python code of filing status
+    DISABLED - Python tax formulas no longer run, so there is nothing to
+    save (see payroll.methods.safe_tax_code.run_tax_code). Storing code
+    that is never executed would only mislead - tax comes from the
+    filing status's tax brackets. The original body is commented out below
+    rather than deleted.
     """
-    code = request.POST.get("code")
-    if not code:
-        messages.error(request, _("Missing required parameter"))
-        return JsonResponse({"message": "Missing required parameter: code"}, status=400)
-    filing = FilingStatus.find(pk)
-    if not filing:
-        messages.error(request, _("Filing status not found"))
-        return JsonResponse({"message": "Filing status not found"}, status=404)
+    messages.error(
+        request,
+        _("Python tax formulas are disabled. Please use tax brackets instead."),
+    )
+    return JsonResponse(
+        {"message": "Python tax formulas are disabled."}, status=403
+    )
 
-    try:
-        validate_tax_code(code)
-    except TaxCodeValidationError as exc:
-        messages.error(request, _("Invalid tax code"))
-        return JsonResponse({"message": str(exc)}, status=400)
-
-    if not filing.python_code == code:
-        filing.python_code = code
-        filing.save()
-        messages.success(request, _("Python code saved successfully!"))
-    return JsonResponse({"message": "success"})
+    # ------------------------------------------------------------------
+    # Original implementation - disabled, see docstring above.
+    # ------------------------------------------------------------------
+    # code = request.POST.get("code")
+    # if not code:
+    #     messages.error(request, _("Missing required parameter"))
+    #     return JsonResponse({"message": "Missing required parameter: code"}, status=400)
+    # filing = FilingStatus.find(pk)
+    # if not filing:
+    #     messages.error(request, _("Filing status not found"))
+    #     return JsonResponse({"message": "Filing status not found"}, status=404)
+    #
+    # try:
+    #     validate_tax_code(code)
+    # except TaxCodeValidationError as exc:
+    #     messages.error(request, _("Invalid tax code"))
+    #     return JsonResponse({"message": str(exc)}, status=400)
+    #
+    # if not filing.python_code == code:
+    #     filing.python_code = code
+    #     filing.save()
+    #     messages.success(request, _("Python code saved successfully!"))
+    # return JsonResponse({"message": "success"})

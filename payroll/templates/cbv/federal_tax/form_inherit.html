@@ -2,6 +2,11 @@
 <div>
     {% include "generic/horilla_form.html" %}
 </div>
+{% comment %}
+Disabled: Python tax formulas no longer run (see payroll/methods/safe_tax_code.py
+run_tax_code), so the embedded third-party code editor (onecompiler.com iframe)
+and its scripts are commented out rather than deleted. Tax is calculated from the
+filing status's tax brackets.
 <iframe
 style="display: none;"
 frameBorder="0"
@@ -44,3 +49,4 @@ width="100%"
     $("[name=python_code]").parent().parent().hide();
     $("[name=use_py]").change();
    </script>
+{% endcomment %}

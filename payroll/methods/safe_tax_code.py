@@ -188,39 +188,60 @@ def validate_tax_code(code: str) -> None:
 
 
 def run_tax_code(code: str, yearly_income):
-    """Validate, sandbox-execute, and call the tax formula.
-
-    Returns the numeric result of ``calculate_federal_tax(yearly_income)``.
-    Raises :class:`TaxCodeValidationError` if the code violates the sandbox
-    policy. Any error raised by the formula itself propagates to the caller.
     """
-    _check(code)
+    DISABLED - Python tax formulas no longer run.
 
-    # No-op stand-in for the template's debug helpers so legacy formulas that
-    # call print()/formated_result() at module load do not blow up. They simply
-    # do nothing in production.
-    def _noop(*args, **kwargs):
-        return None
+    The sandbox this used to run them in (the AST checks above plus a
+    reduced ``__builtins__``) is a denylist, and denylist sandboxes are
+    escapable and have no resource limits: only names starting with "__"
+    were blocked as attributes, so frame/generator attributes such as
+    ``gi_frame``/``f_back``/``f_globals`` (which lead to the real builtins)
+    were reachable, and ``while True: pass`` or ``pow(10, 10**9)`` would
+    freeze a worker for every payslip being generated. Tax is already
+    computed from the declarative bracket table (TaxBracket) for every
+    filing status without ``use_py``, so that path is used instead - see
+    payroll/methods/tax_calc.py.
 
-    sandbox_globals = {
-        "__builtins__": dict(_SAFE_BUILTINS),
-        "print": _noop,
-        "pass_print": _noop,
-        "formated_result": _noop,
-    }
-    local_vars = {}
+    The original implementation is commented out below rather than
+    deleted. Will be redesigned (an allow-list AST visitor plus a separate
+    process with a CPU/memory/time limit, or dropping formulas entirely in
+    favour of brackets) and re-enabled, if ever needed, in further
+    development.
+    """
+    raise TaxCodeValidationError(
+        "Python tax formulas are disabled. Use tax brackets instead."
+    )
 
-    # The AST check above has already guaranteed there are no imports, dunder
-    # escapes, or dangerous calls; execution happens with the restricted
-    # builtins only.
-    compiled = compile(code, "<tax_code>", "exec")
-    exec(
-        compiled, sandbox_globals, local_vars
-    )  # noqa: S102 - sandboxed; see module docstring
-
-    func = local_vars.get(ENTRY_POINT) or sandbox_globals.get(ENTRY_POINT)
-    if not callable(func):
-        raise TaxCodeValidationError(
-            f"Tax code did not define a callable '{ENTRY_POINT}'."
-        )
-    return func(yearly_income)
+    # ------------------------------------------------------------------
+    # Original implementation - disabled, see docstring above.
+    # ------------------------------------------------------------------
+    # _check(code)
+    #
+    # # No-op stand-in for the template's debug helpers so legacy formulas that
+    # # call print()/formated_result() at module load do not blow up. They simply
+    # # do nothing in production.
+    # def _noop(*args, **kwargs):
+    #     return None
+    #
+    # sandbox_globals = {
+    #     "__builtins__": dict(_SAFE_BUILTINS),
+    #     "print": _noop,
+    #     "pass_print": _noop,
+    #     "formated_result": _noop,
+    # }
+    # local_vars = {}
+    #
+    # # The AST check above has already guaranteed there are no imports, dunder
+    # # escapes, or dangerous calls; execution happens with the restricted
+    # # builtins only.
+    # compiled = compile(code, "<tax_code>", "exec")
+    # exec(
+    #     compiled, sandbox_globals, local_vars
+    # )  # noqa: S102 - sandboxed; see module docstring
+    #
+    # func = local_vars.get(ENTRY_POINT) or sandbox_globals.get(ENTRY_POINT)
+    # if not callable(func):
+    #     raise TaxCodeValidationError(
+    #         f"Tax code did not define a callable '{ENTRY_POINT}'."
+    #     )
+    # return func(yearly_income)

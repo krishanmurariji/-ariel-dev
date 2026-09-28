@@ -37,38 +37,30 @@ class FilingStatusForm(ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        attrs: dict = self.fields["use_py"].widget.attrs
-        self.fields["python_code"].required = False
-        attrs[
-            "onchange"
-        ] = """
-        if($(this).is(':checked')){
-            $('#oc-editor').show();
-            //$("#objectCreateModal #objectCreateModalTarget").css("max-width","90%")
-        }else{
-            //$("#objectCreateModal #objectCreateModalTarget").css("max-width","650px")
-            $('#oc-editor').hide();
-        }
-        """
+        # Python tax formulas are disabled (see
+        # payroll.methods.safe_tax_code.run_tax_code), so the "Python Code"
+        # switch and its editor are never offered - tax is always
+        # calculated from the filing status's tax brackets. Both fields are
+        # left out entirely (not just hidden) so they can't be posted
+        # either; the model defaults (use_py=False, no code) apply.
+        self.fields.pop("use_py", None)
+        self.fields.pop("python_code", None)
 
-        if self.instance.pk is None:
-            self.instance.python_code = federal_tax.CODE
-        else:
-            del self.fields["use_py"]
-            del self.fields["python_code"]
+        # Original behaviour, disabled: on create it showed the use_py
+        # toggle (revealing an embedded third-party code editor) and seeded
+        # python_code with the default template; on edit it removed both.
+        #
+        # attrs: dict = self.fields["use_py"].widget.attrs
+        # self.fields["python_code"].required = False
+        # attrs["onchange"] = "...show/hide #oc-editor..."
+        # if self.instance.pk is None:
+        #     self.instance.python_code = federal_tax.CODE
+        # else:
+        #     del self.fields["use_py"]
+        #     del self.fields["python_code"]
 
-    def clean_python_code(self):
-        """Reject tax code that violates the sandbox policy at save time."""
-        code = self.cleaned_data.get("python_code")
-        use_py = self.cleaned_data.get("use_py")
-        # Only validate code that will actually be executed (use_py enabled and
-        # a non-default value supplied). The default template is trusted.
-        if use_py and code and code != federal_tax.CODE:
-            try:
-                validate_tax_code(code)
-            except TaxCodeValidationError as exc:
-                raise forms.ValidationError(str(exc)) from exc
-        return code
+    # clean_python_code (validate_tax_code at save time) is disabled along
+    # with the field itself - nothing executes stored code any more.
 
 
 class TaxBracketForm(ModelForm):

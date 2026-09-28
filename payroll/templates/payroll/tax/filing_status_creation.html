@@ -31,6 +31,11 @@
     </form>
 </div>
 
+{% comment %}
+Disabled: Python tax formulas no longer run (see payroll/methods/safe_tax_code.py
+run_tax_code), so the embedded third-party code editor (onecompiler.com iframe)
+and its scripts are commented out rather than deleted. Tax is calculated from the
+filing status's tax brackets.
 <iframe style="display: none;" frameBorder="0" height="450px" id="oc-editor"
     src="https://onecompiler.com/embed/python?codeChangeEvent=true&hideNew=true&hideNewFileOption=true&hideStdin=true&hideTitle=true&listenToEvents=true&availableLanguages=false&theme=dark"
     width="100%">
@@ -70,3 +75,4 @@
     $("[name=python_code]").parent().hide();
     $("[name=use_py]").change();
 </script>
+{% endcomment %}

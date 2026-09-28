@@ -16,7 +16,6 @@ from payroll.methods.payslip_calc import (
     calculate_gross_pay,
     calculate_taxable_gross_pay,
 )
-from payroll.methods.safe_tax_code import run_tax_code
 from payroll.models.models import Contract
 from payroll.models.tax_models import TaxBracket
 
@@ -73,7 +72,22 @@ def calculate_taxable_amount(**kwargs):
     yearly_income = compute_yearly_taxable_amount(income, yearly_income)
     yearly_income = round(yearly_income, 2)
     federal_tax = 0
-    if filing is not None and not filing.use_py:
+    if filing is not None:
+        if filing.use_py:
+            # Python tax formulas are disabled (see
+            # payroll/methods/safe_tax_code.py), so a filing status that
+            # still has "use_py" switched on is calculated from its tax
+            # brackets like every other one. If it has none defined, its
+            # federal tax comes out as 0 - which is why this is logged
+            # loudly instead of passing silently.
+            logger.warning(
+                "Filing status %s (id=%s) has Python tax formulas enabled, "
+                "but they are disabled; using its tax brackets instead "
+                "(%s defined).",
+                filing,
+                filing.pk,
+                tax_brackets.count(),
+            )
         brackets = [
             {
                 "rate": item["tax_rate"],
@@ -92,11 +106,8 @@ def calculate_taxable_amount(**kwargs):
             break
         federal_tax = sum(bracket["calculated_rate"] for bracket in filterd_brackets)
 
-    elif filing.use_py:
-        try:
-            federal_tax = run_tax_code(filing.python_code, yearly_income)
-        except Exception as e:
-            logger.error(e)
+    # Removed here: `elif filing.use_py: federal_tax = run_tax_code(...)`.
+    # See the docstring on payroll.methods.safe_tax_code.run_tax_code.
 
     federal_tax_for_period = 0
     if federal_tax and (tax_brackets.exists() or filing.use_py):

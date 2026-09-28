@@ -1,7 +1,10 @@
 {% load i18n %}
-{% if not filing_status.use_py %}
-    {% include "generic/horilla_list_table.html" %}
-{% else %}
+{% include "generic/horilla_list_table.html" %}
+{% comment %}
+Disabled: Python tax formulas no longer run (see payroll/methods/safe_tax_code.py
+run_tax_code), so the embedded third-party code editor (onecompiler.com iframe)
+and its scripts are commented out rather than deleted. Tax is calculated from the
+filing status's tax brackets.
     <div class="hidden">
         <button type="submit" class="oh-btn oh-btn--secondary" id="oc-editor-button{{ filing_status.pk }}">
             {% trans "Save" %}
@@ -70,4 +73,4 @@
             });
         });
     </script>
-{% endif %}
+{% endcomment %}
