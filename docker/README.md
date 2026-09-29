@@ -433,21 +433,32 @@ docker cp $(docker compose ps -q web):/app/media ./media-backup
 
 ### Using Cloud Storage (S3/GCP)
 
-Horilla supports AWS S3 and Google Cloud Storage. Add to your environment:
+Horilla supports AWS S3 (or any S3-compatible store: Backblaze B2,
+Cloudflare R2, MinIO, ...) and Google Cloud Storage - set the matching
+variables below and horilla/settings/addons.py switches uploads to that
+bucket automatically. No `DEFAULT_FILE_STORAGE` setting is needed (or read) -
+that was the old, Django-5.1-and-earlier way of naming a storage class, and
+this project runs Django 5.2, which resolves the backend through the
+`STORAGES` setting instead.
 
-**AWS S3:**
+**Before setting any of this in production:** a few places still read
+uploaded files straight off local disk (the Google Drive backup, PDF export,
+a couple of employee/recruitment download views) - they need updating first,
+or they'll silently keep looking at local disk after the bucket switches on.
+
+**AWS S3 (or an S3-compatible store):**
 ```
 AWS_ACCESS_KEY_ID=your-key
 AWS_SECRET_ACCESS_KEY=your-secret
 AWS_STORAGE_BUCKET_NAME=your-bucket
-DEFAULT_FILE_STORAGE=horilla.horilla_backends.PrivateMediaStorage
+# AWS_S3_ENDPOINT_URL=https://s3.your-provider.example   # only for a non-AWS S3-compatible store
+# AWS_S3_REGION_NAME=auto                                # only for Cloudflare R2
 ```
 
 **Google Cloud Storage:**
 ```
 GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
 GS_BUCKET_NAME=your-bucket
-DEFAULT_FILE_STORAGE=horilla.horilla_backends_gcp.PrivateMediaStorage
 ```
 
 ---

@@ -74,7 +74,7 @@ class FaceDetectionConfigAPIView(APIView):
         name="dispatch",
     )
     def delete(self, request):
-        self.get_facedetection(request).delete()
+        self.get_facedetection(request)[0].delete()
         return Response(
             {"message": "Facedetection deleted successfully"}, status=status.HTTP_200_OK
         )
@@ -141,7 +141,7 @@ def get_facedetection(request):
 
 
 @login_required
-@permission_required("geofencing.add_localbackup")
+@permission_required("facedetection.add_facedetection")
 @hx_request_required
 def face_detection_config(request):
     try:

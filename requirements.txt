@@ -81,5 +81,10 @@ XlsxWriter
 gunicorn
 psycopg2-binary
 whitenoise
-django-storages[s3]
+django-storages[s3]==1.14.6
+# django-storages[s3] should pull boto3 in as its "s3" extra, but that has
+# been observed missing from an installed venv despite this line being
+# present - pinned directly so S3Boto3Storage can never ImportError at the
+# moment someone actually enables AWS_ACCESS_KEY_ID.
+boto3==1.43.104
 redis==5.2.1

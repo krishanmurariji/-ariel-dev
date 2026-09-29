@@ -394,10 +394,23 @@ CACHES = {
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
-STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media/")
+
+# STATICFILES_STORAGE / DEFAULT_FILE_STORAGE were removed in Django 5.1 in
+# favour of STORAGES - Django 5.2 (pinned in requirements.txt) silently
+# ignores both legacy names, so setting them here (as this file used to)
+# has no effect at all. STORAGES["default"] is FileSystemStorage - local
+# disk, exactly what production has actually been using regardless of any
+# S3/GCS settings below - unless addons.py switches it to a configured
+# bucket (see horilla/media_storage_s3.py / media_storage_gcs.py).
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "horilla.staticfiles_storage.LenientManifestStaticFilesStorage"
+    },
+}
 
 # ========================================
 # AUTHENTICATION & SECURITY
