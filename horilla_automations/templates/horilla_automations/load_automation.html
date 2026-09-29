@@ -1,3 +1,4 @@
+{% load basefilters %}
 {% load static i18n %}
 <div class="oh-modal__dialog-header">
     <span class="oh-modal__dialog-title">{% trans "Load Automations" %}</span>
@@ -37,7 +38,7 @@
                                 white-space: wrap;
                             "
                         >
-                            {{automation.template_body|safe}}
+                            {{automation.template_body|sanitize_html}}
                         </div>
                         <ul class="oh-faq__tags m-0">
                             {% if automation.fields.delivery_channel == 'email' %}

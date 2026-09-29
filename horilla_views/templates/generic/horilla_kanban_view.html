@@ -109,7 +109,7 @@
                                                     <p
                                                         class="w-full text-left px-3 py-1 hover:text-primary-600 font-semibold"
                                                     >
-                                                        <a {{action.attrs|format:group.instance|safe}}>{{group.instance|getattribute:action.action|default:action.action}}</a>
+                                                        <a {{action.attrs|format_attrs:group.instance|safe}}>{{group.instance|getattribute:action.action|default:action.action}}</a>
                                                     </p>
                                                 </li>
                                             {% endif %}

@@ -1,3 +1,4 @@
+{% load basefilters %}
 <style>
 	#enlargeImageContainer {
 		position: absolute;
@@ -16,7 +17,7 @@
 
 <div class="oh-modal__dialog-body border rounded-md shadow-card m-[20px]">
 	<p class="oh-card__footer--border-top"></p>
-	{{ policy.body|safe }}
+	{{ policy.body|sanitize_html }}
 	<div
 		id="attachmentContainer"
 		class="d-flex"

@@ -3,7 +3,7 @@
     <div class="task-card"
         data-instance-id = "{{instance.id}}"
         data-group = "{{group.label.id}}"
-        {{view.kanban_attrs|format:instance|safe}}
+        {{view.kanban_attrs|format_attrs:instance|safe}}
     >
 
         <div class="p-[20px] rounded-[5px] text-sm relative bg-white mb-2">
@@ -35,7 +35,7 @@
                                         <p
                                             class="w-full text-left px-3 py-1 hover:text-primary-600 font-semibold"
                                         >
-                                            <a {{action.attrs|format:instance|safe}}>{{instance|getattribute:action.action|default:action.action}}</a>
+                                            <a {{action.attrs|format_attrs:instance|safe}}>{{instance|getattribute:action.action|default:action.action}}</a>
                                         </p>
                                     </li>
                                 {% endif %}
@@ -52,7 +52,7 @@
                 {% if details.image_src %}
                     <div class="relative flex items-center w-max">
                         <img
-                            src="{{details.image_src|format:instance|selected_format:request.user.employee_get.employee_work_info.company_id|safe}}"
+                            src="{{details.image_src|format_attrs:instance|selected_format:request.user.employee_get.employee_work_info.company_id|safe}}"
                             class="w-11 h-11 rounded-full"
                             alt="Username"
                         />
@@ -80,7 +80,7 @@
                         >{{key|title}} : </span
                     >
                     <p class="text-xs font-semibold flex items-center gap-2">
-                        <span>{{value|format:instance|selected_format:request.user.employee_get.employee_work_info.company_id|safe}}</span>
+                        <span>{{value|format_attrs:instance|selected_format:request.user.employee_get.employee_work_info.company_id|safe}}</span>
                     </p>
                 </div>
                 {% endif %}

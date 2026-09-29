@@ -1,6 +1,7 @@
 from datetime import timedelta, timezone
 from itertools import chain
 
+from django.utils.html import escape as html_escape
 from django.apps import apps
 from django.db import models
 from django.db.models import Q
@@ -321,7 +322,7 @@ class GoogleMeeting(HorillaModel):
                         <span title="Reveal"><ion-icon class="oh-permission-table__collapse-down" name="chevron-down-outline"></ion-icon></span>
                         <span title="Collapse"><ion-icon class="oh-permission-table__collapse-up" name="chevron-up-outline"></ion-icon></span>
                     </button>
-                    <span class="oh-permission-table__user">{self.title}</span>
+                    <span class="oh-permission-table__user">{html_escape(self.title)}</span>
                 </div>
             </div>
         """

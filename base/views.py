@@ -53,6 +53,7 @@ from accessibility.accessibility import ACCESSBILITY_FEATURE
 from accessibility.models import DefaultAccessibility
 from base.backends import ConfiguredEmailBackend
 from base.mail_letterhead import build_letterhead_email
+from base.otp_mail import send_otp_email
 from base.decorators import (
     shift_request_change_permission,
     work_type_request_change_permission,
@@ -967,32 +968,8 @@ def send_otp(request):
     if not employee:
         return redirect("/login/")
 
-    email = employee.get_mail()
-    email_backend = ConfiguredEmailBackend()
-    display_email_name = email_backend.dynamic_from_email_with_display_name
-
     otp_code = set_otp(request)
-    content_html = (
-        "<p style=\"margin:0 0 16px;font-size:15px;color:#2d2d2d;\">"
-        + str(_("Your one-time verification code is:"))
-        + "</p>"
-        + f"<p style=\"margin:0 0 16px;font-size:32px;font-weight:700;letter-spacing:4px;color:#2d2d2d;\">{otp_code}</p>"
-        + "<p style=\"margin:0;font-size:13px;color:#888888;\">"
-        + str(_("If you didn't request this code, you can safely ignore this email."))
-        + "</p>"
-    )
-    message = build_letterhead_email(
-        subject=_("Your OTP Code"),
-        content_html=content_html,
-        to=email,
-        tag_label=_("Security"),
-        team_label=_("IT Team"),
-        employee=employee,
-        from_email=display_email_name,
-        plain_text=_("Your OTP code is %(otp_code)s") % {"otp_code": otp_code},
-    )
-    thread = threading.Thread(target=message.send)
-    thread.start()
+    send_otp_email(employee, otp_code)
 
     return redirect("two-factor")
 
@@ -1030,8 +1007,15 @@ def get_otp(request):
 
 def logout_user(request):
     """
-    This method used to logout the user
+    Signs the user out. Only a POST (with the CSRF token) does it: a plain GET
+    link or <img src="/logout/"> on another website could otherwise sign
+    people out at will. Opening the address directly shows a confirmation
+    button instead.
     """
+    if request.method != "POST":
+        if not getattr(request.user, "is_authenticated", False):
+            return redirect("/login/")
+        return render(request, "base/auth/logout_confirm.html")
     if request.user:
         logout(request)
     response = HttpResponse()

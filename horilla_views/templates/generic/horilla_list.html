@@ -126,11 +126,11 @@
             class="oh-sticky-table__tr oh-permission-table__tr oh-permission-table--collapsed"
             draggable="true"
             data-instance-id="{{instance.id}}"
-            {{row_attrs|format:instance|safe}}
+            {{row_attrs|format_attrs:instance|safe}}
           >
             {% if bulk_select_option %}
             <div
-              class="oh-sticky-table__sd {{row_status_class|format:instance|safe}}"
+              class="oh-sticky-table__sd {{row_status_class|format_attrs:instance|safe}}"
               onclick="event.stopPropagation()"
               style="width: 10px; z-index: 11 !important"
             >
@@ -160,7 +160,7 @@
               data-header-id="{{view_id}}-{{ forloop.counter }}-{{cell.1}}-header"
               class="{% if index == 1 %} oh-sticky-table__sd {% else %} oh-sticky-table__td{% endif %} t-body"
             >
-              {{instance|getattribute:attribute|selected_format:request.user.employee_get.employee_work_info.company_id|safe}}
+              {{instance|cell_value:attribute|selected_format:request.user.employee_get.employee_work_info.company_id|safe_cell}}
             </div>
             {% else %}
             <div
@@ -188,7 +188,7 @@
                   <a
                     href="#"
                     title="{{option.option|safe}}"
-                    {{option.attrs|format:instance|safe}}
+                    {{option.attrs|format_attrs:instance|safe}}
                   >
                     <ion-icon name="{{option.icon}}"></ion-icon>
                   </a>
@@ -205,7 +205,7 @@
                   {% if action.accessibility|accessibility:instance %}
                   <a
                     title="{{action.action|safe}}"
-                    {{action.attrs|format:instance|safe}}
+                    {{action.attrs|format_attrs:instance|safe}}
                   >
                     <ion-icon name="{{action.icon}}"></ion-icon>
               </a>

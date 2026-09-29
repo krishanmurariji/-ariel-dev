@@ -1,4 +1,5 @@
 {% extends "onboarding/self_onboarding_base.html" %}
+{% load basefilters %}
 {% load i18n %}
 
 {% block extra_style %}
@@ -37,7 +38,7 @@
 <div class="oh-swz__panel">
     <div class="oh-roles-box{% if not roles_responsibilities %} oh-roles-box--empty{% endif %}">
         {% if roles_responsibilities %}
-            {{ roles_responsibilities|safe }}
+            {{ roles_responsibilities|sanitize_html }}
         {% else %}
             {% trans "Your roles and responsibilities will be shared with you shortly." %}
         {% endif %}

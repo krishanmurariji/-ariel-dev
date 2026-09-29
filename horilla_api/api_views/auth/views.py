@@ -1,11 +1,19 @@
+import hmac
+import logging
+
 from axes.handlers.proxy import AxesProxyHandler
+from django.conf import settings
 from django.contrib.auth import authenticate
+from django.core.cache import cache
 from drf_yasg import openapi
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from base.backends import ConfiguredEmailBackend
+from base.methods import generate_otp
+from base.otp_mail import send_otp_email
 from horilla_api.docs import document_api
 from horilla_api.throttling import TrustedScopedRateThrottle
 
@@ -14,6 +22,80 @@ from ...api_serializers.auth.serializers import (
     LoginRequestSerializer,
     PasswordResetSerializer,
 )
+
+
+logger = logging.getLogger(__name__)
+
+API_OTP_LIFETIME_SECONDS = 600
+API_OTP_RESEND_AFTER_SECONDS = 60
+API_OTP_MAX_ATTEMPTS = 3
+API_OTP_LOCKOUT_SECONDS = 900
+
+
+def second_factor_challenge(request, user):
+    """
+    Second step of the API login when TWO_FACTORS_AUTHENTICATION is on
+    (the web login has the same rule). Returns None when the caller may be
+    given tokens, otherwise the Response to send back instead: the caller
+    posts the username/password once, gets a code by email, then posts again
+    with the same fields plus "otp".
+    """
+    if not settings.TWO_FACTORS_AUTHENTICATION:
+        return None
+    try:
+        mail_configured = ConfiguredEmailBackend().configuration is not None
+    except Exception:
+        logger.exception("2FA: could not read the email configuration")
+        mail_configured = True  # fail closed
+    if not mail_configured:
+        logger.warning(
+            "TWO_FACTORS_AUTHENTICATION is on but no outgoing email server is "
+            "configured, so 2FA is NOT being enforced for API logins."
+        )
+        return None
+
+    employee = getattr(user, "employee_get", None)
+    if not employee or not employee.get_mail():
+        return Response(
+            {"error": "Two-factor login needs an employee record with an email."},
+            status=403,
+        )
+
+    code_key = f"api_otp_code_{user.pk}"
+    sent_key = f"api_otp_sent_{user.pk}"
+    attempts_key = f"api_otp_attempts_{user.pk}"
+
+    if cache.get(attempts_key, 0) >= API_OTP_MAX_ATTEMPTS:
+        return Response(
+            {"error": "Too many wrong codes. Please try again later."}, status=429
+        )
+
+    supplied = str(request.data.get("otp") or "").strip()
+    stored = cache.get(code_key)
+
+    if not supplied:
+        if stored is None or not cache.get(sent_key):
+            code = generate_otp()
+            cache.set(code_key, code, API_OTP_LIFETIME_SECONDS)
+            cache.set(sent_key, True, API_OTP_RESEND_AFTER_SECONDS)
+            send_otp_email(employee, code)
+        return Response(
+            {
+                "otp_required": True,
+                "error": "A one-time code was emailed to you. "
+                "Send it again with the same login as 'otp'.",
+            },
+            status=401,
+        )
+
+    if stored and hmac.compare_digest(supplied, stored):
+        cache.delete_many([code_key, sent_key, attempts_key])
+        return None
+
+    cache.set(attempts_key, cache.get(attempts_key, 0) + 1, API_OTP_LOCKOUT_SECONDS)
+    return Response(
+        {"otp_required": True, "error": "Invalid or expired code."}, status=401
+    )
 
 
 class LoginAPIView(APIView):
@@ -67,6 +149,9 @@ class LoginAPIView(APIView):
             # AxesBackendRequestParameterRequired without it.
             user = authenticate(request, username=username, password=password)
             if user:
+                challenge = second_factor_challenge(request, user)
+                if challenge is not None:
+                    return challenge
                 refresh = RefreshToken.for_user(user)
                 employee = user.employee_get
                 face_detection = False

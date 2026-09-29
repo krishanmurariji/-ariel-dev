@@ -26,7 +26,10 @@
         <hr />
         <ul class="oh-dropdown__items">
             <li class="oh-dropdown__item">
-                <a href="/logout/" class="oh-dropdown__link">{% trans "Logout" %}</a>
+                <form method="post" action="/logout/" hx-boost="false" style="margin: 0">
+                    {% csrf_token %}
+                    <button type="submit" class="oh-dropdown__link" style="background: none; border: 0; width: 100%; text-align: left; cursor: pointer">{% trans "Logout" %}</button>
+                </form>
             </li>
         </ul>
     </div>

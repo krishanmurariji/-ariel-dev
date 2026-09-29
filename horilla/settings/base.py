@@ -495,6 +495,16 @@ TIME_ZONE = env("TIME_ZONE", default="Asia/Kolkata")
 USE_I18N = True
 USE_TZ = True
 
+# Every uploaded file passes horilla/upload_handler.py first (blocked file types,
+# content that does not match the extension, SVG with script, size limit). It
+# must stay ahead of Django's own handlers so it sees each file's first bytes.
+FILE_UPLOAD_HANDLERS = [
+    "horilla.upload_handler.SafeUploadHandler",
+    "django.core.files.uploadhandler.MemoryFileUploadHandler",
+    "django.core.files.uploadhandler.TemporaryFileUploadHandler",
+]
+UPLOAD_MAX_BYTES = env.int("UPLOAD_MAX_BYTES", default=25 * 1024 * 1024)
+
 LANGUAGES = (
     ("en", "English (US)"),
     ("de", "Deutsche"),

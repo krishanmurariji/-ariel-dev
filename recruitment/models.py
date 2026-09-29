@@ -17,6 +17,7 @@ from uuid import uuid4
 import django
 import requests
 from dateutil.relativedelta import relativedelta
+from django.utils.html import escape as html_escape
 from django import forms
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
@@ -435,7 +436,7 @@ class Recruitment(HorillaModel):
         employees = self.recruitment_managers.all()
         if employees:
             employee_names_string = "<br>".join(
-                [str(employee) for employee in employees]
+                [html_escape(str(employee)) for employee in employees]
             )
             return f'<span class="oh-timeoff-modal__stat-count">{employee_names_string}</span>'
         else:
@@ -444,7 +445,7 @@ class Recruitment(HorillaModel):
     def managers(self):
         manager_list = self.recruitment_managers.all()
         formatted_managers = [
-            f"<div>{i + 1}. {manager}</div>" for i, manager in enumerate(manager_list)
+            f"<div>{i + 1}. {html_escape(str(manager))}</div>" for i, manager in enumerate(manager_list)
         ]
         return "".join(formatted_managers)
 
@@ -474,7 +475,7 @@ class Recruitment(HorillaModel):
         """
         jobs = self.open_positions.all()
         if jobs:
-            jobs_names_string = "<br>".join([str(job) for job in jobs])
+            jobs_names_string = "<br>".join([html_escape(str(job)) for job in jobs])
             return (
                 f'<span class="oh-timeoff-modal__stat-count">{jobs_names_string}</span>'
             )

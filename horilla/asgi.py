@@ -9,9 +9,13 @@ https://docs.djangoproject.com/en/4.1/howto/deployment/asgi/
 
 import os
 
+from horilla.scheduler_guard import install as run_scheduled_jobs_once
 from django.core.asgi import get_asgi_application
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "horilla.settings")
+
+# Several workers each boot Django; only one may run the scheduled jobs.
+run_scheduled_jobs_once()
 
 # get_asgi_application() must run before importing anything that touches
 # Django models/apps (channels routing imports recruitment.consumers,

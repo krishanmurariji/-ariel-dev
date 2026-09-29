@@ -1,3 +1,4 @@
+{% load basefilters %}
 {% load i18n %} {% if tracked_mails %}
 <div class="oh-sticky-table">
     <div class="oh-sticky-table__table oh-table--sortable">
@@ -42,7 +43,7 @@
 				<div class="oh-modal__dialog-header">
 					<button class="oh-modal__close" aria-label="Close"><ion-icon name="close-outline"></ion-icon></button>
 				</div>
-				<div class="oh-modal__dialog-body" id="mailBodymodal{{log.id}}Target">{{log.body|safe}}</div>
+				<div class="oh-modal__dialog-body" id="mailBodymodal{{log.id}}Target">{{log.body|sanitize_html}}</div>
 				</div>
 			</div>
             {% endfor %}

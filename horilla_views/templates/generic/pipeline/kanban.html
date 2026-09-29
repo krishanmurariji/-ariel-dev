@@ -16,7 +16,7 @@
                 <div class="dropdown-content">
                 {% for action in actions %}
                   {% if action.accessibility|accessibility:group %}
-                  <a {{action.attrs|format:group|safe}}>{{action.action}}</a>
+                  <a {{action.attrs|format_attrs:group|safe}}>{{action.action}}</a>
                   {% endif %}
                 {% endfor %}
                 </div>

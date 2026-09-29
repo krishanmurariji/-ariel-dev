@@ -25,7 +25,7 @@
                                 <li>
                                     <a
                                         class="w-full text-left px-3 py-1 hover:text-primary-600 transition duration-300 oh-profile-dropdown-link"
-                                        {{ action.attrs|format:instance|safe }}
+                                        {{ action.attrs|format_attrs:instance|safe }}
                                     >
                                         <button style="border: none; background: transparent">
                                             {{ action.title }}
@@ -60,7 +60,7 @@
                                     <li>
                                         <a
                                             class="w-full text-left px-3 py-1 hover:text-primary-600 transition duration-300 oh-profile-dropdown-link"
-                                            {{ action.attrs|format:object|safe }}
+                                            {{ action.attrs|format_attrs:object|safe }}
                                         >
                                             <button style="border: none; background: transparent">
                                                 {{ action.title }}

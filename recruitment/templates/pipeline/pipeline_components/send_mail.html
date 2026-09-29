@@ -168,7 +168,7 @@
         const candidates = $('#candidates').val() || [];
         const subject = $('#subject').val().trim();
         const body = $('#writeField').val().trim();
-        const cand = "{{cand|default:'false'|safe}}";
+        const cand = "{% if cand %}true{% else %}false{% endif %}";
         let message = '';
         let valid = true;
 

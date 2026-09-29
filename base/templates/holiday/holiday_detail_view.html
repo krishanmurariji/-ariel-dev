@@ -34,7 +34,7 @@
 
         {# ---- Avatar / name header ---- #}
         {% if header %}
-            <div class="flex items-center gap-5 mb-5" {{ header.attrs|format:instance|safe }}>
+            <div class="flex items-center gap-5 mb-5" {{ header.attrs|format_attrs:instance|safe }}>
                 {% if header.avatar %}
                     <div>
                         <img src="{{ instance|getattribute:header.avatar }}"
@@ -57,7 +57,7 @@
                 <div class="col-span-1 md:col-span-6 mb-2 flex gap-5">
                     <span class="font-medium text-xs text-[#565E6C] w-32">{{ col.0 }}</span>
                     <div class="text-xs font-semibold flex gap-5">
-                        : <span>{{ instance|getattribute:col.1|selected_format:request.user.employee_get.employee_work_info.company_id|safe }}</span>
+                        : <span>{{ instance|cell_value:col.1|selected_format:request.user.employee_get.employee_work_info.company_id|safe_cell }}</span>
                     </div>
                 </div>
             {% endfor %}
@@ -109,7 +109,7 @@
                     {% if actions and not action_method %}
                         <div class="oh-btn-group">
                             {% for action in actions %}
-                                <a {{ action.attrs|format:instance|safe }}>
+                                <a {{ action.attrs|format_attrs:instance|safe }}>
                                     {% if action.icon|is_image_file %}
                                         <img src="{% static 'horilla_theme/assets/img/icons/' %}{{ action.icon }}"
                                              width="13" alt="{{ action.action }}"

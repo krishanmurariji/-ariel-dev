@@ -13,7 +13,7 @@ from email.mime.base import MIMEBase
 from email.utils import parseaddr
 
 from outlook_auth.models import AzureApi
-from outlook_auth.views import get_valid_oauth_session
+from outlook_auth.views import OutlookReauthRequired, get_valid_oauth_session
 
 
 def get_azure_api_for_company(company):
@@ -128,7 +128,16 @@ def send_via_outlook(email_messages, company=None, fail_silently=False):
             "check Settings > Mail Servers > Outlook."
         )
 
-    oauth = get_valid_oauth_session(api)
+    try:
+        oauth = get_valid_oauth_session(api)
+    except OutlookReauthRequired as error:
+        # Microsoft will not renew the login without a person signing in again
+        # (for example because multi-factor authentication is required).
+        if fail_silently:
+            return 0
+        raise RuntimeError(
+            f"{error} - open Settings > Mail Servers > Outlook and use the Login button."
+        ) from error
     sent_count = 0
     for email_message in email_messages:
         payload = _graph_message_payload(email_message)

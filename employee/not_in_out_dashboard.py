@@ -7,6 +7,7 @@ This module is used to write context processor methods
 import json
 from datetime import date
 
+from django.utils.html import escape as html_escape
 from django import template
 from django.apps import apps
 from django.contrib import messages
@@ -242,7 +243,7 @@ def get_mail_preview(request):
     if employee_ids and len(employee_ids) > 1 and employee_obj:
         rendered_body = (
             f"<p style='color:gray; font-size:13px;'>"
-            f"Preview shown for {employee_obj.get_full_name()}. "
+            f"Preview shown for {html_escape(employee_obj.get_full_name())}. "
             f"Mail will be personalized for {len(employee_ids)} employees."
             f"</p>{rendered_body}"
         )

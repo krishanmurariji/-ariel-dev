@@ -30,7 +30,7 @@
             <div class="oh-card oh-card--no-shadow oh-card__body">
                 {% if header %}
                     <a class="oh-timeoff-modal__profile-content" style="text-decoration: none"
-                        {{header.attrs|format:object|safe}}>
+                        {{header.attrs|format_attrs:object|safe}}>
                         <div class="oh-profile mb-3">
                             {% if header.avatar %}
                             <div class="oh-profile__avatar">
@@ -57,11 +57,11 @@
                                     <div class="oh-timeoff-modal__stat">
                                         <span class="oh-timeoff-modal__stat-title">{{col.0}}</span>
                                         <span class="oh-timeoff-modal__stat-count">
-                                            {{object|getattribute:col.1|selected_format:request.user.employee_get.employee_work_info.company_id|safe}}
+                                            {{object|cell_value:col.1|selected_format:request.user.employee_get.employee_work_info.company_id|safe_cell}}
                                         </span>
                                     </div>
                                 {% else %}
-                                    {{object|getattribute:col.1|safe}}
+                                    {{object|cell_value:col.1|safe_cell}}
                                 {% endif %}
                             </div>
                         {% endfor %}
@@ -73,7 +73,7 @@
                         {% if actions and not action_method %}
                             <div class="oh-btn-group" style="width: 100%">
                                 {% for action in actions %}
-                                    <a {{action.attrs|format:object|safe}}>
+                                    <a {{action.attrs|format_attrs:object|safe}}>
                                         <ion-icon name="{{action.icon}}"></ion-icon>
                                         {{action.action}}
                                     </a>

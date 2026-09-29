@@ -36,7 +36,7 @@
             </button>
         </div>
         {% if header %}
-            <div class="flex items-center gap-5 mb-5" {{header.attrs|format:object|safe}}>
+            <div class="flex items-center gap-5 mb-5" {{header.attrs|format_attrs:object|safe}}>
                 {% if header.avatar %}
                     <div>
                         <img
@@ -67,13 +67,13 @@
                         </span>
                         <div class="text-xs font-semibold flex gap-5">
                             : <span>
-                                {{ object|getattribute:col.1|selected_format:request.user.employee_get.employee_work_info.company_id|safe }}
+                                {{ object|cell_value:col.1|selected_format:request.user.employee_get.employee_work_info.company_id|safe_cell }}
                             </span>
                         </div>
                     </div>
                 {% else %}
                     <div class="col-span-1 md:col-span-{{ cols|get_item:col.1|default:6 }}">
-                        {{ object|getattribute:col.1|safe }}
+                        {{ object|cell_value:col.1|safe_cell }}
                     </div>
                 {% endif %}
             {% endfor %}
@@ -82,7 +82,7 @@
         {% comment %} {% for col in body %}
             {% if col.2 %}
                 <div>
-                    {{ object|getattribute:col.1|safe }}
+                    {{ object|cell_value:col.1|safe_cell }}
                 </div>
             {% endif %}
         {% endfor %} {% endcomment %}
@@ -94,7 +94,7 @@
                     {% if actions and not action_method %}
                         <div class="oh-btn-group">
                             {% for action in actions %}
-                                <a {{action.attrs|format:object|safe}}>
+                                <a {{action.attrs|format_attrs:object|safe}}>
                                     {% if action.icon|is_image_file %}
                                         <img
                                             src="{% static 'horilla_theme/assets/img/icons/' %}{{ action.icon }}"

@@ -54,7 +54,7 @@
                                         </span>
                                     </div>
                                 {% else %}
-                                    {{object|getattribute:col.1|safe}}
+                                    {{object|cell_value:col.1|safe_cell}}
                                 {% endif %}
                             </div>
                         {% endfor %}
@@ -83,7 +83,7 @@
                         {% if actions and not action_method %}
                             <div class="oh-btn-group" style="width: 100%">
                                 {% for action in actions %}
-                                    <a {{action.attrs|format:object|safe}}>
+                                    <a {{action.attrs|format_attrs:object|safe}}>
                                         <ion-icon name="{{action.icon}}"></ion-icon>
                                         {{action.action}}
                                     </a>

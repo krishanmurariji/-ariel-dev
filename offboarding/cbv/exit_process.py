@@ -7,6 +7,7 @@ import re
 from datetime import datetime, timedelta
 from urllib.parse import urlencode, urlparse
 
+from django.utils.html import escape as html_escape
 from django import forms
 from django.apps import apps
 from django.contrib import messages
@@ -807,7 +808,7 @@ class OffboardingEmployeeList(HorillaListView):
                     f"""
                         <div class="group w-full flex items-center justify-between transition duration-300">
                           <span class="px-2 py-1 text-xs">
-                            {task.title}
+                            {html_escape(task.title)}
                           </span>
                           <div class="hidden group-hover:flex items-center transition duration-300 gap-1 p-1 rounded z-10 bg-white"
                                onclick="event.stopPropagation()">

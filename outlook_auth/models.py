@@ -2,6 +2,8 @@
 outlook_auth/models.py
 """
 
+import time
+
 from django.apps import apps
 from django.db import models
 from django.utils import timezone
@@ -47,6 +49,13 @@ class AzureApi(models.Model):
     token = EncryptedJSONField(editable=False, default=dict)
     oauth_state = models.CharField(editable=False, max_length=100, null=True)
     last_refreshed = models.DateTimeField(null=True, editable=False)
+    # Set when Microsoft refuses to renew the login without the user signing
+    # in again (e.g. AADSTS50076: multi-factor authentication required).
+    reauth_required = models.BooleanField(default=False, editable=False)
+    last_error = models.CharField(
+        max_length=500, blank=True, default="", editable=False
+    )
+    last_error_at = models.DateTimeField(null=True, blank=True, editable=False)
 
     def save(self, *args, **kwargs):
         if self.is_primary:
@@ -65,25 +74,31 @@ class AzureApi(models.Model):
         """
         last authenticated
         """
-
+        if self.reauth_required:
+            return _("Reconnect needed⚠️")
         if self.last_refreshed:
-            duration_seconds = (timezone.now() - self.last_refreshed).seconds
-            display = sec_to_hm(duration_seconds)
-            expires_in_seconds = self.token.get("expires_in")
+            # total_seconds(), not .seconds: .seconds is only the leftover
+            # part of a day, so after 24h it wrapped back to a small number
+            # and an old, dead token looked fresh.
+            duration_seconds = int((timezone.now() - self.last_refreshed).total_seconds())
+            expires_in_seconds = int((self.token or {}).get("expires_in") or 0)
             if duration_seconds > expires_in_seconds:
                 return _("Expired⚠️")
-            return f"{display}/{sec_to_hm(expires_in_seconds)}"
+            return f"{sec_to_hm(duration_seconds)}/{sec_to_hm(expires_in_seconds)}"
 
-    def is_token_expired(self):
+    def is_token_expired(self, margin_seconds=120):
         """
-        is token expired
+        True when the access token has run out (or will within
+        ``margin_seconds``). None/False when there is no timing information.
         """
+        token = self.token or {}
+        expires_at = token.get("expires_at")
+        if expires_at:
+            return time.time() >= float(expires_at) - margin_seconds
         if self.last_refreshed:
-            duration_seconds = (timezone.now() - self.last_refreshed).seconds
-            expires_in_seconds = self.token.get("expires_in")
-            if duration_seconds > expires_in_seconds:
-                return True
-            return False
+            elapsed = (timezone.now() - self.last_refreshed).total_seconds()
+            return elapsed >= int(token.get("expires_in") or 0) - margin_seconds
+        return False
 
 
 class OutlookMeeting(HorillaModel):

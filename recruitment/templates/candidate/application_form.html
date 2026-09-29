@@ -1,4 +1,5 @@
 {% extends 'candidate/application_form_component.html' %} {% block content %}
+{% load basefilters %}
 {% load static %} {% load i18n %} {{ form.load }}
 <div id="main">
     <div class="oh-wrapper mt-5">
@@ -248,7 +249,7 @@
             {% else %}
                 <div class="col-12 col-md-6 col-lg-6">
                     <div class="oh-onboarding-preview oh-onboarding-card--top-bar w-100">
-                        {{recruitment.description|safe}}
+                        {{recruitment.description|sanitize_html}}
                         <div class="oh-onboarding-preview__content" id="recruitmentInfoBody"
                             style="border-bottom: solid rgba(128, 128, 128, 0.281) 1px"></div>
                     </div>

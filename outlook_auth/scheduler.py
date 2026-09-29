@@ -19,16 +19,27 @@ def refresh_outlook_auth_token():
     scheduler method to refresh token
     """
     from outlook_auth.models import AzureApi
-    from outlook_auth.views import refresh_outlook_token
+    from outlook_auth.views import (
+        OutlookReauthRequired,
+        refresh_is_due,
+        refresh_outlook_token,
+    )
 
-    apis = AzureApi.objects.filter(token__isnull=False)
-    for api in apis:
+    for api in AzureApi.objects.all():
+        if not api.token:
+            continue
+        # An account Microsoft told us needs a person to sign in again is only
+        # retried now and then - hammering a request that cannot succeed just
+        # fills the log (and counts as failed sign-ins on the Microsoft side).
+        if not refresh_is_due(api):
+            continue
         try:
             refresh_outlook_token(api)
-            logger.info(f"Updated token for {api} outlook auth")
-            print(f"Updated token for {api} outlook auth")
-        except Exception as e:
-            logger.error(e)
+            logger.info("Updated token for %s outlook auth", api)
+        except OutlookReauthRequired as error:
+            logger.warning("Outlook for %s needs to be connected again: %s", api, error)
+        except Exception:  # noqa: BLE001
+            logger.exception("Could not refresh the Outlook token for %s", api)
 
 
 if not any(

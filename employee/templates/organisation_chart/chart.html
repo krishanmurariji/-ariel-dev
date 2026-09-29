@@ -1,8 +1,9 @@
 <div class="oh-main__org-chart-container" id="chart-container"></div>
 </div >
 
+{{ act_datasource|json_script:"org-chart-data" }}
 <script>
-    var datascource = {{ act_datasource| safe}}
+    var datascource = JSON.parse(document.getElementById('org-chart-data').textContent);
     function loopChart($hierarchy) {
         var $siblings = $hierarchy.children('.nodes').children('.hierarchy');
         if ($siblings.length) {

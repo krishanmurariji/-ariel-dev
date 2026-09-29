@@ -1,3 +1,4 @@
+{% load basefilters %}
 {% load i18n static %}
 {% include 'filter_tags.html' %}
 {% if meetings %}
@@ -181,7 +182,7 @@
                                         {{ meeting.date }}
                                     </div>
                                     <div data-cell-index="4" class="oh-sticky-table__td">
-                                        {{ meeting.response|default:"-"|safe|truncatechars_html:30 }}
+                                        {{ meeting.response|default:"-"|sanitize_html|truncatechars_html:30 }}
                                     </div>
                                     <div class="oh-sticky-table__td oh-sticky-table__right">
                                         <div class="oh-btn-group" onclick="event.stopPropagation()">

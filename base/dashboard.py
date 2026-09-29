@@ -77,7 +77,12 @@ def main_dashboard_view(request):
         emp = request.user.employee_get
         obj = DashboardEmployeeCharts.objects.filter(employee=emp).first()
         if obj and obj.charts:
-            employee_chart_prefs = json.dumps(obj.charts)
+            employee_chart_prefs = (
+                json.dumps(obj.charts)
+                .replace("<", "\\u003c")
+                .replace(">", "\\u003e")
+                .replace("&", "\\u0026")
+            )
     except Exception:
         pass
 

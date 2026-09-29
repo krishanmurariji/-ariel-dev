@@ -15,8 +15,11 @@ from django.conf import settings
 from django.contrib.auth.context_processors import PermWrapper
 from django.db.models.utils import AltersData
 from django.template.defaultfilters import register
+from django.utils.html import conditional_escape
+from django.utils.safestring import SafeData, mark_safe
 from django.utils.translation import gettext_lazy as _
 
+from base.html_sanitizer import sanitize_html
 from horilla.config import import_method
 from horilla.horilla_middlewares import _thread_locals
 
@@ -92,6 +95,85 @@ def getattribute(value, attr: str):
     #     return _("Yes") if result else _("No")
 
     return result
+
+
+@register.filter(name="cell_value")
+def cell_value(value, attr: str):
+    """
+    Same lookup as ``getattribute``, for table cells that are printed as HTML.
+
+    The result of calling a *method* on the record (for example
+    ``get_status_col``) is code-built HTML and is marked trusted. Anything
+    else is plain stored data - a name, a title, a description someone typed -
+    and is left unmarked so ``safe_cell`` cleans it.
+    """
+    result = ""
+    for part in attr.split("__"):
+        if isinstance(value, AltersData) and hasattr(value, "through"):
+            result = [cell_value(record, part) for record in value.all()]
+        elif hasattr(value, str(part)):
+            result = getattr(value, part)
+            if isinstance(result, (types.MethodType, functools.partial)):
+                result = result()
+                if isinstance(result, str) and "<" in result:
+                    result = mark_safe(result)
+            value = result
+        else:
+            return getattr(value, part, "")
+    return result
+
+
+@register.filter(name="safe_cell")
+def safe_cell(value):
+    """
+    Final step for a table cell (use instead of ``|safe``): trusted HTML from
+    ``cell_value`` passes through; stored text is cleaned so formatting a user
+    typed still shows, but script, event handlers and the like are removed.
+    """
+    if isinstance(value, SafeData):
+        return value
+    if isinstance(value, str):
+        return mark_safe(sanitize_html(value))
+    return conditional_escape(value)
+
+
+@register.filter(name="format_attrs")
+def format_attrs(string: str, instance: object):
+    """
+    ``format`` for strings that are printed as raw HTML (``|safe``), e.g. the
+    ``attrs`` of a row, action or card. The template string itself is written
+    by the developer and kept as is; the record's *data* filled into it is
+    escaped so a name or title cannot close the attribute and add its own.
+    Values that come from calling a method are code-built and left alone.
+    """
+    string = str(string)
+    placeholders = re.findall(r"{([^}]*)}", string)
+    if not placeholders:
+        return mark_safe(string)
+    base = instance
+    context = {}
+    for placeholder in placeholders:
+        instance = base
+        from_method = False
+        for attr in placeholder.split("__"):
+            from_method = False
+            if (
+                attr.startswith("get_")
+                and attr.endswith("_display")
+                and callable(getattr(instance, attr, None))
+            ):
+                value = getattr(instance, attr)()
+                from_method = True
+            else:
+                value = getattr(instance, attr, "")
+            if isinstance(value, types.MethodType):
+                value = value()
+                from_method = True
+            instance = value
+        context[placeholder] = (
+            value if from_method or isinstance(value, SafeData) else conditional_escape(value)
+        )
+    return mark_safe(string.format(**context))
 
 
 @register.filter(name="format")

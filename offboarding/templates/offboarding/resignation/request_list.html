@@ -1,3 +1,4 @@
+{% load basefilters %}
 {% load i18n %} {% load static %}
 {% include 'filter_tags.html' %} {% if messages %}
 <div class="oh-wrapper">
@@ -109,7 +110,7 @@
                         {{letter.status}}
                     </div>
                     <div data-cell-index="4" class="oh-sticky-table__td">
-                        {{letter.description|safe|truncatechars_html:30}}
+                        {{letter.description|sanitize_html|truncatechars_html:30}}
                     </div>
                     <div class="oh-sticky-table__td" onclick="event.stopPropagation()">
                         <div class="oh-btn-group">

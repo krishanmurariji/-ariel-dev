@@ -1,3 +1,4 @@
+{% load basefilters %}
 {% comment %} {% extends 'candidate/application_form_component.html' %}  {% endcomment %}
 {% block content %}
 {% load static %} {% load i18n horillafilters %}
@@ -752,7 +753,7 @@ theming doesn't work for an anonymous candidate).
                         <div class="lg:h-[calc(100vh_-_160px)] overflow-hidden overflow-y-auto">
                             <div class="info-panel active" id="panel-jobdesc">
                                 <div class="p-5 leading-relaxed">
-                                    <div class="text-sm text-gray-600 oh-job__post_description prose prose-sm max-w-none">{{ recruitment.description|safe }}</div>
+                                    <div class="text-sm text-gray-600 oh-job__post_description prose prose-sm max-w-none">{{ recruitment.description|sanitize_html }}</div>
                                 </div>
                             </div>
                             <div class="info-panel" id="panel-resume">

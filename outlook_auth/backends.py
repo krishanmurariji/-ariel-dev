@@ -8,6 +8,7 @@ import logging
 from django.core.mail import EmailMessage
 from django.core.mail.backends.smtp import EmailBackend
 
+from base.email_log_safety import body_for_log
 from base.models import EmailLog
 from horilla.horilla_middlewares import _thread_locals
 from outlook_auth import models
@@ -165,7 +166,7 @@ def send_mail(self, *args, **kwargs):
         subject=self.subject,
         from_email=self.from_email,
         to=self.to,
-        body=self.body,
+        body=body_for_log(self),
         status="sent" if response else "failed",
     )
     email_log.save()

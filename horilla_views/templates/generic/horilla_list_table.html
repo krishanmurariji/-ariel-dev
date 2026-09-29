@@ -113,11 +113,11 @@
           {% for instance in queryset %}
           <tr
            data-instance-id="{{instance.id}}"
-           {{row_attrs|format:instance|safe}}
+           {{row_attrs|format_attrs:instance|safe}}
           >
             {% if bulk_select_option %}
             <td class="p-0"onclick="event.stopPropagation()">
-              <div class="{{row_status_class|format:instance|safe}} centered-div" align="center">
+              <div class="{{row_status_class|format_attrs:instance|safe}} centered-div" align="center">
                 <input
                   type="checkbox"
                   data-view-id="{{view_id|safe}}"
@@ -143,7 +143,7 @@
             {% with attribute=cell.1 index=forloop.counter %}
             <td>
               {% if not cell.2 %}
-              {{instance|getattribute:attribute|selected_format:request.user.employee_get.employee_work_info.company_id|safe}}
+              {{instance|cell_value:attribute|selected_format:request.user.employee_get.employee_work_info.company_id|safe_cell}}
               {% else %}
               <div class="oh-profile oh-profile--md">
                 <div class="oh-profile__avatar mr-1">
@@ -153,7 +153,7 @@
                   />
                 </div>
                 <span class="oh-profile__name oh-text--dark">
-                  {{instance|getattribute:attribute|safe}}
+                  {{instance|cell_value:attribute|safe_cell}}
                 </span>
               </div>
               {% endif %}
@@ -169,7 +169,7 @@
                   <a
                     href="#"
                     title="{{option.option|safe}}"
-                    {{option.attrs|format:instance|safe}}
+                    {{option.attrs|format_attrs:instance|safe}}
                   >
                     <ion-icon name="{{option.icon}}"></ion-icon>
                   </a>
@@ -187,7 +187,7 @@
                   {% if action.accessibility|accessibility:instance %}
                   <a
                     title="{{action.action|safe}}"
-                    {{action.attrs|format:instance|safe}}
+                    {{action.attrs|format_attrs:instance|safe}}
                   >
                     <ion-icon name="{{action.icon}}"></ion-icon>
               </a>

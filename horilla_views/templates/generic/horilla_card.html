@@ -52,7 +52,7 @@
     {% if queryset %}
     <div class="oh-layout--grid-3">
     {% for instance in queryset %}
-    <div class="oh-kanban-card {{card_status_class|format:instance|safe}}" {{card_attrs|format:instance|safe}}>
+    <div class="oh-kanban-card {{card_status_class|format_attrs:instance|safe}}" {{card_attrs|format_attrs:instance|safe}}>
       {% if instance|getattribute:details.image_src %}
       <div class="oh-kanban-card__avatar">
         <div class="oh-kanban-card__profile-container">
@@ -65,8 +65,8 @@
       </div>
       {% endif %}
       <div class="oh-kanban-card__details">
-        <span class="oh-kanban-card__title">{{details.title|format:instance|selected_format:request.user.employee_get.employee_work_info.company_id|safe}}</span>
-        <div class="" style="display: grid;">{{details.subtitle|format:instance|selected_format:request.user.employee_get.employee_work_info.company_id|safe}}</div>
+        <span class="oh-kanban-card__title">{{details.title|format_attrs:instance|selected_format:request.user.employee_get.employee_work_info.company_id|safe}}</span>
+        <div class="" style="display: grid;">{{details.subtitle|format_attrs:instance|selected_format:request.user.employee_get.employee_work_info.company_id|safe}}</div>
       </div>
       {% if actions %}
       <div class="oh-kanban-card__dots" onclick="event.stopPropagation()">
@@ -86,7 +86,7 @@
                 {% for action in actions %}
                 {% if action.accessibility|accessibility:instance %}
                 <li class="oh-dropdown__item">
-                  <a {{action.attrs|format:instance|safe}}>{{instance|getattribute:action.action|default:action.action}}</a>
+                  <a {{action.attrs|format_attrs:instance|safe}}>{{instance|getattribute:action.action|default:action.action}}</a>
                 </li>
                 {% endif %}
                 {% endfor %}

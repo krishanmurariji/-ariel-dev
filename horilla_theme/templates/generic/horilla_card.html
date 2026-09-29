@@ -28,8 +28,8 @@
                     <div class="grid grid-cols-4 gap-4">
                         {% for instance in queryset %}
                             <div
-                                class="border border-[#ebebeb] p-4 rounded-md shadow-card cursor-pointer {{card_status_class|format:instance|safe}}"
-                                {{card_attrs|format:instance|safe}}
+                                class="border border-[#ebebeb] p-4 rounded-md shadow-card cursor-pointer {{card_status_class|format_attrs:instance|safe}}"
+                                {{card_attrs|format_attrs:instance|safe}}
                             >
                                 {% if custom_body_template %}
                                     <div class="relative h-full">
@@ -49,7 +49,7 @@
                                                                 <li>
                                                                     <p class="w-full text-left px-3 py-1 hover:text-primary-600 transition duration-300">
                                                                         <a
-                                                                            {{action.attrs|format:instance|safe}}
+                                                                            {{action.attrs|format_attrs:instance|safe}}
                                                                         >{{ instance|getattribute:action.action|default:action.action }}</a>
                                                                     </p>
                                                                 </li>
@@ -79,7 +79,7 @@
                                                                 <li>
                                                                     <p class="w-full text-left px-3 py-1 hover:text-primary-600 transition duration-300">
                                                                         <a
-                                                                            {{action.attrs|format:instance|safe}}
+                                                                            {{action.attrs|format_attrs:instance|safe}}
                                                                         >{{ instance|getattribute:action.action|default:action.action }}</a>
                                                                     </p>
                                                                 </li>
@@ -101,10 +101,10 @@
                                         {% endif %}
                                         <div>
                                             <h5 class="mb-1 font-medium text-sm">
-                                                {{ details.title|format:instance|selected_format:request.user.employee_get.employee_work_info.company_id|safe }}
+                                                {{ details.title|format_attrs:instance|selected_format:request.user.employee_get.employee_work_info.company_id|safe }}
                                             </h5>
                                             <div class="text-xs text-[#565E6C] mb-1 grid">
-                                                {{ details.subtitle|format:instance|selected_format:request.user.employee_get.employee_work_info.company_id|safe }}
+                                                {{ details.subtitle|format_attrs:instance|selected_format:request.user.employee_get.employee_work_info.company_id|safe }}
                                             </div>
                                         </div>
                                     </div>

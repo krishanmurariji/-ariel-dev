@@ -5,6 +5,7 @@ onboarding/cbv/pipeline.py
 import json
 import re
 
+from django.utils.html import escape as html_escape
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Count
@@ -644,7 +645,7 @@ class CandidateList(HorillaListView):
                     f"""
                         <div class="group w-full flex items-center justify-between transition duration-300">
                             <span class="px-2 py-1 text-xs">
-                                {task.task_title}
+                                {html_escape(task.task_title)}
                             </span>
                             <div class="hidden group-hover:flex items-center transition duration-300 gap-1 p-1 rounded z-10 bg-white"
                                 onclick="event.stopPropagation()"

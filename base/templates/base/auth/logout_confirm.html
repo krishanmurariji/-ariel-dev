@@ -1,0 +1,21 @@
+{% load static %} {% load i18n %}
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>{% trans "Sign out" %} - {{white_label_company_name}}</title>
+        <link rel="stylesheet" href="{% static '/build/css/style.min.css' %}" />
+    </head>
+    <body>
+        <div style="max-width: 360px; margin: 15vh auto; padding: 0 16px; text-align: center; font-family: sans-serif">
+            <h3>{% trans "Sign out?" %}</h3>
+            <p>{% trans "You will need to sign in again to continue." %}</p>
+            <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Sign out" %}</button>
+                <a href="/" class="oh-btn oh-btn--light">{% trans "Stay signed in" %}</a>
+            </form>
+        </div>
+    </body>
+</html>

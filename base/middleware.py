@@ -2,6 +2,7 @@
 middleware.py
 """
 
+import logging
 from urllib.parse import urlparse
 
 from django.apps import apps
@@ -27,6 +28,8 @@ from employee.models import (
 from horilla.horilla_middlewares import _thread_locals, set_selected_company
 from horilla.methods import get_horilla_model_class
 from horilla_documents.models import DocumentRequest
+
+logger = logging.getLogger(__name__)
 
 CACHE_KEY = "horilla_company_models_cache_key"
 
@@ -391,14 +394,27 @@ class TwoFactorAuthMiddleware:
             return self.get_response(request)
 
         if settings.TWO_FACTORS_AUTHENTICATION:
-            try:
-                if ConfiguredEmailBackend().configuration is not None:
-                    if hasattr(request, "user") and request.user.is_authenticated:
-                        if not request.session.get("otp_code_verified", False):
-                            return redirect("/two-factor")
-                else:
-                    return self.get_response(request)
-            except Exception as e:
-                return self.get_response(request)
+            user = getattr(request, "user", None)
+            if (
+                user is not None
+                and user.is_authenticated
+                and not request.session.get("otp_code_verified", False)
+            ):
+                try:
+                    mail_configured = ConfiguredEmailBackend().configuration is not None
+                except Exception:
+                    # Fail closed: if we cannot tell, keep the check on. Letting
+                    # everyone through on an error would switch 2FA off for
+                    # whoever manages to trigger it.
+                    logger.exception("2FA: could not read the email configuration")
+                    mail_configured = True
+                if mail_configured:
+                    return redirect("/two-factor")
+                # No mail server is set up, so no code could ever be delivered;
+                # enforcing would lock every user out. Say so loudly instead.
+                logger.warning(
+                    "TWO_FACTORS_AUTHENTICATION is on but no outgoing email "
+                    "server is configured, so 2FA is NOT being enforced."
+                )
 
         return self.get_response(request)

@@ -3,6 +3,7 @@ import re
 from datetime import date, datetime, timezone
 
 from dateutil.relativedelta import relativedelta
+from django.utils.html import escape as html_escape
 from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
@@ -711,7 +712,7 @@ class EmployeeKeyResult(models.Model):
         col = f"""
         <span class='d-flex justify-content-between align-items-center'
         >
-            {self.key_result}
+            {html_escape(str(self.key_result))}
             <span title = 'due  {due}'>
                 <ion-icon
                     class="text-{color}"

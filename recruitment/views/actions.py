@@ -6,6 +6,7 @@ This module is used to register methods to delete/archive/un-archive instances
 
 import json
 
+from django.utils.html import escape as html_escape
 from django import template
 from django.contrib import messages
 from django.contrib.auth.models import Permission
@@ -641,7 +642,7 @@ def get_mail_preview(request):
     if candidate_ids and len(candidate_ids) > 1 and candidate_obj:
         rendered_body = (
             f"<p style='color:gray; font-size:13px;'>"
-            f"Preview shown for {candidate_obj.name}. "
+            f"Preview shown for {html_escape(candidate_obj.name)}. "
             f"Mail will be personalized for {len(candidate_ids)} candidates."
             f"</p>{rendered_body}"
         )

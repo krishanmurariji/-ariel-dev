@@ -91,20 +91,45 @@ def safe_eval_gross_formula(expression, monthly_ctc):
     Evaluate a restricted arithmetic formula with the single variable CTC.
     Returns None when the expression is missing or invalid.
     """
-    if not expression or not isinstance(expression, str):
-        return None
+    import ast
+    import operator
     import re
 
+    if not expression or not isinstance(expression, str) or len(expression) > 200:
+        return None
     if not re.fullmatch(r"[0-9+\-*/().\sCTCctc]+", expression):
         return None
     python_expr = re.sub("ctc", "(__ctc)", expression, flags=re.IGNORECASE)
     if re.search(r"[a-zA-Z]", python_expr.replace("__ctc", "")):
         return None
+
+    # Only + - * / , brackets, numbers and CTC are evaluated. Powers (**) are
+    # deliberately not supported: "9**9**9**9" never finishes and freezes the
+    # worker. Nothing else is ever executed - the text is parsed, not run.
+    binary = {
+        ast.Add: operator.add,
+        ast.Sub: operator.sub,
+        ast.Mult: operator.mul,
+        ast.Div: operator.truediv,
+    }
+    unary = {ast.UAdd: operator.pos, ast.USub: operator.neg}
+    ctc = float(monthly_ctc)
+
+    def evaluate(node):
+        if isinstance(node, ast.Constant):
+            if isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
+                return float(node.value)
+            raise ValueError("not a number")
+        if isinstance(node, ast.Name) and node.id == "__ctc":
+            return ctc
+        if isinstance(node, ast.BinOp) and type(node.op) in binary:
+            return binary[type(node.op)](evaluate(node.left), evaluate(node.right))
+        if isinstance(node, ast.UnaryOp) and type(node.op) in unary:
+            return unary[type(node.op)](evaluate(node.operand))
+        raise ValueError("not allowed")
+
     try:
-        value = eval(  # noqa: S307 - input restricted to arithmetic + CTC above
-            python_expr, {"__builtins__": {}}, {"__ctc": float(monthly_ctc)}
-        )
-        return float(value) if isinstance(value, (int, float)) else None
+        return float(evaluate(ast.parse(python_expr.strip(), mode="eval").body))
     except Exception:
         return None
 

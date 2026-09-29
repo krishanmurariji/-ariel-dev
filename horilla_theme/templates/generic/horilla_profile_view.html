@@ -145,7 +145,7 @@
                                             {% if action.accessibility|accessibility:instance %}
                                                 <li role="button">
                                                     <p class="kk-action-link w-[200px] text-dark-600 font-bold text-left text-xs px-3 py-1 transition duration-300">
-                                                        <a {{action.attrs|format:instance|safe}}>
+                                                        <a {{action.attrs|format_attrs:instance|safe}}>
                                                             {{ action.title }}
                                                         </a>
                                                     </p>
@@ -394,7 +394,7 @@
                                                         {% if action.accessibility|accessibility:instance %}
                                                             <li role="button">
                                                                 <p class="w-[200px] text-dark-600 font-bold text-left text-xs px-3 py-1 hover:text-primary-600 transition duration-300">
-                                                                    <a {{action.attrs|format:instance|safe}}>
+                                                                    <a {{action.attrs|format_attrs:instance|safe}}>
                                                                         {{ action.title }}
                                                                     </a>
                                                                 </p>

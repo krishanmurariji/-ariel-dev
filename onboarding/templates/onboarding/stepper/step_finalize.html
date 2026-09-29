@@ -1,3 +1,4 @@
+{% load basefilters %}
 {% load i18n %}
 {% include "onboarding/stepper/_nav.html" %}
 {% include "onboarding/stepper/_messages.html" %}
@@ -43,7 +44,7 @@
         <div class="oh-finalize-card oh-finalize-card--wide">
           <div class="oh-finalize-card__title"><ion-icon name="list-outline"></ion-icon> {% trans "Roles & Responsibility" %}</div>
           {% if detail.roles_responsibilities %}
-          <div class="oh-finalize-card__scroll">{{ detail.roles_responsibilities|safe }}</div>
+          <div class="oh-finalize-card__scroll">{{ detail.roles_responsibilities|sanitize_html }}</div>
           {% else %}
           <p class="oh-text-light m-0">{% trans "No roles & responsibilities written yet." %}</p>
           {% endif %}
