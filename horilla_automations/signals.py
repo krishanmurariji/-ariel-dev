@@ -17,6 +17,7 @@ from django.db.models.query import QuerySet
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 
+from base.methods import build_safe_template_request, sanitize_mail_template_body
 from horilla.background_utils import with_db_cleanup
 from horilla.horilla_middlewares import _thread_locals
 from horilla.signals import post_bulk_update, pre_bulk_update
@@ -517,13 +518,15 @@ def send_mail(request, automation, instance):
                 return
             if template_attachments := automation.template_attachments.all():
                 for template_attachment in template_attachments:
-                    template_bdy = template.Template(template_attachment.body)
+                    template_bdy = template.Template(
+                        sanitize_mail_template_body(template_attachment.body)
+                    )
                     context = template.Context(
                         {
                             "instance": context_instance,
                             "self": sender,
                             "model_instance": instance,
-                            "request": request,
+                            "request": build_safe_template_request(request),
                         }
                     )
                     render_bdy = template_bdy.render(context)
@@ -537,22 +540,26 @@ def send_mail(request, automation, instance):
                         )
                     )
 
-            template_bdy = template.Template(mail_template.body)
+            template_bdy = template.Template(sanitize_mail_template_body(mail_template.body))
         else:
-            template_bdy = template.Template(pk_or_text)
+            template_bdy = template.Template(sanitize_mail_template_body(pk_or_text))
         context = template.Context(
             {
                 "instance": context_instance,
                 "self": sender,
                 "model_instance": instance,
-                "request": request,
+                "request": build_safe_template_request(request),
             }
         )
         render_bdy = template_bdy.render(context)
 
-        title_template = template.Template(automation.title)
+        title_template = template.Template(sanitize_mail_template_body(automation.title))
         title_context = template.Context(
-            {"instance": instance, "self": sender, "request": request}
+            {
+                "instance": instance,
+                "self": sender,
+                "request": build_safe_template_request(request),
+            }
         )
         render_title = title_template.render(title_context)
         soup = BeautifulSoup(render_bdy, "html.parser")

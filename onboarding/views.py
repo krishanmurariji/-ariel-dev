@@ -43,6 +43,7 @@ from base.methods import (
     generate_pdf,
     get_key_instances,
     get_pagination,
+    sanitize_mail_template_body,
     sortby,
 )
 from base.models import HorillaMailTemplate, JobPosition
@@ -1052,7 +1053,7 @@ def email_send(request):
 
         # Generate PDFs
         for html in bodys:
-            template_bdy = template.Template(html)
+            template_bdy = template.Template(sanitize_mail_template_body(html))
             context = template.Context(
                 {"instance": candidate, "self": request.user.employee_get}
             )

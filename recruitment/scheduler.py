@@ -39,15 +39,16 @@ def _send_closing_reminder_mail(rec, template_body, email_backend):
     from django.core.mail import EmailMultiAlternatives
 
     from base.mail_letterhead import attach_letterhead_images, render_letterhead_content
+    from base.methods import sanitize_mail_template_body
 
     heads = rec.recruitment_heads.select_related("employee_work_info")
     to_emails = list(filter(None, {head.get_mail() for head in heads}))
     if not to_emails:
         return
 
-    rendered_body = django_template.Template(template_body).render(
-        django_template.Context({"instance": rec})
-    )
+    rendered_body = django_template.Template(
+        sanitize_mail_template_body(template_body)
+    ).render(django_template.Context({"instance": rec}))
     html_body, company, _has_logo = render_letterhead_content(
         rendered_body, tag_label="Recruitment", team_label="Talent Acquisition Team",
         instance=rec,

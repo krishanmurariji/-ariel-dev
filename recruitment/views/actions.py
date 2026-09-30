@@ -550,7 +550,7 @@ def get_template(request, obj_id=None):
         if not body:
             return JsonResponse({"body": None})
 
-        template_bdy = template.Template(body)
+        template_bdy = template.Template(sanitize_mail_template_body(body))
     if request.GET.get("word"):
         word = request.GET.get("word")
         template_bdy = template.Template("{{" + word + "}}")

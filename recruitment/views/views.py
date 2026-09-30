@@ -53,10 +53,12 @@ from base.mail_letterhead import (
     render_letterhead_content,
 )
 from base.methods import (
+    build_safe_template_request,
     eval_validate,
     export_data,
     generate_pdf,
     get_key_instances,
+    sanitize_mail_template_body,
     sortby,
 )
 from base.models import EmailLog, HorillaMailTemplate, JobPosition, clear_messages
@@ -2829,12 +2831,12 @@ def send_acknowledgement(request):
         )
         for html in bodys:
             # due to not having solid template we first need to pass the context
-            template_bdy = template.Template(html)
+            template_bdy = template.Template(sanitize_mail_template_body(html))
             context = template.Context(
                 {
                     "instance": candidate,
                     "self": request.user.employee_get,
-                    "request": request,
+                    "request": build_safe_template_request(request),
                 }
             )
             render_bdy = template_bdy.render(context)
@@ -2846,12 +2848,12 @@ def send_acknowledgement(request):
                 )
             )
 
-        template_bdy = template.Template(bdy)
+        template_bdy = template.Template(sanitize_mail_template_body(bdy))
         context = template.Context(
             {
                 "instance": candidate,
                 "self": request.user.employee_get,
-                "request": request,
+                "request": build_safe_template_request(request),
             }
         )
         render_bdy = template_bdy.render(context)

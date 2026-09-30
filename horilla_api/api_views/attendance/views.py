@@ -24,7 +24,7 @@ from attendance.views.dashboard import (
 from attendance.views.views import *
 from base.backends import ConfiguredEmailBackend
 from base.mail_letterhead import attach_letterhead_images, render_letterhead_content
-from base.methods import generate_pdf, is_reportingmanager
+from base.methods import generate_pdf, is_reportingmanager, sanitize_mail_template_body
 from base.models import HorillaMailTemplate
 from employee.filters import EmployeeFilter
 
@@ -949,7 +949,7 @@ class ConvertedMailTemplateConvert(APIView):
         employee_id = request.data.get("employee_id", None)
         employee = Employee.objects.filter(id=employee_id).first()
         bdy = HorillaMailTemplate.objects.filter(id=template_id).first()
-        template_bdy = template.Template(bdy.body)
+        template_bdy = template.Template(sanitize_mail_template_body(bdy.body))
         context = template.Context(
             {"instance": employee, "self": request.user.employee_get}
         )
@@ -986,7 +986,7 @@ class OfflineEmployeeMailsend(APIView):
         )
         for html in bodys:
             # due to not having solid template we first need to pass the context
-            template_bdy = template.Template(html)
+            template_bdy = template.Template(sanitize_mail_template_body(html))
             context = template.Context(
                 {"instance": employee, "self": request.user.employee_get}
             )
@@ -999,7 +999,7 @@ class OfflineEmployeeMailsend(APIView):
                 )
             )
 
-        template_bdy = template.Template(bdy)
+        template_bdy = template.Template(sanitize_mail_template_body(bdy))
         context = template.Context(
             {"instance": employee, "self": request.user.employee_get}
         )
