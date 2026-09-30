@@ -977,7 +977,6 @@ def get_model_class(model_path):
     """
     method to return the model class from string 'app.models.Model'
     """
-    module_name, class_name = model_path.rsplit(".", 1)
-    module = __import__(module_name, fromlist=[class_name])
-    model_class: Employee = getattr(module, class_name)
-    return model_class
+    from horilla.methods import get_model_class_from_path
+
+    return get_model_class_from_path(model_path)

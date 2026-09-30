@@ -13,7 +13,6 @@ import pdfkit
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import Group
-from django.contrib.staticfiles import finders
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator
 from django.db import models
@@ -1026,70 +1025,6 @@ def check_owner(employee, instance):
         return employee == instance.employee_id
     except:
         return False
-
-
-def link_callback(uri, rel):
-    """
-    Convert HTML URIs to absolute system paths so xhtml2pdf can access those
-    resources
-    """
-    if not uri.startswith("/static"):
-        return uri
-    uri = "payroll/fonts/Poppins_Regular.ttf"
-    result = finders.find(uri)
-    if result:
-        if not isinstance(result, (list, tuple)):
-            result = [result]
-
-        result = list(os.path.realpath(path) for path in result)
-        path = result[0]
-
-    else:
-        sUrl = settings.STATIC_URL
-        sRoot = settings.STATIC_ROOT
-        mUrl = settings.MEDIA_URL
-        mRoot = settings.MEDIA_ROOT
-
-        if uri.startswith(sUrl):
-            path = os.path.join(sRoot, uri.replace(sUrl, ""))
-        else:
-            return uri
-
-    if os.name == "nt":
-        return uri
-
-    if not os.path.isfile(path):
-        raise RuntimeError("media URI must start with %s or %s" % (sUrl, mUrl))
-    return path
-
-
-# def generate_pdf(template_path, context, path=True, title=None, html=True):
-#     template_path = template_path
-#     context_data = context
-#     title = (
-#         f"""{context_data.get("employee")}'s payslip for {context_data.get("range")}.pdf"""
-#         if not title
-#         else title
-#     )
-#     response = HttpResponse(content_type="application/pdf")
-#     response["Content-Disposition"] = f"attachment; filename={title}"
-
-#     if html:
-#         html = template_path
-#     else:
-#         template = get_template(template_path)
-#         html = template.render(context_data)
-
-#     pisa_status = pisa.CreatePDF(
-#         html.encode("utf-8"),
-#         dest=response,
-#         link_callback=link_callback,
-#     )
-
-#     if pisa_status.err:
-#         return HttpResponse("We had some errors <pre>" + html + "</pre>")
-
-#     return response
 
 
 def generate_pdf(template_path, context, path=True, title=None, html=True):

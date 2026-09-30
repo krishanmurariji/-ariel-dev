@@ -43,7 +43,7 @@ from django.views.decorators.http import require_http_methods
 
 from accessibility.decorators import enter_if_accessible
 from accessibility.methods import update_employee_accessibility_cache
-from accessibility.middlewares import ACCESSIBILITY_CACHE_USER_KEYS
+from accessibility.middlewares import accessibility_cache_key
 from accessibility.models import DefaultAccessibility
 from base.forms import ModelForm
 from base.methods import (
@@ -369,12 +369,9 @@ def profile_edit_access(request, emp_id):
             else:
                 accessibility.employees.add(employee)
 
-            user_cache_key = ACCESSIBILITY_CACHE_USER_KEYS.get(
-                employees.first().employee_user_id.id, None
-            )
-            if user_cache_key:
-                cache.delete(user_cache_key[-1])
-                update_employee_accessibility_cache(user_cache_key[-1], employee)
+            cache_key = accessibility_cache_key(employee.id)
+            cache.delete(cache_key)
+            update_employee_accessibility_cache(cache_key, employee)
 
     return HorillaRedirect(request)
 

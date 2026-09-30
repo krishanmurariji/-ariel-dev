@@ -13,7 +13,6 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.utils import NestedObjects
-from django.contrib.staticfiles import finders
 from django.core.cache import cache as CACHE
 from django.core.exceptions import FieldDoesNotExist
 from django.db import connection, router
@@ -912,52 +911,9 @@ def get_model_class(model_path):
     """
     method to return the model class from string 'app.models.Model'
     """
-    module_name, class_name = model_path.rsplit(".", 1)
-    module = __import__(module_name, fromlist=[class_name])
-    model_class = getattr(module, class_name)
-    return model_class
+    from horilla.methods import get_model_class_from_path
 
-
-def link_callback(uri, rel):
-    """
-    Convert html URIs to absolute system paths so xhtml2pdf can access them.
-    Called by pisa.CreatePDF(..., link_callback=link_callback)
-    """
-    # If absolute URL (http/https/file) return as-is
-    if (
-        uri.startswith("http://")
-        or uri.startswith("https://")
-        or uri.startswith("file://")
-    ):
-        return uri
-
-    # Try static files first
-    static_path = None
-    if uri.startswith(settings.STATIC_URL):
-        # remove STATIC_URL prefix
-        rel_path = uri.replace(settings.STATIC_URL, "")
-        # find with staticfiles finders
-        found = finders.find(rel_path)
-        if found:
-            static_path = found
-
-    # Try media files next
-    media_path = None
-    if uri.startswith(settings.MEDIA_URL):
-        rel_path = uri.replace(settings.MEDIA_URL, "")
-        media_path = os.path.join(settings.MEDIA_ROOT, rel_path)
-
-    # If a path found, return it
-    for path in (static_path, media_path, uri):
-        if path and os.path.exists(path):
-            return path
-
-    # Last resort: maybe it's relative to your project root
-    project_path = os.path.join(settings.BASE_DIR, uri)
-    if os.path.exists(project_path):
-        return project_path
-
-    raise Exception("File not found for URI: %s" % uri)
+    return get_model_class_from_path(model_path)
 
 
 def reshape_text(text):

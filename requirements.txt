@@ -2,7 +2,7 @@ APScheduler
 arabic-reshaper
 asgiref
 asn1crypto
-bs4
+beautifulsoup4==4.15.0
 bleach
 certifi
 cffi
@@ -43,7 +43,6 @@ lxml
 numpy
 oauthlib
 openpyxl
-oscrypto
 pandas
 pdfkit
 pillow
@@ -61,7 +60,6 @@ pyzk==0.9
 qrcode
 reportlab==4.0.9
 requests
-responses
 setuptools
 six
 sqlparse
@@ -73,7 +71,6 @@ tzdata
 tzlocal
 uritools
 urllib3
-utils
 uvicorn[standard]
 webencodings
 xhtml2pdf

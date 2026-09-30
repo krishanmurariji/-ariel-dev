@@ -248,6 +248,13 @@ class CompanyMiddleware:
     def _set_company_session(self, request, company_id):
         """
         Set the company session data based on the company ID.
+
+        Only actually writes to request.session when a value has changed -
+        Django marks the session modified (and so saves a row to the
+        session store) the moment anything is assigned into it, even the
+        exact value that was already there, so assigning unconditionally on
+        every single authenticated request meant a session write on every
+        single authenticated request.
         """
         try:
             user = request.user.employee_get
@@ -270,8 +277,8 @@ class CompanyMiddleware:
                 text = "Other Company"
 
             request.selected_company_instance = company_id
-            request.session["selected_company"] = str(company_id.id)
-            request.session["selected_company_instance"] = {
+            new_selected_company = str(company_id.id)
+            new_selected_company_instance = {
                 "company": company_id.company,
                 "icon": company_id.icon.url,
                 "text": text,
@@ -283,14 +290,19 @@ class CompanyMiddleware:
                 if not user_company_id
                 else Company.objects.filter(hq=True).first()
             )
-            request.session["selected_company"] = "all"
+            new_selected_company = "all"
             all_company = AllCompany()
-            request.session["selected_company_instance"] = {
+            new_selected_company_instance = {
                 "company": all_company.company,
                 "icon": all_company.icon.url,
                 "text": all_company.text,
                 "id": all_company.id,
             }
+
+        if request.session.get("selected_company") != new_selected_company:
+            request.session["selected_company"] = new_selected_company
+        if request.session.get("selected_company_instance") != new_selected_company_instance:
+            request.session["selected_company_instance"] = new_selected_company_instance
 
     def __call__(self, request):
         # ✅ make request globally accessible (safe)
@@ -303,12 +315,16 @@ class CompanyMiddleware:
         selected_company = request.session.get("selected_company")
 
         # --- Determine company ---
+        # A specific company id is looked up at most once below (was two
+        # identical queries: an .exists() check here, then .first() again a
+        # few lines later inside _get_company_obj for that same id).
+        selected_company_row = None
         if selected_company == "all":
             company_id = "all"
 
         elif selected_company:
-            company_exists = Company.objects.filter(id=selected_company).exists()
-            company_id = selected_company if company_exists else None
+            selected_company_row = Company.objects.filter(id=selected_company).first()
+            company_id = selected_company if selected_company_row else None
 
         else:
             # First login or session expired → set user's own company
@@ -322,7 +338,11 @@ class CompanyMiddleware:
 
         # ✅ Store in context
         set_selected_company(company_id)
-        company_obj = self._get_company_obj(request, company_id)
+        company_obj = (
+            selected_company_row
+            if selected_company_row is not None
+            else self._get_company_obj(request, company_id)
+        )
         self._set_company_session(request, company_obj)
 
         return self.get_response(request)

@@ -1,6 +1,7 @@
 import contextlib
 import importlib
 
+from django.apps import apps
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
@@ -9,6 +10,34 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext as _
 
 from horilla_auth.models import HorillaUser
+
+
+def get_model_class_from_path(model_path):
+    """
+    Resolves a "app_label.models.ClassName"-style dotted path (how a model
+    choice gets stored on HorillaAutomation.model, DynamicField.model, ...)
+    to the real model class.
+
+    Deliberately goes through apps.get_model(app_label, model_name) rather
+    than the __import__(module_name, fromlist=[class_name]) every one of the
+    4 copies of this used to do: that imported and returned *any* Python
+    object reachable by that dotted path - not necessarily a Django model
+    at all - since the whole point of these fields is to let an app's own
+    admin/config screens choose the model, that was a live way for someone
+    with just automation/dynamic-field edit permission (not necessarily a
+    superuser) to make the server import and inspect an arbitrary installed
+    module. apps.get_model() can only ever resolve to a model that is
+    genuinely registered with Django, and needs no database query (unlike
+    ContentType-based lookups such as get_horilla_model_class above).
+
+    Raises LookupError (via apps.get_model) if the path doesn't name a real,
+    installed model - exactly the same failure mode __import__ raising
+    ModuleNotFoundError/AttributeError produced before, just for a stricter,
+    safer reason.
+    """
+    module_name, class_name = model_path.rsplit(".", 1)
+    app_label = module_name.split(".")[0]
+    return apps.get_model(app_label, class_name)
 
 
 def get_horilla_model_class(app_label, model):

@@ -38,10 +38,9 @@ def generate_choices(model_path):
     """
     Generate mail to choice
     """
-    module_name, class_name = model_path.rsplit(".", 1)
+    from horilla.methods import get_model_class_from_path
 
-    module = __import__(module_name, fromlist=[class_name])
-    model_class: Employee = getattr(module, class_name)
+    model_class = get_model_class_from_path(model_path)
 
     # Get relations to Employee
     employee_fk_paths, employee_m2m_paths = get_forward_relation_paths_separated(
@@ -175,10 +174,9 @@ def get_model_class(model_path):
     """
     method to return the model class from string 'app.models.Model'
     """
-    module_name, class_name = model_path.rsplit(".", 1)
-    module = __import__(module_name, fromlist=[class_name])
-    model_class: Employee = getattr(module, class_name)
-    return model_class
+    from horilla.methods import get_model_class_from_path
+
+    return get_model_class_from_path(model_path)
 
 
 operator_map = {

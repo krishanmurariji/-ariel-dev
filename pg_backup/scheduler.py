@@ -107,7 +107,11 @@ else:
         backup_file = BACKUP_DIR / f"{DB_NAME}_backup_{timestamp}.sql"
 
         os.makedirs(BACKUP_DIR, exist_ok=True)
-        os.environ["PGPASSWORD"] = DB_PASSWORD
+        # Passed via this subprocess's own env, not os.environ - mutating the
+        # whole process's environment let two backups running close together
+        # (this scheduler firing while a manual backup is mid-dump, say)
+        # overwrite or clear each other's password out from under them.
+        env = {**os.environ, "PGPASSWORD": DB_PASSWORD}
 
         command = [
             shutil.which("pg_dump"),
@@ -128,12 +132,10 @@ else:
 
         try:
             logger.info("Starting backup: %s", backup_file)
-            subprocess.run(command, check=True)
+            subprocess.run(command, check=True, env=env)
             logger.info("Backup successful: %s", backup_file)
         except subprocess.CalledProcessError as e:
             logger.error("Backup failed: %s", e)
-        finally:
-            os.environ.pop("PGPASSWORD", None)
 
     def start():
         """
