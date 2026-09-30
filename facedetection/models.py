@@ -6,6 +6,8 @@ from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 
+from horilla.models import sensitive_upload_path
+
 # Create your models here.
 
 
@@ -47,7 +49,7 @@ class EmployeeFaceDetection(models.Model):
     employee_id = models.OneToOneField(
         "employee.Employee", related_name="face_detection", on_delete=models.CASCADE
     )
-    image = models.ImageField()
+    image = models.ImageField(upload_to=sensitive_upload_path)
 
 
 @receiver(post_delete, sender=EmployeeFaceDetection)

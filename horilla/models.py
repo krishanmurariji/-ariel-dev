@@ -66,15 +66,7 @@ def has_xss(value: str) -> bool:
     return bool(combined.search(value) or combined.search(decoded))
 
 
-def upload_path(instance, filename):
-    """
-    Generates a unique file path for uploads in the format:
-    app_label/model_name/field_name/originalfilename-uuid.ext
-    """
-    ext = filename.split(".")[-1]
-    base_name = ".".join(filename.split(".")[:-1]) or "file"
-    unique_name = f"{slugify(base_name)}-{uuid4().hex[:8]}.{ext}"
-
+def _upload_folder(instance, filename):
     # Try to find which field is uploading this file
     field_name = next(
         (
@@ -89,8 +81,32 @@ def upload_path(instance, filename):
     model_name = instance._meta.model_name
 
     if field_name:
-        return f"{app_label}/{model_name}/{field_name}/{unique_name}"
-    return f"{app_label}/{model_name}/{unique_name}"
+        return f"{app_label}/{model_name}/{field_name}"
+    return f"{app_label}/{model_name}"
+
+
+def upload_path(instance, filename):
+    """
+    Generates a unique file path for uploads in the format:
+    app_label/model_name/field_name/originalfilename-uuid.ext
+    """
+    ext = filename.split(".")[-1]
+    base_name = ".".join(filename.split(".")[:-1]) or "file"
+    unique_name = f"{slugify(base_name)}-{uuid4().hex[:8]}.{ext}"
+    return f"{_upload_folder(instance, filename)}/{unique_name}"
+
+
+def sensitive_upload_path(instance, filename):
+    """
+    Same layout as upload_path, but for uploads where even a slugified
+    original filename would leak something to anyone who saw a leaked
+    URL - whose ID document this is, what a credential file is for, whose
+    offer letter. Keeps only the extension; the name is a full,
+    unguessable UUID with no trace of the original filename.
+    """
+    ext = filename.split(".")[-1] if "." in filename else "bin"
+    unique_name = f"{uuid4().hex}.{ext}"
+    return f"{_upload_folder(instance, filename)}/{unique_name}"
 
 
 class HorillaModel(models.Model, metaclass=HorillaModelBase):

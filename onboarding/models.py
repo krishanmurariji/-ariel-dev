@@ -20,7 +20,7 @@ from django.utils.translation import gettext_lazy as _
 from base.horilla_company_manager import HorillaCompanyManager
 from base.models import Company, Department, EmployeeShift, EmployeeType, JobRole, WorkType
 from employee.models import Employee
-from horilla.models import HorillaModel
+from horilla.models import HorillaModel, sensitive_upload_path, upload_path
 from horilla_audit.models import HorillaAuditInfo, HorillaAuditLog
 from horilla_views.cbv_methods import render_template
 from recruitment.models import Candidate, Recruitment
@@ -286,7 +286,7 @@ class OnboardingPortal(HorillaModel):
     token = models.CharField(max_length=200)
     used = models.BooleanField(default=False)
     count = models.IntegerField(default=0)
-    profile = models.ImageField(upload_to="employee/profile", null=True, blank=True)
+    profile = models.ImageField(upload_to=upload_path, null=True, blank=True)
     objects = HorillaCompanyManager("candidate_id__recruitment_id__company_id")
 
     def __str__(self):
@@ -581,7 +581,7 @@ class OnboardingCandidateDetail(HorillaModel):
         verbose_name=_("Employee Type"),
     )
     offer_letter = models.FileField(
-        upload_to="onboarding/offer_letters",
+        upload_to=sensitive_upload_path,
         null=True,
         blank=True,
         verbose_name=_("Offer Letter"),

@@ -1,6 +1,8 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from horilla.models import sensitive_upload_path
+
 # Create your models here.
 
 
@@ -43,7 +45,7 @@ class LocalBackup(models.Model):
 
 class GoogleDriveBackup(models.Model):
     service_account_file = models.FileField(
-        upload_to="gdrive_service_account_file",
+        upload_to=sensitive_upload_path,
         verbose_name=_("Service Account File"),
         blank=True,
         null=True,
