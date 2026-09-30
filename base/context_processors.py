@@ -51,25 +51,46 @@ def get_last_section(path):
 
 def get_companies(request):
     """
-    This method will return the history additional field form
+    Company list for the sidebar's company switcher. Only a user who can
+    actually change the active company (base.change_company - the same
+    permission update_selected_company below already requires to act on
+    a selection) gets the full list plus the "All Company" entry; anyone
+    else sees just their own assigned company, if any - not every
+    company in the system, which used to be shown regardless of
+    permission (so any employee, viewing any company's name/logo,
+    including ones they have no relationship to).
     """
-    companies = list(
-        [company.id, company.company, company.icon.url, False]
-        for company in Company.objects.all()
-    )
-    companies = [
-        [
-            "all",
-            "All Company",
-            "https://ui-avatars.com/api/?name=All+Company&background=random",
-            False,
-        ],
-    ] + companies
+    if request.user.is_authenticated and request.user.has_perm("base.change_company"):
+        companies = list(
+            [company.id, company.company, company.icon.url, False]
+            for company in Company.objects.all()
+        )
+        companies = [
+            [
+                "all",
+                "All Company",
+                "https://ui-avatars.com/api/?name=All+Company&background=random",
+                False,
+            ],
+        ] + companies
+    else:
+        own_company = None
+        if request.user.is_authenticated:
+            work_info = getattr(
+                getattr(request.user, "employee_get", None), "employee_work_info", None
+            )
+            own_company = getattr(work_info, "company_id", None)
+        companies = (
+            [[own_company.id, own_company.company, own_company.icon.url, False]]
+            if own_company
+            else []
+        )
     selected_company = request.session.get("selected_company")
     company_selected = False
     if selected_company and selected_company == "all":
-        companies[0][3] = True
-        company_selected = True
+        if companies and companies[0][0] == "all":
+            companies[0][3] = True
+            company_selected = True
     else:
         for company in companies:
             if str(company[0]) == selected_company:
