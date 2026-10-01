@@ -57,6 +57,22 @@ env.read_env(os.path.join(BASE_DIR, ".env"), overwrite=True)
 #     importing settings) if either is missing.
 DEBUG = env.bool("DEBUG", default=False)
 SECRET_KEY = env("SECRET_KEY")
+
+# Key(s) used to encrypt stored credentials (SMTP/LDAP passwords, OAuth
+# secrets, biometric API keys - see horilla/crypto_fields.py), kept
+# separate from SECRET_KEY so the two can be rotated independently.
+# Not set here: falls back, with zero config change required, to the
+# exact same key EncryptedTextField has always implicitly derived from
+# SECRET_KEY - every already-encrypted row keeps decrypting unchanged.
+# To actually rotate: generate a new key (Fernet.generate_key()), set
+# FIELD_ENCRYPTION_KEYS to "<new key>,<this fallback key>" (comma-
+# separated, newest first - get the exact fallback value by printing
+# horilla.crypto_fields._legacy_key() once on the current deployment),
+# deploy, run a one-off script that re-saves every encrypted row so it
+# re-encrypts under the new key, then drop the old key from the list on
+# a later deploy once that's confirmed done.
+FIELD_ENCRYPTION_KEYS = env.list("FIELD_ENCRYPTION_KEYS", default=None)
+
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
 
 # Belt-and-braces: even with ALLOWED_HOSTS set, refuse to start with a

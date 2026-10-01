@@ -14,19 +14,37 @@ import hashlib
 import json
 import logging
 
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from django.conf import settings
 from django.db import models
 
 logger = logging.getLogger(__name__)
 
 
-def _get_fernet() -> Fernet:
-    # Derived from SECRET_KEY so this needs no extra key to manage or
-    # rotate separately - same tradeoff Django already makes for signed
-    # cookies/sessions: rotating SECRET_KEY invalidates old ciphertext too.
+def _legacy_key() -> str:
+    """
+    The single key every EncryptedTextField value has always implicitly
+    been encrypted with: SHA256(SECRET_KEY), base64-encoded. Kept as its
+    own function (rather than inlined) so a deployment that wants to
+    start rotating keys can print this once to get the exact value to
+    include as its fallback entry in FIELD_ENCRYPTION_KEYS - see that
+    setting's docstring in horilla/settings/base.py.
+    """
     digest = hashlib.sha256(settings.SECRET_KEY.encode()).digest()
-    return Fernet(base64.urlsafe_b64encode(digest))
+    return base64.urlsafe_b64encode(digest).decode()
+
+
+def _get_fernet() -> MultiFernet:
+    # MultiFernet encrypts with the FIRST key in the list but can decrypt
+    # with ANY key in it - that's what makes rotation possible: add a new
+    # key to the front, let old ciphertext keep decrypting under the keys
+    # after it, re-encrypt everything at your own pace, then drop the old
+    # key once nothing depends on it any more. FIELD_ENCRYPTION_KEYS is
+    # unset by default, which keeps current behavior unchanged (the one
+    # key every row has always been encrypted with) until a deployment
+    # opts into an explicit key list.
+    keys = settings.FIELD_ENCRYPTION_KEYS or [_legacy_key()]
+    return MultiFernet([Fernet(key) for key in keys])
 
 
 class EncryptedTextField(models.TextField):
