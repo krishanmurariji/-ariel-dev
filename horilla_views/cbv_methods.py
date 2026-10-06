@@ -275,7 +275,13 @@ def check_feature_enabled(function, feature_name, model_class: models.Model):
     """
 
     def _function(self, request, *args, **kwargs):
-        general_setting = model_class.objects.first()
+        # A settings model can define for_request() to say which row applies
+        # to this request (see OffboardingGeneralSetting); otherwise fall
+        # back to the first row.
+        resolver = getattr(model_class, "for_request", None)
+        general_setting = (
+            resolver(request) if resolver else model_class.objects.first()
+        )
         enabled = getattr(general_setting, feature_name, False)
         if enabled:
             return function(self, request, *args, **kwargs)

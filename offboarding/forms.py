@@ -5,6 +5,7 @@ This module is used to register forms for offboarding app
 """
 
 import contextlib
+from datetime import date
 from typing import Any
 
 import bleach
@@ -12,13 +13,17 @@ from bleach.css_sanitizer import CSSSanitizer
 from django import forms
 from django.contrib import messages
 from django.template.loader import render_to_string
+from django.utils.html import escape, linebreaks
 from django.utils.translation import gettext_lazy as _
 
 from base.forms import ModelForm
 from employee.forms import MultipleFileField
 from employee.models import Employee
 from horilla import horilla_middlewares
+from horilla.models import has_xss
 from notifications.signals import notify
+from offboarding.exit_policy import notice_period_days, notice_period_end
+from offboarding.mailers import notify_manager_of_resignation
 from offboarding.models import (
     EmployeeTask,
     Offboarding,
@@ -280,7 +285,18 @@ class ResignationLetterForm(ModelForm):
     class Meta:
         model = ResignationLetter
         fields = "__all__"
-        exclude = ["is_active"]
+        # The fields below belong to the employee's own "Resign from job"
+        # form (SelfResignationForm) - not part of the HR form.
+        exclude = [
+            "is_active",
+            "reason",
+            "discussed_with_manager",
+            "discussion_summary",
+            "preferred_last_working_day",
+            "notice_period_days",
+            "notice_period_ends",
+            "additional_comment",
+        ]
 
     def clean_description(self):
         description = self.cleaned_data.get("description")
@@ -366,3 +382,174 @@ class ResignationLetterForm(ModelForm):
                     icon="information",
                 )
         return instance
+
+
+class SelfResignationForm(ModelForm):
+    """
+    The employee's own "Resign from job" form. It always files the resignation
+    for the logged-in employee - there is no employee field to tamper with -
+    and records why they are leaving, whether they spoke to their manager, and
+    any preference for an earlier last working day than the notice period
+    ends. Saving it also tells their reporting manager (in-app and by email).
+    """
+
+    verbose_name = _("Resign from job")
+    YES_NO = [("yes", _("Yes")), ("no", _("No"))]
+
+    class Meta:
+        model = ResignationLetter
+        fields = []
+
+    discussed_with_manager = forms.ChoiceField(
+        label=_("Did you have discussion with manager on your decision to exit?"),
+        choices=YES_NO,
+        initial="yes",
+        widget=forms.RadioSelect,
+    )
+    discussion_summary = forms.CharField(
+        label=_("Please write the summary of your discussion"),
+        required=False,
+        max_length=2000,
+        widget=forms.Textarea(attrs={"rows": 3, "placeholder": _("Type here")}),
+    )
+    reason = forms.ChoiceField(
+        label=_("Please select a reason for your resignation"),
+        choices=[("", _("Select reason"))] + ResignationLetter.reasons,
+        error_messages={"required": _("Resignation reason is required")},
+    )
+    early_last_working_day = forms.ChoiceField(
+        label=_("Any preference of an early last working day?"),
+        required=False,
+        choices=YES_NO,
+        initial="no",
+        widget=forms.RadioSelect,
+    )
+    preferred_last_working_day = forms.DateField(
+        label=_("Last working day"),
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+        input_formats=["%Y-%m-%d"],
+    )
+    additional_comment = forms.CharField(
+        label=_("Additional comment"),
+        required=False,
+        max_length=2000,
+        widget=forms.Textarea(attrs={"rows": 3, "placeholder": _("Type here")}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(horilla_middlewares._thread_locals, "request", None)
+        self.employee = request.user.employee_get
+        # Binds the letter to the employee up front so the model's own
+        # "already has a pending/approved resignation" check reports as a
+        # normal form error instead of failing later at save time.
+        self.instance.employee_id = self.employee
+
+        self.today = date.today()
+        self.notice_days = notice_period_days(self.employee)
+        self.notice_end = notice_period_end(self.notice_days, self.today)
+        # With no notice policy to default to, the employee has to say when
+        # they want to leave - there is no "early" about it.
+        self.date_is_mandatory = self.notice_end is None
+        self.fields["preferred_last_working_day"].initial = None
+
+    def _reject_script_like_text(self, name):
+        # The model layer refuses script-like text outright (has_xss) and
+        # would raise at save time - catch it here so the employee gets a
+        # normal message next to the field instead of a bare error page.
+        value = self.cleaned_data.get(name) or ""
+        if has_xss(value):
+            raise forms.ValidationError(
+                _(
+                    "This text contains content that is not allowed (such as "
+                    "script tags or event handlers). Please remove it."
+                )
+            )
+        return value
+
+    def clean_discussion_summary(self):
+        return self._reject_script_like_text("discussion_summary")
+
+    def clean_additional_comment(self):
+        return self._reject_script_like_text("additional_comment")
+
+    def clean(self):
+        cleaned = super().clean()
+
+        if cleaned.get("discussed_with_manager") == "yes" and not (
+            cleaned.get("discussion_summary") or ""
+        ).strip():
+            self.add_error("discussion_summary", _("Summary is required"))
+
+        wants_date = (
+            self.date_is_mandatory or cleaned.get("early_last_working_day") == "yes"
+        )
+        chosen = cleaned.get("preferred_last_working_day")
+        if wants_date:
+            if not chosen:
+                if "preferred_last_working_day" not in self.errors:
+                    self.add_error(
+                        "preferred_last_working_day", _("Please select a date")
+                    )
+            elif chosen < self.today:
+                self.add_error(
+                    "preferred_last_working_day",
+                    _("The last working day cannot be in the past"),
+                )
+            elif self.notice_end and chosen > self.notice_end:
+                self.add_error(
+                    "preferred_last_working_day",
+                    _("Please choose a date on or before %(date)s")
+                    % {"date": self.notice_end.strftime("%d %b %Y")},
+                )
+        else:
+            cleaned["preferred_last_working_day"] = None
+        return cleaned
+
+    def save(self, commit=True):
+        data = self.cleaned_data
+        letter = self.instance
+        employee = self.employee
+        discussed = data["discussed_with_manager"] == "yes"
+        preferred = data.get("preferred_last_working_day")
+
+        letter.employee_id = employee
+        letter.title = f"Resignation - {employee.get_full_name()}"[:100]
+        letter.reason = data["reason"]
+        letter.discussed_with_manager = discussed
+        letter.discussion_summary = (data.get("discussion_summary") or "") if discussed else ""
+        letter.preferred_last_working_day = preferred
+        letter.notice_period_days = self.notice_days
+        letter.notice_period_ends = self.notice_end
+        letter.additional_comment = data.get("additional_comment") or ""
+        letter.planned_to_leave_on = preferred or self.notice_end
+        # Shown in the Resignations list/detail, which render a free-text
+        # description - the employee's own comment, or failing that a line
+        # naming the reason, so it is never blank.
+        letter.description = linebreaks(
+            escape(letter.additional_comment)
+            or escape(
+                _("Resigning - reason: %(reason)s")
+                % {"reason": letter.get_reason_col()}
+            )
+        )
+        letter.status = "requested"
+        letter.save()
+
+        manager = employee.get_reporting_manager()
+        if manager and manager.employee_user_id:
+            with contextlib.suppress(Exception):
+                notify.send(
+                    employee,
+                    recipient=manager.employee_user_id,
+                    verb=f"{employee.get_full_name()} requested for resignation.",
+                    verb_ar="",
+                    verb_de="",
+                    verb_es="",
+                    verb_fr="",
+                    redirect="#",
+                    icon="information",
+                )
+        self.manager_mailed = notify_manager_of_resignation(letter)
+        return letter

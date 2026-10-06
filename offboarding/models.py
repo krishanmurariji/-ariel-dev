@@ -382,9 +382,56 @@ class ResignationLetter(HorillaModel):
     offboarding_employee_id = models.ForeignKey(
         OffboardingEmployee, on_delete=models.CASCADE, editable=False, null=True
     )
+
+    reasons = [
+        ("explore_other_careers", _("Explore Other Careers")),
+        ("other", _("Other")),
+        ("personal_reasons", _("Personal Reasons")),
+        ("relocating", _("Relocating")),
+        ("resignation", _("Resignation")),
+        ("retirement", _("Retirement")),
+    ]
+    # Captured by the employee's own "Resign from job" form. Blank/NULL on
+    # letters created any other way (HR creating one for someone, older rows).
+    reason = models.CharField(
+        max_length=30, choices=reasons, blank=True, default="", verbose_name=_("Reason")
+    )
+    discussed_with_manager = models.BooleanField(
+        null=True, blank=True, verbose_name=_("Discussed with manager")
+    )
+    discussion_summary = models.TextField(
+        blank=True, default="", verbose_name=_("Discussion summary")
+    )
+    preferred_last_working_day = models.DateField(
+        null=True, blank=True, verbose_name=_("Preferred last working day")
+    )
+    # Snapshot of the notice-period policy at the moment of submission, so
+    # the request keeps saying what the employee was told even if the policy
+    # is changed later.
+    notice_period_days = models.PositiveIntegerField(null=True, blank=True)
+    notice_period_ends = models.DateField(
+        null=True, blank=True, verbose_name=_("Notice period ends")
+    )
+    additional_comment = models.TextField(
+        blank=True, default="", verbose_name=_("Additional comment")
+    )
     objects = HorillaCompanyManager(
         related_company_field="employee_id__employee_work_info__company_id"
     )
+
+    def get_reason_col(self):
+        return dict(self.reasons).get(self.reason) or "—"
+
+    def get_discussion_col(self):
+        if self.discussed_with_manager is None:
+            return "—"
+        return _("Yes") if self.discussed_with_manager else _("No")
+
+    def get_preferred_lwd_col(self):
+        return self.preferred_last_working_day or "—"
+
+    def get_notice_end_col(self):
+        return self.notice_period_ends or "—"
 
     def get_status(self):
         """
@@ -687,3 +734,28 @@ class OffboardingGeneralSetting(HorillaModel):
     resignation_request = models.BooleanField(default=False)
     company_id = models.ForeignKey(Company, on_delete=models.CASCADE, null=True)
     objects = HorillaCompanyManager("company_id")
+
+    @classmethod
+    def for_request(cls, request):
+        """
+        The one settings row that governs this request: the selected
+        company's own row if there is one, otherwise the global (no-company)
+        row. "All Company" mode means the global row.
+
+        Every feature-flag gate and the admin toggle go through this, so
+        they can never disagree about whether the feature is on - the
+        tab, the Create form and the toggle used to each look the row up
+        differently (first row / company-or-global / global only).
+        """
+        session = getattr(request, "session", None)
+        selected = session.get("selected_company") if session is not None else None
+        rows = cls.objects.entire().order_by("pk")
+        if selected and str(selected).isdigit():
+            row = rows.filter(company_id=selected).first()
+            if row is not None:
+                return row
+        return rows.filter(company_id__isnull=True).first()
+
+    @classmethod
+    def resignation_enabled_for(cls, request):
+        return bool(getattr(cls.for_request(request), "resignation_request", False))

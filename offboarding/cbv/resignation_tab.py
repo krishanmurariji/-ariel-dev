@@ -9,9 +9,23 @@ from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 
 from employee.cbv.employee_profile import EmployeeProfileView
+from horilla.methods import handle_no_permission
 from horilla_views.cbv_methods import check_feature_enabled, login_required
 from offboarding.cbv.resignation import ResignationLetterDetailView, ResignationListView
-from offboarding.models import OffboardingGeneralSetting
+from offboarding.models import OffboardingGeneralSetting, ResignationLetter
+
+
+def may_view_letters_of(request, employee_pk):
+    """
+    The profile tab is for the employee's own resignation; anyone else needs
+    the real view permission (the same one the main Resignations list
+    requires). Hiding the tab for other people's profiles isn't enough - the
+    URL behind it takes any employee id.
+    """
+    if request.user.has_perm("offboarding.view_resignationletter"):
+        return True
+    own = getattr(request.user, "employee_get", None)
+    return own is not None and str(own.pk) == str(employee_pk)
 
 
 # @method_decorator(check_feature_enabled("resignation_request", OffboardingGeneralSetting), name="dispatch")
@@ -36,6 +50,8 @@ class ResignationTabView(ResignationListView):
         name="dispatch",
     )
     def dispatch(self, *args, **kwargs):
+        if not may_view_letters_of(self.request, self.kwargs.get("pk")):
+            return handle_no_permission(self.request)
         return super(ResignationListView, self).dispatch(*args, **kwargs)
 
     def get_context_data(self, **kwargs: Any):
@@ -69,6 +85,14 @@ class ResignationTabDetailView(ResignationLetterDetailView):
         name="dispatch",
     )
     def dispatch(self, *args, **kwargs):
+        owner_pk = (
+            ResignationLetter.objects.entire()
+            .filter(pk=self.kwargs.get("pk"))
+            .values_list("employee_id", flat=True)
+            .first()
+        )
+        if owner_pk is not None and not may_view_letters_of(self.request, owner_pk):
+            return handle_no_permission(self.request)
         return super(ResignationLetterDetailView, self).dispatch(*args, **kwargs)
 
     def __init__(self, **kwargs: Any) -> None:

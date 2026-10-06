@@ -25,7 +25,7 @@ from horilla_views.generic.cbv.views import (
     TemplateView,
 )
 from offboarding.filters import LetterFilter
-from offboarding.forms import ResignationLetterForm
+from offboarding.forms import ResignationLetterForm, SelfResignationForm
 from offboarding.models import Offboarding, OffboardingGeneralSetting, ResignationLetter
 
 
@@ -156,16 +156,7 @@ class ResinationLettersNav(HorillaNavView):
         self.search_url = reverse("list-resignation-request")
         request = self.request
         if request:
-            selected_company = request.session.get("selected_company")
-            if selected_company and selected_company != "all":
-                general_setting = OffboardingGeneralSetting.objects.filter(
-                    company_id=selected_company
-                ).first()
-            else:
-                general_setting = OffboardingGeneralSetting.objects.filter(
-                    company_id=None
-                ).first()
-            feature_enabled = getattr(general_setting, "resignation_request", False)
+            feature_enabled = OffboardingGeneralSetting.resignation_enabled_for(request)
             if not feature_enabled and not request.user.is_superuser:
                 can_create = False
             else:
@@ -213,16 +204,7 @@ class ResignationLettersFormView(HorillaFormView):
     new_display_title = _("Create Resignation Letter")
 
     def dispatch(self, request, *args, **kwargs):
-        selected_company = request.session.get("selected_company")
-        if selected_company and selected_company != "all":
-            general_setting = OffboardingGeneralSetting.objects.filter(
-                company_id=selected_company
-            ).first()
-        else:
-            general_setting = OffboardingGeneralSetting.objects.filter(
-                company_id=None
-            ).first()
-        feature_enabled = getattr(general_setting, "resignation_request", False)
+        feature_enabled = OffboardingGeneralSetting.resignation_enabled_for(request)
         if not feature_enabled and not request.user.is_superuser:
             can_create = False
         else:
@@ -262,6 +244,35 @@ class ResignationLettersFormView(HorillaFormView):
 
 
 @method_decorator(login_required, name="dispatch")
+class SelfResignationFormView(ResignationLettersFormView):
+    """
+    The employee's own "Resign from job" modal: files a resignation for
+    whoever is logged in (never anyone else), with the exit details Keka-style
+    exit flows ask for, and tells their reporting manager by email.
+    """
+
+    form_class = SelfResignationForm
+    template_name = "offboarding/resignation/self_form.html"
+    new_display_title = _("Resign from job")
+
+    def dispatch(self, request, *args, **kwargs):
+        if getattr(request.user, "employee_get", None) is None:
+            return handle_no_permission(request)
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form: SelfResignationForm) -> HttpResponse:
+        form.save()
+        if form.manager_mailed:
+            messages.success(
+                self.request,
+                _("Your resignation has been submitted and your reporting manager has been informed."),
+            )
+        else:
+            messages.success(self.request, _("Your resignation has been submitted."))
+        return self.HttpResponse()
+
+
+@method_decorator(login_required, name="dispatch")
 @method_decorator(
     permission_required("offboarding.view_resignationletter"), name="dispatch"
 )
@@ -291,6 +302,10 @@ class ResignationLetterDetailView(HorillaDetailedView):
     body = [
         (_("Planned To Leave"), "planned_to_leave_on"),
         (_("Status"), "get_status_badge"),
+        (_("Reason"), "get_reason_col"),
+        (_("Discussed with manager"), "get_discussion_col"),
+        (_("Preferred last working day"), "get_preferred_lwd_col"),
+        (_("Notice period ends"), "get_notice_end_col"),
         (_("Description"), "detail_description_col"),
     ]
 

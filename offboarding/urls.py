@@ -209,6 +209,11 @@ urlpatterns = [
         name="resignation-requests-create",
     ),
     path(
+        "resignation-self-create/",
+        resignation.SelfResignationFormView.as_view(),
+        name="resignation-self-create",
+    ),
+    path(
         "resignation-requests-update/<int:pk>/",
         resignation.ResignationLettersFormView.as_view(),
         name="resignation-request-update",
