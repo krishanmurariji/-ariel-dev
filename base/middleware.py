@@ -314,6 +314,19 @@ class CompanyMiddleware:
 
         selected_company = request.session.get("selected_company")
 
+        # Only someone who can change the active company (the permission
+        # update_selected_company requires) can ever have *chosen* a
+        # company other than their own. For everyone else the session value
+        # is just a leftover - typically "all", written at first login while
+        # their work information had no company yet - and without this it
+        # outlives the company being assigned afterwards, so the sidebar
+        # kept saying "All Company" until they logged out and in again.
+        if not request.user.has_perm("base.change_company"):
+            own_company = self._get_user_default_company(request)
+            if own_company and selected_company != str(own_company.id):
+                selected_company = str(own_company.id)
+                request.session["selected_company"] = selected_company
+
         # --- Determine company ---
         # A specific company id is looked up at most once below (was two
         # identical queries: an .exists() check here, then .first() again a
