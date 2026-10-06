@@ -19,6 +19,7 @@ from horilla.background_utils import with_db_cleanup
 from horilla.decorators import check_integration_enabled, login_required
 from horilla.horilla_middlewares import _thread_locals
 from notifications.signals import notify
+from whatsapp.security import verify_meta_signature
 from whatsapp.flows import (
     get_asset_category_flow_json,
     get_attendance_request_json,
@@ -133,7 +134,22 @@ def whatsapp(request):
             return HttpResponse(challenge, status=200)
 
     if request.method == "POST":
-        data = json.loads(request.body)
+        verified = verify_meta_signature(request)
+        if verified is False:
+            logger.warning(
+                "WhatsApp webhook: rejected a POST with a missing or invalid "
+                "X-Hub-Signature-256"
+            )
+            return HttpResponse(status=403)
+        if verified is None:
+            logger.warning(
+                "WhatsApp webhook: no App Secret is saved on any WhatsApp "
+                "credential, so incoming messages are NOT being verified"
+            )
+        try:
+            data = json.loads(request.body)
+        except ValueError:
+            return HttpResponse("Bad Request", status=400)
         if "object" in data and "entry" in data:
             if data["object"] == "whatsapp_business_account":
                 for entry in data["entry"]:

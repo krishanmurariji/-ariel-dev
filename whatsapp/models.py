@@ -19,6 +19,16 @@ class WhatsappCredientials(HorillaModel):
         verbose_name="Webhook Token",
         help_text=_("This token is used to connect webhook to the server"),
     )
+    meta_app_secret = EncryptedTextField(
+        blank=True,
+        default="",
+        verbose_name="App Secret",
+        help_text=_(
+            "Used to check that incoming webhook messages really come from Meta "
+            "(Meta developer dashboard > App settings > Basic > App secret). "
+            "Once saved, messages without a valid signature are rejected."
+        ),
+    )
     company_id = models.ManyToManyField(Company, blank=True, verbose_name="Company")
     is_primary = models.BooleanField(default=False)
 

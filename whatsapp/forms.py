@@ -20,11 +20,12 @@ class WhatsappForm(ModelForm):
         widgets = {
             "meta_token": forms.PasswordInput(render_value=False),
             "meta_webhook_token": forms.PasswordInput(render_value=False),
+            "meta_app_secret": forms.PasswordInput(render_value=False),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for field_name in ("meta_token", "meta_webhook_token"):
+        for field_name in ("meta_token", "meta_webhook_token", "meta_app_secret"):
             self.fields[field_name].widget.attrs.update(
                 {"class": "oh-input w-100 form-control"}
             )
@@ -44,6 +45,12 @@ class WhatsappForm(ModelForm):
         value = self.cleaned_data.get("meta_webhook_token")
         if not value and self.instance.pk:
             return self.instance.meta_webhook_token
+        return value
+
+    def clean_meta_app_secret(self):
+        value = self.cleaned_data.get("meta_app_secret")
+        if not value and self.instance.pk:
+            return self.instance.meta_app_secret
         return value
 
     def as_p(self):
