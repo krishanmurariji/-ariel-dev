@@ -555,22 +555,6 @@ LOCALE_PATHS = [join(BASE_DIR, "horilla", "locale")]
 # ========================================
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# With DEBUG=False Django's default logging config sends django.request /
-# django.security records only to mail_admins (a no-op without ADMINS), so a
-# 400 (DisallowedHost, SuspiciousOperation, BadRequest) or 403/404 left no
-# trace in `journalctl -u arielhr` and could not be diagnosed. Send both
-# loggers' WARNING+ records to stderr (journald) as well. propagate stays
-# True so the default mail_admins handling is unchanged.
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "handlers": {"console": {"class": "logging.StreamHandler"}},
-    "loggers": {
-        "django.request": {"handlers": ["console"], "level": "WARNING"},
-        "django.security": {"handlers": ["console"], "level": "WARNING"},
-    },
-}
-
 MESSAGE_TAGS = {
     messages.DEBUG: "oh-alert--warning",
     messages.INFO: "oh-alert--info",
