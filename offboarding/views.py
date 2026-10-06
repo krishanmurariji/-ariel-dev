@@ -1085,18 +1085,7 @@ def create_resignation_request(request):
     """
     This method is used to render form to create resignation requests
     """
-    Selected_company = request.session.get("selected_company")
-    company_id = None
-    if Selected_company and Selected_company != "all":
-        company_id = Selected_company
-        general_setting = OffboardingGeneralSetting.objects.filter(
-            company_id=company_id
-        ).first()
-    else:
-        general_setting = OffboardingGeneralSetting.objects.filter(
-            company_id__isnull=True
-        ).first()
-    feature_enabled = getattr(general_setting, "resignation_request", False)
+    feature_enabled = OffboardingGeneralSetting.resignation_enabled_for(request)
     if not feature_enabled and not request.user.is_superuser:
         can_create = False
     else:
@@ -1226,16 +1215,26 @@ def enable_resignation_request(request):
     """
     selected_company = request.session.get("selected_company")
 
-    if selected_company and selected_company != "all":
-        resignation_request_feature = OffboardingGeneralSetting.objects.filter(
-            company_id=selected_company
-        ).first()
+    # Edits exactly the row the feature-flag gates read (see
+    # OffboardingGeneralSetting.for_request): the selected company's own
+    # row, or the global one in "All Company" mode - not whichever row
+    # happens to come first, which could belong to any company.
+    if selected_company and str(selected_company).isdigit():
+        resignation_request_feature = (
+            OffboardingGeneralSetting.objects.entire()
+            .filter(company_id=selected_company)
+            .first()
+        )
         if not resignation_request_feature:
             resignation_request_feature = OffboardingGeneralSetting(
                 company_id_id=selected_company
             )
     else:
-        resignation_request_feature = OffboardingGeneralSetting.objects.first()
+        resignation_request_feature = (
+            OffboardingGeneralSetting.objects.entire()
+            .filter(company_id__isnull=True)
+            .first()
+        )
         if not resignation_request_feature:
             resignation_request_feature = OffboardingGeneralSetting()
 

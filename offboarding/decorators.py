@@ -94,7 +94,7 @@ def offboarding_or_stage_manager_can_enter(function, perm):
 @decorator_with_arguments
 def check_feature_enabled(function, feature_name):
     def _function(request, *args, **kwargs):
-        general_setting = OffboardingGeneralSetting.objects.first()
+        general_setting = OffboardingGeneralSetting.for_request(request)
         enabled = getattr(general_setting, feature_name, False)
         if enabled:
             return function(request, *args, **kwargs)

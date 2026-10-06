@@ -1,0 +1,141 @@
+{% load i18n widget_tweaks %}
+<style>
+    #{{ view_id }}Form .sr-notice {
+        border-radius: 8px;
+        padding: 12px 14px;
+        font-size: 0.85rem;
+        line-height: 1.5;
+    }
+    #{{ view_id }}Form .sr-notice--warning {
+        background: rgba(245, 158, 11, 0.14);
+        border: 1px solid rgba(245, 158, 11, 0.45);
+    }
+    #{{ view_id }}Form .sr-notice--info {
+        background: rgba(120, 130, 150, 0.12);
+        border: 1px solid rgba(120, 130, 150, 0.3);
+    }
+    #{{ view_id }}Form .sr-radios label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0 24px 0 0;
+        cursor: pointer;
+    }
+    #{{ view_id }}Form .sr-group { margin-top: 18px; }
+    #{{ view_id }}Form .sr-hint { font-size: 0.78rem; color: #d98200; margin-top: 6px; }
+    #{{ view_id }}Form .sr-error { font-size: 0.78rem; color: #d93025; margin-top: 4px; }
+    #{{ view_id }}Form .sr-optional { font-weight: 400; opacity: 0.7; font-size: 0.8rem; }
+</style>
+
+<div class="oh-modal__dialog-header">
+    <h2 class="oh-modal__dialog-title" id="createTitle">{{ form.verbose_name }}</h2>
+    <button type="button" class="oh-modal__close--custom"
+        onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')" aria-label="Close">
+        <ion-icon name="close-outline" role="img" class="md hydrated" aria-label="close outline"></ion-icon>
+    </button>
+</div>
+
+<div class="oh-modal__dialog-body oh-modal__dialog-relative">
+    <div id="{{ view_id }}">
+        <form id="{{ view_id }}Form" hx-post="{{ request.path }}?{{ request.GET.urlencode }}"
+            {% if request.META.HTTP_HX_TARGET %}hx-target="#{{ request.META.HTTP_HX_TARGET }}"{% endif %}
+            hx-swap="{% if hx_target == 'this' %}outerHTML{% else %}innerHTML{% endif %}"
+            novalidate>
+            {% csrf_token %}
+
+            <div class="sr-notice sr-notice--warning">
+                <ion-icon name="warning-outline" style="vertical-align: -2px;"></ion-icon>
+                {% trans "This will trigger your job resignation process. It is always advisable to talk to your management first before coming here!" %}
+            </div>
+
+            {% if form.non_field_errors %}
+                <div class="sr-error mt-2">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <div class="sr-group">
+                <label class="oh-label required-star">{{ form.discussed_with_manager.label }}</label>
+                <div class="sr-radios">
+                    {% for radio in form.discussed_with_manager %}
+                        <label for="{{ radio.id_for_label }}">{{ radio.tag }} <span>{{ radio.choice_label }}</span></label>
+                    {% endfor %}
+                </div>
+                {% for error in form.discussed_with_manager.errors %}<div class="sr-error">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="sr-group" id="srDiscussionWrap">
+                <label class="oh-label required-star" for="{{ form.discussion_summary.id_for_label }}">{{ form.discussion_summary.label }}</label>
+                {{ form.discussion_summary|add_class:"oh-input w-100" }}
+                {% for error in form.discussion_summary.errors %}<div class="sr-error">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="sr-group">
+                <label class="oh-label required-star" for="{{ form.reason.id_for_label }}">{{ form.reason.label }}</label>
+                {{ form.reason|add_class:"oh-select w-100" }}
+                {% for error in form.reason.errors %}<div class="sr-error">{{ error }}</div>{% endfor %}
+            </div>
+
+            {% if not form.date_is_mandatory %}
+                <div class="sr-group">
+                    <label class="oh-label">{{ form.early_last_working_day.label }} <span class="sr-optional">({% trans "Optional" %})</span></label>
+                    <div class="sr-radios">
+                        {% for radio in form.early_last_working_day %}
+                            <label for="{{ radio.id_for_label }}">{{ radio.tag }} <span>{{ radio.choice_label }}</span></label>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="sr-group" id="srEarlyDateWrap">
+                {% if form.date_is_mandatory %}
+                    <label class="oh-label required-star" for="{{ form.preferred_last_working_day.id_for_label }}">{% trans "When would you like your last working day to be?" %}</label>
+                {% endif %}
+                {{ form.preferred_last_working_day|add_class:"oh-input w-100" }}
+                {% for error in form.preferred_last_working_day.errors %}<div class="sr-error">{{ error }}</div>{% endfor %}
+                <div class="sr-hint">{% trans "Decision on last working day is subject to mutual agreement with the employer" %}</div>
+            </div>
+
+            {% if form.notice_end %}
+                <div class="sr-notice sr-notice--info sr-group">
+                    <ion-icon name="information-circle-outline" style="vertical-align: -2px;"></ion-icon>
+                    {% blocktrans with days=form.notice_days date=form.notice_end|date:"d M Y" %}Note: As per the company policy, you are required to serve notice period of {{ days }} days, that is till {{ date }}.{% endblocktrans %}
+                </div>
+            {% endif %}
+
+            <div class="sr-group">
+                <label class="oh-label" for="{{ form.additional_comment.id_for_label }}">{{ form.additional_comment.label }}</label>
+                {{ form.additional_comment|add_class:"oh-input w-100" }}
+                {% for error in form.additional_comment.errors %}<div class="sr-error">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="d-flex flex-row-reverse sr-group" style="gap: 10px;">
+                <button type="submit" class="oh-btn oh-btn--danger pl-4 pr-4">{% trans "Submit resignation" %}</button>
+                <button type="button" class="oh-btn oh-btn--light pl-4 pr-4"
+                    onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')">{% trans "Cancel" %}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var form = $("#{{ view_id }}Form");
+        var minDate = "{{ form.today|date:'Y-m-d' }}";
+        var maxDate = "{{ form.notice_end|date:'Y-m-d' }}";
+        var dateInput = form.find("[name=preferred_last_working_day]");
+        dateInput.attr("min", minDate);
+        if (maxDate) { dateInput.attr("max", maxDate); }
+
+        function sync() {
+            var discussed = form.find("[name=discussed_with_manager]:checked").val();
+            $("#srDiscussionWrap").toggle(discussed === "yes");
+            {% if form.date_is_mandatory %}
+                $("#srEarlyDateWrap").show();
+            {% else %}
+                var early = form.find("[name=early_last_working_day]:checked").val();
+                $("#srEarlyDateWrap").toggle(early === "yes");
+            {% endif %}
+        }
+        form.on("change", "input[type=radio]", sync);
+        sync();
+    })();
+</script>
