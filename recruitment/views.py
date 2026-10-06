@@ -860,6 +860,7 @@ def stage_update(request, stage_id):
 
 
 @login_required
+@permission_required(perm="recruitment.change_stage")
 @require_http_methods(["POST"])
 @hx_request_required
 def stage_name_update(request, stage_id):

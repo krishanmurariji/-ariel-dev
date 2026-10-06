@@ -49,3 +49,20 @@ def can_access_employee(user, employee, perm="employee.view_employee"):
     if me is not None and me.pk == employee.pk:
         return True
     return is_reporting_manager_of(user, employee)
+
+
+def check_employee_access(user, employee, perm="employee.view_employee", also_allow=()):
+    """
+    Raise Http404 unless ``user`` may see data belonging to ``employee`` (see
+    ``can_access_employee``). ``also_allow`` lists other employees who are
+    legitimately involved in the record, e.g. the colleague a shift swap was
+    requested from.
+    """
+    from django.http import Http404
+
+    if can_access_employee(user, employee, perm):
+        return
+    me = current_employee(user)
+    if me is not None and any(e is not None and e.pk == me.pk for e in also_allow):
+        return
+    raise Http404

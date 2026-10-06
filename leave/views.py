@@ -20,7 +20,7 @@ from django.db.models import ProtectedError, Q
 from django.http import HttpResponse, JsonResponse
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
-from horilla.access import can_access_employee
+from horilla.access import can_access_employee, check_employee_access
 from django.urls import reverse
 from django.utils.encoding import force_str
 from django.utils.translation import gettext as __
@@ -3553,6 +3553,10 @@ def leave_allocation_request_single_view(request, req_id):
         requests_ids = json.loads(requests_ids_json)
         previous_id, next_id = closest_numbers(requests_ids, req_id)
     leave_allocation_request = LeaveAllocationRequest.find(req_id)
+    if leave_allocation_request is not None:
+        check_employee_access(
+            request.user, leave_allocation_request.employee_id, "leave.view_leaveallocationrequest"
+        )
     context = {
         "leave_allocation_request": leave_allocation_request,
         "my_request": my_request,

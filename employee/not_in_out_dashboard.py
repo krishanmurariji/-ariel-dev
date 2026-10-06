@@ -189,6 +189,7 @@ def employee_data_export(request, emp_id=None):
 
 
 @login_required
+@manager_can_enter('employee.change_employee')
 def get_template(request, emp_id):
     """
     This method is used to return the mail template

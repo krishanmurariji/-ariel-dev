@@ -37,6 +37,8 @@ from django.db import transaction
 from django.db.models import ProtectedError
 from django.forms import ValidationError
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
+from django.http import Http404
+from horilla.access import check_employee_access
 from django.shortcuts import redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -867,6 +869,10 @@ def activity_single_view(request, obj_id):
     request_copy.pop("instances_ids", None)
     previous_data = request_copy.urlencode()
     activity = AttendanceActivity.objects.filter(id=obj_id).first()
+    if activity is not None:
+        check_employee_access(
+            request.user, activity.employee_id, "attendance.view_attendanceactivity"
+        )
 
     instance_ids_json = request.GET["instances_ids"]
     instance_ids = json.loads(instance_ids_json) if instance_ids_json else []
@@ -1224,6 +1230,10 @@ def late_in_early_out_single_view(request, obj_id):
     request_copy.pop("instances_ids", None)
     previous_data = request_copy.urlencode()
     late_in_early_out = AttendanceLateComeEarlyOut.objects.filter(id=obj_id).first()
+    if late_in_early_out is not None:
+        check_employee_access(
+            request.user, late_in_early_out.employee_id, "attendance.view_attendancelatecomeearlyout"
+        )
     instance_ids_json = request.GET["instances_ids"]
     instance_ids = json.loads(instance_ids_json) if instance_ids_json else []
     previous_instance, next_instance = closest_numbers(instance_ids, obj_id)
@@ -1880,6 +1890,10 @@ def user_request_one_view(request, id):
     GET : return one user attendance request view template
     """
     attendance_request = Attendance.find(id)
+    if attendance_request is not None:
+        check_employee_access(
+            request.user, attendance_request.employee_id, "attendance.view_attendance"
+        )
     if not attendance_request:
         return HorillaRedirect(
             request, message=_("No Attendance found matching the query.")
@@ -1916,6 +1930,10 @@ def user_request_one_view(request, id):
 @hx_request_required
 def get_attendance_activities(request, obj_id):
     attendance = Attendance.find(obj_id)
+    if attendance is not None:
+        check_employee_access(
+            request.user, attendance.employee_id, "attendance.view_attendance"
+        )
     return render(
         request,
         "attendance/attendance/attendance_activites_view.html",
@@ -2448,6 +2466,11 @@ def view_attendancerequest_comment(request, attendance_id):
     """
     This method is used to show Attendance request comments
     """
+    attendance_request = Attendance.find(attendance_id)
+    if attendance_request is not None:
+        check_employee_access(
+            request.user, attendance_request.employee_id, "attendance.view_attendance"
+        )
     comments = AttendanceRequestComment.objects.filter(
         request_id=attendance_id
     ).order_by("-created_at")
@@ -2486,6 +2509,11 @@ def delete_attendancerequest_comment(request, comment_id):
             request, message=_("No Comment found matching the query.")
         )
 
+    if not (
+        comment.created_by == request.user
+        or request.user.has_perm("attendance.delete_attendancerequestcomment")
+    ):
+        raise Http404
     script = ""
     comment.delete()
     messages.success(request, _("Comment deleted successfully!"))

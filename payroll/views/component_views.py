@@ -456,6 +456,7 @@ def view_allowance(request):
 
 
 @login_required
+@permission_required('payroll.view_allowance')
 @hx_request_required
 def view_single_allowance(request, allowance_id):
     """

@@ -17,6 +17,7 @@ from base.models import Announcement, IntegrationApps
 from employee.models import Employee
 from horilla.background_utils import with_db_cleanup
 from horilla.decorators import check_integration_enabled, login_required
+from horilla.decorators import permission_required
 from horilla.horilla_middlewares import _thread_locals
 from notifications.signals import notify
 from whatsapp.security import verify_meta_signature
@@ -265,6 +266,7 @@ def whatsapp(request):
 
 
 @login_required
+@permission_required("whatsapp.change_whatsappcredientials")
 @check_integration_enabled(app_name="whatsapp")
 def create_generic_templates(request, id):
     """

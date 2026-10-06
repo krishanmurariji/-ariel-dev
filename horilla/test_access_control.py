@@ -13,15 +13,29 @@ Four kinds of user are used throughout:
     hr        - holds the relevant permission
 """
 
+import datetime
+
 from django.contrib.auth.models import Permission
+from django.http import Http404
 from django.test import Client
 from django.urls import reverse
 
-from base.models import Announcement
+from base.models import (
+    Announcement,
+    EmployeeShift,
+    HorillaMailTemplate,
+    ShiftRequest,
+    WorkType,
+    WorkTypeRequest,
+)
 from employee.models import Employee, EmployeeWorkInformation
 from helpdesk.access import can_view_ticket
 from helpdesk.models import Ticket, TicketType
-from horilla.access import can_access_employee, is_reporting_manager_of
+from horilla.access import (
+    can_access_employee,
+    check_employee_access,
+    is_reporting_manager_of,
+)
 from horilla.isolated_testcase import IsolatedTestCase
 from horilla_auth.models import HorillaUser
 from horilla_documents.models import Document
@@ -191,3 +205,95 @@ class TicketVisibilityTests(AccessTestCase):
         url = reverse("ticket-individual-view", kwargs={"ticket_id": ticket.pk})
         self.assertEqual(self.client_for(self.stranger_user).get(url).status_code, 404)
         self.assertEqual(self.client_for(self.owner_user).get(url).status_code, 200)
+
+
+# ---------------------------------------------------------------------------
+# Second batch: shift / work-type requests, and the permission-gated views.
+# ---------------------------------------------------------------------------
+
+
+class CheckEmployeeAccessTests(AccessTestCase):
+    def test_raises_404_for_a_stranger_and_not_for_the_allowed(self):
+        grant(self.hr_user, "base", "view_shiftrequest")
+        with self.assertRaises(Http404):
+            check_employee_access(self.stranger_user, self.owner, "base.view_shiftrequest")
+        for user in (self.owner_user, self.mgr_user, self.hr_user):
+            check_employee_access(user, self.owner, "base.view_shiftrequest")
+
+    def test_involved_party_listed_in_also_allow_is_let_in(self):
+        check_employee_access(
+            self.stranger_user, self.owner, "base.view_shiftrequest", also_allow=[self.stranger]
+        )
+        with self.assertRaises(Http404):
+            check_employee_access(
+                self.stranger_user, self.owner, "base.view_shiftrequest", also_allow=[None, self.hr]
+            )
+
+    def test_missing_record_owner_is_refused(self):
+        with self.assertRaises(Http404):
+            check_employee_access(self.hr_user, None, "base.view_shiftrequest")
+
+
+class RequestDetailViewTests(AccessTestCase):
+    def setUp(self):
+        super().setUp()
+        self.partner_user, self.partner = make_employee("acc_swap_partner")
+        shift = EmployeeShift.objects.bulk_create([EmployeeShift(employee_shift="Day")])[0]
+        today = datetime.date.today()
+        self.shift_request = ShiftRequest.objects.bulk_create(
+            [
+                ShiftRequest(
+                    employee_id=self.owner,
+                    shift_id=shift,
+                    requested_date=today,
+                    requested_till=today,
+                    reallocate_to=self.partner,
+                )
+            ]
+        )[0]
+        work_type = WorkType.objects.bulk_create([WorkType(work_type="Office")])[0]
+        self.work_type_request = WorkTypeRequest.objects.bulk_create(
+            [
+                WorkTypeRequest(
+                    employee_id=self.owner,
+                    work_type_id=work_type,
+                    requested_date=today,
+                    requested_till=today,
+                )
+            ]
+        )[0]
+
+    def get(self, user, url):
+        client = Client(raise_request_exception=False)
+        client.force_login(user)
+        return client.get(url, **HX)
+
+    def test_shift_request_details(self):
+        url = reverse("shift-request-details", kwargs={"id": self.shift_request.pk})
+        self.assertEqual(self.get(self.stranger_user, url).status_code, 404)
+        # Allowed users are not stopped by the check (the page itself may need
+        # more data than this test builds, so only "not 404" is asserted).
+        for user in (self.owner_user, self.mgr_user, self.partner_user):
+            self.assertNotEqual(self.get(user, url).status_code, 404, user.username)
+
+    def test_work_type_request_details(self):
+        url = reverse(
+            "work-type-request-single-view", kwargs={"obj_id": self.work_type_request.pk}
+        )
+        self.assertEqual(self.get(self.stranger_user, url).status_code, 404)
+        self.assertEqual(self.get(self.partner_user, url).status_code, 404)  # not involved here
+        for user in (self.owner_user, self.mgr_user):
+            self.assertNotEqual(self.get(user, url).status_code, 404, user.username)
+
+
+class PermissionGatedViewTests(AccessTestCase):
+    def test_mail_template_body_needs_the_employee_change_permission(self):
+        template = HorillaMailTemplate.objects.bulk_create(
+            [HorillaMailTemplate(title="Secret", body="<p>confidential</p>")]
+        )[0]
+        url = reverse("get-template-employee", kwargs={"emp_id": template.pk})
+        grant(self.hr_user, "employee", "change_employee")
+        stranger = self.client_for(self.stranger_user).get(url, **HX)
+        self.assertNotIn(b"confidential", stranger.content)
+        hr = self.client_for(self.hr_user).get(url, **HX)
+        self.assertIn(b"confidential", hr.content)

@@ -33,6 +33,7 @@ from django.core.management import call_command
 from django.core.validators import validate_ipv46_address
 from django.db.models import ProtectedError, Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
+from horilla.access import check_employee_access
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
@@ -2458,6 +2459,10 @@ def rotating_work_individual_view(request, instance_id):
     request_copy.pop("instances_ids", None)
     previous_data = request_copy.urlencode()
     instance = RotatingWorkTypeAssign.objects.filter(id=instance_id).first()
+    if instance is not None:
+        check_employee_access(
+            request.user, instance.employee_id, "base.view_rotatingworktypeassign"
+        )
     context = {"instance": instance, "pd": previous_data}
     assign_ids_json = request.GET.get("instances_ids")
     if assign_ids_json:
@@ -3147,6 +3152,10 @@ def rotating_shift_individual_view(request, instance_id):
     request_copy.pop("instances_ids", None)
     previous_data = request_copy.urlencode()
     instance = RotatingShiftAssign.objects.filter(id=instance_id).first()
+    if instance is not None:
+        check_employee_access(
+            request.user, instance.employee_id, "base.view_rotatingshiftassign"
+        )
     context = {"instance": instance, "pd": previous_data}
     assign_ids_json = request.GET.get("instances_ids")
     HTTP_REFERER = request.META.get("HTTP_REFERER", None)
@@ -4364,6 +4373,10 @@ def work_type_request_single_view(request, obj_id):
     This method is used to view details of an work type request
     """
     work_type_request = WorkTypeRequest.objects.filter(id=obj_id).first()
+    if work_type_request is not None:
+        check_employee_access(
+            request.user, work_type_request.employee_id, "base.view_worktyperequest"
+        )
     context = {
         "work_type_request": work_type_request,
         "dashboard": request.GET.get("dashboard"),
@@ -4790,6 +4803,10 @@ def shift_request_details(request, id):
     if not shift_request:
         messages.error(request, _("Shift request not found."))
         return HorillaRedirect(request)
+    if shift_request is not None:
+        check_employee_access(
+            request.user, shift_request.employee_id, "base.view_shiftrequest", also_allow=[shift_request.reallocate_to]
+        )
     requests_ids_json = request.GET.get("instances_ids")
     context = {
         "shift_request": shift_request,
@@ -4820,6 +4837,10 @@ def shift_allocation_request_details(request, id):
     if not shift_request:
         messages.error(request, _("Shift request not found."))
         return HorillaRedirect(request)
+    if shift_request is not None:
+        check_employee_access(
+            request.user, shift_request.employee_id, "base.view_shiftrequest", also_allow=[shift_request.reallocate_to]
+        )
     requests_ids_json = request.GET.get("instances_ids")
     context = {
         "shift_request": shift_request,
@@ -4876,6 +4897,10 @@ def shift_allocation_request_update(request, shift_request_id):
         id : shift request instance id
     """
     shift_request = ShiftRequest.objects.get(id=shift_request_id)
+    if shift_request is not None:
+        check_employee_access(
+            request.user, shift_request.employee_id, "base.change_shiftrequest"
+        )
     form = ShiftAllocationForm(instance=shift_request)
     form = choosesubordinates(request, form, "base.change_shiftrequest")
     form = include_employee_instance(request, form)
@@ -6670,6 +6695,10 @@ def view_shift_comment(request, shift_id):
     This method is used to render all the notes of the employee
     """
     shift_request = ShiftRequest.find(shift_id)
+    if shift_request is not None:
+        check_employee_access(
+            request.user, shift_request.employee_id, "base.view_shiftrequest", also_allow=[shift_request.reallocate_to]
+        )
     comments = ShiftRequestComment.objects.filter(request_id=shift_id).order_by(
         "-created_at"
     )
@@ -6746,6 +6775,10 @@ def view_work_type_comment(request, work_type_id):
     This method is used to render all the notes of the employee
     """
     work_type_request = WorkTypeRequest.find(work_type_id)
+    if work_type_request is not None:
+        check_employee_access(
+            request.user, work_type_request.employee_id, "base.view_worktyperequest"
+        )
     comments = WorkTypeRequestComment.objects.filter(request_id=work_type_id).order_by(
         "-created_at"
     )
