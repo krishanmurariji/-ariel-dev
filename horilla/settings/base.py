@@ -105,6 +105,20 @@ CORS_ALLOW_ALL_ORIGINS = env("CORS_ALLOW_ALL_ORIGINS")
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 
+# Logins last 3 hours. Django does not refresh the expiry on every request
+# (SESSION_SAVE_EVERY_REQUEST is off), so this is roughly 3 hours from login
+# rather than 3 hours of inactivity.
+SESSION_COOKIE_AGE = 3 * 60 * 60
+
+# Production runs behind nginx, which terminates TLS and forwards plain http to
+# gunicorn, so without this request.is_secure() is False and request.scheme is
+# "http": links built from it (e.g. the Portal Link in the Candidate Portal
+# Login mail) come out as http://. nginx sets X-Forwarded-Proto on every
+# proxied request, overwriting any value the client sent. Not set for local
+# dev, which has no proxy in front of it.
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 THEME_APP = "horilla_theme"
 
 INSTALLED_APPS = [
