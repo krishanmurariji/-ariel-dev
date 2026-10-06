@@ -10,6 +10,8 @@ from django.contrib import messages
 from django.core import serializers
 from django.db.models import ProtectedError
 from django.http import HttpResponse, JsonResponse
+from django.http import Http404
+from helpdesk.access import can_view_ticket
 from django.shortcuts import redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -1004,6 +1006,8 @@ def ticket_individual_view(request, ticket_id):
         return HorillaRedirect(
             request, message=_("No Ticket found matching the query.")
         )
+    if not can_view_ticket(request.user, ticket):
+        raise Http404
 
     context = {
         "ticket": ticket,

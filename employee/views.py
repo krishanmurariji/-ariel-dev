@@ -32,7 +32,9 @@ from django.db.models import F, ProtectedError, Q
 from django.db.models.query import QuerySet
 from django.forms import DateInput, HiddenInput, Select
 from django.http import HttpResponse, JsonResponse
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from horilla.access import can_access_employee
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
@@ -464,7 +466,9 @@ def about_tab(request, pk, **kwargs):
     """
     This method is used to view profile of an employee.
     """
-    employee = Employee.objects.get(id=pk)
+    employee = get_object_or_404(Employee, id=pk)
+    if not can_access_employee(request.user, employee):
+        raise Http404
     contracts = employee.contract_set.all() if apps.is_installed("payroll") else None
     employee_leaves = (
         employee.available_leave.all() if apps.is_installed("leave") else None
@@ -492,7 +496,9 @@ def allowances_deductions_tab(request, pk):
     condition-based rules. The results are then rendered in the allowance and
     deduction tab template.
     """
-    employee = Employee.objects.get(id=pk)
+    employee = get_object_or_404(Employee, id=pk)
+    if not can_access_employee(request.user, employee):
+        raise Http404
     active_contracts = (
         employee.contract_set.filter(contract_status="active").first()
         if apps.is_installed("payroll")
@@ -856,6 +862,10 @@ def update_document_title(request, id):
     Returns: return document_tab template
     """
     document = get_object_or_404(Document, id=id)
+    if not can_access_employee(
+        request.user, document.employee_id, perm="horilla_documents.change_document"
+    ):
+        raise Http404
     name = request.POST.get("title")
     if request.method == "POST":
         document.title = name

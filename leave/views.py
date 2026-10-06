@@ -18,7 +18,9 @@ from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import ProtectedError, Q
 from django.http import HttpResponse, JsonResponse
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from horilla.access import can_access_employee
 from django.urls import reverse
 from django.utils.encoding import force_str
 from django.utils.translation import gettext as __
@@ -2874,7 +2876,11 @@ def user_request_one(request, id):
     Returns:
     GET : return one user leave request view template
     """
-    leave_request = LeaveRequest.objects.get(id=id)
+    leave_request = get_object_or_404(LeaveRequest, id=id)
+    if not can_access_employee(
+        request.user, leave_request.employee_id, perm="leave.view_leaverequest"
+    ):
+        raise Http404
     try:
         requests_ids_json = request.GET.get("instances_ids")
         if requests_ids_json:
@@ -4671,6 +4677,10 @@ def view_clashes(request, leave_request_id):
     This method is used to filter or view the leave clashes
     """
     record = get_object_or_404(LeaveRequest, id=leave_request_id)
+    if not can_access_employee(
+        request.user, record.employee_id, perm="leave.view_leaverequest"
+    ):
+        raise Http404
 
     if record.status == "rejected" or record.status == "cancelled":
         overlapping_requests = LeaveRequest.objects.none()

@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from django.contrib import messages
 from django.db.models import Q
 from django.http import HttpResponse
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -203,6 +204,7 @@ def create_announcement(request):
 
 @login_required
 @hx_request_required
+@permission_required("base.delete_announcement")
 def delete_announcement(request, anoun_id):
     """
     This method is used to delete announcements.
@@ -320,6 +322,7 @@ def update_announcement(request, anoun_id):
 
 @login_required
 @hx_request_required
+@permission_required("base.change_announcement")
 def remove_announcement_file(request, obj_id, attachment_id):
     announcement = get_object_or_404(Announcement, id=obj_id)
     attachment = get_object_or_404(Attachment, id=attachment_id)
@@ -409,7 +412,12 @@ def delete_announcement_comment(request, comment_id):
     """
     This method is used to delete announcement comments
     """
-    comment = AnnouncementComment.objects.get(id=comment_id)
+    comment = get_object_or_404(AnnouncementComment, id=comment_id)
+    if not (
+        request.user.has_perm("base.delete_announcementcomment")
+        or comment.created_by == request.user
+    ):
+        raise Http404
     comment.delete()
     messages.success(request, _("Comment deleted successfully!"))
     return HttpResponse()

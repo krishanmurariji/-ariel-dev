@@ -1011,6 +1011,7 @@ def task_timesheet(request, task_id):
 
 
 @login_required
+@task_update_permission()
 def create_timesheet_task(request, task_id):
     task = Task.objects.get(id=task_id)
     project = task.project
@@ -1038,6 +1039,8 @@ def update_timesheet_task(request, timesheet_id):
     timesheet = TimeSheet.objects.filter(id=timesheet_id).first()
     if not timesheet:
         return HorillaRedirect(request, message=_("Timesheet not found"))
+    if not time_sheet_update_permissions(request, timesheet_id):
+        return HorillaRedirect(request, message=_("You don't have permission."))
     form = TimesheetInTaskForm(instance=timesheet)
     if request.method == "POST":
         form = TimesheetInTaskForm(request.POST, instance=timesheet)
@@ -1160,6 +1163,7 @@ def task_all_create(request):
 
 
 @login_required
+@task_update_permission()
 def update_project_task_status(request, task_id):
     status = request.GET.get("status")
     task = Task.find(task_id)
@@ -1177,6 +1181,7 @@ def update_project_task_status(request, task_id):
 
 
 @login_required
+@task_update_permission()
 def update_task_all(request, task_id):
     task = Task.objects.get(id=task_id)
     form = TaskAllForm(instance=task)
@@ -1281,6 +1286,7 @@ def task_all_bulk_delete(request):
 
 
 @login_required
+@task_update_permission()
 # @permission_required("project.change_task")
 def task_all_archive(request, task_id):
     """

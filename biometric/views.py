@@ -1814,6 +1814,7 @@ def add_biometric_user(request, device_id):
 
 
 @login_required
+@permission_required("biometric.change_biometricdevices")
 @install_required
 @hx_request_required
 def map_biometric_users(request, device_id):
@@ -1853,6 +1854,7 @@ def map_biometric_users(request, device_id):
 
 
 @login_required
+@permission_required("biometric.change_biometricdevices")
 @install_required
 @hx_request_required
 def add_dahua_biometric_user(request, device_id):
@@ -1935,6 +1937,7 @@ def find_employee_badge_id(request):
 
 
 @login_required
+@permission_required("biometric.change_biometricdevices")
 @hx_request_required
 @install_required
 def delete_dahua_user(request, obj_id=None):
