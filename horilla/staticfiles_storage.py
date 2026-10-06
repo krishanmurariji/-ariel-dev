@@ -50,6 +50,18 @@ class LenientManifestStaticFilesStorage(CompressedManifestStaticFilesStorage):
 
     manifest_strict = False
 
+    def url(self, name, force=False):
+        # ~176 templates write {% static '/jquery/ajax.js' %} with a leading
+        # slash. That was harmless with the plain storage this project used
+        # before the hashed one was switched on, but hashing joins the name
+        # onto STATIC_ROOT, and an absolute "/jquery/ajax.js" escapes it
+        # (SuspiciousFileOperation -> a bare HTTP 400 on /dashboard/ and
+        # /login/). Static names are always relative to STATIC_ROOT, so strip
+        # the slash here once instead of editing every template.
+        if name:
+            name = name.lstrip("/")
+        return super().url(name, force)
+
     def post_process(self, *args, **kwargs):
         for name, hashed_name, processed in super().post_process(*args, **kwargs):
             if isinstance(processed, Exception):
