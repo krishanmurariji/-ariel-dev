@@ -24,6 +24,7 @@ django_asgi_app = get_asgi_application()
 
 from channels.auth import AuthMiddlewareStack
 from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.security.websocket import AllowedHostsOriginValidator
 
 import recruitment.routing
 
@@ -35,8 +36,13 @@ application = ProtocolTypeRouter(
         # employees) and scope["session"] (candidates, who never log in via
         # Django auth and are instead tracked by a "candidate_id" session
         # key - see candidate_login_required, recruitment/decorators.py).
-        "websocket": AuthMiddlewareStack(
-            URLRouter(recruitment.routing.websocket_urlpatterns)
+        #
+        # AllowedHostsOriginValidator rejects a websocket opened from a page on
+        # any other site. Without it a malicious page could connect using the
+        # visitor's session cookie (cross-site WebSocket hijacking), because
+        # browsers do not apply CORS to websockets.
+        "websocket": AllowedHostsOriginValidator(
+            AuthMiddlewareStack(URLRouter(recruitment.routing.websocket_urlpatterns))
         ),
     }
 )

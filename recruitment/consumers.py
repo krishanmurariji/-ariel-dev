@@ -2,6 +2,7 @@ from channels.generic.websocket import JsonWebsocketConsumer
 
 from employee.models import Employee
 from horilla.background_utils import with_db_cleanup
+from recruitment.access import staff_can_use_chat
 
 
 class ChatConsumer(JsonWebsocketConsumer):
@@ -29,7 +30,8 @@ class ChatConsumer(JsonWebsocketConsumer):
 
         user = self.scope["user"]
         session = self.scope["session"]
-        is_employee = getattr(user, "is_authenticated", False)
+        # Staff must be allowed to see candidate chat, not merely be logged in.
+        is_employee = staff_can_use_chat(user)
         is_this_candidate = session.get("candidate_id") == self.candidate_id
 
         if not (is_employee or is_this_candidate):
