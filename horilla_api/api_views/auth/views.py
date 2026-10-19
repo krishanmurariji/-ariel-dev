@@ -149,6 +149,11 @@ class LoginAPIView(APIView):
             # AxesBackendRequestParameterRequired without it.
             user = authenticate(request, username=username, password=password)
             if user:
+                # Archived employees must not get tokens (the web login
+                # refuses them too), whatever state their User row is in.
+                archived = getattr(user, "employee_get", None)
+                if archived is not None and not archived.is_active:
+                    return Response({"error": "Invalid credentials"}, status=401)
                 challenge = second_factor_challenge(request, user)
                 if challenge is not None:
                     return challenge

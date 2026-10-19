@@ -228,7 +228,7 @@ class AttendanceView(APIView):
     def get(self, request, pk=None, type=None):
         # individual object workflow
         if pk:
-            attendance = get_object_or_404(Attendance, pk=pk)
+            attendance = get_object_or_404(self.get_queryset(request), pk=pk)
             serializer = AttendanceSerializer(instance=attendance)
             return Response(serializer.data, status=200)
         # permission based querysete

@@ -34,6 +34,41 @@ def is_reporting_manager_of(user, employee):
     return manager_id is not None and manager_id == me.pk
 
 
+def is_manager_in_chain(user, employee, nested=None):
+    """
+    True if ``user`` manages ``employee`` the way the list pages count it:
+    the direct reporting manager and, while NESTED_SUBORDINATE_VISIBILITY is
+    on, every manager further up the reporting chain.
+
+    Single-record reads must use this (not ``is_reporting_manager_of``) wherever
+    the matching list uses ``filtersubordinates``, otherwise a manager sees a
+    row in the list and then gets a 404 when opening it.
+    """
+    from django.conf import settings
+
+    me = current_employee(user)
+    if me is None or employee is None:
+        return False
+    if nested is None:
+        nested = getattr(settings, "NESTED_SUBORDINATE_VISIBILITY", True)
+    seen = set()
+    current = employee
+    # Bounded and cycle-safe: bad data (A manages B, B manages A) must not loop.
+    for _ in range(100):
+        manager = getattr(
+            getattr(current, "employee_work_info", None), "reporting_manager_id", None
+        )
+        if manager is None or manager.pk in seen:
+            return False
+        if manager.pk == me.pk:
+            return True
+        if not nested:
+            return False
+        seen.add(manager.pk)
+        current = manager
+    return False
+
+
 def can_access_employee(user, employee, perm="employee.view_employee"):
     """
     May ``user`` see or change data that belongs to ``employee``?

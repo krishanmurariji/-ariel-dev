@@ -1007,9 +1007,12 @@ def check_manager(employee, instance, nested=settings.NESTED_SUBORDINATE_VISIBIL
 
         # Recursive (nested) manager check
         current_manager = direct_manager
-        while current_manager:
+        seen = set()
+        # cycle guard: A manages B and B manages A must not loop forever
+        while current_manager and current_manager.pk not in seen:
             if current_manager == employee:
                 return True
+            seen.add(current_manager.pk)
             current_manager = current_manager.employee_work_info.reporting_manager_id
 
         return False

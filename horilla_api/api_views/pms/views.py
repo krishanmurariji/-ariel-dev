@@ -66,7 +66,11 @@ from ...api_decorators.base.decorators import (
     manager_permission_required,
     permission_required,
 )
-from ...api_methods.base.methods import groupby_queryset, permission_based_queryset
+from ...api_methods.base.methods import (
+    groupby_queryset,
+    permission_based_queryset,
+    permitted_object,
+)
 
 
 def object_check(cls, pk):
@@ -827,7 +831,7 @@ class FeedbackGetCreateAPIView(APIView):
 
     def get(self, request, pk=None, employee_id=None):
         if pk:
-            feedback = object_check(Feedback, pk)
+            feedback = permitted_object(request.user, "pms.view_feedback", Feedback, pk)
             if feedback is None:
                 return Response({"error": "Feedback not found"}, status=404)
             serializer = FeedbackSerializer(feedback)
@@ -861,7 +865,7 @@ class FeedbackGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
-        feedback = object_check(Feedback, pk)
+        feedback = permitted_object(request.user, "pms.view_feedback", Feedback, pk)
         if feedback is None:
             return Response({"error": "Feedback not found"}, status=404)
         serializer = FeedbackSerializer(feedback)

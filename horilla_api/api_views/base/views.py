@@ -44,7 +44,11 @@ from ...api_decorators.base.decorators import (
     manager_permission_required,
     permission_required,
 )
-from ...api_methods.base.methods import groupby_queryset, permission_based_queryset
+from ...api_methods.base.methods import (
+    groupby_queryset,
+    permission_based_queryset,
+    permitted_object,
+)
 from ...api_serializers.base.serializers import (
     CompanySerializer,
     DepartmentSerializer,
@@ -79,15 +83,27 @@ def object_delete(cls, pk):
 
 
 def individual_permssion_check(request):
-    employee_id = request.GET.get("employee_id")
-    employee = Employee.objects.filter(id=employee_id).first()
+    """
+    Gate for the "individual" endpoints, which list one employee's records via
+    ?employee_id=. Fetching a single record by id is authorised by the record's
+    own owner instead (permitted_object), so it needs no employee_id.
+    """
+    resolver = getattr(request, "resolver_match", None)
+    if resolver is not None and resolver.kwargs.get("pk"):
+        return True
+    employee = Employee.objects.filter(id=request.GET.get("employee_id")).first()
+    if employee is None:
+        # nobody to look up: only people who can see everyone get through
+        return request.user.has_perm("base.view_rotatingworktypeassign")
     if request.user.employee_get == employee:
         return True
-    elif employee.employee_work_info.reporting_manager_id == request.user.employee_get:
+    work_info = getattr(employee, "employee_work_info", None)
+    if (
+        work_info is not None
+        and work_info.reporting_manager_id == request.user.employee_get
+    ):
         return True
-    elif request.user.has_perm("base.view_rotatingworktypeassign"):
-        return True
-    return False
+    return request.user.has_perm("base.view_rotatingworktypeassign")
 
 
 def _is_reportingmanger(request, instance):
@@ -99,7 +115,7 @@ def _is_reportingmanger(request, instance):
     try:
         employee_work_info_manager = instance.employee_work_info.reporting_manager_id
     except Exception:
-        return HttpResponse("This Employee Dont Have any work information")
+        return False
     return manager == employee_work_info_manager
 
 
@@ -355,7 +371,9 @@ class WorkTypeRequestView(APIView):
     def get(self, request, pk=None):
         # individual object workflow
         if pk:
-            work_type_request = object_check(WorkTypeRequest, pk)
+            work_type_request = permitted_object(
+                request.user, "base.view_worktyperequest", WorkTypeRequest, pk
+            )
             if work_type_request is None:
                 return Response({"error": "WorkTypeRequest not found"}, status=404)
             serializer = self.serializer_class(work_type_request)
@@ -477,8 +495,8 @@ class WorkRequestApproveView(APIView):
         work_type_request = WorkTypeRequest.find(pk)
         if (
             is_reportingmanger(request, work_type_request)
-            or request.user.has_perm("approve_worktyperequest")
-            or request.user.has_perm("change_worktyperequest")
+            or request.user.has_perm("base.approve_worktyperequest")
+            or request.user.has_perm("base.change_worktyperequest")
             and not work_type_request.approved
         ):
             """
@@ -524,7 +542,12 @@ class IndividualRotatingWorktypesView(APIView):
         if individual_permssion_check(request) == False:
             return Response({"error": "you have no permssion to view"}, status=400)
         if pk:
-            rotating_work_type_assign = object_check(RotatingWorkTypeAssign, pk)
+            rotating_work_type_assign = permitted_object(
+                request.user,
+                "base.view_rotatingworktypeassign",
+                RotatingWorkTypeAssign,
+                pk,
+            )
             if rotating_work_type_assign is None:
                 return Response(
                     {"error": "RotatingWorkTypeAssign not found"}, status=404
@@ -564,7 +587,12 @@ class RotatingWorkTypeAssignView(APIView):
 
         if pk:
 
-            rotating_work_type_assign = object_check(RotatingWorkTypeAssign, pk)
+            rotating_work_type_assign = permitted_object(
+                request.user,
+                "base.view_rotatingworktypeassign",
+                RotatingWorkTypeAssign,
+                pk,
+            )
             if rotating_work_type_assign is None:
                 return Response(
                     {"error": "RotatingWorkTypeAssign not found"}, status=404
@@ -644,7 +672,9 @@ class IndividualWorkTypeRequestView(APIView):
 
         # individual object workflow
         if pk:
-            work_type_request = object_check(WorkTypeRequest, pk)
+            work_type_request = permitted_object(
+                request.user, "base.view_worktyperequest", WorkTypeRequest, pk
+            )
             if work_type_request is None:
                 return Response({"error": "WorkTypeRequest not found"}, status=404)
             serializer = self.serializer_class(work_type_request)
@@ -819,7 +849,12 @@ class IndividualRotatingShiftView(APIView):
             return Response({"error": "you have no permssion to view"}, status=400)
 
         if pk:
-            rotating_shift_assign = object_check(RotatingShiftAssign, pk)
+            rotating_shift_assign = permitted_object(
+                request.user,
+                "base.view_rotatingshiftassign",
+                RotatingShiftAssign,
+                pk,
+            )
             if rotating_shift_assign is None:
                 return Response({"error": "RotatingShiftAssign not found"}, status=404)
             serializer = self.serializer_class(rotating_shift_assign)
@@ -844,7 +879,12 @@ class RotatingShiftAssignView(APIView):
     @manager_permission_required("base.view_rotatingshiftassign")
     def get(self, request, pk=None):
         if pk:
-            rotating_shift_assign = object_check(RotatingShiftAssign, pk)
+            rotating_shift_assign = permitted_object(
+                request.user,
+                "base.view_rotatingshiftassign",
+                RotatingShiftAssign,
+                pk,
+            )
             if rotating_shift_assign is None:
                 return Response({"error": "RotatingShiftAssign not found"}, status=404)
             serializer = self.serializer_class(rotating_shift_assign)
@@ -906,7 +946,9 @@ class IndividualShiftRequestView(APIView):
             return Response({"error": "you have no permssion to view"}, status=400)
 
         if pk:
-            shift_request = object_check(ShiftRequest, pk)
+            shift_request = permitted_object(
+                request.user, "base.view_shiftrequest", ShiftRequest, pk
+            )
             if shift_request is None:
                 return Response({"error": "EmployeeShift not found"}, status=404)
             serializer = self.serializer_class(shift_request)
@@ -940,7 +982,9 @@ class ShiftRequestView(APIView):
     def get(self, request, pk=None):
         # individual section
         if pk:
-            shift_request = object_check(ShiftRequest, pk)
+            shift_request = permitted_object(
+                request.user, "base.view_shiftrequest", ShiftRequest, pk
+            )
             if shift_request is None:
                 return Response({"error": "ShiftRequest not found"}, status=404)
             serializer = self.serializer_class(shift_request)
@@ -1048,8 +1092,8 @@ class ShiftRequestApproveView(APIView):
         shift_request = ShiftRequest.objects.get(id=pk)
         if (
             is_reportingmanger(request, shift_request)
-            or request.user.has_perm("approve_shiftrequest")
-            or request.user.has_perm("change_shiftrequest")
+            or request.user.has_perm("base.approve_shiftrequest")
+            or request.user.has_perm("base.change_shiftrequest")
             and not shift_request.approved
         ):
             """
@@ -1079,8 +1123,8 @@ class ShiftRequestBulkApproveView(APIView):
             shift_request = ShiftRequest.objects.get(id=id)
             if (
                 is_reportingmanger(request, shift_request)
-                or request.user.has_perm("approve_shiftrequest")
-                or request.user.has_perm("change_shiftrequest")
+                or request.user.has_perm("base.approve_shiftrequest")
+                or request.user.has_perm("base.change_shiftrequest")
                 and not shift_request.approved
             ):
                 """
@@ -1262,8 +1306,8 @@ class WorktypeRequestApprovePermissionCheck(APIView):
         instance = Employee.objects.filter(id=request.GET.get("employee_id")).first()
         if (
             _is_reportingmanger(request, instance)
-            or request.user.has_perm("approve_shiftrequest")
-            or request.user.has_perm("change_shiftrequest")
+            or request.user.has_perm("base.approve_worktyperequest")
+            or request.user.has_perm("base.change_worktyperequest")
         ):
             return Response(status=200)
         return Response(status=400)
@@ -1276,8 +1320,8 @@ class ShiftRequestApprovePermissionCheck(APIView):
         instance = Employee.objects.filter(id=request.GET.get("employee_id")).first()
         if (
             _is_reportingmanger(request, instance)
-            or request.user.has_perm("approve_shiftrequest")
-            or request.user.has_perm("change_shiftrequest")
+            or request.user.has_perm("base.approve_shiftrequest")
+            or request.user.has_perm("base.change_shiftrequest")
         ):
             return Response(status=200)
         return Response(status=400)

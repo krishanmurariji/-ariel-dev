@@ -486,6 +486,16 @@ def action_type_name(request):
     return JsonResponse({"action_type": action_type})
 
 
+def visible_disciplinary_actions(request):
+    """
+    Disciplinary actions the user may see: all with the view permission,
+    otherwise their own and their subordinates' (same rule as the list page).
+    """
+    return filtersubordinates(
+        request, DisciplinaryAction.objects.all(), "employee.view_disciplinaryaction"
+    ).distinct()
+
+
 @login_required
 @hx_request_required
 def disciplinary_filter_view(request):
@@ -495,7 +505,9 @@ def disciplinary_filter_view(request):
 
     previous_data = request.GET.urlencode()
     action_id = request.GET.get("click_id") if request.GET.get("click_id") else None
-    dis_filter = DisciplinaryActionFilter(request.GET).qs
+    dis_filter = DisciplinaryActionFilter(
+        request.GET, queryset=visible_disciplinary_actions(request)
+    ).qs
     page_number = request.GET.get("page")
     page_obj = paginator_qry(dis_filter, page_number)
     data_dict = parse_qs(previous_data)
@@ -519,7 +531,9 @@ def search_disciplinary(request):
     """
     This method is used to search in Disciplinary Actions
     """
-    disciplinary = DisciplinaryActionFilter(request.GET).qs
+    disciplinary = DisciplinaryActionFilter(
+        request.GET, queryset=visible_disciplinary_actions(request)
+    ).qs
     return render(
         request,
         "disciplinary_actions/disciplinary_records.html",

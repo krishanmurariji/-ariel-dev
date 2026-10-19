@@ -29,7 +29,7 @@ from payroll.models.tax_models import TaxBracket
 from payroll.threadings.mail import MailSendThread
 from payroll.views.views import payslip_pdf
 
-from ...api_methods.base.methods import groupby_queryset
+from ...api_methods.base.methods import groupby_queryset, owned_object
 from ...api_serializers.payroll.serializers import (
     AllowanceSerializer,
     ContractSerializer,
@@ -121,7 +121,11 @@ class ContractView(APIView):
 
     def get(self, request, id=None):
         if id:
-            contract = Contract.objects.filter(id=id).first()
+            contract = owned_object(
+                request.user, "payroll.view_contract", Contract, id, managers=False
+            )
+            if contract is None:
+                return Response({"error": "Contract not found"}, status=404)
             serializer = ContractSerializer(contract)
             return Response(serializer.data, status=200)
         if request.user.has_perm("payroll.view_contract"):
@@ -288,7 +292,15 @@ class ReimbursementView(APIView):
 
     def get(self, request, pk=None):
         if pk:
-            reimbursement = Reimbursement.objects.get(id=pk)
+            reimbursement = owned_object(
+                request.user,
+                "payroll.view_reimbursement",
+                Reimbursement,
+                pk,
+                managers=False,
+            )
+            if reimbursement is None:
+                return Response({"error": "Reimbursement not found"}, status=404)
             serializer = self.serializer_class(reimbursement)
             return Response(serializer.data, status=200)
         reimbursements = Reimbursement.objects.all()

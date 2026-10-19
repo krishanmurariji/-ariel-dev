@@ -9,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from base.methods import filtersubordinates
 from employee.filters import (
     DisciplinaryActionFilter,
     DocumentRequestFilter,
@@ -35,7 +36,11 @@ from ...api_decorators.base.decorators import (
     manager_permission_required,
 )
 from ...api_decorators.employee.decorators import or_condition
-from ...api_methods.base.methods import groupby_queryset, permission_based_queryset
+from ...api_methods.base.methods import (
+    groupby_queryset,
+    owned_object,
+    permission_based_queryset,
+)
 from ...api_serializers.employee.serializers import (
     ActiontypeSerializer,
     DisciplinaryActionSerializer,
@@ -725,11 +730,22 @@ class DocumentRequestAPIView(APIView):
 
     def get(self, request, pk=None):
         if pk:
-            document_request = self.get_object(pk)
+            document_request = owned_object(
+                request.user,
+                "horilla_documents.view_documentrequest",
+                DocumentRequest,
+                pk,
+            )
+            if document_request is None:
+                raise Http404
             serializer = DocumentRequestSerializer(document_request)
             return Response(serializer.data)
         else:
-            document_requests = DocumentRequest.objects.all()
+            document_requests = filtersubordinates(
+                request,
+                DocumentRequest.objects.all(),
+                "horilla_documents.view_documentrequest",
+            ).distinct()
             pagination = PageNumberPagination()
             page = pagination.paginate_queryset(document_requests, request)
             serializer = DocumentRequestSerializer(page, many=True)
@@ -901,9 +917,10 @@ class EmployeeBulkArchiveView(APIView):
         for employee_id in ids:
             employee = Employee.objects.get(id=employee_id)
             employee.is_active = is_active
-            employee.employee_user_id.is_active = is_active
             if employee.get_archive_condition() is False:
                 employee.save()
+                employee.sync_user_active()
+                continue
             error.append(
                 {
                     "employee": str(employee),
@@ -920,10 +937,10 @@ class EmployeeArchiveView(APIView):
     def post(self, request, id, is_active):
         employee = Employee.objects.get(id=id)
         employee.is_active = is_active
-        employee.employee_user_id.is_active = is_active
         response = None
         if employee.get_archive_condition() is False:
             employee.save()
+            employee.sync_user_active()
         else:
             response = {
                 "employee": str(employee),

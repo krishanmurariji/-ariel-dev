@@ -19,7 +19,7 @@ from leave.models import AvailableLeave, LeaveAllocationRequest, LeaveRequest, L
 from notifications.signals import notify
 
 from ...api_decorators.base.decorators import manager_permission_required
-from ...api_methods.base.methods import groupby_queryset
+from ...api_methods.base.methods import groupby_queryset, owned_object
 
 
 class EmployeeAvailableLeaveGetAPIView(APIView):
@@ -299,7 +299,14 @@ class LeaveAllocationRequestGetUpdateDeleteAPIView(APIView):
 
     @manager_permission_required("leave.view_leaveallocationrequest")
     def get(self, request, pk):
-        allocation_request = self.get_leave_allocation_request(pk)
+        allocation_request = owned_object(
+            request.user,
+            "leave.view_leaveallocationrequest",
+            LeaveAllocationRequest,
+            pk,
+        )
+        if allocation_request is None:
+            raise Http404
         serializer = LeaveAllocationRequestGetSerializer(allocation_request)
         return Response(serializer.data, status=200)
 
@@ -524,7 +531,16 @@ class LeaveRequestGetUpdateDeleteAPIView(APIView):
 
     @manager_permission_required("leave.view_leaverequest")
     def get(self, request, pk):
-        leave_request = self.get_leave_request(pk)
+        # Same visibility as the list endpoint, including multi-step approvers.
+        visible = (
+            filtersubordinates(
+                request, LeaveRequest.objects.all(), "leave.view_leaverequest"
+            )
+            | filter_conditional_leave_request(request)
+        )
+        leave_request = visible.filter(pk=pk).first()
+        if leave_request is None:
+            raise Http404
         serializer = LeaveRequestGetSerilaizer(
             leave_request, context={"request": request}
         )

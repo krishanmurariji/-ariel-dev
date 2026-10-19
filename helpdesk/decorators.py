@@ -25,12 +25,23 @@ def ticket_owner_can_enter(function, perm: str, model: object, manager_access=Fa
         instance_id = kwargs[list(kwargs.keys())[0]]
         if model == Employee:
             employee = Employee.objects.get(id=instance_id)
+            instance = None
         else:
             try:
-                employee = model.objects.get(id=instance_id).employee_id
+                instance = model.objects.get(id=instance_id)
+                employee = instance.employee_id
             except:
                 messages.error(request, ("Sorry, something went wrong!"))
                 return HorillaRedirect(request)
+        # Only this ticket counts: the assignee/creator checks used to be
+        # unscoped querysets, true for anyone who had ever touched any ticket.
+        is_ticket_party = (
+            isinstance(instance, Ticket)
+            and (
+                instance.assigned_to.filter(pk=request.user.employee_get.pk).exists()
+                or instance.created_by_id == request.user.pk
+            )
+        )
         can_enter = (
             request.user.employee_get == employee
             or request.user.has_perm(perm)
@@ -42,8 +53,7 @@ def ticket_owner_can_enter(function, perm: str, model: object, manager_access=Fa
                 if manager_access
                 else False
             )
-            or Ticket.objects.filter(assigned_to__in=[request.user.employee_get])
-            or Ticket.objects.filter(created_by=request.user)
+            or is_ticket_party
         )
         if can_enter:
             return function(request, *args, **kwargs)

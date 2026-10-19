@@ -82,3 +82,47 @@ def permission_based_queryset(user, perm, queryset, user_obj=None):
         return merged_queryset
 
     return queryset.filter(employee_id=employee)
+
+
+def owned_object(user, perm, model, pk, owner_field="employee_id", managers=True):
+    """
+    For models whose owner is not reached through ``employee_id`` (or is a
+    many-to-many): the object with this pk if the user holds ``perm`` or is the
+    owner, else None. With ``managers=True`` (the default) the owner's
+    managers count too, by the same rule as the list pages' filtersubordinates
+    (nested while NESTED_SUBORDINATE_VISIBILITY is on). Pass ``managers=False``
+    for records whose list shows only your own rows (contracts, reimbursements)
+    so a record is never readable by id when the list hides it.
+    """
+    from horilla.access import current_employee, is_manager_in_chain
+
+    obj = model.objects.filter(pk=pk).first()
+    if obj is None:
+        return None
+    if user.has_perm(perm):
+        return obj
+    owners = getattr(obj, owner_field)
+    if hasattr(owners, "all"):
+        owners = owners.all()
+    elif owners is not None:
+        owners = [owners]
+    me = current_employee(user)
+    for owner in owners or []:
+        if me is not None and owner.pk == me.pk:
+            return obj
+        if managers and is_manager_in_chain(user, owner):
+            return obj
+    return None
+
+
+def permitted_object(user, perm, model, pk):
+    """
+    Single-record counterpart of permission_based_queryset: the object with
+    this pk if the user may see it (same rule as the list endpoints), else
+    None. Callers answer None with 404 so a record's existence isn't leaked.
+    """
+    return (
+        permission_based_queryset(user, perm, model.objects.all(), user_obj=True)
+        .filter(pk=pk)
+        .first()
+    )

@@ -41,6 +41,7 @@ from ...api_decorators.base.decorators import (
     permission_required,
 )
 from ...api_methods.base.methods import groupby_queryset, permission_based_queryset
+from helpdesk.access import can_view_ticket
 
 
 def object_check(cls, pk):
@@ -406,7 +407,7 @@ class CommentGetUpdateDeleteAPIView(APIView):
 
     def get(self, request, pk):
         comment = object_check(Comment, pk)
-        if comment is None:
+        if comment is None or not can_view_ticket(request.user, comment.ticket):
             return Response({"error": "Comment not found"}, status=404)
         serializer = CommentSerializer(comment)
         return Response(serializer.data, status=200)
@@ -470,17 +471,30 @@ class AttachmentGetCreateAPIView(APIView):
 class AttachmentGetDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @staticmethod
+    def can_see(user, attachment):
+        ticket = attachment.ticket or (
+            attachment.comment.ticket if attachment.comment else None
+        )
+        return ticket is not None and can_view_ticket(user, ticket)
+
     def get(self, request, pk):
         attachment = object_check(Attachment, pk)
-        if attachment is None:
+        if attachment is None or not self.can_see(request.user, attachment):
             return Response({"error": "Attachment not found"}, status=404)
         serializer = AttachmentSerializer(attachment)
         return Response(serializer.data, status=200)
 
     def delete(self, request, pk):
         attachment = object_check(Attachment, pk)
-        if attachment is None:
+        if attachment is None or not self.can_see(request.user, attachment):
             return Response({"error": "Attachment not found"}, status=404)
+        author = attachment.comment.employee_id if attachment.comment else None
+        if not (
+            request.user.has_perm("helpdesk.change_ticket")
+            or (author is not None and author == request.user.employee_get)
+        ):
+            return Response({"error": "Permission denied"}, status=403)
         try:
             attachment.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)

@@ -99,7 +99,7 @@ urlpatterns = [
         name="api-document-detail",
     ),
     path(
-        "employee-bulk- archive/<str:is_active>/",
+        "employee-bulk-archive/<str:is_active>/",
         views.EmployeeBulkArchiveView.as_view(),
         name="api-employee-bulk-archive",
     ),

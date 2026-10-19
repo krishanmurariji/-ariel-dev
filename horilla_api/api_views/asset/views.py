@@ -1,5 +1,6 @@
 from datetime import date
 
+from django.db.models import ProtectedError
 from django.http import QueryDict
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
@@ -9,9 +10,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from asset.filters import AssetFilter
+from base.methods import filtersubordinates
 from asset.models import *
 
+from ...api_decorators.base.decorators import permission_required
 from ...api_filters.asset.filters import AssetCategoryFilter
+from ...api_methods.base.methods import owned_object
 from ...api_serializers.asset.serializers import *
 
 
@@ -39,6 +43,7 @@ class AssetAPIView(APIView):
         serializer = AssetGetAllSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
+    @permission_required("asset.add_asset")
     def post(self, request):
         serializer = AssetSerializer(data=request.data)
         if serializer.is_valid():
@@ -46,6 +51,7 @@ class AssetAPIView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @permission_required("asset.change_asset")
     def put(self, request, pk):
         asset = self.get_asset(pk)
         serializer = AssetSerializer(asset, data=request.data)
@@ -54,9 +60,16 @@ class AssetAPIView(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @permission_required("asset.delete_asset")
     def delete(self, request, pk):
         asset = self.get_asset(pk)
-        asset.delete()
+        try:
+            asset.delete()
+        except ProtectedError:
+            return Response(
+                {"error": "This asset is in use and cannot be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -84,6 +97,7 @@ class AssetCategoryAPIView(APIView):
         serializer = AssetCategorySerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
+    @permission_required("asset.add_assetcategory")
     def post(self, request):
         serializer = AssetCategorySerializer(data=request.data)
         if serializer.is_valid():
@@ -91,6 +105,7 @@ class AssetCategoryAPIView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @permission_required("asset.change_assetcategory")
     def put(self, request, pk):
         asset_category = self.get_asset_category(pk)
         serializer = AssetCategorySerializer(asset_category, data=request.data)
@@ -99,9 +114,16 @@ class AssetCategoryAPIView(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @permission_required("asset.delete_assetcategory")
     def delete(self, request, pk):
         asset_category = self.get_asset_category(pk)
-        asset_category.delete()
+        try:
+            asset_category.delete()
+        except ProtectedError:
+            return Response(
+                {"error": "This category is in use and cannot be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -125,6 +147,7 @@ class AssetLotAPIView(APIView):
         serializer = AssetLotSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
+    @permission_required("asset.add_assetlot")
     def post(self, request):
         serializer = AssetLotSerializer(data=request.data)
         if serializer.is_valid():
@@ -132,6 +155,7 @@ class AssetLotAPIView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @permission_required("asset.change_assetlot")
     def put(self, request, pk):
         asset_lot = self.get_asset_lot(pk)
         serializer = AssetLotSerializer(asset_lot, data=request.data)
@@ -140,9 +164,16 @@ class AssetLotAPIView(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @permission_required("asset.delete_assetlot")
     def delete(self, request, pk):
         asset_lot = self.get_asset_lot(pk)
-        asset_lot.delete()
+        try:
+            asset_lot.delete()
+        except ProtectedError:
+            return Response(
+                {"error": "This lot is in use and cannot be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -157,15 +188,29 @@ class AssetAllocationAPIView(APIView):
 
     def get(self, request, pk=None):
         if pk:
-            asset_assignment = self.get_asset_assignment(pk)
+            asset_assignment = owned_object(
+                request.user,
+                "asset.view_assetassignment",
+                AssetAssignment,
+                pk,
+                owner_field="assigned_to_employee_id",
+            )
+            if asset_assignment is None:
+                return Response({"error": "Not found"}, status=404)
             serializer = AssetAssignmentGetSerializer(asset_assignment)
             return Response(serializer.data)
         paginator = PageNumberPagination()
-        assets = AssetAssignment.objects.all()
+        assets = filtersubordinates(
+            request,
+            AssetAssignment.objects.all(),
+            "asset.view_assetassignment",
+            field="assigned_to_employee_id",
+        ).distinct()
         page = paginator.paginate_queryset(assets, request)
         serializer = AssetAssignmentGetSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
+    @permission_required("asset.add_assetassignment")
     def post(self, request):
         serializer = AssetAssignmentSerializer(data=request.data)
         if serializer.is_valid():
@@ -173,6 +218,7 @@ class AssetAllocationAPIView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @permission_required("asset.change_assetassignment")
     def put(self, request, pk):
         asset_assignment = self.get_asset_assignment(pk)
         serializer = AssetAssignmentSerializer(asset_assignment, data=request.data)
@@ -181,14 +227,33 @@ class AssetAllocationAPIView(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @permission_required("asset.delete_assetassignment")
     def delete(self, request, pk):
         asset_assignment = self.get_asset_assignment(pk)
-        asset_assignment.delete()
+        try:
+            asset_assignment.delete()
+        except ProtectedError:
+            return Response(
+                {"error": "This assignment is in use and cannot be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class AssetRequestAPIView(APIView):
     permission_classes = [IsAuthenticated]
+
+    @staticmethod
+    def may_modify(user, asset_request, verb):
+        """Permission holders, or the requester while it is still pending."""
+        if user.has_perm(f"asset.{verb}_assetrequest"):
+            return True
+        me = getattr(user, "employee_get", None)
+        return (
+            me is not None
+            and asset_request.requested_employee_id_id == me.pk
+            and asset_request.asset_request_status == "Requested"
+        )
 
     def get_asset_request(self, pk):
         try:
@@ -198,11 +263,28 @@ class AssetRequestAPIView(APIView):
 
     def get(self, request, pk=None):
         if pk:
-            asset_request = self.get_asset_request(pk)
+            asset_request = owned_object(
+                request.user,
+                "asset.view_assetrequest",
+                AssetRequest,
+                pk,
+                owner_field="requested_employee_id",
+            )
+            if asset_request is None:
+                return Response({"error": "Not found"}, status=404)
             serializer = AssetRequestGetSerializer(asset_request)
             return Response(serializer.data)
         paginator = PageNumberPagination()
-        assets = AssetRequest.objects.all().order_by("-id")
+        assets = (
+            filtersubordinates(
+                request,
+                AssetRequest.objects.all(),
+                "asset.view_assetrequest",
+                field="requested_employee_id",
+            )
+            .distinct()
+            .order_by("-id")
+        )
         page = paginator.paginate_queryset(assets, request)
         serializer = AssetRequestGetSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
@@ -216,6 +298,8 @@ class AssetRequestAPIView(APIView):
 
     def put(self, request, pk):
         asset_request = self.get_asset_request(pk)
+        if not self.may_modify(request.user, asset_request, "change"):
+            return Response({"error": "Permission denied"}, status=403)
         serializer = AssetRequestSerializer(asset_request, data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -224,7 +308,15 @@ class AssetRequestAPIView(APIView):
 
     def delete(self, request, pk):
         asset_request = self.get_asset_request(pk)
-        asset_request.delete()
+        if not self.may_modify(request.user, asset_request, "delete"):
+            return Response({"error": "Permission denied"}, status=403)
+        try:
+            asset_request.delete()
+        except ProtectedError:
+            return Response(
+                {"error": "This request is in use and cannot be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -237,6 +329,7 @@ class AssetRejectAPIView(APIView):
         except AssetRequest.DoesNotExist as e:
             raise serializers.ValidationError(e)
 
+    @permission_required("asset.add_assetassignment")
     def put(self, request, pk):
         asset_request = self.get_asset_request(pk)
         if asset_request.asset_request_status == "Requested":
@@ -255,6 +348,7 @@ class AssetApproveAPIView(APIView):
         except AssetRequest.DoesNotExist as e:
             raise serializers.ValidationError(e)
 
+    @permission_required("asset.add_assetassignment")
     def put(self, request, pk):
         asset_request = self.get_asset_request(pk)
         if asset_request.asset_request_status == "Requested":
@@ -289,7 +383,7 @@ class AssetReturnAPIView(APIView):
 
     def put(self, request, pk):
         asset_assignment = self.get_asset_assignment(pk)
-        if request.user.has_perm("app_name.change_mymodel"):
+        if request.user.has_perm("asset.change_assetassignment"):
             serializer = AssetReturnSerializer(
                 instance=asset_assignment, data=request.data
             )
@@ -300,15 +394,23 @@ class AssetReturnAPIView(APIView):
                 ]
                 asset_return = serializer.save()
                 asset_return.return_images.set(images)
-                if asset_return.return_status == "Healthy":
-                    Asset.objects.filter(id=pk).update(asset_status="Available")
-                else:
-                    Asset.objects.filter(id=pk).update(asset_status="Not-Available")
+                # pk is the assignment's id; the asset is its own record.
+                new_status = (
+                    "Available"
+                    if asset_return.return_status == "Healthy"
+                    else "Not-Available"
+                )
+                Asset.objects.filter(id=asset_assignment.asset_id_id).update(
+                    asset_status=new_status
+                )
                 AssetAssignment.objects.filter(id=asset_return.id).update(
                     return_date=date.today()
                 )
                 return Response(status=200)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         else:
+            me = getattr(request.user, "employee_get", None)
+            if me is None or asset_assignment.assigned_to_employee_id_id != me.pk:
+                return Response({"error": "Permission denied"}, status=403)
             AssetAssignment.objects.filter(id=pk).update(return_request=True)
             return Response(status=200)

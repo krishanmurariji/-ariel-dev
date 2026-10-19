@@ -803,6 +803,17 @@ class Employee(models.Model):
 
         return self
 
+    def sync_user_active(self):
+        """
+        Make the login account follow the archive flag. Archiving used to set
+        the flag on an in-memory user and never save it, so archived employees
+        could still sign in.
+        """
+        user = self.employee_user_id
+        if user is not None and user.is_active != self.is_active:
+            user.is_active = self.is_active
+            user.save(update_fields=["is_active"])
+
 
 class EmployeeEmergencyContact(HorillaModel):
     """

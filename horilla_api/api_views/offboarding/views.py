@@ -43,7 +43,11 @@ from ...api_decorators.base.decorators import (
     manager_permission_required,
     permission_required,
 )
-from ...api_methods.base.methods import groupby_queryset, permission_based_queryset
+from ...api_methods.base.methods import (
+    groupby_queryset,
+    permission_based_queryset,
+    permitted_object,
+)
 
 
 def object_check(cls, pk):
@@ -343,7 +347,12 @@ class ResignationLetterGetCreateAPIView(APIView):
 
     def get(self, request, pk=None, employee_id=None):
         if pk:
-            letter = object_check(ResignationLetter, pk)
+            letter = permitted_object(
+                request.user,
+                "offboarding.view_resignationletter",
+                ResignationLetter,
+                pk,
+            )
             if letter is None:
                 return Response({"error": "ResignationLetter not found"}, status=404)
             serializer = ResignationLetterSerializer(letter)
@@ -384,7 +393,9 @@ class ResignationLetterGetUpdateDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
-        letter = object_check(ResignationLetter, pk)
+        letter = permitted_object(
+            request.user, "offboarding.view_resignationletter", ResignationLetter, pk
+        )
         if letter is None:
             return Response({"error": "ResignationLetter not found"}, status=404)
         serializer = ResignationLetterSerializer(letter)
