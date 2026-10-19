@@ -415,6 +415,15 @@ class ResignationLetter(HorillaModel):
     additional_comment = models.TextField(
         blank=True, default="", verbose_name=_("Additional comment")
     )
+    # People the employee chose to be told as well - they get the same mail
+    # and in-app notice as the reporting manager. Telling them confers no
+    # access to the request itself.
+    notify_employees = models.ManyToManyField(
+        Employee,
+        blank=True,
+        related_name="resignations_to_notify",
+        verbose_name=_("Persons to notify"),
+    )
     objects = HorillaCompanyManager(
         related_company_field="employee_id__employee_work_info__company_id"
     )

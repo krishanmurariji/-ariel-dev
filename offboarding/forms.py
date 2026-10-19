@@ -369,18 +369,22 @@ class ResignationLetterForm(ModelForm):
             and request
             and not request.user.has_perm("offboarding.add_resignationletter")
         ):
-            with contextlib.suppress(Exception):
-                notify.send(
-                    request.user.employee_get,
-                    recipient=self.instance.employee_id.get_reporting_manager().employee_user_id,
-                    verb=f"{self.instance.employee_id.get_full_name()} requested for resignation.",
-                    verb_ar=f"",
-                    verb_de=f"",
-                    verb_es=f"",
-                    verb_fr=f"",
-                    redirect="#",
-                    icon="information",
-                )
+            from horilla.access import VIEW, managers_for
+
+            # the reporting manager and, if they may see resignations, the second manager
+            for manager in managers_for(self.instance.employee_id, "resignation", VIEW):
+                with contextlib.suppress(Exception):
+                    notify.send(
+                        request.user.employee_get,
+                        recipient=manager.employee_user_id,
+                        verb=f"{self.instance.employee_id.get_full_name()} requested for resignation.",
+                        verb_ar=f"",
+                        verb_de=f"",
+                        verb_es=f"",
+                        verb_fr=f"",
+                        redirect="#",
+                        icon="information",
+                    )
         return instance
 
 
@@ -436,11 +440,27 @@ class SelfResignationForm(ModelForm):
         max_length=2000,
         widget=forms.Textarea(attrs={"rows": 3, "placeholder": _("Type here")}),
     )
+    notify_employees = forms.ModelMultipleChoiceField(
+        label=_("Persons to notify"),
+        required=False,
+        queryset=Employee.objects.none(),
+        help_text=_(
+            "Optional. Anyone you choose receives the same email as your "
+            "reporting manager."
+        ),
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         request = getattr(horilla_middlewares._thread_locals, "request", None)
         self.employee = request.user.employee_get
+        self.fields["notify_employees"].queryset = (
+            Employee.objects.filter(is_active=True)
+            .exclude(pk=self.employee.pk)
+            .select_related("employee_work_info__job_position_id")
+            .order_by("employee_first_name", "employee_last_name")
+        )
+        self.fields["notify_employees"].label_from_instance = self._person_label
         # Binds the letter to the employee up front so the model's own
         # "already has a pending/approved resignation" check reports as a
         # normal form error instead of failing later at save time.
@@ -453,6 +473,12 @@ class SelfResignationForm(ModelForm):
         # they want to leave - there is no "early" about it.
         self.date_is_mandatory = self.notice_end is None
         self.fields["preferred_last_working_day"].initial = None
+
+    @staticmethod
+    def _person_label(employee):
+        position = employee.get_job_position()
+        name = employee.get_full_name()
+        return f"{name} - {position}" if position else name
 
     def _reject_script_like_text(self, name):
         # The model layer refuses script-like text outright (has_xss) and
@@ -536,9 +562,17 @@ class SelfResignationForm(ModelForm):
         )
         letter.status = "requested"
         letter.save()
+        letter.notify_employees.set(data.get("notify_employees") or [])
 
-        manager = employee.get_reporting_manager()
-        if manager and manager.employee_user_id:
+        from horilla.access import VIEW, managers_for
+
+        recipients = list(managers_for(employee, "resignation", VIEW))
+        for person in letter.notify_employees.all():
+            if all(person.pk != known.pk for known in recipients):
+                recipients.append(person)
+        for manager in recipients:
+            if not manager.employee_user_id:
+                continue
             with contextlib.suppress(Exception):
                 notify.send(
                     employee,

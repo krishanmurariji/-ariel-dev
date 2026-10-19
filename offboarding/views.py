@@ -1,6 +1,6 @@
 from horilla.post_only import post_only
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
 from django.apps import apps

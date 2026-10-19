@@ -216,11 +216,8 @@ class ValidationTests(SelfResignationTestBase):
 
 
 class ManagerEmailTests(SelfResignationTestBase):
-    def test_the_reporting_manager_gets_a_clear_summary_email(self):
-        early = datetime.date.today() + datetime.timedelta(days=30)
-        self.submit(
-            early_last_working_day="yes", preferred_last_working_day=early.isoformat()
-        )
+    def test_the_reporting_manager_gets_the_resignation_mail(self):
+        self.submit()
 
         self.assertEqual(len(mail.outbox), 1)
         message = mail.outbox[0]
@@ -229,29 +226,61 @@ class ManagerEmailTests(SelfResignationTestBase):
         self.assertEqual(message.reply_to, [self.employee.get_mail()])
         html = message.alternatives[0][0]
         for expected in (
-            self.manager.get_full_name(),
             self.employee.get_full_name(),
+            "has requested for resignation",
+            "Requested Date",
+            datetime.date.today().strftime("%d %b %Y"),
+            "Reason",
             "Relocating",
-            "Spoke with my manager about the move.",
-            "90 days",
-            self.notice_end.strftime("%d %b %Y"),
-            early.strftime("%d %b %Y"),
-            "Subject to mutual agreement",
+            "Note",
             "Thank you for the opportunity.",
         ):
             self.assertIn(expected, html)
+        self.assertNotIn("Hi All", html)
         self.assertIn("Relocating", message.body)
+        self.assertIn("Thank you for the opportunity.", message.body)
+
+    def test_the_greeting_uses_the_recipients_name_not_hi_all_or_a_designation(self):
+        from base.models import Department, JobPosition
+
+        department = Department.objects.create(department="Engineering")
+        position = JobPosition.objects.create(
+            job_position="Engineering Lead", department_id=department
+        )
+        EmployeeWorkInformation.objects.filter(employee_id=self.manager).update(
+            job_position_id=position
+        )
+        self.submit()
+        message = mail.outbox[0]
+        name = self.manager.get_full_name()
+        self.assertIn("Hi <strong>%s</strong>," % name, message.alternatives[0][0])
+        self.assertTrue(message.body.startswith("Hi %s," % name))
+        self.assertNotIn("Engineering Lead", message.body)
+        self.assertNotIn("Hi All", message.body)
+
+    def test_each_chosen_person_is_greeted_by_their_own_name(self):
+        p_user, person = _employee(company=self.company)
+        self.submit(notify_employees=[person.pk])
+        by_address = {m.to[0]: m for m in mail.outbox}
+        self.assertTrue(
+            by_address[person.get_mail()].body.startswith("Hi %s," % person.get_full_name())
+        )
+        self.assertTrue(
+            by_address[self.manager.get_mail()].body.startswith(
+                "Hi %s," % self.manager.get_full_name()
+            )
+        )
+
+    def test_the_note_line_is_left_out_when_there_is_no_comment(self):
+        self.submit(additional_comment="")
+        message = mail.outbox[0]
+        self.assertNotIn("Note :", message.body)
+        self.assertNotIn("Note :", message.alternatives[0][0])
 
     def test_text_the_employee_typed_cannot_inject_markup_into_the_email(self):
-        self.submit(
-            discussion_summary='Talked <b>twice</b> - see <a href="http://evil.example">this</a>',
-            additional_comment="<h1>Big</h1> & more",
-        )
+        self.submit(additional_comment="<h1>Big</h1> & more")
         html = mail.outbox[0].alternatives[0][0]
-        self.assertNotIn("<b>twice</b>", html)
-        self.assertNotIn('<a href="http://evil.example">', html)
         self.assertNotIn("<h1>Big</h1>", html)
-        self.assertIn("&lt;b&gt;twice&lt;/b&gt;", html)
         self.assertIn("&lt;h1&gt;Big&lt;/h1&gt; &amp; more", html)
 
     def test_no_manager_means_no_email_but_the_resignation_still_goes_through(self):
@@ -350,3 +379,122 @@ class HrCanSeeTheAnswersTests(SelfResignationTestBase):
 
         self.assertIn("Relocating", body)
         self.assertIn("Discussed with manager", body)
+
+
+class PersonToNotifyTests(SelfResignationTestBase):
+    """The optional "Persons to notify" dropdown on the resignation form."""
+
+    def setUp(self):
+        super().setUp()
+        self.p1_user, self.p1 = _employee(company=self.company)
+        self.p2_user, self.p2 = _employee(company=self.company)
+
+    def recipients(self):
+        return sorted(address for m in mail.outbox for address in m.to)
+
+    def select_html(self):
+        body = self.client.get(reverse(URL), **HX).content.decode()
+        return body, body.split('name="notify_employees"')[1].split("</select>")[0]
+
+    def test_the_dropdown_is_on_the_form_and_lists_people_with_their_designation(self):
+        from base.models import Department, JobPosition
+
+        department = Department.objects.create(department="Finance")
+        position = JobPosition.objects.create(
+            job_position="Finance Head", department_id=department
+        )
+        EmployeeWorkInformation.objects.filter(employee_id=self.p1).update(
+            job_position_id=position
+        )
+        body, select = self.select_html()
+        self.assertIn("Persons to notify", body)
+        self.assertIn("%s - Finance Head" % self.p1.get_full_name(), select)
+        self.assertIn("same email as your reporting manager", body)
+
+    def test_the_employee_themselves_is_not_offered(self):
+        _body, select = self.select_html()
+        self.assertNotIn('value="%s"' % self.employee.pk, select)
+        self.assertIn('value="%s"' % self.p1.pk, select)
+
+    def test_archived_people_are_not_offered(self):
+        Employee.objects.filter(pk=self.p2.pk).update(is_active=False)
+        _body, select = self.select_html()
+        self.assertNotIn('value="%s"' % self.p2.pk, select)
+
+    def test_the_field_is_optional(self):
+        self.submit()
+        self.assertEqual(self.letters().count(), 1)
+        self.assertEqual(self.letters().get().notify_employees.count(), 0)
+        self.assertEqual(self.recipients(), [self.manager.get_mail()])
+
+    def test_chosen_people_get_the_same_mail_as_the_reporting_manager(self):
+        self.submit(notify_employees=[self.p1.pk, self.p2.pk])
+
+        letter = self.letters().get()
+        self.assertEqual(
+            set(letter.notify_employees.values_list("pk", flat=True)),
+            {self.p1.pk, self.p2.pk},
+        )
+        self.assertEqual(
+            self.recipients(),
+            sorted([self.manager.get_mail(), self.p1.get_mail(), self.p2.get_mail()]),
+        )
+        # same body apart from the greeting line
+        bodies = {m.alternatives[0][0].split("</p>", 1)[1] for m in mail.outbox}
+        self.assertEqual(len(bodies), 1, "everyone must get the same body")
+        for message in mail.outbox:
+            self.assertEqual(message.subject, mail.outbox[0].subject)
+            self.assertEqual(message.reply_to, [self.employee.get_mail()])
+
+    def test_choosing_the_manager_does_not_send_them_two_mails(self):
+        self.submit(notify_employees=[self.manager.pk, self.p1.pk])
+        self.assertEqual(self.recipients().count(self.manager.get_mail()), 1)
+        self.assertEqual(len(mail.outbox), 2)
+
+    def test_chosen_people_also_get_an_in_app_notice(self):
+        from notifications.models import Notification
+
+        self.submit(notify_employees=[self.p1.pk])
+        for user in (self.manager_user, self.p1_user):
+            self.assertTrue(
+                Notification.objects.filter(
+                    recipient=user, verb__contains="requested for resignation"
+                ).exists(),
+                user.username,
+            )
+        self.assertFalse(Notification.objects.filter(recipient=self.p2_user).exists())
+
+    def test_someone_who_is_not_chosen_gets_nothing(self):
+        self.submit(notify_employees=[self.p1.pk])
+        self.assertNotIn(self.p2.get_mail(), self.recipients())
+
+    def test_a_chosen_person_without_an_email_does_not_break_the_others(self):
+        Employee.objects.filter(pk=self.p1.pk).update(email="")
+        EmployeeWorkInformation.objects.filter(employee_id=self.p1).update(email="")
+        self.submit(notify_employees=[self.p1.pk, self.p2.pk])
+        self.assertEqual(self.letters().count(), 1)
+        self.assertIn(self.p2.get_mail(), self.recipients())
+        self.assertIn(self.manager.get_mail(), self.recipients())
+
+    def test_the_employee_cannot_pick_themselves_or_an_archived_employee(self):
+        Employee.objects.filter(pk=self.p2.pk).update(is_active=False)
+        for bad in (self.employee.pk, self.p2.pk, 999999):
+            with self.subTest(bad=bad):
+                response = self.submit(notify_employees=[bad])
+                self.assertEqual(self.letters().count(), 0)
+                self.assertIn("Select a valid choice", response.content.decode())
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_a_mail_failure_for_one_person_does_not_stop_the_submission(self):
+        from offboarding import mailers
+
+        real = mailers._notify_one_manager
+
+        def flaky(letter, person):
+            if person.pk == self.p1.pk:
+                raise RuntimeError("smtp down")
+            return real(letter, person)
+
+        with mock.patch.object(mailers, "_notify_one_manager", side_effect=flaky):
+            self.submit(notify_employees=[self.p1.pk, self.p2.pk])
+        self.assertEqual(self.letters().count(), 1)

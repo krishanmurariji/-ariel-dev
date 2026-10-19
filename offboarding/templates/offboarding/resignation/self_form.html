@@ -107,6 +107,13 @@
                 {% for error in form.additional_comment.errors %}<div class="sr-error">{{ error }}</div>{% endfor %}
             </div>
 
+            <div class="sr-group">
+                <label class="oh-label" for="{{ form.notify_employees.id_for_label }}">{{ form.notify_employees.label }} <span class="sr-optional">({% trans "Optional" %})</span></label>
+                {{ form.notify_employees|add_class:"oh-select w-100" }}
+                <small class="sr-optional">{{ form.notify_employees.help_text }}</small>
+                {% for error in form.notify_employees.errors %}<div class="sr-error">{{ error }}</div>{% endfor %}
+            </div>
+
             <div class="d-flex flex-row-reverse sr-group" style="gap: 10px;">
                 <button type="submit" class="oh-btn oh-btn--danger pl-4 pr-4">{% trans "Submit resignation" %}</button>
                 <button type="button" class="oh-btn oh-btn--light pl-4 pr-4"
@@ -137,5 +144,14 @@
         }
         form.on("change", "input[type=radio]", sync);
         sync();
+
+        var people = form.find("[name=notify_employees]");
+        if (window.jQuery && $.fn.select2 && people.length) {
+            people.select2({
+                width: "100%",
+                placeholder: "{% trans 'Select people to notify' %}",
+                dropdownParent: people.closest(".oh-modal, .sr-wrap, body"),
+            });
+        }
     })();
 </script>
