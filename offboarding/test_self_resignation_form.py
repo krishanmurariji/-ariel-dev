@@ -28,7 +28,7 @@ URL = "resignation-self-create"
 def _employee(*, company=None, manager=None, **user_extra):
     user = make_user(f"selfresign_{next(_counter)}", **user_extra)
     employee = Employee.objects.get(employee_user_id=user)
-    EmployeeWorkInformation.objects.update_or_create(
+    EmployeeWorkInformation.objects.entire().update_or_create(
         employee_id=employee,
         defaults={"company_id": company, "reporting_manager_id": manager},
     )

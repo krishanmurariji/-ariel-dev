@@ -11,18 +11,26 @@ model; HorillaModel.save() then stamps modified_by with that stale user and
 SQLite rejects the dangling foreign key when the test ends - tests that pass
 alone fail in the full run. This clears it before each test, and again
 afterwards so this test's own requests don't poison the next one either.
+
+The "selected company" is another such variable: the company id the last
+request selected stays set, so the company-scoped managers of the next test
+filter on a company that no longer exists (and add DISTINCT, which PostgreSQL
+refuses together with FOR UPDATE). SQLite hid this by reusing the same ids
+after every rollback; PostgreSQL does not, so it is reset here too.
 """
 
 from django.test import TestCase
 
-from horilla.horilla_middlewares import _thread_locals
+from horilla.horilla_middlewares import _thread_locals, set_selected_company
 
 
 class IsolatedTestCase(TestCase):
     def _pre_setup(self):
         super()._pre_setup()
         _thread_locals.request = None
+        set_selected_company(None)
 
     def _post_teardown(self):
         _thread_locals.request = None
+        set_selected_company(None)
         super()._post_teardown()
