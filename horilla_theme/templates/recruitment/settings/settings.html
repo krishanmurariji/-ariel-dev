@@ -178,39 +178,39 @@
             </div>
         </div>
     </div>
-    <button id="selfTrackButton" hx-get="{% url 'candidate-self-tracking' %}" hx-target="#reloadMessages" hidden>
+    <button id="selfTrackButton" hx-post="{% url 'candidate-self-tracking' %}" hx-target="#reloadMessages" hidden>
     </button>
     <button
         id="ratingButton"
-        hx-get="{% url 'candidate-self-tracking-rating-option' %}"
+        hx-post="{% url 'candidate-self-tracking-rating-option' %}"
         hx-target="#reloadMessages"
         hidden
     >
     </button>
     <button
         id="candidatePortalMailButton"
-        hx-get="{% url 'candidate-portal-mail-setting' %}"
+        hx-post="{% url 'candidate-portal-mail-setting' %}"
         hx-target="#reloadMessages"
         hidden
     >
     </button>
     <button
         id="platformConversionWidgetButton"
-        hx-get="{% url 'platform-conversion-widget-setting' %}"
+        hx-post="{% url 'platform-conversion-widget-setting' %}"
         hx-target="#reloadMessages"
         hidden
     >
     </button>
     <button
         id="meetingProviderButton"
-        hx-get="{% url 'default-meeting-provider' %}"
+        hx-post="{% url 'default-meeting-provider' %}"
         hx-target="#reloadMessages"
         hidden
     >
     </button>
     <button
         id="probationPeriodButton"
-        hx-get="{% url 'default-probation-period' %}"
+        hx-post="{% url 'default-probation-period' %}"
         hx-target="#reloadMessages"
         hidden
     >

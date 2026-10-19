@@ -1,3 +1,4 @@
+from horilla.post_only import post_only
 import json
 from datetime import datetime, timedelta
 from urllib.parse import parse_qs, urlparse
@@ -262,6 +263,7 @@ def create_offboarding(request):
     )
 
 
+@post_only
 @login_required
 @permission_required("offboarding.delete_offboarding")
 def delete_offboarding(request, id):
@@ -397,6 +399,7 @@ def add_employee(request):
     return render(request, "offboarding/employee/form.html", {"form": form})
 
 
+@post_only
 @login_required
 @permission_required("offboarding.delete_offboardingemployee")
 def delete_employee(request):
@@ -426,6 +429,7 @@ def delete_employee(request):
     return redirect(filter_pipeline)
 
 
+@post_only
 @login_required
 @permission_required("offboarding.delete_offboardingstage")
 def delete_stage(request):
@@ -683,6 +687,7 @@ def add_note(request):
     )
 
 
+@post_only
 @login_required
 @manager_can_enter(perm="offboarding.delete_offboardingNote")
 def offboarding_note_delete(request, note_id):
@@ -699,6 +704,7 @@ def offboarding_note_delete(request, note_id):
     return HttpResponse(script)
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("offboarding.delete_offboardingnote")
@@ -845,6 +851,7 @@ def task_assign(request):
     )
 
 
+@post_only
 @login_required
 @offboarding_or_stage_manager_can_enter("offboarding.delete_offboardingtask")
 def delete_task(request):
@@ -1056,6 +1063,7 @@ def resignation_list_swap_response(original_request):
         return HttpResponse(" ", content_type="text/html")
 
 
+@post_only
 @login_required
 @check_feature_enabled("resignation_request")
 def delete_resignation_request(request):
@@ -1206,6 +1214,7 @@ def update_status(request):
     return redirect(reverse("resignation-request-view"))
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("offboarding.add_offboardinggeneralsetting")

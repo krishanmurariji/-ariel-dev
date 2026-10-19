@@ -209,7 +209,7 @@ class ResignationToggleTests(IsolatedTestCase):
         self.client.force_login(admin)
         _set_session_company(self.client, session_value)
         query = "?resignation_request=on" if on else ""
-        self.client.get(reverse("enable-resignation-request") + query, **HX)
+        self.client.post(reverse("enable-resignation-request") + query, **HX)
 
     def test_in_all_company_mode_the_toggle_edits_only_the_global_row(self):
         x = _company("Co X")

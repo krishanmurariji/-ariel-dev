@@ -70,7 +70,7 @@
         ></ion-icon
         >{% trans "Edit" %}
       </a>
-      <a
+      <a data-post-link
         href="{% url 'delete-allowance' allowance.id %}"
         onclick="event.preventDefault();event.stopPropagation(); confirm(`Do you want to delete this allowance?`)"
         class="oh-btn oh-btn--danger"

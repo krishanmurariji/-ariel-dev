@@ -68,7 +68,7 @@
                     ></ion-icon
                 ></a>
                 {% if perms.offboarding.delete_resignationletter %}
-                <a
+                <a data-post-link
                     href="{% url 'delete-resignation-request' %}?letter_ids={{letter.id}}"
                     class="oh-btn oh-btn--light"
                     style="

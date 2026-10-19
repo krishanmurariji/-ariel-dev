@@ -11,6 +11,7 @@ This module is part of the recruitment project and is intended to
 provide the main entry points for interacting with the application's functionality.
 """
 
+from horilla.post_only import post_only
 import contextlib
 import json
 import logging
@@ -663,6 +664,7 @@ def note_update(request, note_id):
     )
 
 
+@post_only
 @login_required
 @permission_required(perm="recruitment.delete_stagenote")
 def note_delete(request, note_id):
@@ -1122,6 +1124,7 @@ def candidate_delete(request, cand_id):
     return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 @permission_required(perm="recruitment.delete_candidate")
 def candidate_archive(request, cand_id):

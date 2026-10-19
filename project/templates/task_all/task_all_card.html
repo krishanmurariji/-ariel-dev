@@ -74,11 +74,11 @@
             {% endif %}
             <li class="oh-dropdown__item">
                 {% if task.is_active %}
-                    <a href="{% url 'task-all-archive' task.id %}" onclick="return confirm('{% trans 'Do you want to archive this task?' %}')" class="oh-dropdown__link">
+                    <a data-post-link href="{% url 'task-all-archive' task.id %}" onclick="return confirm('{% trans 'Do you want to archive this task?' %}')" class="oh-dropdown__link">
                         {% trans "Archive" %}
                     </a>
                 {% else %}
-                    <a href="{% url 'task-all-archive' task.id %}" onclick="return confirm('{% trans 'Do you want to un archive this task?' %}')" class="oh-dropdown__link">
+                    <a data-post-link href="{% url 'task-all-archive' task.id %}" onclick="return confirm('{% trans 'Do you want to un archive this task?' %}')" class="oh-dropdown__link">
                     {% trans "Un-Archive" %}
                     </a>
                 {% endif %}

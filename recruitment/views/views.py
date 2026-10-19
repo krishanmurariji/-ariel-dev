@@ -11,6 +11,7 @@ This module is part of the recruitment project and is intended to
 provide the main entry points for interacting with the application's functionality.
 """
 
+from horilla.post_only import post_only
 import ast
 import contextlib
 import io
@@ -863,6 +864,7 @@ def recruitment_pipeline_card(request):
     )
 
 
+@post_only
 @login_required
 @permission_required(perm="recruitment.delete_recruitment")
 def recruitment_archive(request, rec_id):
@@ -969,6 +971,7 @@ def recruitment_update_pipeline(request, rec_id):
     return render(request, "pipeline/form/recruitment_update.html", {"form": form})
 
 
+@post_only
 @login_required
 @recruitment_manager_can_enter(perm="recruitment.change_recruitment")
 def recruitment_close_pipeline(request, rec_id):
@@ -985,6 +988,7 @@ def recruitment_close_pipeline(request, rec_id):
     return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 @recruitment_manager_can_enter(perm="recruitment.change_recruitment")
 def recruitment_reopen_pipeline(request, rec_id):
@@ -1206,6 +1210,7 @@ def add_candidate_note(request, cand_id):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 @manager_can_enter(perm="recruitment.delete_candidatenote")
@@ -1225,6 +1230,7 @@ def candidate_note_delete(request, note_id):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 @manager_can_enter(perm="recruitment.delete_candidatenote")
@@ -1345,6 +1351,7 @@ def add_more_individual_files(request, id):
     return redirect(f"/recruitment/add-note/{note.candidate_id.id}/")
 
 
+@post_only
 @login_required
 @hx_request_required
 def delete_stage_note_file(request, id):
@@ -1362,6 +1369,7 @@ def delete_stage_note_file(request, id):
     return HttpResponse("")
 
 
+@post_only
 @login_required
 @hx_request_required
 def delete_individual_note_file(request, id):
@@ -1378,6 +1386,7 @@ def delete_individual_note_file(request, id):
     return HttpResponse(script)
 
 
+@post_only
 @candidate_login_required
 @hx_request_required
 def candidate_notes_mark_read(request, cand_id):
@@ -1843,6 +1852,7 @@ def interview_view(request):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 @manager_can_enter(perm="recruitment.change_interviewschedule")
@@ -2303,6 +2313,7 @@ def candidate_update(request, cand_id, **kwargs):
     return HorillaRedirect(request)
 
 
+@post_only
 @transaction.atomic
 @login_required
 @manager_can_enter(perm="recruitment.change_candidate")
@@ -2380,6 +2391,7 @@ def candidate_conversion(request, cand_id, **kwargs):
     return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 @manager_can_enter(perm="recruitment.change_candidate")
 def delete_profile_image(request, obj_id):
@@ -2646,6 +2658,7 @@ def _cancel_interview_meeting(interview, request):
                 logger.error(f"Error cancelling Google Meeting: {e}")
 
 
+@post_only
 @login_required
 @hx_request_required
 @manager_can_enter(perm="recruitment.delete_interviewschedule")
@@ -3098,6 +3111,7 @@ def skill_zone_update(request, sz_id):
     )
 
 
+@post_only
 @login_required
 @manager_can_enter(perm="recruitment.delete_skillzone")
 def skill_zone_delete(request, sz_id):
@@ -3129,6 +3143,7 @@ def skill_zone_delete(request, sz_id):
     )
 
 
+@post_only
 @login_required
 @manager_can_enter(perm="recruitment.change_skillzone")
 def skill_zone_archive(request, sz_id):
@@ -3311,6 +3326,7 @@ def skill_zone_cand_edit(request, sz_cand_id):
     return render(request, template, {"form": form, "sz_cand_id": sz_cand_id})
 
 
+@post_only
 @login_required
 @manager_can_enter(perm="recruitment.delete_skillzonecandidate")
 def skill_zone_cand_delete(request, sz_cand_id):
@@ -3368,6 +3384,7 @@ def skill_zone_cand_filter(request):
     )
 
 
+@post_only
 @login_required
 @manager_can_enter(perm="recruitment.delete_skillzonecandidate")
 def skill_zone_cand_archive(request, sz_cand_id):
@@ -3398,6 +3415,7 @@ def skill_zone_cand_archive(request, sz_cand_id):
     return redirect(skill_zone_view)
 
 
+@post_only
 @login_required
 @manager_can_enter(perm="recruitment.delete_skillzonecandidate")
 def skill_zone_cand_delete(request, sz_cand_id):
@@ -3583,6 +3601,7 @@ def _sync_candidate_portal_mail_automation(is_on):
         automation.save()
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("recruitment.add_recruitmentgeneralsetting")
@@ -3615,6 +3634,7 @@ def candidate_self_tracking(request):
     return HttpResponse("<script>$('#reloadMessagesButton').click()</script>")
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("recruitment.add_recruitmentgeneralsetting")
@@ -3640,6 +3660,7 @@ def candidate_self_tracking_rating_option(request):
     return HttpResponse("<script>$('#reloadMessagesButton').click()</script>")
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("recruitment.add_recruitmentgeneralsetting")
@@ -3669,6 +3690,7 @@ def candidate_portal_mail_setting(request):
     return HttpResponse("<script>$('#reloadMessagesButton').click()</script>")
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("recruitment.change_recruitmentgeneralsetting")
@@ -3693,6 +3715,7 @@ def default_meeting_provider(request):
     return HttpResponse("<script>$('#reloadMessagesButton').click()</script>")
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("recruitment.change_recruitmentgeneralsetting")
@@ -4066,6 +4089,7 @@ def create_interview_meeting(request):
     return JsonResponse({"success": "true"})
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("recruitment.add_recruitmentgeneralsetting")
@@ -4396,6 +4420,7 @@ def self_tracking_feature(request):
     return render(request, "recruitment/settings/settings.html")
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("recruitment.delete_rejectreason")
@@ -4666,6 +4691,7 @@ def create_skills(request):
     return render(request, "settings/skills/skills_form.html", context=context)
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("recruitment.delete_rejectreason")
@@ -4690,6 +4716,7 @@ def delete_skills(request, id=None):
     return HttpResponse("<script>$('.reload-record').click()</script>")
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("recruitment.delete_recruitment")
@@ -4752,6 +4779,7 @@ def add_bulk_resumes(request):
         return redirect(f"{url}{query_params}")
 
 
+@post_only
 @login_required
 @hx_request_required
 @manager_can_enter("recruitment.add_candidate")
@@ -4999,6 +5027,7 @@ def update_document_title(request, id):
         )
 
 
+@post_only
 @login_required
 @hx_request_required
 @manager_can_enter("recruitment.delete_candidatedocument")
@@ -5108,6 +5137,7 @@ def view_file(request, id):
     return render(request, "candidate/view_file.html", context)
 
 
+@post_only
 @login_required
 @hx_request_required
 @manager_can_enter("recruitment.change_candidatedocument")
@@ -5132,6 +5162,7 @@ def document_approve(request, id):
     return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 @hx_request_required
 @manager_can_enter("recruitment.change_candidatedocument")
@@ -5320,6 +5351,7 @@ def employee_profile_interview_tab(request):
     return render(request, "tabs/scheduled_interview.html", {"interviews": interviews})
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("recruitment.delete_rejectedcandidate")

@@ -76,7 +76,7 @@
                 <li class="oh-activity-sidebar__qa-item">
                     <span class="oh-activity-sidebar__q">{{note.description}}
                         {% if perms.employee.delete_employeenote or request.user|is_reportingmanager %}
-                        <span class="float-end" hx-get="{% url 'employee-note-delete' note.id %}"
+                        <span class="float-end" hx-post="{% url 'employee-note-delete' note.id %}"
                             hx-on:click="setTimeout(() => {reloadMessage(this);},100);" hx-target="#employeeNote{{note.id}}"
                             hx-swap="delete" id="deleteNote">
                             <ion-icon name="close-outline" style="font-size: 24px" role="img" class="md hydrated" aria-label="close outline"></ion-icon></span>
@@ -93,7 +93,7 @@
                                         {% if perms.employee.delete_notefiles or request.user|is_reportingmanager %}
                                             <img src="{% static 'images/ui/minus-icon.png' %}"
                                                 style="display: block; width: 50%; height: 50%" hx-swap="delete"
-                                                hx-get="{% url 'delete-employee-note-file' file.id %}" hx-target="#noteFile{{file.id}}"
+                                                hx-post="{% url 'delete-employee-note-file' file.id %}" hx-target="#noteFile{{file.id}}"
                                                 onclick="event.stopPropagation();event.preventDefault()" />
                                         {% endif %}
                                     </span>

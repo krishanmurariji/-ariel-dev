@@ -6,6 +6,7 @@ as well as scheduling attendance capture. Also provides views for managing emplo
 registered on biometric devices.
 """
 
+from horilla.post_only import post_only
 import json
 import logging
 from datetime import datetime, timedelta
@@ -511,6 +512,7 @@ def biometric_device_schedule(request, device_id):
     return render(request, "biometric/scheduler_device_form.html", context)
 
 
+@post_only
 @login_required
 @install_required
 @hx_request_required
@@ -596,6 +598,7 @@ def biometric_device_edit(request, device_id):
     return render(request, "biometric/biometric_device_form.html", context)
 
 
+@post_only
 @login_required
 @install_required
 @hx_request_required
@@ -616,6 +619,7 @@ def biometric_device_archive(request, device_id):
     return redirect(f"/biometric/view-biometric-devices/?{previous_data}")
 
 
+@post_only
 @login_required
 @install_required
 @hx_request_required
@@ -1367,6 +1371,7 @@ def search_employee_device(request):
     return render(request, template, context)
 
 
+@post_only
 @login_required
 @install_required
 @permission_required("biometric.delete_biometricemployees")
@@ -1541,6 +1546,7 @@ def edit_cosec_user(request, user_id, device_id):
         )
 
 
+@post_only
 @login_required
 @install_required
 @permission_required("biometric.delete_biometricemployees")
@@ -2025,6 +2031,7 @@ def delete_etimeoffice_user(request, obj_id=None):
     return HttpResponse(script)
 
 
+@post_only
 @login_required
 @install_required
 @hx_request_required

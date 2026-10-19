@@ -5,6 +5,7 @@ This module contains the view functions for handling HTTP requests and rendering
 responses in pms app.
 """
 
+from horilla.post_only import post_only
 import datetime
 import json
 import logging
@@ -420,6 +421,7 @@ def kr_create_or_update(request, kr_id=None):
     return render(request, "okr/key_result/real_kr_form.html", {"form": form})
 
 
+@post_only
 @login_required
 @permission_required("pms.change_keyresult")
 def archive_key_result(request, pk):
@@ -514,6 +516,7 @@ def add_assignees(request, obj_id):
     return render(request, "okr/add_assignees.html", context)
 
 
+@post_only
 @login_required
 @hx_request_required
 @manager_can_enter(perm="pms.delete_employeeobjective")
@@ -590,6 +593,7 @@ def key_result_remove(request, obj_id, kr_id):
     )
 
 
+@post_only
 @login_required
 @manager_can_enter("pms.delete_employeeobjective")
 def assignees_remove(request, obj_id, emp_id):
@@ -1061,6 +1065,7 @@ def objective_detailed_view_current_value(request, kr_id):
         return redirect(objective_detailed_view_activity, objective_id)
 
 
+@post_only
 @login_required
 def objective_archive(request, id):
     """
@@ -1207,6 +1212,7 @@ def update_employee_objective(request, emp_obj_id):
         return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 @manager_can_enter(perm="pms.delete_employeeobjective")
 def archive_employee_objective(request, emp_obj_id):
@@ -1238,6 +1244,7 @@ def archive_employee_objective(request, emp_obj_id):
     return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 @manager_can_enter(perm="pms.delete_employeeobjective")
 def delete_employee_objective(request, emp_obj_id):
@@ -1268,6 +1275,7 @@ def delete_employee_objective(request, emp_obj_id):
     return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 @hx_request_required
 def change_employee_objective_status(request):
@@ -2305,6 +2313,7 @@ def feedback_answer_view(request, id, **kwargs):
     return render(request, "feedback/answer/feedback_answer_view.html", context)
 
 
+@post_only
 @login_required
 @permission_required(perm="pms.delete_feedback")
 def feedback_delete(request, id):
@@ -2445,6 +2454,7 @@ def get_feedback_overview(request, obj_id):
     return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 @manager_can_enter(perm="pms.delete_feedback")
 def feedback_archive(request, id):
@@ -2695,6 +2705,7 @@ def question_update(request, temp_id, q_id):
         return redirect(question_template_detailed_view, temp_id)
 
 
+@post_only
 @login_required
 @manager_can_enter(perm="pms.delete_question")
 def question_delete(request, id):
@@ -2841,6 +2852,7 @@ def question_template_update(request, template_id):
     )
 
 
+@post_only
 @login_required
 @manager_can_enter(perm="pms.delete_questiontemplate")
 def question_template_delete(request, template_id):
@@ -2947,6 +2959,7 @@ def period_update(request, period_id):
     return render(request, "period/period_update.html", context)
 
 
+@post_only
 @login_required
 @manager_can_enter(perm="pms.delete_period")
 def period_delete(request, period_id):
@@ -3459,6 +3472,7 @@ def edit_anonymous_feedback(request, obj_id):
         return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 def archive_anonymous_feedback(request, obj_id):
     """
@@ -3491,6 +3505,7 @@ def archive_anonymous_feedback(request, obj_id):
     return redirect(reverse("feedback-view"))
 
 
+@post_only
 @login_required
 @permission_required("pms.delete_anonymousfeedback")
 def delete_anonymous_feedback(request, obj_id):
@@ -3653,6 +3668,7 @@ def employee_keyresult_update(request, kr_id):
     return render(request, "okr/key_result/kr_form.html", context=context)
 
 
+@post_only
 @login_required
 @manager_can_enter(perm="pms.delete_employeekeyresult")
 def delete_employee_keyresult(request, kr_id):
@@ -3926,6 +3942,7 @@ def create_meetings(request):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("pms.change_meetings")
@@ -3956,6 +3973,7 @@ def archive_meetings(request, obj_id):
     return HttpResponse("")
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("pms.change_meetings")
@@ -3983,6 +4001,7 @@ def meeting_manager_remove(request, meet_id, manager_id):
     return HttpResponse("")
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("pms.change_meetings")
@@ -4270,6 +4289,7 @@ def dashboard_feedback_answer(request):
     )
 
 
+@post_only
 @login_required
 @permission_required("pms.delete_bonuspointsetting")
 def delete_bonus_point_setting(request, pk):
@@ -4285,6 +4305,7 @@ def delete_bonus_point_setting(request, pk):
     return redirect(reverse("bonus-point-setting-list-view"))
 
 
+@post_only
 @login_required
 @permission_required("pms.delete_employeebonuspoint")
 def delete_employee_bonus_point(request, pk):

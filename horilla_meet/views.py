@@ -1,3 +1,4 @@
+from horilla.post_only import post_only
 import os
 from datetime import datetime
 
@@ -122,6 +123,7 @@ def google_auth_callback(request):
     return redirect("gmeet-view")
 
 
+@post_only
 @login_required
 @permission_required("horilla_meet.delete_googlecloudcredentials")
 def delete_google_credentials(request, obj_id):
@@ -150,6 +152,7 @@ def create_google_meet_link(request):
     return HttpResponseRedirect(request.META.get("HTTP_REFERER", "/"))
 
 
+@post_only
 @login_required
 @permission_required("horilla_meet.delete_googlemeeting")
 @check_integration_enabled(app_name="horilla_meet")
@@ -179,6 +182,7 @@ def delete_google_meet(request, id):
 if apps.is_installed("recruitment"):
     from recruitment.models import InterviewSchedule
 
+    @post_only
     @login_required
     @permission_required("horilla_meet.add_googlemeeting")
     @check_integration_enabled(app_name="horilla_meet")
@@ -239,6 +243,7 @@ if apps.is_installed("recruitment"):
 if apps.is_installed("pms"):
     from pms.models import Meetings
 
+    @post_only
     @login_required
     @permission_required("horilla_meet.add_googlemeeting")
     @check_integration_enabled(app_name="horilla_meet")

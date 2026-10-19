@@ -57,13 +57,13 @@
 </div>
 
 <div class="oh-inner-sidebar-content__footer"></div>
-<button id="selfTrackButton" hx-get="{% url 'candidate-self-tracking' %}" hx-target="#reloadMessages" hidden>
+<button id="selfTrackButton" hx-post="{% url 'candidate-self-tracking' %}" hx-target="#reloadMessages" hidden>
 </button>
-<button id="ratingButton" hx-get="{% url 'candidate-self-tracking-rating-option' %}" hx-target="#reloadMessages" hidden>
+<button id="ratingButton" hx-post="{% url 'candidate-self-tracking-rating-option' %}" hx-target="#reloadMessages" hidden>
 </button>
-<button id="meetingProviderButton" hx-get="{% url 'default-meeting-provider' %}" hx-target="#reloadMessages" hidden>
+<button id="meetingProviderButton" hx-post="{% url 'default-meeting-provider' %}" hx-target="#reloadMessages" hidden>
 </button>
-<button id="probationPeriodButton" hx-get="{% url 'default-probation-period' %}" hx-target="#reloadMessages" hidden>
+<button id="probationPeriodButton" hx-post="{% url 'default-probation-period' %}" hx-target="#reloadMessages" hidden>
 </button>
 
 <script>

@@ -206,7 +206,7 @@
                                                             <ion-icon class="me-1" name="checkmark-outline"></ion-icon>
                                                         </a>
                                                     {% else %}
-                                                        <a
+                                                        <a data-post-link
                                                             type="submit"
                                                             href="{% url 'approve-overtime' attendance.id %}"
                                                             title="{% trans 'Approve' %}"
@@ -501,7 +501,7 @@
                                                 </div>
                                                 <div class="oh-sticky-table__td oh-sticky-table__right">
                                                     {% if request.user|is_reportingmanager or perms.attendance.change_attendance %}
-                                                        <a
+                                                        <a data-post-link
                                                             href='{% url "validate-this-attendance" attendance.id %}?vpage={{validate_attendances.number}}&{{attendance_list.dynamic_name}}={{ attendance_list.list.number }}'
                                                             hx-target="#updateAttendanceBody"
                                                             data-req="/attendance/request-attendance-view/?id={{attendance.id}}"

@@ -4,6 +4,7 @@ surveys.py
 This module is used to write views related to the survey features
 """
 
+from horilla.post_only import post_only
 import json
 import os
 import re
@@ -353,6 +354,7 @@ def create_question_template(request):
     return render(request, "survey/template_form.html", {"form": form})
 
 
+@post_only
 @login_required
 @permission_required(perm="recruitment.delete_recruitmentsurvey")
 def delete_survey_question(request, survey_id):
@@ -705,6 +707,7 @@ def create_template(request):
     return render(request, "survey/main_form.html", {"form": form})
 
 
+@post_only
 @login_required
 @permission_required("recruitment.delete_surveytemplate")
 def delete_template(request):

@@ -44,7 +44,7 @@
               {% if not rec.closed %}
                 {% if perms.recruitment.change_recruitment or request.user|recruitment_manages:rec %}
                   <li class="oh-dropdown__item">
-                    <a href="{% url 'recruitment-close-pipeline' rec.id %}" class="oh-dropdown__link"
+                    <a data-post-link href="{% url 'recruitment-close-pipeline' rec.id %}" class="oh-dropdown__link"
                     onclick="return confirm('{% trans "Are you sure you want to close this recruitment?" %}');"
                     >{% trans "Close" %}</a
                     >
@@ -63,7 +63,7 @@
                 {% endif %}
               {% elif perms.recruitment.change_recruitment or request.user|recruitment_manages:rec %}
                 <li class="oh-dropdown__item">
-                  <a href="{% url 'recruitment-reopen-pipeline' rec.id %}" class="oh-dropdown__link"
+                  <a data-post-link href="{% url 'recruitment-reopen-pipeline' rec.id %}" class="oh-dropdown__link"
                   onclick="return confirm('{% trans "Are you sure you want to reopen this recruitment?" %}');"
                   >{% trans "Reopen" %}</a
                   >

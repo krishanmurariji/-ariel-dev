@@ -30,8 +30,9 @@ function groupSequenceGet(groupHead) {
 	});
 
 	$.ajax({
-		type: "GET",
+		type: "POST",
 		url: "/update-kanban-group-sequence/",
+		headers: {"X-CSRFToken": (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || ""},
 		data: {
 			"sequence": JSON.stringify(sequence),
 			"tab_id": groupHead.attr("data-tab-id"),
@@ -70,8 +71,9 @@ function handleValidDrop(groupId, objectId, row) {
 		}
 
 		$.ajax({
-			type: "GET",
+			type: "POST",
 			url: "/update-kanban-item-group/",
+			headers: {"X-CSRFToken": (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || ""},
 			traditional: true,
 			data: {
 				model: model,
@@ -126,8 +128,9 @@ function handleSortableUpdate(event, ui, container) {
 	}
 
 	$.ajax({
-		type: "get",
+		type: "POST",
 		url: "/update-kanban-sequence/",
+		headers: {"X-CSRFToken": (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || ""},
 		traditional: true,
 		data: {
 			model: model,

@@ -4,6 +4,7 @@ base/views/holidays.py
 Holidays and company leaves: creating, listing, filtering, importing and exporting holidays, and the company-leave settings.
 """
 
+from horilla.post_only import post_only
 import csv
 import json
 import os
@@ -471,6 +472,7 @@ def holiday_update(request, obj_id):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("base.delete_holidays")
@@ -679,6 +681,7 @@ def company_leave_update(request, id):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("base.delete_companyleaves")

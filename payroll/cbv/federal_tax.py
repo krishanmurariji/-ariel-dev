@@ -185,7 +185,7 @@ class FilingStatusPipeline(Pipeline):
                         class="oh-dropdown__link oh-dropdown__link--danger"
                         data-toggle="oh-modal-toggle"
                         data-target="#deleteConfirmation"
-                        hx-get="{get_delete_url}"
+                        hx-post="{get_delete_url}"
                         hx-target="#deleteConfirmationBody"
                     """,
                 },
@@ -232,7 +232,7 @@ class TaxBracketListView(HorillaListView):
                 class="oh-btn oh-btn--danger-outline w-100"
                 data-toggle="oh-modal-toggle"
                 data-target="#objectCreateModal"
-                hx-get="{get_delete_url}"
+                hx-post="{get_delete_url}"
                 hx-target="#objectCreateModalTarget"
             """,
         },

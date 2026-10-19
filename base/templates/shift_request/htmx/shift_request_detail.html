@@ -94,14 +94,14 @@
     <div class="oh-modal__button-container text-center">
        <div class="oh-btn-group">
         {% if dashboard == 'true' %}
-            <a
+            <a data-post-link
                 href="/shift-request-approve/{{shift_request.id}}/"
                 onclick="return confirm('{% trans "Do you want to approve this request?" %}')"
                 class="oh-btn oh-btn--info w-50"
                 title='{% trans "Approve" %}'
                 >{% trans "Approve" %}</a>
 
-            <a
+            <a data-post-link
                 href="/shift-request-cancel/{{shift_request.id}}/"
                 onclick="return confirm('{% trans "Do you want to cancel this request?" %}')"
                 class="oh-btn oh-btn--danger w-50"

@@ -1,3 +1,4 @@
+from horilla.post_only import post_only
 import json
 import logging
 import os
@@ -176,6 +177,7 @@ def faq_category_update(request, id):
     return render(request, "helpdesk/faq/faq_category_create.html", context)
 
 
+@post_only
 @login_required
 @permission_required("helpdesk.delete_faqcategory")
 def faq_category_delete(request, id):
@@ -389,6 +391,7 @@ def faq_suggestion(request):
     return JsonResponse(response)
 
 
+@post_only
 @login_required
 @permission_required("helpdesk.delete_faq")
 def faq_delete(request, id):
@@ -574,6 +577,7 @@ def ticket_update(request, ticket_id):
         return handle_no_permission(request)
 
 
+@post_only
 @login_required
 def ticket_archive(request, ticket_id):
     """
@@ -736,6 +740,7 @@ def change_ticket_status(request, ticket_id):
     return JsonResponse(response)
 
 
+@post_only
 @login_required
 @ticket_owner_can_enter(perm="helpdesk.delete_ticket", model=Ticket)
 def ticket_delete(request, ticket_id):
@@ -1260,6 +1265,7 @@ def view_ticket_document(request, doc_id):
     return render(request, "helpdesk/ticket/ticket_document.html", context)
 
 
+@post_only
 @login_required
 @hx_request_required
 @ticket_owner_can_enter(perm="helpdesk.view_ticket", model=Ticket)
@@ -1385,6 +1391,7 @@ def comment_edit(request):
     )
 
 
+@post_only
 @login_required
 @permission_required("helpdesk.delete_comment")
 def comment_delete(request, comment_id):
@@ -1437,6 +1444,7 @@ def get_raised_on(request):
     return JsonResponse(response)
 
 
+@post_only
 @login_required
 def claim_ticket(request, id):
     """
@@ -1455,6 +1463,7 @@ def claim_ticket(request, id):
     return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 @ticket_owner_can_enter(perm="helpdesk.change_ticket", model=Ticket)
 def approve_claim_request(request, req_id):
@@ -1724,6 +1733,7 @@ def update_department_manager(request, dep_id):
     return render(request, "department_managers/department_managers_form.html", context)
 
 
+@post_only
 @login_required
 @permission_required("helpdesk.delete_departmentmanager")
 def delete_department_manager(request, dep_id):

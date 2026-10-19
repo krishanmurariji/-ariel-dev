@@ -4,6 +4,7 @@ actions.py
 This module is used to register methods to delete/archive/un-archive instances
 """
 
+from horilla.post_only import post_only
 import json
 
 from django.utils.html import escape as html_escape
@@ -149,6 +150,7 @@ def recruitment_delete_pipeline(request, rec_id):
     return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 @manager_can_enter(perm="recruitment.delete_stagenote")
 def note_delete(request, note_id):
@@ -171,6 +173,7 @@ def note_delete(request, note_id):
     return HttpResponse(script)
 
 
+@post_only
 @candidate_login_required
 @hx_request_required
 def note_delete_individual(request, note_id):
@@ -336,6 +339,7 @@ def candidate_bulk_delete(request):
     return JsonResponse({"message": "Success"})
 
 
+@post_only
 @login_required
 @permission_required(perm="recruitment.delete_candidate")
 def candidate_archive(request, cand_id):

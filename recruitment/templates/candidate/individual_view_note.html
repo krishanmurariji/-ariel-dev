@@ -21,7 +21,7 @@
                         <a href="{{ file.files.url }}" target="_blank" rel="noopener noreferrer" id="candidateNoteFile{{ file.id }}" class="oh-chat-file-link">
                             <i class="fas fa-paperclip"></i> {{ file }}
                             <ion-icon name="close-circle-outline" title="{% trans 'Remove file' %}"
-                                hx-get="{% url 'delete-individual-note-file' file.id %}"
+                                hx-post="{% url 'delete-individual-note-file' file.id %}"
                                 hx-target="#candidateNoteFile{{ file.id }}" hx-swap="outerHTML"
                                 hx-on:click="event.preventDefault();event.stopPropagation();setTimeout(() => {reloadMessage(this);},100);"
                             ></ion-icon>
@@ -35,7 +35,7 @@
                     {% if note.updated_user == request.user.employee_get or perms.recruitment.delete_stagenote %}
                     <button class="oh-chat-delete"
                         aria-label="{% trans 'Delete message' %}"
-                        hx-get="{% url 'note-delete-individual' note.id %}"
+                        hx-post="{% url 'note-delete-individual' note.id %}"
                         title="{% trans 'delete' %}" hx-swap="delete"
                         hx-target="closest .oh-chat-bubble-row"
                         hx-on:click="setTimeout(() => {reloadMessage(this);},250);"

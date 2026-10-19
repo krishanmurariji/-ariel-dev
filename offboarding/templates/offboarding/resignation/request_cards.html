@@ -109,7 +109,7 @@
                         </a>
                         {% endif %}
                         {% if perms.offboarding.delete_resignationletter or record.status == "requested" %}
-                        <a
+                        <a data-post-link
                             href="{% url 'delete-resignation-request' %}?letter_ids={{record.id}}"
                             class="oh-btn oh-btn--light"
                             title="{%trans 'Delete' %}"

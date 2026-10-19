@@ -41,7 +41,7 @@
                     onclick="event.stopPropagation();"
                 >
                     <div class="oh-btn-group float-end">
-                        <a
+                        <a data-post-link
                             href="/shift-request-approve/{{shift_request.id}}/"
 							onclick="return confirm('{% trans "Do you want to approve this shift request?" %}')"
                             class="oh-btn oh-btn--success"
@@ -49,7 +49,7 @@
                             ><ion-icon name="checkmark-outline"></ion-icon
                         ></a>
 
-                        <a
+                        <a data-post-link
                             href="/shift-request-cancel/{{shift_request.id}}/"
 							onclick="return confirm('{% trans "Do you want to cancel this request?" %}')"
                             class="oh-btn oh-btn--danger"

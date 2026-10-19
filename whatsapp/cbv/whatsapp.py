@@ -1,3 +1,4 @@
+from horilla.post_only import post_only
 from django.contrib import messages
 from django.http import HttpResponse
 from django.shortcuts import render
@@ -149,6 +150,7 @@ class CredentialForm(HorillaFormView):
         return super().form_valid(form)
 
 
+@post_only
 @func_login_required
 @permission_required("whatsapp.delete_whatsappcredentials")
 @check_integration_enabled(app_name="whatsapp")

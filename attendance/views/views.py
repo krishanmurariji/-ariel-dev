@@ -11,6 +11,7 @@ This module is part of the recruitment project and is intended to
 provide the main entry points for interacting with the application's functionality.
 """
 
+from horilla.post_only import post_only
 import logging
 import uuid
 
@@ -1438,6 +1439,7 @@ def validate_bulk_attendance(request):
     return JsonResponse({"message": "success"})
 
 
+@post_only
 @login_required
 @manager_can_enter("attendance.change_attendance")
 def validate_this_attendance(request, obj_id):
@@ -1491,6 +1493,7 @@ def validate_this_attendance(request, obj_id):
     return attendance_view_redirect(request)
 
 
+@post_only
 @login_required
 def revalidate_this_attendance(request, obj_id):
     """
@@ -1533,6 +1536,7 @@ def revalidate_this_attendance(request, obj_id):
     return HttpResponse("You Cannot Request for others attendance")
 
 
+@post_only
 @login_required
 @manager_can_enter("attendance.change_attendance")
 @require_http_methods(["GET", "POST"])
@@ -2207,6 +2211,7 @@ def update_grace_time(request, grace_id):
     )
 
 
+@post_only
 @login_required
 @permission_required("attendance.delete_gracetime")
 def delete_grace_time(request, grace_id):
@@ -2497,6 +2502,7 @@ def view_attendancerequest_comment(request, attendance_id):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 def delete_attendancerequest_comment(request, comment_id):
@@ -2520,6 +2526,7 @@ def delete_attendancerequest_comment(request, comment_id):
     return HttpResponse(script)
 
 
+@post_only
 @login_required
 @hx_request_required
 def delete_comment_file(request):
@@ -2868,6 +2875,7 @@ def work_record_export(request):
     return response
 
 
+@post_only
 @login_required
 @permission_required("attendance.add_attendancegeneralsetting")
 def enable_timerunner(request):
@@ -3187,6 +3195,7 @@ def create_allowed_ips(request):
     )
 
 
+@post_only
 @login_required
 @permission_required("attendance.delete_attendance")
 def delete_allowed_ips(request):

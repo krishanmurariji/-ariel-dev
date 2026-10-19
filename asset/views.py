@@ -3,6 +3,7 @@ asset.py
 
 This module is used to"""
 
+from horilla.post_only import post_only
 import csv
 import json
 import os
@@ -478,6 +479,7 @@ def asset_category_update(request, cat_id):
     return render(request, "category/asset_category_form.html", context)
 
 
+@post_only
 @login_required
 @permission_required(perm="asset.delete_assetcategory")
 def delete_asset_category(request, cat_id):
@@ -764,6 +766,7 @@ def reject_request_return(request, asset_request, req_id):
     )
 
 
+@post_only
 @login_required
 @permission_required(perm="asset.add_assetassignment")
 def asset_request_reject(request, req_id):
@@ -845,6 +848,7 @@ def asset_allocate_creation(request):
     return render(request, "request_allocation/asset_allocation_creation.html", context)
 
 
+@post_only
 @login_required
 @owner_can_enter(
     "change_assetassignment", AssetAssignment, employee_field="assigned_to_employee_id"
@@ -1609,6 +1613,7 @@ def asset_batch_update(request, batch_id):
     return render(request, "batch/asset_batch_number_update.html", context)
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required(perm="asset.delete_assetlot")

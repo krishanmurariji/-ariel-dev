@@ -9,6 +9,42 @@
       event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}'
     })
 </script>
+<script>
+    // A link marked data-post-link changes data, so it is sent as a POST with the CSRF token
+    // (a GET could be triggered from another site by a single click). The link's own onclick
+    // - usually an "Are you sure?" confirm - still runs first and can cancel it.
+    document.addEventListener('click', function (event) {
+        var link = event.target.closest ? event.target.closest('a[data-post-link]') : null;
+        if (!link || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (link.onclick && link.onclick.call(link, event) === false) return;
+        var form = document.createElement('form');
+        form.method = 'post';
+        form.action = link.getAttribute('href');
+        var token = document.createElement('input');
+        token.type = 'hidden';
+        token.name = 'csrfmiddlewaretoken';
+        token.value = '{{ csrf_token }}';
+        form.appendChild(token);
+        document.body.appendChild(form);
+        form.submit();
+    }, true);
+    // postTo(url): for buttons that used to navigate (GET) to an action URL
+    window.postTo = function (url) {
+        var form = document.createElement('form');
+        form.method = 'post';
+        form.action = url;
+        var token = document.createElement('input');
+        token.type = 'hidden';
+        token.name = 'csrfmiddlewaretoken';
+        token.value = '{{ csrf_token }}';
+        form.appendChild(token);
+        document.body.appendChild(form);
+        form.submit();
+    };
+</script>
+
 <script src="{% static '/index/index.js' %}"></script>
 <script src="{% static '/index/saveFilters.js' %}"></script>
 <script src="{% static 'horilla_theme/assets/js/htmxSelect2.js' %}"></script>

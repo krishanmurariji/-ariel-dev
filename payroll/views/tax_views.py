@@ -10,6 +10,7 @@ django.shortcuts module.
 
 """
 
+from horilla.post_only import post_only
 import math
 from urllib.parse import parse_qs
 
@@ -104,6 +105,7 @@ def update_filing_status(request, filing_status_id):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("payroll.delete_filingstatus")
@@ -259,6 +261,7 @@ def update_tax_bracket(request, tax_bracket_id):
     return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("payroll.delete_taxbracket")

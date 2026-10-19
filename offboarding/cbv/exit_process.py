@@ -632,7 +632,7 @@ class OffboardingKanbanView(HorillaKanbanView):
                 "attrs": """
                     data-target="#objectDetailsModal"
                     data-toggle="oh-modal-toggle"
-                    hx-get="{get_archive_url}"
+                    hx-post="{get_archive_url}"
                     hx-target="#objectDetailsModalTarget"
                 """,
             },
@@ -652,7 +652,7 @@ class OffboardingKanbanView(HorillaKanbanView):
                 "attrs": """
                     data-target="#objectDetailsModal"
                     data-toggle="oh-modal-toggle"
-                    hx-get="{get_managing_record_url}"
+                    hx-post="{get_managing_record_url}"
                     hx-target="#objectDetailsModalTarget"
                 """,
             },

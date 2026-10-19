@@ -485,7 +485,7 @@ class TaskCardView(HorillaCardView):
                 "action": _("archive_status"),
                 "accessibility": "project.cbv.accessibility.task_crud_accessibility",
                 "attrs": """
-                    hx-get="{get_archive_url}"
+                    hx-post="{get_archive_url}"
                     hx-target="#listContainer"
                     hx-swap="innerHTML"
                     hx-confirm="Do you want to {archive_status} this task?"

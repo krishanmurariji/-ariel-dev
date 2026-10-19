@@ -18,7 +18,7 @@
                         class="filter brightness-0 invert"
                     >{% trans 'Approve' %}
                 </a>
-                <a
+                <a data-post-link
                     class="w-24 px-4 py-2 bg-white rounded-md text-xs flex items-center justify-center gap-2 border border-primary-500 hover:border-primary-600 transition duration-300"
                     role="button"
                     href="{% url 'asset-request-reject' instance.id %}"

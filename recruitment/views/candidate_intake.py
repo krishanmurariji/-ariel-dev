@@ -6,6 +6,7 @@ CBV list/nav/form pattern: toggling a mailbox active, deleting a mailbox,
 the two standalone pages, and the manual poll trigger/status widget.
 """
 
+from horilla.post_only import post_only
 import threading
 
 from django.contrib import messages
@@ -44,6 +45,7 @@ def update_isactive_intake_mailbox(request, obj_id):
     return HttpResponse("<script>$('#reloadMessagesButton').click();</script>")
 
 
+@post_only
 @login_required
 @permission_required("recruitment.delete_candidateintakemailbox")
 def delete_intake_mailbox(request, pk):

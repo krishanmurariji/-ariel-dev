@@ -4,6 +4,7 @@ views.py
 This module is used to map url pattens with django views or methods
 """
 
+from horilla.post_only import post_only
 import csv
 import hmac
 import json
@@ -562,6 +563,7 @@ def initialize_department_edit(request, obj_id):
     )
 
 
+@post_only
 @hx_request_required
 def initialize_department_delete(request, obj_id):
     """
@@ -1745,6 +1747,7 @@ def mail_server_test_email(request):
     )
 
 
+@post_only
 @login_required
 @permission_required("base.delete_dynamicemailconfiguration")
 def mail_server_delete(request):
@@ -1902,6 +1905,7 @@ def create_mail_templates(request):
     )
 
 
+@post_only
 @login_required
 @permission_required("base.delete_horillamailtemplate")
 def delete_mail_templates(request):
@@ -2625,6 +2629,7 @@ def rotating_work_type_assign_redirect(request, obj_id=None, employee_id=None):
         return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 @hx_request_required
 @manager_can_enter("base.change_rotatingworktypeassign")
@@ -3500,6 +3505,7 @@ def rotating_shift_assign_redirect(request, obj_id, employee_id):
     return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 @hx_request_required
 @manager_can_enter("base.change_rotatingshiftassign")
@@ -4095,6 +4101,7 @@ def handle_wtr_redirect(request, work_type_request):
     return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 def work_type_request_cancel(request, id):
     """
@@ -4190,6 +4197,7 @@ def work_type_request_bulk_cancel(request):
     return JsonResponse({"result": result})
 
 
+@post_only
 @login_required
 def work_type_request_approve(request, id):
     """
@@ -4984,6 +4992,7 @@ def shift_allocation_request_update(request, shift_request_id):
     )
 
 
+@post_only
 @login_required
 def shift_request_cancel(request, id):
     """
@@ -5058,6 +5067,7 @@ def shift_request_cancel(request, id):
     return JsonResponse({"result": True}) if is_ajax else HorillaRedirect(request)
 
 
+@post_only
 @login_required
 def shift_allocation_request_cancel(request, id):
     """
@@ -5160,6 +5170,7 @@ def shift_request_bulk_cancel(request):
     return JsonResponse({"result": result})
 
 
+@post_only
 @login_required
 @manager_can_enter("base.change_shiftrequest")
 def shift_request_approve(request, id):
@@ -5231,6 +5242,7 @@ def shift_request_approve(request, id):
     return JsonResponse({"result": True}) if is_ajax else HorillaRedirect(request)
 
 
+@post_only
 @login_required
 def shift_allocation_request_approve(request, id):
     """
@@ -5445,6 +5457,7 @@ def notifications(request):
     )
 
 
+@post_only
 @login_required
 def clear_notification(request):
     """
@@ -5463,6 +5476,7 @@ def clear_notification(request):
     )
 
 
+@post_only
 @login_required
 def delete_all_notifications(request):
     try:
@@ -5477,6 +5491,7 @@ def delete_all_notifications(request):
     )
 
 
+@post_only
 @login_required
 def delete_notification(request, id):
     """
@@ -5558,6 +5573,7 @@ def all_notifications(request):
     )
 
 
+@post_only
 @login_required
 def notification_sound(request):
     employee = request.user.employee_get
@@ -6566,6 +6582,7 @@ def multiple_level_approval_edit(request, condition_id):
     )
 
 
+@post_only
 @login_required
 @permission_required("base.delete_multipleapprovalcondition")
 def multiple_level_approval_delete(request, condition_id):
@@ -6752,6 +6769,7 @@ def view_shift_comment(request, shift_id):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 def delete_shift_comment_file(request):
@@ -6832,6 +6850,7 @@ def view_work_type_comment(request, work_type_id):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 def delete_work_type_comment_file(request):
@@ -6871,6 +6890,7 @@ def delete_work_type_comment_file(request):
     return HttpResponse(script)
 
 
+@post_only
 @login_required
 @hx_request_required
 def delete_shiftrequest_comment(request, comment_id):
@@ -7011,6 +7031,7 @@ def create_worktyperequest_comment(request, worktype_id):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 def delete_worktyperequest_comment(request, comment_id):
@@ -7135,6 +7156,7 @@ def action_type_update(request, act_id):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("employee.delete_actiontype")
@@ -7169,6 +7191,7 @@ def driver_viewed_status(request):
     return HttpResponse("")
 
 
+@post_only
 @login_required
 @hx_request_required
 def dashboard_components_toggle(request):
@@ -7292,6 +7315,7 @@ def view_penalties(request):
     return render(request, "penalty/penalty_view.html", {"records": records})
 
 
+@post_only
 @login_required
 @permission_required("base.delete_penaltyaccounts")
 def delete_penalities(request, penalty_id):

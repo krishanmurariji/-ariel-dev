@@ -9,7 +9,7 @@
                             <span hx-get="{% url 'initialize-department-edit' instance.id %}" hx-target="#initializeDepartment"
                                 hx-swap="outerHTML">{{instance}}</span>
                             <form hx-confirm="{% trans 'Are you sure you want to delete this department?' %}"
-                                hx-get="{% url 'initialize-department-delete' instance.id %}" hx-target="#initializeDepartment"
+                                hx-post="{% url 'initialize-department-delete' instance.id %}" hx-target="#initializeDepartment"
                                 hx-swap="outerHTML">
                                 <button class="oh-filter-tag__close" style="color: red;" title={% trans "Delete" %}>
                                     <ion-icon name="trash-outline"></ion-icon>

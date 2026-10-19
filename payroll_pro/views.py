@@ -9,6 +9,7 @@ Menus:
 5. Payslips & My Finance (admin payslips + employee self service)
 """
 
+from horilla.post_only import post_only
 import calendar
 import json
 import logging
@@ -467,6 +468,7 @@ def tax_regime_save(request):
     return redirect("pp-tax-regime-new")
 
 
+@post_only
 @login_required
 @permission_required("payroll_pro.delete_taxregime")
 def tax_regime_delete(request, pk):
@@ -687,6 +689,7 @@ def structure_duplicate(request, pk):
     return redirect("pp-structure-edit", pk=duplicate.pk)
 
 
+@post_only
 @login_required
 @permission_required("payroll_pro.delete_salarystructure")
 def structure_delete(request, pk):
@@ -799,6 +802,7 @@ def component_update(request, pk):
     return redirect("pp-structure-detail", pk=structure.pk)
 
 
+@post_only
 @login_required
 @permission_required("payroll_pro.change_salarystructure")
 def component_delete(request, pk):
@@ -1710,6 +1714,7 @@ def auto_settings_save(request):
     return render(request, "payroll_pro/settings_auto_form.html", context)
 
 
+@post_only
 @login_required
 @permission_required("payroll_pro.change_payrollproautosetting")
 def auto_settings_delete(request, pk):

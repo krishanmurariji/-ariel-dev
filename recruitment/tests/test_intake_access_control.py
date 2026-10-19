@@ -198,7 +198,7 @@ class PermissionGatingTests(IntakeAccessTestBase):
 
     def test_employee_cannot_delete_a_mailbox(self):
         client = self.login_as(self.emp_a1)
-        response = client.get(
+        response = client.post(
             reverse("candidate-intake-mailbox-delete", kwargs={"pk": self.mailbox_a.pk})
         )
         self.assertEqual(response.status_code, 302)

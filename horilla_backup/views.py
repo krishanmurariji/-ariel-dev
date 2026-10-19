@@ -1,3 +1,4 @@
+from horilla.post_only import post_only
 from django.contrib import messages
 from django.db import connection
 from django.shortcuts import redirect, render
@@ -147,6 +148,7 @@ def gdrive_setup(request):
     )
 
 
+@post_only
 @login_required
 @permission_required("backup.change_localbackup")
 def gdrive_Backup_stop_or_start(request):
@@ -175,6 +177,7 @@ def gdrive_Backup_stop_or_start(request):
     return redirect("gdrive")
 
 
+@post_only
 @login_required
 @permission_required("backup.delete_localbackup")
 def gdrive_Backup_delete(request):

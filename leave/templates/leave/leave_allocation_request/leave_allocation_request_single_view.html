@@ -173,7 +173,7 @@
                 {% else %}
                     {% if perms.leave.change_leaveallocationrequest or request.user|is_reportingmanager %}
                         {% if leave_allocation_request.status == 'requested' %}
-                            <a
+                            <a data-post-link
                                 href="{% url 'leave-allocation-request-approve' leave_allocation_request.id %}"
                                 class="oh-btn oh-btn--success w-100"
                                 title="{% trans 'Approve' %}"                        >

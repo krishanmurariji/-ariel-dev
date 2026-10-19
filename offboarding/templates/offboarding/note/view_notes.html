@@ -41,7 +41,7 @@
 			<li class="oh-activity-sidebar__qa-item fade-me-out" id="offboardingNoteItem{{note.id}}">
 				<span class="oh-activity-sidebar__q">{{ note.description }}
 					{% if request.user.employee_get|is_any_stage_manager or perms.offboarding.change_offboarding or perms.offboarding.change_offboardingemployee %}
-						<span class="float-end" hx-get="{% url 'offboarding-note-delete' note.id %}"
+						<span class="float-end" hx-post="{% url 'offboarding-note-delete' note.id %}"
 							hx-target="#offboardingNoteItem{{note.id}}" hx-on:click="setTimeout(() => {reloadMessage(this);},100);"
 							hx-swap="outerHTML swap:.5s">
 							<ion-icon name="close-outline" style="font-size: 24px" role="img" class="md hydrated"
@@ -57,7 +57,7 @@
 								onmouseover="enlargeImage('{{ file.attachment.url }}',$(this))" style="width: 40px; height: 40px">
 								{% if request.user.employee_get|is_any_stage_manager or perms.offboarding.change_offboarding or perms.offboarding.change_offboardingemployee %}
 									<img src="{% static 'images/ui/minus-icon.png' %}" style="display: block; width: 50%; height: 50%"
-										hx-get="{% url 'delete-note-attachment' %}?ids={{ file.id }}&employee_id={{ employee.id }}"
+										hx-post="{% url 'delete-note-attachment' %}?ids={{ file.id }}&employee_id={{ employee.id }}"
 										hx-target="#noteFileItem{{file.id}}" hx-swap="outerHTML"
 										hx-on:click="setTimeout(() => {reloadMessage(this);},100);"
 										onclick="event.stopPropagation();event.preventDefault()" />

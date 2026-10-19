@@ -21,7 +21,7 @@
                     <i class="fas fa-paperclip"></i> {{ file }}
                     {% if perms.recruitment.delete_candidatenote or request|is_any_manager %}
                     <ion-icon name="close-circle-outline" title="{% trans 'Remove file' %}"
-                        hx-get="{% url 'delete-candidate-note-file' file.id %}"
+                        hx-post="{% url 'delete-candidate-note-file' file.id %}"
                         hx-target="#notesMessages"
                         hx-swap="innerHTML"
                         hx-on:click="event.preventDefault();event.stopPropagation();"
@@ -36,7 +36,7 @@
             <span>{{ note.updated_by }}{% if note.created_at %} &middot; {{ note.created_at|date:"M d, h:i A" }}{% endif %}</span>
             {% if note.updated_by == request.user.employee_get or perms.recruitment.delete_candidatenote or request|is_any_manager %}
             <span
-                hx-get="{% url 'candidate-note-delete' note.id %}"
+                hx-post="{% url 'candidate-note-delete' note.id %}"
                 hx-target="#notesMessages"
                 hx-swap="innerHTML"
                 class="oh-chat-delete"

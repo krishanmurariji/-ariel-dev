@@ -4,6 +4,7 @@ requests.py
 This module is used to register the endpoints to the attendance requests
 """
 
+from horilla.post_only import post_only
 import copy
 import json
 from datetime import date, datetime, time
@@ -272,6 +273,7 @@ def update_title(request):
     return redirect(reverse("get-batches"))
 
 
+@post_only
 @login_required
 @permission_required("attendance.delete_batchattendance")
 def delete_batch(request, batch_id):
@@ -473,6 +475,7 @@ def validate_attendance_request(request, attendance_id):
     )
 
 
+@post_only
 @login_required
 @manager_can_enter("attendance.change_attendance")
 def approve_validate_attendance_request(request, attendance_id):
@@ -609,6 +612,7 @@ def approve_validate_attendance_request(request, attendance_id):
     return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 def cancel_attendance_request(request, attendance_id):
     """

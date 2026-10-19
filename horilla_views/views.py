@@ -1,3 +1,4 @@
+from horilla.post_only import post_only
 import csv
 import importlib
 import json
@@ -685,6 +686,7 @@ class HorillaDeleteConfirmationView(View):
         return context
 
 
+@post_only
 @func_login_required
 def update_kanban_sequence(request):
     """
@@ -755,6 +757,7 @@ def update_kanban_sequence(request):
     return JsonResponse({"status": "success", "updated": len(updated_objs)})
 
 
+@post_only
 @func_login_required
 def update_kanban_item_group(request):
     """
@@ -838,6 +841,7 @@ def update_kanban_item_group(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
+@post_only
 @func_login_required
 def update_kanban_group_sequence(request):
     """

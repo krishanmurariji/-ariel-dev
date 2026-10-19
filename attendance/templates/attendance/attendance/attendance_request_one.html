@@ -195,7 +195,7 @@
                                 <ion-icon name="ban-outline"></ion-icon>
                             </a>
                         {% elif minot <= attendance_request.overtime_second %}
-                            <a
+                            <a data-post-link
                                 href="{% url 'approve-overtime' attendance_request.id %}"
                                 class="oh-btn oh-btn--success w-50"
                                 title='{% trans "Approve" %}'
@@ -236,7 +236,7 @@
                                 data-ot-approve-id="{{attendance_request.id}}"
                                 hidden
                                 href=""
-                                onclick="window.location.href='{% url 'approve-overtime' attendance_request.id %}'"
+                                onclick="postTo('{% url 'approve-overtime' attendance_request.id %}')"
                                 title="{% trans 'Approve Overtime' %}"
                                 class="oh-btn oh-btn--success w-100"
                             >
@@ -285,7 +285,7 @@
                             <ion-icon name="create-outline" role="img" class="md hydrated" aria-label="create outline">
                             </ion-icon>
                         </a>
-                        <a
+                        <a data-post-link
                             href='{% url "validate-this-attendance" attendance_request.id %}'
                             hx-target="#updateAttendanceBody"
                             class="oh-btn oh-btn--success w-50"

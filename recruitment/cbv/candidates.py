@@ -360,6 +360,7 @@ class CardCandidates(HorillaCardView):
             "attrs": """
                 onclick="event.stopPropagation()
                 return confirm('Are you sure you want to convert this candidate into an employee?')"
+                data-post-link
                 href='{get_convert_to_emp}'
                 class="oh-dropdown__link"
 

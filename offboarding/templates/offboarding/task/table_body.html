@@ -88,7 +88,7 @@
                         {% if stage.grouper.type == "archived" %}
                         <a
                             type="button"
-                            hx-get="{% url 'employee-archive' employee.employee_id.id %}"
+                            hx-post="{% url 'employee-archive' employee.employee_id.id %}"
                             hx-target="#objectDetailsModalTarget"
                             data-toggle="oh-modal-toggle"
                             data-target="#objectDetailsModal"
@@ -116,7 +116,7 @@
                         <a
                             type="button"
                             title="{% trans 'Show managing records' %}"
-                            hx-get="{% url 'get-manager-in' %}?employee_id={{employee.employee_id.id}}&offboarding=True"
+                            hx-post="{% url 'get-manager-in' %}?employee_id={{employee.employee_id.id}}&offboarding=True"
                             hx-target="#objectDetailsModalTarget"
                             data-toggle="oh-modal-toggle"
                             data-target="#objectDetailsModal"

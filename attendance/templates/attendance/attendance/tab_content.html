@@ -618,7 +618,7 @@
                                     </div>
                                     <div class="oh-sticky-table__td oh-sticky-table__right">
                                         {% if request.user|is_reportingmanager or perms.attendance.change_attendance %}
-                                            <a
+                                            <a data-post-link
                                                 href='{% url "validate-this-attendance" attendance.id %}'
                                                 hx-target="#updateAttendanceBody"
                                                 data-req="/attendance/request-attendance-view/?id={{attendance.id}}"
@@ -983,7 +983,7 @@
                                                 <ion-icon class="me-1" name="checkmark-outline"></ion-icon>
                                             </a>
                                         {% elif minot <= attendance.overtime_second %}
-                                            <a
+                                            <a data-post-link
                                                 type="submit"
                                                 href="{% url 'approve-overtime' attendance.id %}"
                                                 title="{% trans 'Approve Overtime' %}"
@@ -1027,7 +1027,7 @@
                                                 data-ot-approve-id="{{attendance.id}}"
                                                 hidden
                                                 href=""
-                                                onclick="window.location.href='{% url 'approve-overtime' attendance.id %}'"
+                                                onclick="postTo('{% url 'approve-overtime' attendance.id %}')"
                                                 title="{% trans 'Approve Overtime' %}"
                                                 class="oh-btn oh-btn--success w-100"
                                             >

@@ -109,8 +109,9 @@ function workTypeRequestRowApprove(url, confirmText) {
     }).then(function (result) {
         if (result.isConfirmed) {
             $.ajax({
-                type: "GET",
+                type: "POST",
                 url: url,
+                data: {csrfmiddlewaretoken: getCookie("csrftoken")},
                 headers: {
                     "X-Requested-With": "XMLHttpRequest",
                 },

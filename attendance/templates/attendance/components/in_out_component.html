@@ -12,7 +12,7 @@
                             onmouseenter="$(this).find('span').show();$(this).find('.time-runner').hide()"
                             onmouseleave="$(this).find('span').hide();$(this).find('.time-runner').show()"
                         {% endif %}
-                        hx-get="{% url 'clock-out' %}"
+                        hx-post="{% url 'clock-out' %}"
                         hx-target="#attendance-activity-container"
                         hx-swap="innerHTML"
                     >

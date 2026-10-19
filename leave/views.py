@@ -2,6 +2,7 @@
 views.py
 """
 
+from horilla.post_only import post_only
 import ast
 import contextlib
 import json
@@ -312,6 +313,7 @@ def leave_type_update(request, id, **kwargs):
     return render(request, "leave/leave_type/leave_type_update_page.html", context)
 
 
+@post_only
 @login_required
 @permission_required("leave.delete_leavetype")
 def leave_type_delete(request, obj_id):
@@ -974,6 +976,7 @@ def leave_request_update(request, id):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 @manager_can_enter("leave.delete_leaverequest")
@@ -1868,6 +1871,7 @@ def available_leave_update(request, id):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 @manager_can_enter("leave.delete_availableleave")
@@ -2245,6 +2249,7 @@ def restrict_update(request, id):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("leave.delete_restrictleave")
@@ -2632,6 +2637,7 @@ def user_request_update(request, id):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 def user_request_delete(request, id):
@@ -3762,6 +3768,7 @@ def leave_allocation_request_update(request, req_id):
         return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 @leave_allocation_reject_permission()
 def leave_allocation_request_approve(request, req_id):
@@ -3882,6 +3889,7 @@ def leave_allocation_request_reject(request, req_id):
         return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 @hx_request_required
 @leave_allocation_delete_permission()
@@ -4615,6 +4623,7 @@ def view_allocationrequest_comment(request, leave_id):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 def delete_allocationrequest_comment(request, comment_id):
@@ -4639,6 +4648,7 @@ def delete_allocationrequest_comment(request, comment_id):
     return HttpResponse(script)
 
 
+@post_only
 @login_required
 def delete_allocation_comment_file(request):
     """
@@ -4871,6 +4881,7 @@ def restrict_leaves_settings_view(request):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 def delete_leaverequest_comment(request, comment_id):
@@ -4894,6 +4905,7 @@ def delete_leaverequest_comment(request, comment_id):
     return HttpResponse(script)
 
 
+@post_only
 @login_required
 def delete_leave_comment_file(request):
     """
@@ -5007,6 +5019,7 @@ if apps.is_installed("attendance"):
             },
         )
 
+    @post_only
     @login_required
     @hx_request_required
     def delete_leaverequest_compensatory_comment(request, comment_id):
@@ -5213,6 +5226,7 @@ if apps.is_installed("attendance"):
         }
         return render(request, template, context)
 
+    @post_only
     @login_required
     @is_compensatory_leave_enabled()
     @hx_request_required
@@ -5237,6 +5251,7 @@ if apps.is_installed("attendance"):
         else:
             return HorillaRedirect(request)
 
+    @post_only
     @login_required
     @is_compensatory_leave_enabled()
     @hx_request_required

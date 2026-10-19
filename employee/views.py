@@ -11,6 +11,7 @@ This module is part of the recruitment project and is intended to
 provide the main entry points for interacting with the application's functionality.
 """
 
+from horilla.post_only import post_only
 import ast
 import calendar
 import json
@@ -876,6 +877,7 @@ def update_document_title(request, id):
     return HttpResponse("")
 
 
+@post_only
 @login_required
 @hx_request_required
 def document_delete(request, id):
@@ -1631,6 +1633,7 @@ def save_employee_bulk_update(request):
     return redirect("/employee/employee-view/?view=list")
 
 
+@post_only
 @login_required
 @permission_required("employee.change_employee")
 def employee_account_block_unblock(request, emp_id):
@@ -2416,6 +2419,7 @@ def employee_bulk_archive(request):
     return JsonResponse({"message": "Success"})
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("employee.delete_employee")
@@ -2569,6 +2573,7 @@ def replace_employee(request, emp_id):
     return redirect(f"{reverse('employee-view')}?view=list")
 
 
+@post_only
 @login_required
 @permission_required("employee.view_employee")
 def get_manager_in(request):
@@ -3529,6 +3534,7 @@ def employee_note_update(request, note_id):
     )
 
 
+@post_only
 @login_required
 @manager_can_enter(perm="employee.delete_employeenote")
 def employee_note_delete(request, note_id):
@@ -3580,6 +3586,7 @@ def add_more_employee_files(request, note_id):
     return redirect(f"/employee/note-tab/{employee_id}")
 
 
+@post_only
 @login_required
 @hx_request_required
 @manager_can_enter(perm="employee.delete_notefiles")

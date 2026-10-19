@@ -1,6 +1,6 @@
 {% load i18n %}
 <div class="col-span-12 lg:col-span-6">
-    <form hx-get="{% url 'enable-timerunner' %}" hx-swap="none">
+    <form hx-post="{% url 'enable-timerunner' %}" hx-swap="none">
         <div class="flex items-center justify-between mb-4">
             <div class="flex space-x-2">
                 <h3 class="text-sm font-medium">{% trans "At-Work Tracker" %}</h3>

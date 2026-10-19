@@ -37,7 +37,7 @@
 
 <div class="oh-modal__dialog-body oh-modal__dialog-relative">
     <div id="{{ view_id }}">
-        <form id="{{ view_id }}Form" hx-post="{{ request.path }}?{{ request.GET.urlencode }}"
+        <form id="{{ view_id }}Form" data-xm-limits hx-post="{{ request.path }}?{{ request.GET.urlencode }}"
             {% if request.META.HTTP_HX_TARGET %}hx-target="#{{ request.META.HTTP_HX_TARGET }}"{% endif %}
             hx-swap="{% if hx_target == 'this' %}outerHTML{% else %}innerHTML{% endif %}"
             novalidate>

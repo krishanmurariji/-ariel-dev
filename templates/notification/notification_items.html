@@ -18,7 +18,7 @@
                 <ion-icon name="checkmark-done-outline" class="mr-1"></ion-icon> {% trans "Mark as read" %}
             </a>
             <a class="oh-navbar__notification-tray-link oh-navbar__notification-tray-link--danger"
-                hx-get="{% url 'clear-notifications' %}" hx-target="#notificationContainer">
+                hx-post="{% url 'clear-notifications' %}" hx-target="#notificationContainer">
                 <ion-icon name="close-outline" class="mr-1"></ion-icon> {% trans "Clear" %}
             </a>
         </div>

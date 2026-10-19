@@ -4,6 +4,7 @@ component_views.py
 This module is used to write methods to the component_urls patterns respectively
 """
 
+from horilla.post_only import post_only
 import json
 import math
 import operator
@@ -595,6 +596,7 @@ def update_allowance(request, allowance_id, **kwargs):
 #     return redirect(filter_allowance)
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("payroll.delete_allowance")
@@ -815,6 +817,7 @@ def update_deduction(request, deduction_id, **kwargs):
     )
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("payroll.delete_deduction")
@@ -1618,6 +1621,7 @@ def view_installments(request):
     )
 
 
+@post_only
 @login_required
 @permission_required("payroll.delete_loanaccount")
 def delete_loan(request):
@@ -1959,6 +1963,7 @@ def get_assigned_leaves(request):
     return JsonResponse(list(assigned_leaves), safe=False)
 
 
+@post_only
 @login_required
 @permission_required("payroll.change_reimbursement")
 def approve_reimbursements(request):
@@ -2027,6 +2032,7 @@ def approve_reimbursements(request):
     return redirect(reverse("view-reimbursement"))
 
 
+@post_only
 @login_required
 @permission_required("payroll.delete_reimbursement")
 def delete_reimbursements(request):

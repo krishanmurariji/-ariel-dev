@@ -1,3 +1,4 @@
+from horilla.post_only import post_only
 import calendar
 import datetime
 import json
@@ -297,6 +298,7 @@ def change_project_status(request, project_id):
     return HttpResponse("<script>$('#reloadMessagesButton').click();</script>")
 
 
+@post_only
 @login_required
 @project_delete_permission()
 def project_delete(request, project_id):
@@ -697,6 +699,7 @@ def project_bulk_delete(request):
     return HttpResponse("<script>$('#applyFilter').click();</script>")
 
 
+@post_only
 @login_required
 @project_delete_permission()
 def project_archive(request, project_id):
@@ -895,6 +898,7 @@ def update_task(request, task_id):
     )
 
 
+@post_only
 @login_required
 @task_delete_permission()
 def delete_task(request, task_id):
@@ -1162,6 +1166,7 @@ def task_all_create(request):
     )
 
 
+@post_only
 @login_required
 @task_update_permission()
 def update_project_task_status(request, task_id):
@@ -1285,6 +1290,7 @@ def task_all_bulk_delete(request):
     return JsonResponse({"message": "Success"})
 
 
+@post_only
 @login_required
 @task_update_permission()
 # @permission_required("project.change_task")
@@ -1366,6 +1372,7 @@ def update_project_stage(request, stage_id):
     )
 
 
+@post_only
 @login_required
 @project_stage_delete_permission()
 def delete_project_stage(request, stage_id):
@@ -1772,6 +1779,7 @@ def time_sheet_update(request, time_sheet_id):
         return HorillaRedirect(request)
 
 
+@post_only
 @login_required
 def time_sheet_delete(request, time_sheet_id):
     """

@@ -11,6 +11,8 @@ This module is part of the recruitment project and is intended to
 provide the main entry points for interacting with the application's functionality.
 """
 
+from horilla.post_only import post_only
+from django.views.decorators.http import require_POST
 import contextlib
 import json
 import logging
@@ -459,6 +461,7 @@ def update_stage_order(request, pk):
     )
 
 
+@post_only
 @login_required
 @permission_required("onboarding.delete_onboardingstage")
 @recruitment_manager_can_enter("onboarding.delete_onboardingstage")
@@ -602,6 +605,7 @@ def task_update(
     )
 
 
+@post_only
 @login_required
 @permission_required("onboarding.delete_onboardingtask")
 @stage_manager_can_enter("onboarding.delete_onboardingtask")
@@ -684,6 +688,7 @@ def candidate_update(request, obj_id):
     return render(request, "onboarding/candidate_update.html", {"form": form})
 
 
+@post_only
 @login_required
 @permission_required("onboarding.delete_onboardingcandidate")
 def candidate_delete(request, obj_id):
@@ -2049,6 +2054,7 @@ def get_status(request, task_id):
     )
 
 
+@post_only
 @login_required
 @all_manager_can_enter("onboarding.change_candidatetask")
 def assign_task(request, task_id):
@@ -2585,6 +2591,7 @@ def candidate_tasks_status(request):
     )
 
 
+@post_only
 @login_required
 @all_manager_can_enter("onboarding.change_candidatetask")
 def change_task_status(request):
@@ -2614,6 +2621,7 @@ def change_task_status(request):
     )
 
 
+@post_only
 @login_required
 @permission_required("recruitment.change_recruitment")
 def update_offer_letter_status(request):
@@ -2759,6 +2767,7 @@ def candidate_select_filter(request):
         )
 
 
+@post_only
 @login_required
 @permission_required("recruitment.change_candidate")
 def offer_letter_bulk_status_update(request):
@@ -2788,6 +2797,7 @@ def offer_letter_bulk_status_update(request):
     return JsonResponse("success", safe=False)
 
 
+@post_only
 @login_required
 @permission_required("recruitment.delete_candidate")
 def onboarding_candidate_bulk_delete(request):
@@ -2795,7 +2805,7 @@ def onboarding_candidate_bulk_delete(request):
     This function is used to bulk delete onboarding candidates
     """
 
-    cand_ids = request.GET.get("ids")
+    cand_ids = request.POST.get("ids")
     if not cand_ids:
         messages.error(request, "No candidates selected for deletion.")
         return JsonResponse("Missing required parameter: ids", safe=False, status=400)

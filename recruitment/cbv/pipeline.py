@@ -190,6 +190,7 @@ class RecruitmentTabView(HorillaTabView):
                             {
                                 "action": _("Reopen"),
                                 "attrs": f"""
+                                    data-post-link
                                     href="{reverse("recruitment-reopen-pipeline", kwargs={"rec_id": rec.pk})}"
                                     style="cursor: pointer;"
                                     onclick="return confirm('Are you sure you want to reopen this recruitment?');"
@@ -201,6 +202,7 @@ class RecruitmentTabView(HorillaTabView):
                             {
                                 "action": _("Close"),
                                 "attrs": f"""
+                                    data-post-link
                                     href="{reverse("recruitment-close-pipeline", kwargs={"rec_id": rec.pk})}"
                                     style="cursor: pointer;"
                                     onclick="return confirm('Are you sure you want to close this recruitment?');"

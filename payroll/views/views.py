@@ -4,6 +4,7 @@ views.py
 This module is used to define the method for the path in the urls
 """
 
+from horilla.post_only import post_only
 import json
 from collections import defaultdict
 from datetime import date, datetime, timedelta
@@ -274,6 +275,7 @@ def update_contract_filing_status(request, contract_id):
         return redirect("contract-filter")
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("payroll.delete_contract")
@@ -636,6 +638,7 @@ def view_created_payslip(request, payslip_id, **kwargs):
     return render(request, "404.html")
 
 
+@post_only
 @login_required
 @permission_required("payroll.delete_payslip")
 def delete_payslip(request, payslip_id):
@@ -1838,6 +1841,7 @@ def view_payrollrequest_comment(request, payroll_id):
     )
 
 
+@post_only
 @login_required
 def delete_payrollrequest_comment(request, comment_id):
     """
@@ -1852,6 +1856,7 @@ def delete_payrollrequest_comment(request, comment_id):
     return HorillaRedirect(request, message=_("Comment deleted successfully!"))
 
 
+@post_only
 @login_required
 def delete_reimbursement_comment_file(request):
     """
@@ -1867,6 +1872,7 @@ def delete_reimbursement_comment_file(request):
     return HorillaRedirect(request, message=_("File deleted successfully"))
 
 
+@post_only
 @login_required
 @permission_required("payroll.add_payrollgeneralsetting")
 def initial_notice_period(request):
@@ -1971,6 +1977,7 @@ def activate_auto_payslip_generate(request):
     return JsonResponse(response)
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("payroll.delete_payslipautogenerate")

@@ -60,20 +60,20 @@
                     {% endif %}
                     {% if skill_zone.is_active %}
                       <li class="oh-dropdown__item">
-                        <a
+                        <a data-post-link
                         href="{% url 'skill-zone-archive' skill_zone.id %}"
                         onclick = "event.preventDefault();event.stopPropagation(); confirm(`{% trans 'Do you want to Archive this Skill zone?' %}`)"
                         >{% trans "Archive" %}</a>
                       </li>
                     {% else %}
-                      <a
+                      <a data-post-link
                       href="{% url 'skill-zone-archive' skill_zone.id %}"
                       onclick = "event.preventDefault();event.stopPropagation(); confirm(`{% trans 'Do you want to Un-Archive this Skill zone?' %}`)"
                       >{% trans "Un Archive" %}</a>
                     {% endif %}
 
                     <li class="oh-dropdown__item">
-                        <a class="text-danger"
+                        <a data-post-link class="text-danger"
                         href="{% url 'skill-zone-delete' skill_zone.id %}"
                         onclick = "event.preventDefault();event.stopPropagation(); confirm(`{% trans 'Do you want to delete this Skill zone?' %}`)"
                         >{% trans "Delete" %}</a>

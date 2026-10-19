@@ -2,6 +2,7 @@
 horilla_automation/views/views.py
 """
 
+from horilla.post_only import post_only
 from django import forms
 from django.contrib import messages
 from django.http import JsonResponse
@@ -53,6 +54,7 @@ def get_to_field(request):
     )
 
 
+@post_only
 @login_required
 @permission_required("horilla_automations.delete_mailautomation")
 def delete_automation(request, pk):

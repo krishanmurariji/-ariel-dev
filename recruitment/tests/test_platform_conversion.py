@@ -154,7 +154,7 @@ class PlatformConversionDataTests(PlatformConversionTestCase):
 class PlatformConversionSettingToggleTests(PlatformConversionTestCase):
     def test_enabling_creates_setting_row_with_true(self):
         self.assertFalse(RecruitmentGeneralSetting.objects.exists())
-        self.client.get(
+        self.client.post(
             "/recruitment/platform-conversion-widget-setting/?show_platform_conversion=true",
             HTTP_HX_REQUEST="true",
         )
@@ -165,7 +165,7 @@ class PlatformConversionSettingToggleTests(PlatformConversionTestCase):
         RecruitmentGeneralSetting.objects.create(
             company_id=None, show_platform_conversion=True
         )
-        self.client.get(
+        self.client.post(
             "/recruitment/platform-conversion-widget-setting/?show_platform_conversion=false",
             HTTP_HX_REQUEST="true",
         )

@@ -106,7 +106,7 @@
               />
               {% if form.instance.id %}
               <div class="d-flex justify-content-center">
-                <a
+                <a data-post-link
                   class="oh-btn oh-btn--light-danger mr-1"
                   href="{% url 'delete-profile-image' form.instance.id %}"
                 >

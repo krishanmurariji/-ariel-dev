@@ -428,9 +428,10 @@
               })
         }else {
             $.ajax({
-                type: "GET",
+                type: "POST",
                 url: "{% url 'offer-letter-bulk-status-update' %}",
                 data: {
+                    csrfmiddlewaretoken: "{{ csrf_token }}",
                     ids: JSON.stringify(ids),
                     status: $(this).val(),
                 },
@@ -467,10 +468,11 @@
             }).then(function (result) {
                 if (result.isConfirmed) {
                     $.ajax({
-                        type: "GET",
+                        type: "POST",
                         url: "{% url 'onboarding-candidate-bulk-delete' %}",
                         data: {
                             ids: JSON.stringify(ids),
+                            csrfmiddlewaretoken: "{{ csrf_token }}",
                         },
                         success: function (response) {
                             window.location.reload()

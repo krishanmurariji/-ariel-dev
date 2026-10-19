@@ -137,12 +137,13 @@
                     {% endif %}
                     {% if perms.pms.delete_employeeobjective or instance|is_manager:request.user %}
                         {% if instance.archive %}
-                            <form
+                            <form method="post"
                                 class="oh-btn oh-btn--primary"
                                 style="width: 50%"
                                 onsubmit="return confirm('Do you want to Unarchive this Employee objective?')"
                                 action='{% url "archive-employee-objective" instance.id %}'
                             >
+{% csrf_token %}
                                 <input type="hidden" name="archive" value="False" id="">
                                 <input type="hidden" name="single_view" value="True">
                                 <button style="background: none; color: inherit; border: none; padding: 0; font: inherit; cursor: pointer; outline: inherit">
@@ -151,12 +152,13 @@
                                 </button>
                             </form>
                         {% else %}
-                            <form
+                            <form method="post"
                                 class="oh-btn oh-btn--primary"
                                 style="width: 50%"
                                 onsubmit="return confirm('Do you want to archive this Employee objective?')"
                                 action='{% url "archive-employee-objective" instance.id %}'
                             >
+{% csrf_token %}
                                 <input type="hidden" name="archive" value="False" id="">
                                 <input type="hidden" name="single_view" value="True">
                                 <button style="background: none; color: inherit; border: none; padding: 0; font: inherit; cursor: pointer; outline: inherit">

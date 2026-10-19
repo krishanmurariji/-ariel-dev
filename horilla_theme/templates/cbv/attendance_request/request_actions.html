@@ -23,7 +23,7 @@
                         cancelButtonText: '{% trans 'Cancel' %}'
                     }).then(function(result) {
                         if (result.isConfirmed) {
-                            htmx.ajax('GET', '{% url 'approve-validate-attendance-request' instance.id %}', {target: '#validateAttendanceRequestModalBody', swap: 'innerHTML'});
+                            htmx.ajax('POST', '{% url 'approve-validate-attendance-request' instance.id %}', {target: '#validateAttendanceRequestModalBody', swap: 'innerHTML'});
                         }
                     });
                 })({{ instance.id }}); return false"
@@ -54,7 +54,7 @@
                         cancelButtonText: '{% trans 'Cancel' %}'
                     }).then(function(result) {
                         if (result.isConfirmed) {
-                            htmx.ajax('GET', '{% url 'cancel-validate-attendance-request' instance.id %}', {target: '#validateAttendanceRequestModalBody', swap: 'innerHTML'});
+                            htmx.ajax('POST', '{% url 'cancel-validate-attendance-request' instance.id %}', {target: '#validateAttendanceRequestModalBody', swap: 'innerHTML'});
                         }
                     });
                 })({{ instance.id }}); return false"

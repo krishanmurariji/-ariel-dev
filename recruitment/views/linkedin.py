@@ -1,3 +1,4 @@
+from horilla.post_only import post_only
 import ipaddress
 import json
 import secrets
@@ -175,6 +176,7 @@ def update_isactive_linkedin(request, obj_id):
     return HttpResponse("<script>$('#reloadMessagesButton').click();</script>")
 
 
+@post_only
 @login_required
 @permission_required("recruitment.delete_linkedinaccount")
 def delete_linkedin_account(request, pk, return_redirect=True):

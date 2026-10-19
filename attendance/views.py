@@ -11,6 +11,7 @@ This module is part of the recruitment project and is intended to
 provide the main entry points for interacting with the application's functionality.
 """
 
+from horilla.post_only import post_only
 import contextlib
 import json
 from datetime import date, datetime, timedelta
@@ -1106,6 +1107,7 @@ def revalidate_this_attendance(request, obj_id):
     return HttpResponse("You Cannot Request for others attendance")
 
 
+@post_only
 @login_required
 @manager_can_enter("attendance.change_attendance")
 def approve_overtime(request, obj_id):

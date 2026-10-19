@@ -205,8 +205,9 @@ body.onboarding-list-hide-toolbar #onboardingCandidatesNavBar {
 
       function offerLetter(url){
         $.ajax({
-          type: "get",
+          type: "POST",
           url: url,
+          headers: {"X-CSRFToken": "{{ csrf_token }}"},
           success: function (response) {
             $("#reloadMessagesButton").click()
           }

@@ -139,14 +139,14 @@
                                                             class="oh-dropdown__item"
                                                         >
                                                             {% if ticket.is_active %}
-                                                                <a
+                                                                <a data-post-link
                                                                     href="{% url 'ticket-archive' ticket.id %}"
                                                                     onclick="event.stopPropagation();return confirm('{% trans "Do you want to archive this ticket?" %}');"
                                                                     class="oh-dropdown__link"
                                                                     >{% trans "Archive" %}</a
                                                                 >
                                                             {% else %}
-                                                                <a
+                                                                <a data-post-link
                                                                     href="{% url 'ticket-archive' ticket.id %}"
                                                                     onclick="event.stopPropagation();return confirm('{% trans "Do you want to un-archive this ticket?" %}');"
                                                                     class="oh-dropdown__link"
@@ -428,7 +428,7 @@
                                                                     <li
                                                                         class="oh-dropdown__item"
                                                                     >
-                                                                        <a
+                                                                        <a data-post-link
                                                                             style="
                                                                                 color: inherit;
                                                                                 text-decoration: none;
@@ -469,7 +469,7 @@
                                                                     <li
                                                                         class="oh-dropdown__item"
                                                                     >
-                                                                        <a
+                                                                        <a data-post-link
                                                                             href="{% url 'ticket-archive' ticket.id %}"
                                                                             onclick="event.stopPropagation();return confirm('{% trans "Do you want to archive this ticket?" %}');"
                                                                             class="oh-dropdown__link"
@@ -480,7 +480,7 @@
                                                                     <li
                                                                         class="oh-dropdown__item"
                                                                     >
-                                                                        <a
+                                                                        <a data-post-link
                                                                             href="{% url 'ticket-archive' ticket.id %}"
                                                                             onclick="event.stopPropagation();return confirm('{% trans "Do you want to un-archive this ticket?" %}');"
                                                                             class="oh-dropdown__link"
@@ -793,7 +793,7 @@
                                                                     <li
                                                                         class="oh-dropdown__item"
                                                                     >
-                                                                        <a
+                                                                        <a data-post-link
                                                                             href="{% url 'ticket-archive' ticket.id %}"
                                                                             onclick="event.stopPropagation();return confirm('{% trans "Do you want to archive this ticket?" %}');"
                                                                             class="oh-dropdown__link"
@@ -804,7 +804,7 @@
                                                                     <li
                                                                         class="oh-dropdown__item"
                                                                     >
-                                                                        <a
+                                                                        <a data-post-link
                                                                             href="{% url 'ticket-archive' ticket.id %}"
                                                                             onclick="event.stopPropagation();return confirm('{% trans "Do you want to un-archive this ticket?" %}');"
                                                                             class="oh-dropdown__link"

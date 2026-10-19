@@ -248,8 +248,9 @@
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({
-                    type: "GET",
+                    type: "POST",
                     url: url,
+                    headers: {"X-CSRFToken": "{{ csrf_token }}"},
                     success: function () {
                         $("#applyFilter").click();
                         $("#reloadMessagesButton").click();

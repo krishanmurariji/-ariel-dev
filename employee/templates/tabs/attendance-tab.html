@@ -136,7 +136,7 @@
 							></ion-icon
 							></a>
 
-						<a
+						<a data-post-link
 							type="submit"
 							class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100"
 							title="{% trans 'Re-validate Request' %}"
@@ -324,7 +324,7 @@
 							</div>
 							<div class="oh-sticky-table__td" onclick="event.stopPropagation();">
 								{% if request.user|is_reportingmanager or perms.attendance.change_attendance %}
-								<a
+								<a data-post-link
 								href = '{% url "validate-this-attendance" attendance.id %}'
 								hx-target='#updateAttendanceBody'
 								class="oh-btn oh-btn--info">

@@ -60,7 +60,7 @@
                             {{ attendance.attendance_overtime }}
                         </div>
                         <div class="oh-sticky-table__td">
-                            <a
+                            <a data-post-link
                                 href="{% url 'approve-overtime' attendance.id %}"
                                 onclick="event.stopPropagation()"
                                 class="oh-btn oh-btn oh-btn--success w-100"

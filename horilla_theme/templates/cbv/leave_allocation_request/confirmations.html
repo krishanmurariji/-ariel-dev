@@ -4,7 +4,7 @@
     <div onclick="event.stopPropagation()">
         <div class="oh-btn-group">
             {% if instance.status == 'requested' %}
-                <a
+                <a data-post-link
                     type="submit"
                     href="{% url 'leave-allocation-request-approve' instance.id %}"
                     onclick="return confirm('{% trans "Do you want to approve this request?" %}')"

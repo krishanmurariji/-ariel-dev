@@ -834,7 +834,7 @@ class EmployeeObjectiveKeyResultDetailListView(HorillaListView):
                     "action": _("Delete"),
                     "icon": "trash-outline",
                     "attrs": f"""
-                        hx-get='{{get_delete_url}}'
+                        hx-post='{{get_delete_url}}'
                         hx-confirm="{delete_confirm}"
                         hx-swap="none"
                         class="oh-btn oh-btn--danger-outline w-100"

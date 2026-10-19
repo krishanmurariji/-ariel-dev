@@ -182,9 +182,9 @@
                         if (credential) {
                             var url = "{% url 'create-pms-google-meeting' %}";
                             $.ajax({
-                                type: "GET",
+                                type: "POST",
                                 url: url,
-                                data: { id: meetingID },
+                                data: { id: meetingID, csrfmiddlewaretoken: "{{ csrf_token }}" },
                                 success: function(response) {
                                     window.location.reload();
                                 },

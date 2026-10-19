@@ -3,7 +3,7 @@
 <div class="oh-inner-sidebar-content__header mt-4">
     <h2 class="oh-inner-sidebar-content__title">{% trans 'Time Runner' %}</h2>
 </div>
-<form hx-get="{% url 'enable-timerunner' %}" hx-swap="none">
+<form hx-post="{% url 'enable-timerunner' %}" hx-swap="none">
     <div class="oh-label__info" for="application_tracking">
         <label class="oh-label" for="application_tracking">{% trans "At-Work Tracker" %}</label>
         <span

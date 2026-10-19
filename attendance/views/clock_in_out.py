@@ -4,6 +4,7 @@ clock_in_out.py
 This module is used register endpoints to the check-in check-out functionalities
 """
 
+from horilla.post_only import post_only
 import ipaddress
 import logging
 
@@ -477,6 +478,7 @@ def early_out(attendance, start_time, end_time, shift):
     return
 
 
+@post_only
 @login_required
 @hx_request_required
 def clock_out(request):

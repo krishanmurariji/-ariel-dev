@@ -7,7 +7,7 @@
     data-toggle="oh-modal-toggle"
     data-target="#whatsappModal"
     hx-confirm="{% trans 'Do you want to create Templates and Flows in whatsapp manager?' %}"
-    hx-get="{% url 'generic-template-creation' instance.id %}"
+    hx-post="{% url 'generic-template-creation' instance.id %}"
     aria-describedby="ui-id-2"
 >
     <ion-icon

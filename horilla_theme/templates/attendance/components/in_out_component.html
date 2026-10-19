@@ -6,7 +6,7 @@
             <!-- "CHEKING WETHER Check in/check out enabled" -->
             {% if request|is_check_in_enabled %}
                 {% if request.user|is_clocked_in and get_forecasted_at_work.has_attendance %}
-                    {% comment %} <button class="check checkout" hx-get="{% url 'clock-out' %}"  hx-target='#attendance-activity-container' hx-swap='innerHTML'>
+                    {% comment %} <button class="check checkout" hx-post="{% url 'clock-out' %}"  hx-target='#attendance-activity-container' hx-swap='innerHTML'>
                         <span class="date">
                             <i class="fa-solid fa-right-from-bracket pe-2"></i><div class="time-runner"></div>
                         </span>
@@ -15,7 +15,7 @@
                     <span class="at_work_seconds" data-at-work-seconds = "{{ get_forecasted_at_work.forecasted_at_work_seconds|default:0 }}" data-run= "{{run|default:1}}" ></span> {% endcomment %}
                     <button
                         class="check checkout"
-                        hx-get="{% url 'clock-out' %}"
+                        hx-post="{% url 'clock-out' %}"
                         hx-target="#attendance-activity-container"
                         hx-swap="innerHTML"
                         {% if enabled_timerunner and get_forecasted_at_work.has_attendance %}

@@ -9,7 +9,7 @@
 					<ion-icon name="checkmark-outline"></ion-icon>
 				</button>
 			{% else %}
-				<a
+				<a data-post-link
 					href=" {% url 'shift-allocation-request-approve' instance.id %}"
 					onclick="return confirm(`{% trans 'Are you available for this shift reallocation?' %}`)"
 					class="oh-btn oh-btn--success w-100"
@@ -26,7 +26,7 @@
 					<ion-icon class="me-1" name="checkmark-outline"></ion-icon>
 				</button>
 			{% else %}
-				<a
+				<a data-post-link
 					href="{% url 'shift-allocation-request-approve' instance.id %}"
 					onclick="return confirm(`{% trans 'Do you want to approve this request?' %}`)"
 					class="oh-btn oh-btn--success w-100"
@@ -43,7 +43,7 @@
 					<ion-icon name="close-circle-outline"></ion-icon>
 				</button>
 			{% else %}
-				<a
+				<a data-post-link
 					href=" {% url 'shift-allocation-request-cancel' instance.id %}"
 					onclick="return confirm(`{% trans 'Are you not available for this shift reallocation?' %}`)"
 					class="oh-btn oh-btn--danger w-100"
@@ -101,7 +101,7 @@
 					<ion-icon class="me-1" name="close-circle-outline"></ion-icon>
 				</button>
 			{% else %}
-				<a
+				<a data-post-link
 					href="{% url 'shift-allocation-request-cancel' instance.id %}"
 					onclick="return confirm(`{% trans 'Do you want to reject this request?' %}`)"
 					class="oh-btn oh-btn--danger w-100"

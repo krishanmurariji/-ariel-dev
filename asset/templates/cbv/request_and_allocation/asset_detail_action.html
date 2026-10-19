@@ -16,7 +16,7 @@
                 </button>
             {% else %}
                 {% if not instance.return_request %}
-                    <form
+                    <form method="post"
                         class="w-100"
                         action="{% url 'asset-allocate-return-request' asset_id=instance.id %}"
                         onsubmit="return confirm('{% trans "Are you sure you want to return this asset?" %}')"

@@ -4,6 +4,7 @@ policies.py
 This module is used to write operation related to policies
 """
 
+from horilla.post_only import post_only
 import datetime
 import json
 from datetime import timedelta
@@ -143,6 +144,7 @@ def view_policy(request):
     )
 
 
+@post_only
 @login_required
 @permission_required("employee.delete_policy")
 def delete_policies(request):
@@ -197,6 +199,7 @@ def add_attachment(request):
     return render(request, "policies/attachments.html", {"policy": policy})
 
 
+@post_only
 @login_required
 @permission_required("employee.delete_policymultiplefile")
 def remove_attachment(request):
@@ -377,6 +380,7 @@ def update_actions(request, action_id):
     return render(request, "disciplinary_actions/update_form.html", {"form": form})
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("employee.change_disciplinaryaction")
@@ -411,6 +415,7 @@ def remove_employee_disciplinary_action(request, action_id, emp_id):
     return redirect(f"/employee/disciplinary-actions-list?click_id={dis_action.id}")
 
 
+@post_only
 @login_required
 @hx_request_required
 @permission_required("employee.delete_disciplinaryaction")

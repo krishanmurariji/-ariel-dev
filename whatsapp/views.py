@@ -1,3 +1,4 @@
+from horilla.post_only import post_only
 import json
 import logging
 import string
@@ -265,6 +266,7 @@ def whatsapp(request):
     return HttpResponse("error", status=200)
 
 
+@post_only
 @login_required
 @permission_required("whatsapp.change_whatsappcredientials")
 @check_integration_enabled(app_name="whatsapp")

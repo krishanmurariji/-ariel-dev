@@ -222,7 +222,7 @@
                     {% endif %}
                     {% if perms.recruitment.delete_candidate %}
                         <li class="oh-dropdown__item">
-                            <a onclick="return confirm('{% trans "Do you want to archive this candidate?" %}')" href="{% url 'rec-candidate-archive' cand.id %}?is_active=False" class="oh-dropdown__link ">{% trans "Archive" %}</a>
+                            <a data-post-link onclick="return confirm('{% trans "Do you want to archive this candidate?" %}')" href="{% url 'rec-candidate-archive' cand.id %}?is_active=False" class="oh-dropdown__link ">{% trans "Archive" %}</a>
                         </li>
                     {% endif %}
                     {% if perms.recruitment.delete_candidate %}

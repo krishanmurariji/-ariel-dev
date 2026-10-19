@@ -54,7 +54,7 @@
                                             class="oh-btn oh-btn--success flex items-center justify-center"
                                             data-toggle="oh-modal-toggle"
                                             data-target="#objectDetailsModal"
-                                            hx-get="{% url 'approve-claim-request' req.id %}?approve=True"
+                                            hx-post="{% url 'approve-claim-request' req.id %}?approve=True"
                                             hx-target="#objectDetailsModalTarget"
                                             title="{% trans 'Approve request' %}"
                                         >
@@ -75,7 +75,7 @@
                                             class="oh-btn oh-btn--danger flex items-center justify-center"
                                             data-toggle="oh-modal-toggle"
                                             data-target="#objectDetailsModal"
-                                            hx-get="{% url 'approve-claim-request' req.id %}?approve=False"
+                                            hx-post="{% url 'approve-claim-request' req.id %}?approve=False"
                                             hx-target="#objectDetailsModalTarget"
                                             title="{% trans 'Reject request' %}"
                                         >
