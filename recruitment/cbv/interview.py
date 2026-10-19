@@ -112,6 +112,7 @@ class InterviewLIstView(HorillaListView):
         (_("Interviewer"), "interviewer_custom_col"),
         (_("Interview Date"), "interview_date"),
         (_("Interview Time"), "interview_time"),
+        (_("Interview End Time"), "get_end_time"),
         (_("Description"), "get_description"),
         (_("Status"), "status_custom_col"),
     ]
@@ -158,6 +159,7 @@ class InterviewDetailView(HorillaDetailedView):
         (_("Interviewer"), "interviewer_detail"),
         (_("Interview Date"), "interview_date"),
         (_("Interview Time"), "interview_time"),
+        (_("Interview End Time"), "get_end_time"),
         (_("Description"), "get_description"),
         (_("Status"), "status_custom_col"),
     ]

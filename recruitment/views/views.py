@@ -3992,7 +3992,9 @@ def generate_interview_meeting(interview, request):
         description = _interview_meeting_description(
             interview,
             status="scheduled" if meeting_id is None else "rescheduled",
-            duration_minutes=link.meeting.duration if link else 60,
+            duration_minutes=interview.duration_minutes(
+                link.meeting.duration if link else 60
+            ),
         )
         try:
             meeting, created = OutlookMeeting.objects.update_or_create(
@@ -4001,6 +4003,9 @@ def generate_interview_meeting(interview, request):
                     "employee_id": request.user.employee_get,
                     "title": title,
                     "start_time": start_time,
+                    "duration": interview.duration_minutes(
+                        link.meeting.duration if link else 60
+                    ),
                     "description": description,
                     "attendees": attendees,
                     "is_online": is_online,
@@ -4038,7 +4043,9 @@ def generate_interview_meeting(interview, request):
     description = _interview_meeting_description(
         interview,
         status="scheduled" if meeting_id is None else "rescheduled",
-        duration_minutes=link.meeting.duration if link else 60,
+        duration_minutes=interview.duration_minutes(
+            link.meeting.duration if link else 60
+        ),
     )
     try:
         meeting, created = GoogleMeeting.objects.update_or_create(
@@ -4046,6 +4053,9 @@ def generate_interview_meeting(interview, request):
             defaults={
                 "title": title,
                 "start_time": start_time,
+                "duration": interview.duration_minutes(
+                    link.meeting.duration if link else 60
+                ),
                 "description": description,
                 "attendees": attendees,
                 "is_online": is_online,

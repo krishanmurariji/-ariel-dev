@@ -2421,6 +2421,12 @@ class InterviewSchedule(HorillaModel):
     employee_id = models.ManyToManyField(Employee, verbose_name=_("Interviewer"))
     interview_date = models.DateField(verbose_name=_("Interview Date"))
     interview_time = models.TimeField(verbose_name=_("Interview Time"))
+    interview_end_time = models.TimeField(
+        null=True,
+        blank=True,
+        verbose_name=_("Interview End Time"),
+        help_text=_("Optional. Leave empty to keep the default meeting length."),
+    )
     interview_mode = models.CharField(
         max_length=10,
         choices=interview_modes,
@@ -2443,6 +2449,18 @@ class InterviewSchedule(HorillaModel):
 
     def __str__(self) -> str:
         return f"{self.candidate_id} -Interview."
+
+    def get_end_time(self):
+        """The end time for list/detail columns, '-' when none was set."""
+        return self.interview_end_time or "-"
+
+    def duration_minutes(self, default=60):
+        """Length of the interview in minutes: start to end, else ``default``."""
+        if not self.interview_end_time or not self.interview_time:
+            return default
+        start = self.interview_time.hour * 60 + self.interview_time.minute
+        end = self.interview_end_time.hour * 60 + self.interview_end_time.minute
+        return end - start if end > start else default
 
     def candidate_custom_col(self):
         """

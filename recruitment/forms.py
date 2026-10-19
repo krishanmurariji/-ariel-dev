@@ -1772,6 +1772,7 @@ class ScheduleInterviewForm(BaseModelForm):
     cols = {
         "interview_date": 12,
         "interview_time": 12,
+        "interview_end_time": 12,
         "candidate_id": 12,
         "description": 12,
         "employee_id": 12,
@@ -1814,6 +1815,15 @@ class ScheduleInterviewForm(BaseModelForm):
                     attrs={"type": "time", "class": "oh-input w-100"}
                 ),
             )
+        self.fields["interview_end_time"] = forms.TimeField(
+            required=False,
+            label=_("Interview End Time"),
+            help_text=_("Optional. Leave empty to keep the default meeting length."),
+            input_formats=["%H:%M", "%I:%M %p", "%H:%M:%S", "%I:%M:%S %p"],
+            widget=forms.TimeInput(
+                format="%H:%M", attrs={"type": "time", "class": "oh-input w-100"}
+            ),
+        )
         candidate_attr = {
             "hx-include": "#InterviewCreateForm",
             "hx-target": "#id_employee_id_parent_div",
@@ -1854,6 +1864,17 @@ class ScheduleInterviewForm(BaseModelForm):
                         continue
             cleaned_data["interview_time"] = parsed_time or instance.interview_time
             interview_time = cleaned_data.get("interview_time")
+
+        interview_end_time = cleaned_data.get("interview_end_time")
+        if (
+            interview_end_time
+            and interview_time
+            and interview_end_time <= interview_time
+        ):
+            self.add_error(
+                "interview_end_time",
+                _("End time must be later than the start time."),
+            )
 
         if not instance.pk and interview_date and interview_date < date.today():
             self.add_error("interview_date", _("Interview date cannot be in the past."))
