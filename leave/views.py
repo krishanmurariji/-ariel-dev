@@ -1182,7 +1182,7 @@ def leave_request_approve(request, id, emp_id=None):
         # read the same pre-deduction total_available_leave, both pass
         # the >= check, and both deduct - over-drawing the balance.
         with transaction.atomic():
-            available_leave = AvailableLeave.objects.select_for_update().get(
+            available_leave = AvailableLeave.objects.entire().select_for_update().get(
                 leave_type_id=leave_type_id, employee_id=employee_id
             )
             return _leave_request_approve_locked(

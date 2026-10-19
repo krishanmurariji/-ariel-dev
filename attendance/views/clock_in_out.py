@@ -155,7 +155,7 @@ def clock_in_attendance_and_activity(
     # constraint (surfacing as an unhandled IntegrityError instead of
     # being handled gracefully).
     with transaction.atomic():
-        Employee.objects.select_for_update().get(pk=employee.pk)
+        Employee.objects.entire().select_for_update().get(pk=employee.pk)
 
         # attendance activity create
         activity = AttendanceActivity.objects.filter(
@@ -359,7 +359,7 @@ def clock_out_attendance_and_activity(employee, date_today, now, out_datetime=No
     # clock-out for the same employee otherwise (e.g. a double-clicked
     # clock-out button).
     with transaction.atomic():
-        Employee.objects.select_for_update().get(pk=employee.pk)
+        Employee.objects.entire().select_for_update().get(pk=employee.pk)
 
         attendance_activities = AttendanceActivity.objects.filter(
             employee_id=employee,

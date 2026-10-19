@@ -688,7 +688,7 @@ def save_payslip(**kwargs):
         # only protects against the two writes actually overlapping, not
         # against both readers seeing "no existing row" before either
         # writes.
-        Employee.objects.select_for_update().get(pk=kwargs["employee"].pk)
+        Employee.objects.entire().select_for_update().get(pk=kwargs["employee"].pk)
 
         filtered_instance = Payslip.objects.filter(
             employee_id=kwargs["employee"],
