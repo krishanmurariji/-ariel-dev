@@ -98,7 +98,7 @@
 		type="button"
 		class="oh-btn oh-btn--light-bkg w-100"
 		title="{% trans 'Allocations' %}"
-		hx-get="{% url 'allocation-view' instance.pk %}?model=recruitment.models.Candidate"
+		hx-post="{% url 'allocation-view' instance.pk %}?model=recruitment.models.Candidate"
 		hx-target="#allocationModalBody"
 		data-toggle="oh-modal-toggle"
 		data-target="#allocationModal"

@@ -473,7 +473,7 @@ class CandidateList(HorillaListView):
             "icon": "clipboard-outline",
             "attrs": """
                     class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100"
-                    hx-get = "{allocation_path}"
+                    hx-post = "{allocation_path}"
                     data-toggle="oh-modal-toggle"
                     data-target="#allocationModal"
                     hx-target="#allocationModalBody"
@@ -733,7 +733,7 @@ class CandidateKanbanView(HorillaKanbanView):
         {
             "action": _("Allocations"),
             "attrs": """
-                hx-get = "{onboarding_stage__allocation_path}"
+                hx-post = "{onboarding_stage__allocation_path}"
                 data-toggle="oh-modal-toggle"
                 data-target="#allocationModal"
                 hx-target="#allocationModalBody"

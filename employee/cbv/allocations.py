@@ -87,6 +87,14 @@ class AllocationView(HorillaDetailedView):
         super().__init__(**kwargs)
 
     def get(self, request, *args, **kwargs):
+        # Opening the page must not change anything: converting a hired
+        # candidate into an Employee is done by POST (see ``post``).
+        return self.show(request, *args, convert=False, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        return self.show(request, *args, convert=True, **kwargs)
+
+    def show(self, request, *args, convert, **kwargs):
         pk = self.kwargs["pk"]
         model = request.GET.get("model")
         if model:
@@ -97,6 +105,17 @@ class AllocationView(HorillaDetailedView):
             # set candidate to request for accessing inside work info signal
             request.employee_candidate = candidate
             instance = candidate.converted_employee_id
+            if instance is None and not convert:
+                if candidate.hired or candidate.onboarding_stage:
+                    messages.info(
+                        request,
+                        _("Allocation needs this candidate to be converted first."),
+                    )
+                else:
+                    messages.info(
+                        request, _("Allocation feature not possible to this candidate")
+                    )
+                return HorillaFormView.HttpResponse()
             if instance is None and (candidate.hired or candidate.onboarding_stage):
                 # A candidate's email may already belong to an existing
                 # Employee (re-application, prior manual conversion, etc.) —
