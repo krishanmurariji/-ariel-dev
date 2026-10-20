@@ -373,6 +373,21 @@ class RecruitmentForm(HorillaFormView):
         )
 
     @staticmethod
+    def _remove_post(request, recruitment, account, post_id):
+        """Delete one LinkedIn post and tell the user when LinkedIn would not."""
+        if not post_id:
+            return
+        if not delete_post(recruitment, account, post_id=post_id):
+            messages.warning(
+                request,
+                _(
+                    "The LinkedIn post on the %(account)s account could not be "
+                    "removed automatically. Please delete it on LinkedIn."
+                )
+                % {"account": account},
+            )
+
+    @staticmethod
     def _sync_linkedin_posts(
         request, recruitment, previous_account_ids, previous_post_ids, content_changed
     ):
@@ -393,6 +408,15 @@ class RecruitmentForm(HorillaFormView):
         gets its post deleted.
         """
         if not recruitment.publish_in_linkedin:
+            # Switching "Publish in LinkedIn" off clears the stored post ids and
+            # accounts in Recruitment.save(), so the live posts have to come down
+            # here, from the ids read before the save - otherwise they stay on
+            # LinkedIn with nothing left that could ever delete them.
+            stored_ids = [int(key) for key in previous_post_ids if str(key).isdigit()]
+            for account in LinkedInAccount.objects.filter(id__in=stored_ids):
+                RecruitmentForm._remove_post(
+                    request, recruitment, account, previous_post_ids.get(str(account.id))
+                )
             return
         current_account_ids = set(
             recruitment.linkedin_accounts.values_list("id", flat=True)
@@ -400,8 +424,8 @@ class RecruitmentForm(HorillaFormView):
 
         removed_ids = previous_account_ids - current_account_ids
         for account in LinkedInAccount.objects.filter(id__in=removed_ids):
-            delete_post(
-                recruitment, account, post_id=previous_post_ids.get(str(account.id))
+            RecruitmentForm._remove_post(
+                request, recruitment, account, previous_post_ids.get(str(account.id))
             )
 
         accounts_to_publish_ids = current_account_ids - previous_account_ids

@@ -524,7 +524,11 @@ def delete_post(recruitment, linkedin_account, post_id=None):
         return True
 
     url = f"https://api.linkedin.com/rest/posts/{quote(target_post_id, safe='')}"
-    headers = _linkedin_rest_headers(linkedin_account.api_token)
+    # LinkedIn's REST delete expects the method to be named in this header too.
+    headers = {
+        **_linkedin_rest_headers(linkedin_account.api_token),
+        "X-RestLi-Method": "DELETE",
+    }
 
     try:
         response = requests.delete(url, headers=headers, timeout=30)
