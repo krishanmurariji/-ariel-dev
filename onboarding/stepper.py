@@ -295,6 +295,7 @@ def _render_step(request, candidate, detail, step_key, extra=None):
         if "form" not in context:
             context["form"] = OnboardingDetailsForm(
                 exclude_employee_id=_candidate_own_employee_id(candidate),
+                candidate=candidate,
                 initial={
                     "job_position_id": candidate.job_position_id_id,
                     "department_id": detail.department_id_id,
@@ -384,9 +385,11 @@ def finalize_onboarding(request, pk):
             return redirect(reverse("onboarding-stepper-page", kwargs={"pk": candidate.pk}))
         # Reporting Manager/Buddy assignment mails only go out the first
         # time this candidate's configuration is finalized - re-finalizing
-        # (not currently possible from the UI once start_onboard is set,
-        # but guarded here regardless) must never re-send them.
-        is_first_finalize = not candidate.start_onboard
+        # must never re-send them. This used to ask "is start_onboard still off?",
+        # but sending the candidate the portal link switches that on too, so a
+        # candidate who got the link before Finish Configuration never had the
+        # mails sent. The finalized timestamp is what says "already finalized".
+        is_first_finalize = detail.configuration_finalized_at is None
         Candidate.objects.filter(pk=candidate.pk).update(start_onboard=True)
         if not detail.configuration_finalized_at:
             detail.configuration_finalized_at = timezone.now()
@@ -472,10 +475,15 @@ def _save_step(request, candidate, detail, step_key):
 
     if step_key == "details":
         form = OnboardingDetailsForm(
-            request.POST, exclude_employee_id=_candidate_own_employee_id(candidate)
+            request.POST,
+            exclude_employee_id=_candidate_own_employee_id(candidate),
+            candidate=candidate,
         )
         if not form.is_valid():
-            return _("Please check the job profile details.")
+            problems = " ".join(
+                str(message) for messages_ in form.errors.values() for message in messages_
+            )
+            return (_("Please check the job profile details.") + " " + problems).strip()
         data = form.cleaned_data
         candidate.job_position_id = (
             JobPosition.objects.filter(pk=data["job_position_id"]).first()
@@ -484,7 +492,12 @@ def _save_step(request, candidate, detail, step_key):
         )
         candidate.joining_date = data["date_of_joining"]
         candidate.probation_end = data["probation_end"]
-        candidate.save()
+        try:
+            candidate.save()
+        except ValidationError as error:
+            # Candidate.save() has its own rules (open positions, ...); show them
+            # instead of letting the page fail with a server error.
+            return " ".join(error.messages)
 
         detail.department_id = (
             Department.objects.filter(pk=data["department_id"]).first()
@@ -497,6 +510,7 @@ def _save_step(request, candidate, detail, step_key):
             else None
         )
         previous_reporting_manager = detail.reporting_manager_id
+        previous_buddy = detail.buddy_id
         detail.reporting_manager_id = (
             Employee.objects.filter(pk=data["reporting_manager_id"]).first()
             if data["reporting_manager_id"]
@@ -529,11 +543,16 @@ def _save_step(request, candidate, detail, step_key):
         # during the first-time setup, before finalize, must stay silent
         # even if the reporting manager is picked, cleared, and re-picked
         # a few times along the way.
-        if candidate.start_onboard and previous_reporting_manager != detail.reporting_manager_id:
-            if previous_reporting_manager:
-                notify_reporting_manager_removed(candidate, previous_reporting_manager)
-            if detail.reporting_manager_id:
-                notify_reporting_manager_assigned(candidate, detail.reporting_manager_id)
+        # "Finalized" is the configuration being finished - not start_onboard, which the
+        # "Send Portal" mail also switches on, possibly long before Finish Configuration.
+        if detail.configuration_finalized_at:
+            if previous_reporting_manager != detail.reporting_manager_id:
+                if previous_reporting_manager:
+                    notify_reporting_manager_removed(candidate, previous_reporting_manager)
+                if detail.reporting_manager_id:
+                    notify_reporting_manager_assigned(candidate, detail.reporting_manager_id)
+            if previous_buddy != detail.buddy_id and detail.buddy_id:
+                notify_onboarding_buddy_assigned(candidate, detail.buddy_id)
         return None
 
     if step_key in ("pre_joining", "post_joining", "employee_checklist"):

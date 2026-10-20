@@ -849,6 +849,42 @@ class BackgroundVerificationForm(HorillaModelForm):
         return _sanitize_rich_text(self.cleaned_data.get("background_verification_notes", ""))
 
 
+class _DependentSelect(forms.Select):
+    """
+    A select whose options carry ``data-parent="<id>"`` (the department of a job
+    position, the job position of a job role), so the page can show only the options
+    that belong to what was chosen above them.
+    """
+
+    def __init__(self, parent_of=None, attrs=None, choices=()):
+        super().__init__(attrs, choices)
+        self.parent_of = parent_of or {}
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        parent = self.parent_of.get(str(value))
+        if parent is not None:
+            option["attrs"]["data-parent"] = str(parent)
+        return option
+
+
+def _dependent_choice_field(rows, label, parent_index=2):
+    """``rows`` are (id, name, parent_id) tuples; returns a field using _DependentSelect."""
+    rows = list(rows)
+    choices = [("", _("---Choose %(label)s---") % {"label": label})] + [
+        (row[0], row[1]) for row in rows
+    ]
+    return forms.ChoiceField(
+        choices=choices,
+        required=False,
+        label=label,
+        widget=_DependentSelect(
+            parent_of={str(row[0]): row[parent_index] for row in rows},
+            attrs={"class": "oh-select oh-select-2"},
+        ),
+    )
+
+
 def _choice_field(queryset, label_field, label, required=False):
     """
     Builds a plain ChoiceField off a "settings" queryset, matching the
@@ -898,16 +934,33 @@ class OnboardingDetailsForm(HorillaForm):
     )
     buddy_id = forms.ChoiceField(label=_("Buddy"), required=False)
 
-    def __init__(self, *args, exclude_employee_id=None, **kwargs):
+    def __init__(self, *args, exclude_employee_id=None, candidate=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["job_position_id"] = _choice_field(
-            JobPosition.objects.filter(is_active=True), "job_position", _("Job Position")
+        # Only the positions this candidate's recruitment is open for can be saved
+        # (Candidate.save() rejects any other), so only those are offered. A
+        # recruitment with none listed offers every active position.
+        positions = JobPosition.objects.filter(is_active=True)
+        recruitment = getattr(candidate, "recruitment_id", None)
+        if recruitment is not None:
+            open_ids = list(recruitment.open_positions.values_list("id", flat=True))
+            if open_ids:
+                positions = positions.filter(id__in=open_ids)
+        self.allowed_position_ids = set(positions.values_list("id", flat=True))
+        self.fields["job_position_id"] = _dependent_choice_field(
+            positions.values_list("id", "job_position", "department_id"), _("Job Position")
         )
         self.fields["department_id"] = _choice_field(
-            Department.objects.filter(is_active=True), "department", _("Department")
+            Department.objects.filter(
+                is_active=True, id__in=positions.values_list("department_id", flat=True)
+            ),
+            "department",
+            _("Department"),
         )
-        self.fields["job_role_id"] = _choice_field(
-            JobRole.objects.filter(is_active=True), "job_role", _("Job Role")
+        self.fields["job_role_id"] = _dependent_choice_field(
+            JobRole.objects.filter(
+                is_active=True, job_position_id__in=positions.values_list("id", flat=True)
+            ).values_list("id", "job_role", "job_position_id"),
+            _("Job Role"),
         )
         employees = Employee.objects.filter(is_active=True)
         if exclude_employee_id:
@@ -938,6 +991,33 @@ class OnboardingDetailsForm(HorillaForm):
             "employee_type",
             _("Employee Type"),
         )
+
+    def clean(self):
+        """The three job-profile choices must agree with each other."""
+        cleaned = super().clean()
+        department_id = cleaned.get("department_id")
+        position_id = cleaned.get("job_position_id")
+        role_id = cleaned.get("job_role_id")
+        if position_id:
+            position = JobPosition.objects.filter(pk=position_id).first()
+            if position is None or int(position_id) not in self.allowed_position_ids:
+                self.add_error(
+                    "job_position_id",
+                    _("Choose a job position that is open for this recruitment."),
+                )
+            elif department_id and str(position.department_id_id) != str(department_id):
+                self.add_error(
+                    "job_position_id",
+                    _("This job position does not belong to the chosen department."),
+                )
+        if role_id:
+            role = JobRole.objects.filter(pk=role_id).first()
+            if role is None or (position_id and str(role.job_position_id_id) != str(position_id)):
+                self.add_error(
+                    "job_role_id",
+                    _("This job role does not belong to the chosen job position."),
+                )
+        return cleaned
 
 
 class TaskTemplateForm(HorillaModelForm):

@@ -1751,7 +1751,11 @@ def employee_creation(request, token):
         if form.is_valid() and emergency_contact_formset.is_valid():
             if not getattr(user, "pk", None):
                 user.save()
-            login(request, user)
+            # Two login backends are configured (axes + the model backend), and this user
+            # was not produced by authenticate(), so name the backend or login() raises.
+            login(
+                request, user, backend="django.contrib.auth.backends.ModelBackend"
+            )
             employee_personal_info = form.save(commit=False)
             employee_personal_info.employee_user_id = user
             employee_personal_info.email = candidate.email

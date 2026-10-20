@@ -37,3 +37,49 @@
     </div>
   </form>
 </div>
+<script>
+  /* Department -> Job Position -> Job Role: each list shows only what belongs to the choice above it. */
+  (function () {
+    var department = document.getElementById("id_department_id");
+    var position = document.getElementById("id_job_position_id");
+    var role = document.getElementById("id_job_role_id");
+    if (!department || !position || !role) return;
+    function snapshot(select) {
+      return Array.prototype.map.call(select.options, function (option) {
+        return { value: option.value, text: option.text, parent: option.getAttribute("data-parent") };
+      });
+    }
+    var allPositions = snapshot(position);
+    var allRoles = snapshot(role);
+    function fill(select, all, parentValue) {
+      var current = select.value;
+      select.innerHTML = "";
+      all.forEach(function (item) {
+        if (item.value === "" || !parentValue || item.parent === parentValue) {
+          var option = new Option(item.text, item.value);
+          if (item.parent) option.setAttribute("data-parent", item.parent);
+          select.add(option);
+        }
+      });
+      var stillThere = Array.prototype.some.call(select.options, function (option) {
+        return option.value === current;
+      });
+      select.value = stillThere ? current : "";
+      if (window.jQuery) window.jQuery(select).trigger("change.select2");
+    }
+    function onChange(select, handler) {
+      /* select2 raises a jQuery change event, which plain listeners do not see */
+      if (window.jQuery) window.jQuery(select).on("change", handler);
+      else select.addEventListener("change", handler);
+    }
+    onChange(department, function () {
+      fill(position, allPositions, department.value);
+      fill(role, allRoles, position.value);
+    });
+    onChange(position, function () {
+      fill(role, allRoles, position.value);
+    });
+    fill(position, allPositions, department.value);
+    fill(role, allRoles, position.value);
+  })();
+</script>

@@ -62,6 +62,7 @@ DOCUMENT_REMINDER_CONTENT = """<p style="margin:0 0 16px;font-size:15px;color:#2
 
 def _send(subject, content_html, to_email, company):
     if not to_email:
+        logger.warning("Onboarding notification '%s' not sent: the person has no email address.", subject)
         return
     email_backend = ConfiguredEmailBackend()
     display_email_name = email_backend.dynamic_from_email_with_display_name
