@@ -18,6 +18,7 @@ from django.utils.translation import gettext as _
 
 from base.mail_helpers import (
     action_button,
+    automation_sends,
     greeting,
     info_card,
     paragraph,
@@ -49,6 +50,9 @@ def _requirements(doc_request):
 def notify_candidate_document_requested(candidate, doc_request, upload_link):
     """Tell the candidate which document is wanted and where to upload it."""
     if not candidate.email:
+        return False
+    if automation_sends("recruitment.models.CandidateDocumentRequest"):
+        # a switched-on mail automation already sends this mail
         return False
     content = (
         greeting(candidate.name)
@@ -124,6 +128,9 @@ def request_creator_email(doc_request):
 
 def notify_document_submitted(document, open_link):
     """Tell whoever made the request that the candidate has submitted the document."""
+    if automation_sends("recruitment.models.CandidateDocument"):
+        # a switched-on mail automation already sends this mail
+        return False
     doc_request = document.document_request_id
     candidate = document.candidate_id
     if doc_request is None or candidate is None:

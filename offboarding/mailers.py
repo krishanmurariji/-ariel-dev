@@ -97,8 +97,12 @@ def notify_manager_of_resignation(letter):
     has already been saved by the time this runs, so a mail problem must not
     turn into an error for the employee.
     """
+    from base.mail_helpers import automation_sends
     from horilla.access import VIEW, managers_for
 
+    if automation_sends("offboarding.models.ResignationLetter"):
+        # a switched-on mail automation already sends this mail
+        return False
     sent = False
     recipients = list(managers_for(letter.employee_id, "resignation", VIEW))
     chosen = list(letter.notify_employees.all()) if letter.pk else []
@@ -277,6 +281,11 @@ def notify_exit_initiated(letter, initiator):
     Returns how many mails went out. Never raises - the exit is already saved,
     so a mail problem must not turn into an error for whoever clicked.
     """
+    from base.mail_helpers import automation_sends
+
+    if automation_sends("offboarding.models.OffboardingEmployee"):
+        # a switched-on mail automation already sends this mail
+        return 0
     sent = 0
     try:
         recipients = exit_initiated_recipients(letter, initiator)

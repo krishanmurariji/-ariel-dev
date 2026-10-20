@@ -22,6 +22,35 @@ from base.mail_letterhead import build_letterhead_email
 logger = logging.getLogger(__name__)
 
 
+def automation_sends(model_path, trigger=None, to_recipient=None):
+    """
+    True while an ACTIVE mail automation already sends this mail, so the built-in
+    version must stay quiet and nobody gets it twice. When no such automation is
+    switched on (none exists, or it was turned off) the built-in mail is sent.
+
+    The match is by what the automation watches - ``model_path`` such as
+    "recruitment.models.Candidate", the optional ``trigger`` ("on_create" or
+    "on_update") and, when ``to_recipient`` is given (such as "get_email", the
+    record's own address), who it mails - never by the mail template's name,
+    which people choose freely. Automations that only send an in-app
+    notification do not count.
+    """
+    import re
+
+    from horilla_automations.models import MailAutomation
+
+    queryset = MailAutomation._base_manager.filter(model=model_path, is_active=True)
+    queryset = queryset.exclude(delivery_channel="notification")
+    if trigger:
+        queryset = queryset.filter(trigger=trigger)
+    if to_recipient:
+        # a whole name in the list, not the tail of a longer path like manager__get_email
+        queryset = queryset.filter(
+            mail_to__regex=r"(^|[\[\s'\",])%s($|[\]\s'\",])" % re.escape(to_recipient)
+        )
+    return queryset.exists()
+
+
 def run_in_background(func, *args, **kwargs):
     """Run ``func`` in a daemon thread (closing its database connection afterwards)."""
 

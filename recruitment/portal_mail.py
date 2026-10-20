@@ -48,14 +48,12 @@ def portal_mail_enabled(candidate):
 
 def automation_sends_it():
     """True while a switched-on mail automation sends this mail already."""
-    from horilla_automations.models import MailAutomation
+    from base.mail_helpers import automation_sends
 
-    return MailAutomation.objects.filter(
-        model="recruitment.models.Candidate",
-        mail_template__title=PORTAL_TEMPLATE_TITLE,
-        trigger="on_create",
-        is_active=True,
-    ).exists()
+    # an automation that mails the candidate's own address when a candidate is created
+    return automation_sends(
+        "recruitment.models.Candidate", trigger="on_create", to_recipient="get_email"
+    )
 
 
 def portal_link():

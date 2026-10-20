@@ -8,9 +8,9 @@ It is built in - nobody has to create a mail template or a mail automation. The 
 the one the mail template has always had: one version for someone rejected after an
 interview, another for someone rejected at application stage.
 
-If a mail automation for this mail already exists (set up earlier by hand), it owns the mail:
-switched on, it keeps sending it; switched off, an admin has chosen not to send it. Either way
-this stays quiet, so a candidate is never mailed twice and a switched-off mail stays off.
+If a mail automation that mails candidates on rejection is switched on (set up earlier by
+hand), it keeps being the sender and this stays quiet, so a candidate is never mailed twice.
+Turn that automation off and this mail takes over.
 """
 
 import logging
@@ -28,13 +28,10 @@ _P = 'style="margin:0 0 16px;font-size:14px;color:#444444;line-height:1.7;"'
 
 
 def automation_owns_it():
-    """True if a mail automation for this mail exists, on or off."""
-    from horilla_automations.models import MailAutomation
+    """True while a switched-on mail automation sends mail when a candidate is rejected."""
+    from base.mail_helpers import automation_sends
 
-    return MailAutomation.objects.filter(
-        model="recruitment.models.RejectedCandidate",
-        mail_template__title=TEMPLATE_TITLE,
-    ).exists()
+    return automation_sends("recruitment.models.RejectedCandidate", trigger="on_create")
 
 
 def _company_of(candidate):
