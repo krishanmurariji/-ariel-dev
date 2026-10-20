@@ -60,7 +60,7 @@ def offboarding_kpi_data(request):
 
     employees = Employee.objects.filter(is_active=True).count()
     total_offboarding = period_offboardings.count()
-    archived = period_offboardings.filter(stage_id__type="archived").count()
+    archived = period_offboardings.filter(status="exited").count()
 
     exit_ratio = round((archived / employees * 100), 1) if employees > 0 else 0
 
@@ -75,20 +75,19 @@ def offboarding_kpi_data(request):
         round((completed_tasks / total_tasks * 100), 1) if total_tasks > 0 else 0
     )
 
-    # Active offboarding (current state, not archived)
-    active_offboarding = OffboardingEmployee.objects.exclude(
-        stage_id__type="archived"
+    # Active offboarding (current state: exits in progress)
+    active_offboarding = OffboardingEmployee.objects.filter(
+        status="in_progress"
     ).count()
 
     # Notice periods ending soon (next 7 days)
     today = date.today()
     notice_ending_soon = (
         OffboardingEmployee.objects.filter(
+            status="in_progress",
             notice_period_ends__gte=today,
             notice_period_ends__lte=today + timedelta(days=7),
-        )
-        .exclude(stage_id__type="archived")
-        .count()
+        ).count()
     )
 
     return JsonResponse(
@@ -111,30 +110,28 @@ def offboarding_kpi_data(request):
 @login_required
 @permission_required("offboarding.view_offboarding")
 def offboarding_pipeline(request):
-    """Employees grouped by offboarding stage (offboardings opened within the selected period)."""
-    from offboarding.models import OffboardingEmployee, OffboardingStage
+    """People per Exit Process tab (exits raised within the selected period)."""
+    from offboarding.models import OffboardingEmployee, ResignationLetter
 
     from_date, to_date = _parse_period(request)
-    stages = []
-
-    try:
-        stage_qs = OffboardingStage.objects.all().order_by("sequence")
-        for stage in stage_qs:
-            count = OffboardingEmployee.objects.filter(
-                stage_id=stage,
-                created_at__date__gte=from_date,
-                created_at__date__lte=to_date,
-            ).count()
-            stages.append(
-                {
-                    "stage": stage.title,
-                    "type": stage.type,
-                    "count": count,
-                }
-            )
-    except Exception:
-        pass
-
+    in_period = {"created_at__date__gte": from_date, "created_at__date__lte": to_date}
+    stages = [
+        {
+            "stage": "Under Review",
+            "type": "review",
+            "count": ResignationLetter.objects.filter(status="requested", **in_period).count(),
+        },
+        {
+            "stage": "Exits in Progress",
+            "type": "progress",
+            "count": OffboardingEmployee.objects.filter(status="in_progress", **in_period).count(),
+        },
+        {
+            "stage": "Exited",
+            "type": "exited",
+            "count": OffboardingEmployee.objects.filter(status="exited", **in_period).count(),
+        },
+    ]
     return JsonResponse({"stages": stages})
 
 
@@ -279,8 +276,8 @@ def offboarding_notice_period_tracker(request):
                 notice_period_starts__lte=to_date,
                 notice_period_ends__gte=from_date,
             )
-            .exclude(stage_id__type="archived")
-            .select_related("employee_id", "stage_id")
+            .filter(status="in_progress")
+            .select_related("employee_id")
             .order_by("notice_period_ends")[:15]
         )
 
@@ -298,7 +295,7 @@ def offboarding_notice_period_tracker(request):
                         if emp and emp.employee_profile
                         else None
                     ),
-                    "stage": oe.stage_id.title if oe.stage_id else "—",
+                    "stage": oe.get_status_display(),
                     "notice_ends": (
                         oe.notice_period_ends.strftime("%b %d, %Y")
                         if oe.notice_period_ends
@@ -420,7 +417,7 @@ def offboarding_avg_duration(request):
     durations = []
     try:
         archived = OffboardingEmployee.objects.filter(
-            stage_id__type="archived",
+            status="exited",
             notice_period_starts__isnull=False,
             notice_period_ends__gte=from_date,
             notice_period_ends__lte=to_date,

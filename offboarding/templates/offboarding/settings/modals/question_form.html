@@ -1,0 +1,51 @@
+{% load i18n %}
+{% if question %}{% trans "Edit survey question" as head_title %}{% else %}{% trans "Add a survey question" as head_title %}{% endif %}
+{% include "offboarding/exit_process/_modal_head.html" with title=head_title %}
+<div class="oh-modal__dialog-body oh-modal__dialog-relative">
+    <form class="xu-modal-body"
+          hx-post="{% if question %}{% url 'exit-survey-question-update' question.pk %}{% else %}{% url 'exit-survey-question-new' %}{% endif %}"
+          hx-swap="none" hx-disabled-elt="find button[type='submit']">
+        {% csrf_token %}
+        <div class="xu-field">
+            <label class="xu-label" for="xqText">{% trans "Question" %}</label>
+            <textarea id="xqText" name="question" rows="3" class="oh-input w-100" maxlength="500" required autofocus
+                      placeholder="{% trans 'e.g. What is the main reason you are leaving?' %}">{{ question.question|default:'' }}</textarea>
+        </div>
+        <div style="display:grid; grid-template-columns: 2fr 1fr; gap:14px;">
+            <div class="xu-field">
+                <label class="xu-label" for="xqType">{% trans "Answer type" %}</label>
+                <select name="type" id="xqType" class="oh-select w-100">
+                    {% for key, label in types %}<option value="{{ key }}" {% if question.type == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="xu-field">
+                <label class="xu-label" for="xqOrder">{% trans "Order" %}</label>
+                <input type="number" name="sequence" id="xqOrder" class="oh-input w-100" value="{% if question %}{{ question.sequence }}{% else %}{{ next_sequence }}{% endif %}">
+            </div>
+        </div>
+        <div class="xu-field" id="xqChoicesBox" style="display:none;">
+            <label class="xu-label" for="xqChoices">{% trans "Choices" %}</label>
+            <input type="text" name="options" id="xqChoices" class="oh-input w-100" value="{{ question.options|default:'' }}"
+                   placeholder="{% trans 'e.g. Better pay, Career growth, Manager, Relocation' %}">
+            <div class="xu-hint">{% trans "Separate the choices with commas. Give at least two." %}</div>
+        </div>
+        <div class="xu-field" style="margin-bottom:0;">
+            <label class="xu-check"><input type="checkbox" name="is_mandatory" {% if question.is_mandatory %}checked{% endif %}> {% trans "Required (the person must answer it)" %}</label>
+            {% if question %}
+            <label class="xu-check"><input type="checkbox" name="is_active" {% if question.is_active %}checked{% endif %}> {% trans "On (asked in new surveys)" %}</label>
+            {% endif %}
+        </div>
+        <div class="xu-modal-actions">
+            <button type="submit" class="oh-btn oh-btn--secondary pl-4 pr-4">{% if question %}{% trans "Save question" %}{% else %}{% trans "Add question" %}{% endif %}</button>
+            <button type="button" class="oh-btn oh-btn--light pl-4 pr-4" onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')">{% trans "Cancel" %}</button>
+        </div>
+    </form>
+</div>
+<script>
+    (function () {
+        var type = document.getElementById("xqType"), box = document.getElementById("xqChoicesBox");
+        function sync() { box.style.display = (type.value === "options" || type.value === "multiple") ? "" : "none"; }
+        type.addEventListener("change", sync);
+        sync();
+    })();
+</script>

@@ -1,0 +1,19 @@
+{# Small, self-contained styles for the exit screens. The active theme does not load the older #}
+{# table / soft-button styles, so these screens carry their own and look the same everywhere. #}
+<style>
+    .xp-table-wrap { border: 1px solid rgba(120,130,150,0.3); border-radius: 8px; overflow-x: auto; margin-bottom: 16px; }
+    .xp-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+    .xp-table th { text-align: left; font-weight: 600; padding: 10px 14px; background: rgba(120,130,150,0.1); border-bottom: 1px solid rgba(120,130,150,0.3); white-space: nowrap; }
+    .xp-table td { padding: 10px 14px; border-bottom: 1px solid rgba(120,130,150,0.15); vertical-align: middle; }
+    .xp-table tbody tr:last-child td { border-bottom: 0; }
+    .xp-table tbody tr:hover td { background: rgba(120,130,150,0.06); }
+    .xp-person { display: flex; align-items: center; gap: 10px; min-width: 190px; }
+    .xp-avatar { flex: none; }
+    .xp-avatar-img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; display: block; }
+    .xp-name { font-weight: 500; }
+    .xm-bar-rev { display: flex; flex-direction: row-reverse; gap: 10px; margin-top: 16px; align-items: center; flex-wrap: wrap; }
+    .xm-bar-rev form { margin: 0; display: inline-flex; }
+    .xm-bar-rev .oh-btn { width: auto; margin: 0; white-space: nowrap; }
+    .oh-btn.oh-btn--light-bg { background: rgba(120,130,150,0.16); color: inherit; border: 0; }
+    .oh-btn.oh-btn--light-bg:hover { background: rgba(120,130,150,0.28); }
+</style>

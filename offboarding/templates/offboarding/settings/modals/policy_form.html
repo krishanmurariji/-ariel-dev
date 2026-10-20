@@ -1,0 +1,33 @@
+{% load i18n %}
+{% if policy %}{% trans "Edit notice period policy" as head_title %}{% else %}{% trans "New notice period policy" as head_title %}{% endif %}
+{% include "offboarding/exit_process/_modal_head.html" with title=head_title %}
+<div class="oh-modal__dialog-body oh-modal__dialog-relative">
+    <form class="xu-modal-body"
+          hx-post="{% if policy %}{% url 'notice-policy-update' policy.pk %}{% else %}{% url 'notice-policy-save' %}{% endif %}"
+          hx-swap="none" hx-disabled-elt="find button[type='submit']">
+        {% csrf_token %}
+        <div class="xu-field">
+            <label class="xu-label" for="xuPolicyTitle">{% trans "Policy name" %}</label>
+            <input type="text" id="xuPolicyTitle" name="title" class="oh-input w-100" maxlength="100"
+                   value="{{ policy.title|default:'' }}" placeholder="{% trans 'e.g. Senior staff' %}" required autofocus>
+        </div>
+        <div class="xu-field">
+            <label class="xu-label" for="xuPolicyDays">{% trans "Notice period (days)" %}</label>
+            <input type="number" id="xuPolicyDays" name="days" class="oh-input w-100" min="0"
+                   value="{{ policy.days|default_if_none:'' }}" placeholder="30" required>
+        </div>
+        <div class="xu-field">
+            <label class="xu-label" for="xuPolicyDescription">{% trans "Description" %} <span style="opacity:.6;">({% trans "optional" %})</span></label>
+            <input type="text" id="xuPolicyDescription" name="description" class="oh-input w-100" maxlength="255"
+                   value="{{ policy.description|default:'' }}" placeholder="{% trans 'Who this policy is for' %}">
+        </div>
+        <div class="xu-field">
+            <label class="xu-check"><input type="checkbox" name="is_default" {% if policy.is_default %}checked{% endif %}> {% trans "Make this the default policy" %}</label>
+            <div class="xu-hint">{% trans "Employees with no policy of their own are on the default one. Only one policy can be the default." %}</div>
+        </div>
+        <div class="xu-modal-actions">
+            <button type="submit" class="oh-btn oh-btn--secondary pl-4 pr-4">{% trans "Save policy" %}</button>
+            <button type="button" class="oh-btn oh-btn--light pl-4 pr-4" onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')">{% trans "Cancel" %}</button>
+        </div>
+    </form>
+</div>

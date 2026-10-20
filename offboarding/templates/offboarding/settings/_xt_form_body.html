@@ -1,0 +1,118 @@
+{% load i18n %}
+<style>
+    .xg-err { color: #dc3c3c; font-size: 0.76rem; margin-top: 3px; }
+    .xg-box { border: 1px solid rgba(120,130,150,0.28); border-radius: 8px; margin-bottom: 16px; }
+    .xg-box > h6 { margin: 0; padding: 10px 14px; font-size: 0.82rem; font-weight: 600; background: rgba(120,130,150,0.09); border-bottom: 1px solid rgba(120,130,150,0.2); border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .xg-pad { padding: 14px; }
+    .xg-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+    .xg-grid .full { grid-column: 1 / -1; }
+    @media (max-width: 800px) { .xg-grid { grid-template-columns: 1fr; } }
+    .xg-pad label.xg-l { display: block; font-size: 0.78rem; font-weight: 500; margin-bottom: 4px; }
+    .xg-pad input[type=text], .xg-pad input[type=number], .xg-pad select, .xg-pad textarea { width: 100%; }
+    .xg-task { border: 1px solid rgba(120,130,150,0.3); border-radius: 8px; padding: 12px; margin-bottom: 12px; background: rgba(120,130,150,0.03); }
+    .xg-task-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.8rem; font-weight: 600; }
+    .xg-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .xg-inline input[type=number] { width: 90px !important; }
+    .xg-inline select { width: auto !important; min-width: 220px; }
+    .xg-check { display: flex !important; align-items: center; gap: 8px; font-size: 0.82rem; cursor: pointer; }
+    .xg-scroll { max-height: 62vh; overflow-y: auto; padding: 2px 6px 2px 2px; }
+</style>
+
+<form id="xgForm" {% if modal %}hx-post="{{ request.path }}" hx-target="#xsModalBody" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']"{% else %}method="post"{% endif %}>
+    {% csrf_token %}
+    <div class="{% if modal %}xg-scroll{% endif %}">
+        {% if form.non_field_errors %}<div class="xg-box"><div class="xg-pad xg-err" style="margin:0;">{{ form.non_field_errors|join:" " }}</div></div>{% endif %}
+
+        <div class="xg-box">
+            <h6>{% trans "Group" %}</h6>
+            <div class="xg-pad xg-grid">
+                <div class="full">
+                    <label class="xg-l">{% trans "Name" %} <span class="xg-err">*</span></label>
+                    {{ form.title }}
+                    {% for e in form.title.errors %}<div class="xg-err">{{ e }}</div>{% endfor %}
+                </div>
+                <div>
+                    <label class="xg-l">{% trans "Applies to" %}</label>
+                    {{ form.exit_type }}
+                </div>
+                <div style="display:flex; align-items:flex-end;">
+                    <label class="xg-check">{{ form.is_active }} {% trans "Turned on - add these tasks to new exits" %}</label>
+                </div>
+                <div>
+                    <label class="xg-l">{% trans "Only for these departments (leave empty for everyone)" %}</label>
+                    {{ form.include_departments }}
+                </div>
+                <div>
+                    <label class="xg-l">{% trans "Never for these departments" %}</label>
+                    {{ form.exclude_departments }}
+                    {% for e in form.exclude_departments.errors %}<div class="xg-err">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="xg-box">
+            <h6>
+                <span>{% trans "Tasks" %}</span>
+                <button type="button" class="oh-btn oh-btn--light-bg xu-btn" id="xgAdd" style="height:30px;"><ion-icon name="add-outline"></ion-icon>{% trans "Add task" %}</button>
+            </h6>
+            <div class="xg-pad">
+                {{ formset.management_form }}
+                <div id="xgTasks">
+                    {% for row in formset %}{% include "offboarding/settings/_exit_task_row.html" with row=row %}{% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="xu-modal-actions">
+        <button type="submit" class="oh-btn oh-btn--secondary pl-4 pr-4">{% trans "Save group" %}</button>
+        {% if modal %}
+        <button type="button" class="oh-btn oh-btn--light pl-4 pr-4" onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')">{% trans "Cancel" %}</button>
+        {% else %}
+        <a href="{% url 'exit-task-groups' %}" class="oh-btn oh-btn--light pl-4 pr-4">{% trans "Cancel" %}</a>
+        {% endif %}
+    </div>
+</form>
+
+<template id="xgEmpty">{% include "offboarding/settings/_exit_task_row.html" with row=empty_form %}</template>
+
+<script>
+    (function () {
+        var total = document.getElementById("id_tasks-TOTAL_FORMS");
+        var box = document.getElementById("xgTasks");
+        var inModal = !!document.getElementById("xgForm").closest("#xsModal");
+        if (window.jQuery && $.fn.select2) {
+            $("#id_include_departments, #id_exclude_departments").select2({
+                width: "100%",
+                dropdownParent: inModal ? $("#xsModal") : $(document.body),
+            });
+        }
+        function wire(row) {
+            var type = function (sel, other) {
+                var select = row.querySelector(sel), target = row.querySelector(other);
+                function sync() { target.style.display = select.value === "specific" ? "" : "none"; }
+                select.addEventListener("change", sync); sync();
+            };
+            type("[name$=owner_type]", ".xg-owner-person");
+            type("[name$=approver_type]", ".xg-approver-person");
+            var when = row.querySelector("[name$=trigger_when]"), days = row.querySelector("[name$=trigger_days]");
+            function syncWhen() { days.style.display = when.value === "on" ? "none" : ""; }
+            when.addEventListener("change", syncWhen); syncWhen();
+            row.querySelector(".xg-remove").addEventListener("click", function () {
+                row.querySelector("[name$=-DELETE]").checked = true;
+                row.style.display = "none";
+            });
+        }
+        box.querySelectorAll(".xg-task").forEach(wire);
+        document.getElementById("xgAdd").addEventListener("click", function () {
+            var html = document.getElementById("xgEmpty").innerHTML.replace(/__prefix__/g, total.value);
+            var holder = document.createElement("div");
+            holder.innerHTML = html.trim();
+            var row = holder.firstElementChild;
+            box.appendChild(row);
+            total.value = parseInt(total.value, 10) + 1;
+            wire(row);
+            row.scrollIntoView({ block: "nearest" });
+        });
+    })();
+</script>

@@ -1,0 +1,108 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+{% include "offboarding/exit_process/_styles.html" %}
+<style>
+    .xp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+    .xp-head h1 { font-size: 1.15rem; font-weight: 600; margin: 0; }
+    .xp-tabs { display: flex; gap: 4px; border-bottom: 1px solid rgba(120,130,150,0.3); margin-bottom: 16px; overflow-x: auto; }
+    .xp-tab { background: none; border: 0; border-bottom: 3px solid transparent; padding: 10px 16px; font-size: 0.9rem; cursor: pointer; color: inherit; opacity: 0.7; white-space: nowrap; }
+    .xp-tab.active { border-bottom-color: hsl(8, 77%, 56%); opacity: 1; font-weight: 600; }
+    .xp-count { font-size: 0.72rem; margin-left: 6px; padding: 1px 8px; border-radius: 10px; background: rgba(120,130,150,0.2); }
+    .xp-filter { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; flex-shrink: 0; }
+    .xp-filter .oh-input, .xp-filter .oh-select { margin: 0; }
+    .xp-filter form, #xpTabTools { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; }
+    #xpTabTools .oh-btn, #xpTabTools .oh-select, .xp-filter .oh-btn { white-space: nowrap; }
+    .xp-seg { display: inline-flex; border: 1px solid rgba(120,130,150,0.35); border-radius: 6px; overflow: hidden; }
+    .xp-seg { flex-shrink: 0; box-sizing: border-box; height: var(--xp-h, 38px); align-items: stretch; }
+    .xp-seg .oh-btn { border-radius: 0; flex-shrink: 0; height: auto !important; min-height: 0 !important; }
+    /* every control in the top bar is the same height, and the dropdowns never change width */
+    .xp-filter { --xp-h: 38px; }
+    .xp-filter .oh-btn, .xp-filter .oh-input, .xp-filter .oh-select { height: var(--xp-h); min-height: var(--xp-h); box-sizing: border-box; margin: 0; padding-top: 0; padding-bottom: 0; display: inline-flex; align-items: center; }
+    .xp-filter .oh-input { width: 170px; padding-left: 12px; padding-right: 12px; }
+    .xp-filter .oh-btn { padding-left: 14px; padding-right: 14px; font-size: 0.82rem; line-height: 1; }
+    .xp-filter .select2-container { width: var(--xp-w, 130px) !important; flex: 0 0 var(--xp-w, 130px); }
+    .xp-filter .select2-container .select2-selection--single { height: var(--xp-h); box-sizing: border-box; display: flex; align-items: center; }
+    .xp-filter .select2-container .select2-selection__rendered { flex: 1 1 auto; line-height: normal; padding-left: 10px; padding-right: 26px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .xp-filter .select2-container .select2-selection__arrow { height: 100%; top: 0; }
+    .xp-filter select[name=type] + .select2-container { --xp-w: 130px; }
+    #xpTabTools select[name=status] + .select2-container { --xp-w: 220px; }
+    .xp-filter select.oh-select { width: var(--xp-w, 130px); }
+    @media (max-width: 900px) { .xp-filter, .xp-filter form, #xpTabTools { flex-wrap: wrap; } }
+    #xpContent { transition: opacity .15s; }
+    #xpContent.xp-loading { opacity: 0.45; pointer-events: none; }
+</style>
+
+<div class="oh-wrapper">
+    <div class="xp-head">
+        <h1>{% trans "Exit Process" %}</h1>
+        <div class="xp-filter">
+            <div id="xpTabTools"></div>
+            <form id="xpFilter" class="xp-filter" onsubmit="xpLoad(); return false;">
+                <input type="search" name="q" class="oh-input" placeholder="{% trans 'Search employee' %}">
+                <select name="type" class="oh-select" onchange="xpLoad()">
+                    <option value="">{% trans "All types" %}</option>
+                    <option value="resignation">{% trans "Resignation" %}</option>
+                    <option value="termination">{% trans "Termination" %}</option>
+                </select>
+            </form>
+            <button class="oh-btn oh-btn--secondary"
+                hx-get="{% url 'exit-initiate' %}" hx-target="#genericModalBody"
+                data-toggle="oh-modal-toggle" data-target="#genericModal">
+                <ion-icon name="add-outline"></ion-icon> {% trans "Initiate exit" %}
+            </button>
+        </div>
+    </div>
+
+    <div class="xp-tabs" role="tablist">
+        <button class="xp-tab {% if tab == 'review' %}active{% endif %}" data-tab="review" role="tab">{% trans "Under Review" %}<span class="xp-count">{{ counts.review }}</span></button>
+        <button class="xp-tab {% if tab == 'progress' %}active{% endif %}" data-tab="progress" role="tab">{% trans "Exits in Progress" %}<span class="xp-count">{{ counts.progress }}</span></button>
+        <button class="xp-tab {% if tab == 'exited' %}active{% endif %}" data-tab="exited" role="tab">{% trans "Exited Employees" %}<span class="xp-count">{{ counts.exited }}</span></button>
+        <button class="xp-tab {% if tab == 'tasks' %}active{% endif %}" data-tab="tasks" role="tab">{% trans "Exit Tasks" %}<span class="xp-count">{{ counts.tasks }}</span></button>
+        {% if is_admin %}<button class="xp-tab {% if tab == 'survey' %}active{% endif %}" data-tab="survey" role="tab">{% trans "Survey Responses" %}<span class="xp-count">{{ counts.survey }}</span></button>{% endif %}
+    </div>
+
+    <div id="xpContent"><div class="animated-background"></div></div>
+</div>
+
+{% include "generic/components.html" %}
+
+<script>
+    var xpTab = "{{ tab }}";
+    var xpUrls = {
+        review: "{% url 'exit-process-tab' 'review' %}",
+        progress: "{% url 'exit-process-tab' 'progress' %}",
+        exited: "{% url 'exit-process-tab' 'exited' %}",
+        tasks: "{% url 'exit-process-tab' 'tasks' %}",
+        survey: "{% url 'exit-process-tab' 'survey' %}"
+    };
+    var xpSkeleton = '<div class="animated-background"></div>';
+    function xpLoad(fresh) {
+        var params = $("#xpFilter").serialize();
+        // switching tabs shows the placeholder; filters and paging just dim what is there
+        if (fresh) { $("#xpContent").html(xpSkeleton); $("#xpTabTools").empty(); }
+        htmx.ajax("GET", xpUrls[xpTab] + (params ? "?" + params : ""), { target: "#xpContent", swap: "innerHTML" });
+    }
+    $(".xp-tab").on("click", function () {
+        xpTab = $(this).data("tab");
+        $(".xp-tab").removeClass("active");
+        $(this).addClass("active");
+        history.replaceState(null, "", "?tab=" + xpTab);
+        xpLoad(true);
+    });
+    // every request that fills the list: dim it while waiting, and say so if it fails
+    document.body.addEventListener("htmx:beforeRequest", function (e) {
+        if (e.detail.target && e.detail.target.id === "xpContent") $("#xpContent").addClass("xp-loading");
+    });
+    document.body.addEventListener("htmx:afterRequest", function (e) {
+        if (!e.detail.target || e.detail.target.id !== "xpContent") return;
+        $("#xpContent").removeClass("xp-loading");
+        if (!e.detail.successful) {
+            $("#xpContent").html('<div style="text-align:center; padding:48px 0; opacity:0.75;">{% trans "Could not load this tab. Please try again." %}</div>');
+        }
+    });
+    // an action inside the Manage window changed something - refresh the list behind it
+    document.body.addEventListener("exitPanelChanged", function () { xpLoad(); });
+    $(document).ready(function () { xpLoad(); });
+</script>
+{% endblock content %}

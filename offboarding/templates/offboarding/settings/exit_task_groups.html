@@ -1,0 +1,14 @@
+{% extends 'settings.html' %}
+{% block settings %}{% load i18n %}
+{% include "offboarding/settings/_settings_ui.html" %}
+
+<div class="mb-4">
+    <h4 class="text-base font-semibold text-[#333]">{% trans "Exit Tasks" %}</h4>
+    <p class="text-xs text-gray-500 mt-1">
+        {% trans "Checklists every exit has to get through. When an exit starts, each group that applies to that person becomes tasks for it." %}
+        {% if scope_company %}{% trans "You are editing this company's groups; organisation-wide groups are shown read-only." %}{% else %}{% trans "You are editing the organisation-wide groups." %}{% endif %}
+    </p>
+</div>
+
+{% include "offboarding/settings/_xt_groups.html" %}
+{% endblock settings %}

@@ -1,0 +1,105 @@
+{% load i18n widget_tweaks %}
+{% trans "Initiate exit" as head_title %}
+{% include "offboarding/exit_process/_modal_head.html" with title=head_title %}
+<div class="oh-modal__dialog-body oh-modal__dialog-relative">
+    <style>
+        .xi-group { margin-top: 14px; }
+        .xi-radios label { display: inline-flex; gap: 6px; align-items: center; margin: 0 20px 0 0; cursor: pointer; }
+        .xi-error { color: #d93025; font-size: 0.78rem; margin-top: 4px; }
+        .xi-two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .xi-hint { font-size: 0.75rem; opacity: 0.7; margin-top: 4px; }
+    </style>
+    <form hx-post="{{ request.path }}" hx-target="#genericModalBody" hx-swap="innerHTML" hx-encoding="multipart/form-data" id="xiForm" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="xi-error">{{ form.non_field_errors }}</div>{% endif %}
+
+        <div class="xi-group">
+            <label class="oh-label required-star" for="{{ form.employee.id_for_label }}">{% trans "Employee" %}</label>
+            {{ form.employee|add_class:"oh-select w-100" }}
+            {% for error in form.employee.errors %}<div class="xi-error">{{ error }}</div>{% endfor %}
+        </div>
+
+        <div class="xi-two">
+            <div class="xi-group">
+                <label class="oh-label required-star">{% trans "Exit type" %}</label>
+                <div class="xi-radios">
+                    {% for choice in form.exit_type %}<label for="{{ choice.id_for_label }}">{{ choice.tag }} <span>{{ choice.choice_label }}</span></label>{% endfor %}
+                </div>
+            </div>
+            <div class="xi-group">
+                <label class="oh-label required-star" for="xiReason">{% trans "Reason" %}</label>
+                <select name="reason" id="xiReason" class="oh-select w-100">
+                    <option value="">{% trans "Select reason" %}</option>
+                    {% for reason in form.reasons %}
+                        <option value="{{ reason.title }}" data-type="{{ reason.exit_type }}" {% if form.reason.value == reason.title %}selected{% endif %}>{{ reason.title }}</option>
+                    {% endfor %}
+                </select>
+                {% for error in form.reason.errors %}<div class="xi-error">{{ error }}</div>{% endfor %}
+            </div>
+        </div>
+
+        <div class="xi-group">
+            <label class="oh-label required-star">{% trans "Did you discuss this with the employee?" %}</label>
+            <div class="xi-radios">
+                {% for choice in form.discussed %}<label for="{{ choice.id_for_label }}">{{ choice.tag }} <span>{{ choice.choice_label }}</span></label>{% endfor %}
+            </div>
+        </div>
+        <div class="xi-group" id="xiSummary">
+            <label class="oh-label required-star" for="{{ form.discussion_summary.id_for_label }}">{% trans "Summary of the discussion" %}</label>
+            {{ form.discussion_summary|add_class:"oh-input w-100" }}
+            {% for error in form.discussion_summary.errors %}<div class="xi-error">{{ error }}</div>{% endfor %}
+        </div>
+
+        <div class="xi-two">
+            <div class="xi-group">
+                <label class="oh-label required-star" for="{{ form.notice_date.id_for_label }}">{% trans "Notice date" %}</label>
+                {{ form.notice_date|add_class:"oh-input w-100" }}
+                {% for error in form.notice_date.errors %}<div class="xi-error">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="xi-group">
+                <label class="oh-label" for="{{ form.last_working_day.id_for_label }}">{% trans "Last working day" %}</label>
+                {{ form.last_working_day|add_class:"oh-input w-100" }}
+                <div class="xi-hint">{% trans "Leave empty to use the employee's notice period." %}</div>
+                {% for error in form.last_working_day.errors %}<div class="xi-error">{{ error }}</div>{% endfor %}
+            </div>
+        </div>
+
+        <div class="xi-group">
+            <label class="oh-label">{% trans "Eligible for rehire?" %}</label>
+            <div class="xi-radios">
+                {% for choice in form.rehire_eligible %}<label for="{{ choice.id_for_label }}">{{ choice.tag }} <span>{{ choice.choice_label }}</span></label>{% endfor %}
+            </div>
+            {{ form.rehire_comment|add_class:"oh-input w-100" }}
+            {% for error in form.rehire_comment.errors %}<div class="xi-error">{{ error }}</div>{% endfor %}
+        </div>
+
+        <div class="xi-group">
+            <label class="oh-label" for="{{ form.attachment.id_for_label }}">{% trans "Attachment (optional)" %}</label>
+            {{ form.attachment|add_class:"oh-input w-100" }}
+            {% for error in form.attachment.errors %}<div class="xi-error">{{ error }}</div>{% endfor %}
+        </div>
+
+        <div class="xm-bar-rev xi-group" style="gap:10px;">
+            <button type="submit" class="oh-btn oh-btn--secondary pl-4 pr-4">{% trans "Initiate exit" %}</button>
+            <button type="button" class="oh-btn oh-btn--light pl-4 pr-4" onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')">{% trans "Cancel" %}</button>
+        </div>
+    </form>
+    <script>
+        (function () {
+            var form = $("#xiForm");
+            function sync() {
+                var type = form.find("[name=exit_type]:checked").val();
+                var reason = $("#xiReason");
+                reason.find("option[data-type]").each(function () {
+                    var match = $(this).data("type") === type;
+                    $(this).prop("hidden", !match).prop("disabled", !match);
+                });
+                var current = reason.find("option:selected");
+                if (current.data("type") && current.data("type") !== type) { reason.val(""); }
+                $("#xiSummary").toggle(form.find("[name=discussed]:checked").val() === "yes");
+            }
+            form.on("change", "[name=exit_type], [name=discussed]", sync);
+            sync();
+        })();
+    </script>
+</div>

@@ -122,7 +122,7 @@
     @keyframes ob-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
     .ob-refresh__toggle { cursor: pointer; opacity: 0.6; font-size: 13px; border: none; background: none; color: inherit; padding: 2px; }
     .ob-refresh__toggle:hover { opacity: 1; }
-    #chart-resignation .apexcharts-pie-slice-donut { cursor: pointer; }
+    /* (retired widget) resignation chart cursor rule removed */
 
 
     /* Responsive */
@@ -155,14 +155,13 @@
     <div class="ob-kpi-grid" id="ob-kpi-grid">
         <div class="ob-skeleton ob-skeleton--kpi"></div>
         <div class="ob-skeleton ob-skeleton--kpi"></div>
-        <div class="ob-skeleton ob-skeleton--kpi"></div>
-        <div class="ob-skeleton ob-skeleton--kpi"></div>
     </div>
 
     <div class="ob-layout">
         <div class="ob-main">
             <div class="ob-chart-grid">
 
+{% comment %}Widgets: Offboarding Pipeline, Resignation Status, Task Completion - Retired with the old resignation / offboarding-task screens; a new widget will replace it.
                 <div class="ob-chart-card ob-chart-card--wide" data-chart-id="offboarding_pipeline" data-chart-label="{% trans 'Offboarding Pipeline' %}">
                     <div class="ob-chart-card__header"><div><div class="ob-chart-card__title">{% trans "Offboarding Pipeline" %}</div><div class="ob-chart-card__subtitle">{% trans "Employees by stage" %}</div></div></div>
                     <div class="ob-chart-card__body"><div id="ob-pipeline"></div></div>
@@ -178,11 +177,13 @@
                     <div class="ob-chart-card__body"><div id="chart-tasks"></div></div>
                 </div>
 
+{% endcomment %}
                 <div class="ob-chart-card" data-chart-id="dept_attrition" data-chart-label="{% trans 'Department Attrition' %}">
                     <div class="ob-chart-card__header"><div><div class="ob-chart-card__title">{% trans "Department Attrition" %}</div><div class="ob-chart-card__subtitle">{% trans "Offboarding by department" %}</div></div></div>
                     <div class="ob-chart-card__body"><div id="chart-dept-attrition"></div></div>
                 </div>
 
+{% comment %}Widgets: Exit Reasons, Joining vs Exiting - Retired with the old resignation / offboarding-task screens; a new widget will replace it.
                 <div class="ob-chart-card" data-chart-id="exit_reasons" data-chart-label="{% trans 'Exit Reasons' %}">
                     <div class="ob-chart-card__header"><div><div class="ob-chart-card__title">{% trans "Exit Reasons" %}</div><div class="ob-chart-card__subtitle">{% trans "Why employees leave" %}</div></div></div>
                     <div class="ob-chart-card__body"><div id="chart-exit-reasons"></div></div>
@@ -193,6 +194,7 @@
                     <div class="ob-chart-card__body"><div id="chart-join-exit"></div></div>
                 </div>
 
+{% endcomment %}
             </div>
         </div>
 
@@ -371,6 +373,7 @@
                     <div class="ob-kpi-card__value">${data.active_offboarding}</div>
                     <div class="ob-kpi-card__sub"><span class="ob-badge ob-badge--red">${data.exit_ratio}% {% trans "exit rate" %}</span></div>
                 </a>
+{% comment %}KPI cards: Resignations, Task Completion - Retired with the old resignation / offboarding-task screens; a new widget will replace it.
                 <a href="{% url 'resignation-request-view' %}" class="ob-kpi-card">
                     <div class="ob-kpi-card__icon ob-kpi-card__icon--amber"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
                     <div class="ob-kpi-card__label">{% trans "Resignations" %}</div>
@@ -383,6 +386,7 @@
                     <div class="ob-kpi-card__value">${data.task_completion}%</div>
                     <div class="ob-kpi-card__sub">${data.completed_tasks}/${data.total_tasks} {% trans "tasks done" %}</div>
                 </a>
+{% endcomment %}
                 <a href="{% url 'employee-view' %}?is_active=False" class="ob-kpi-card">
                     <div class="ob-kpi-card__icon ob-kpi-card__icon--blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
                     <div class="ob-kpi-card__label">{% trans "Archived" %}</div>
@@ -399,6 +403,7 @@
             if (el) el.textContent = data.avg_days !== null ? data.avg_days + ' days avg' : '';
         });
 
+{% comment %}Scripts: pipeline, resignation status, task completion - Retired with the old resignation / offboarding-task screens; a new widget will replace it.
     // ─── OFFBOARDING PIPELINE ───
     fetchP("{% url 'offboarding-dashboard-pipeline' %}")
         .then(r => r.json())
@@ -461,6 +466,7 @@
             }).render();
         });
 
+{% endcomment %}
     // ─── DEPARTMENT ATTRITION ───
     fetchP("{% url 'offboarding-dashboard-dept' %}")
         .then(r => r.json())
@@ -488,6 +494,7 @@
             }).render();
         });
 
+{% comment %}Scripts: exit reasons, joining vs exiting - Retired with the old resignation / offboarding-task screens; a new widget will replace it.
     // ─── EXIT REASONS ───
     fetchP("{% url 'offboarding-dashboard-reasons' %}")
         .then(r => r.json())
@@ -545,6 +552,7 @@
             }).render();
         });
 
+{% endcomment %}
     // ─── NOTICE PERIOD TRACKER ───
     fetchP("{% url 'offboarding-dashboard-notice' %}")
         .then(r => r.json())

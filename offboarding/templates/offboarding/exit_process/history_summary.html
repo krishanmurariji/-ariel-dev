@@ -1,0 +1,20 @@
+{% load i18n %}
+{% if error %}
+<div class="xm-ai xm-ai--bad">
+    <div class="xm-ai-head"><ion-icon name="alert-circle-outline"></ion-icon><b>{% trans "Could not summarise" %}</b></div>
+    <p>{{ error }}</p>
+    <button type="button" class="xm-ai-btn" hx-post="{% url 'exit-history-summary' case.pk %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-target="#xmHistorySummary" hx-swap="innerHTML" hx-indicator="#xmAiBusy" hx-disabled-elt="this">{% trans "Try again" %}</button>
+</div>
+{% elif result %}
+<div class="xm-ai">
+    <div class="xm-ai-head"><ion-icon name="sparkles"></ion-icon><b>{% trans "AI summary" %}</b>
+        <button type="button" class="xm-ai-btn xm-ai-btn--ghost" title="{% trans 'Write a new summary' %}"
+            hx-post="{% url 'exit-history-summary' case.pk %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-vals='{"fresh": "1"}' hx-target="#xmHistorySummary" hx-swap="innerHTML" hx-indicator="#xmAiBusy" hx-disabled-elt="this"><ion-icon name="refresh-outline"></ion-icon></button>
+    </div>
+    <p>{{ result.summary }}</p>
+    {% if result.highlights %}<ul>{% for item in result.highlights %}<li>{{ item }}</li>{% endfor %}</ul>{% endif %}
+    <div class="xm-ai-foot">{% blocktrans with n=result.events %}Based on the last {{ n }} recorded step(s).{% endblocktrans %} {% trans "Written by AI - check it against the history below." %}</div>
+</div>
+{% else %}
+<div class="xm-ai xm-ai--empty">{% trans "There is no history to summarise yet." %}</div>
+{% endif %}

@@ -1,0 +1,73 @@
+{% load i18n widget_tweaks %}
+{% trans "Review resignation" as head_title %}
+{% include "offboarding/exit_process/_modal_head.html" with title=head_title %}
+<div class="oh-modal__dialog-body oh-modal__dialog-relative">
+    <style>
+        .xr-card { border: 1px solid rgba(120,130,150,0.3); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; font-size: 0.86rem; }
+        .xr-card dl { display: grid; grid-template-columns: 170px 1fr; gap: 6px 12px; margin: 0; }
+        .xr-card dt { opacity: 0.7; font-weight: 400; }
+        .xr-card dd { margin: 0; }
+        .xr-group { margin-top: 14px; }
+        .xr-radios label { display: inline-flex; gap: 6px; align-items: center; margin: 0 20px 0 0; cursor: pointer; }
+        .xr-error { color: #d93025; font-size: 0.78rem; margin-top: 4px; }
+    </style>
+    <form hx-post="{{ request.path }}" hx-target="#genericModalBody" hx-swap="innerHTML" id="xrForm" novalidate>
+        {% csrf_token %}
+        <div class="xr-card">
+            <strong>{{ employee.get_full_name }}</strong>
+            <span style="opacity:0.7;"> — {{ employee.get_department|default:"" }} {% if employee.get_job_position %}/ {{ employee.get_job_position }}{% endif %}</span>
+            <dl style="margin-top:10px;">
+                <dt>{% trans "Type" %}</dt><dd>{{ letter.get_exit_type_display }}</dd>
+                <dt>{% trans "Reason" %}</dt><dd>{{ letter.get_reason_col }}</dd>
+                <dt>{% trans "Discussed with manager" %}</dt><dd>{{ letter.get_discussion_col }}</dd>
+                {% if letter.discussion_summary %}<dt>{% trans "Discussion summary" %}</dt><dd>{{ letter.discussion_summary|linebreaksbr }}</dd>{% endif %}
+                <dt>{% trans "Notice period ends" %}</dt><dd>{{ letter.notice_period_ends|date:"d M Y"|default:"—" }}</dd>
+                <dt>{% trans "Requested last day" %}</dt><dd>{{ letter.planned_to_leave_on|date:"d M Y" }}</dd>
+                {% if letter.additional_comment %}<dt>{% trans "Employee's comment" %}</dt><dd>{{ letter.additional_comment|linebreaksbr }}</dd>{% endif %}
+            </dl>
+        </div>
+
+        {% if form.non_field_errors %}<div class="xr-error">{{ form.non_field_errors }}</div>{% endif %}
+
+        <div class="xr-group">
+            <div class="xr-radios">
+                {% for radio in form.decision %}<label for="{{ radio.id_for_label }}">{{ radio.tag }} <span>{{ radio.choice_label }}</span></label>{% endfor %}
+            </div>
+        </div>
+
+        <div class="xr-group" id="xrAcceptOnly">
+            <label class="oh-label required-star" for="{{ form.last_working_day.id_for_label }}">{% trans "Last working day" %}</label>
+            {{ form.last_working_day|add_class:"oh-input w-100" }}
+            {% for error in form.last_working_day.errors %}<div class="xr-error">{{ error }}</div>{% endfor %}
+
+            <div class="xr-group">
+                <label class="oh-label">{% trans "Eligible for rehire?" %}</label>
+                <div class="xr-radios">
+                    {% for radio in form.rehire_eligible %}<label for="{{ radio.id_for_label }}">{{ radio.tag }} <span>{{ radio.choice_label }}</span></label>{% endfor %}
+                </div>
+                {{ form.rehire_comment|add_class:"oh-input w-100" }}
+            </div>
+        </div>
+
+        <div class="xr-group">
+            <label class="oh-label required-star" for="{{ form.comment.id_for_label }}">{% trans "Comment" %}</label>
+            {{ form.comment|add_class:"oh-input w-100" }}
+            {% for error in form.comment.errors %}<div class="xr-error">{{ error }}</div>{% endfor %}
+        </div>
+
+        <div class="xm-bar-rev xr-group" style="gap:10px;">
+            <button type="submit" class="oh-btn oh-btn--secondary pl-4 pr-4">{% trans "Submit review" %}</button>
+            <button type="button" class="oh-btn oh-btn--light pl-4 pr-4" onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')">{% trans "Cancel" %}</button>
+        </div>
+    </form>
+    <script>
+        (function () {
+            var form = $("#xrForm");
+            function sync() {
+                $("#xrAcceptOnly").toggle(form.find("[name=decision]:checked").val() === "accept");
+            }
+            form.on("change", "[name=decision]", sync);
+            sync();
+        })();
+    </script>
+</div>

@@ -1,0 +1,65 @@
+{% load i18n %}
+<div class="xm-grid2">
+    <div>
+        <div class="xm-card">
+            <h5 class="xm-card-title"><ion-icon name="document-text-outline"></ion-icon>{% trans "Exit details" %}</h5>
+            <dl>
+                <dt>{% trans "Type" %}</dt><dd>{{ case.get_exit_type_display }}</dd>
+                {% if letter %}
+                    <dt>{% trans "Reason" %}</dt><dd>{{ letter.get_reason_col }}</dd>
+                    {% if letter.discussion_summary %}<dt>{% trans "Discussion summary" %}</dt><dd>{{ letter.discussion_summary|linebreaksbr }}</dd>{% endif %}
+                {% endif %}
+                <dt>{% trans "Notice date" %}</dt><dd>{{ case.notice_date|date:"d M Y"|default:"—" }}</dd>
+                <dt>{% trans "Last working day" %}</dt><dd>{{ case.last_working_day|date:"d M Y"|default:"—" }}</dd>
+                {% if case.exited_on %}<dt>{% trans "Exited on" %}</dt><dd>{{ case.exited_on|date:"d M Y" }}</dd>{% endif %}
+                <dt>{% trans "Eligible for rehire" %}</dt>
+                <dd>{% if case.rehire_eligible is None %}—{% elif case.rehire_eligible %}<span class="xm-chip xm-chip--ok">{% trans "Yes" %}</span>{% else %}<span class="xm-chip xm-chip--bad">{% trans "No" %}</span>{% endif %}{% if case.rehire_comment %} <span class="xm-muted">{{ case.rehire_comment }}</span>{% endif %}</dd>
+            </dl>
+        </div>
+
+        {% if sections %}
+        <div class="xm-card" style="margin-top:14px;">
+            <h5 class="xm-card-title"><ion-icon name="flag-outline"></ion-icon>{% trans "Exit actions" %}</h5>
+            <div class="xm-steps">
+                {% for item in sections %}
+                <div class="xm-step xm-step--{{ item.state }}">
+                    <span class="ic"><ion-icon name="{% if item.state == 'done' %}checkmark-circle{% else %}{{ item.icon|default:'ellipse-outline' }}{% endif %}"></ion-icon></span>
+                    <div><b>{{ item.label }}</b>
+                        <span>{% if item.state == "done" %}{% trans "Done" %}{% elif item.state == "doing" %}{% trans "In progress" %}{% else %}{% trans "Not started" %}{% endif %}</span></div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="xm-card xm-hist">
+        <h5 class="xm-card-title"><ion-icon name="time-outline"></ion-icon>{% trans "History" %}
+            {% if activities %}<button type="button" class="xm-ai-btn" style="margin-left:auto;"
+                hx-post="{% url 'exit-history-summary' case.pk %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-target="#xmHistorySummary" hx-swap="innerHTML" hx-indicator="#xmAiBusy" hx-disabled-elt="this">
+                <ion-icon name="sparkles-outline"></ion-icon>{% trans "Summarise with AI" %}</button>{% endif %}
+        </h5>
+        <div class="xm-hist-body"><div class="xm-scroll">
+        <div id="xmAiBusy" class="htmx-indicator xm-ai xm-ai--busy"><span class="xm-spin"></span>{% trans "Writing the summary - this can take a few seconds…" %}</div>
+        <div id="xmHistorySummary"></div>
+        <ul class="xm-log">
+            {% for item in activities %}
+                <li>
+                    <strong>{{ item.get_action_display }}</strong>{% if item.to_value %}: {% if item.from_value %}{{ item.from_value }} → {% endif %}{{ item.to_value }}{% endif %}
+                    {% if item.comment %}<div class="xm-muted">“{{ item.comment }}”</div>{% endif %}
+                    <small>{{ item.performed_by.get_full_name|default:_("System") }} · {{ item.created_at|date:"d M Y, H:i" }}</small>
+                </li>
+            {% empty %}
+                <li>{% trans "No activity recorded yet." %}</li>
+            {% endfor %}
+        </ul></div></div>
+    </div>
+</div>
+
+{% if is_admin %}
+<div class="xm-foot">
+    <span class="lead">{% trans "Changes here are recorded in the history." %}</span>
+    <button class="oh-btn oh-btn--secondary" hx-get="{% url 'exit-change-date' case.pk %}?from=panel&section=summary" hx-target="#genericModalBody"><ion-icon name="calendar-outline" style="margin-right:6px;"></ion-icon>{% trans "Edit last working day" %}</button>
+    <button class="oh-btn oh-btn--danger-outline" hx-get="{% url 'exit-cancel' case.pk %}?from=panel&section=summary" hx-target="#genericModalBody">{% if case.status == "exited" %}{% trans "Cancel exit / rejoin" %}{% else %}{% trans "Cancel exit" %}{% endif %}</button>
+</div>
+{% endif %}

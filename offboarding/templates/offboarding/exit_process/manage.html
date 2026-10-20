@@ -1,0 +1,256 @@
+{% load i18n %}
+{% trans "Manage exit" as head_title %}
+{% include "offboarding/exit_process/_modal_head.html" with title=head_title %}
+<div class="oh-modal__dialog-body oh-modal__dialog-relative xm-wide">
+    <style>
+        /* ---------- window: one size for every tab ---------- */
+        #genericModalBody:has(.xm-wide) { max-width: 1140px; width: 96vw; border-radius: 16px; overflow: hidden; }
+        #genericModalBody:has(.xm-wide) .oh-modal__dialog-header { padding-bottom: 14px; border-bottom: 1px solid rgba(120,130,150,0.18); }
+        #genericModalBody:has(.xm-wide) .oh-modal__dialog-title { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.1px; }
+        .xm-wide {
+            --xm-accent: #1b9be0; --xm-accent-soft: rgba(27,155,224,0.12);
+            --xm-ok: #22a05a; --xm-ok-soft: rgba(34,160,90,0.14);
+            --xm-warn: #e08a00; --xm-warn-soft: rgba(245,158,11,0.16);
+            --xm-bad: #d93636; --xm-bad-soft: rgba(220,60,60,0.13);
+            --xm-line: rgba(120,130,150,0.28); --xm-line-soft: rgba(120,130,150,0.16);
+            --xm-fill: rgba(120,130,150,0.07);
+            width: 100%; box-sizing: border-box; min-height: min(640px, 80vh);
+            padding-top: 16px; font-size: 0.88rem;
+        }
+
+        /* ---------- person banner ---------- */
+        .xm-hero { border: 1px solid var(--xm-line-soft); border-radius: 14px; padding: 16px 18px; margin-bottom: 16px;
+            background: linear-gradient(135deg, var(--xm-accent-soft) 0%, rgba(120,130,150,0.05) 60%, transparent 100%); }
+        .xm-hero-id { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+        .xm-avatar { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex: none;
+            border: 3px solid #fff; box-shadow: 0 0 0 2px var(--xm-accent), 0 4px 12px rgba(0,0,0,0.12); }
+        .xm-hero-name { margin: 0; font-size: 1.12rem; font-weight: 700; line-height: 1.25; }
+        .xm-hero-role { margin-top: 2px; opacity: 0.7; font-size: 0.82rem; }
+        .xm-status { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px;
+            font-size: 0.76rem; font-weight: 600; background: var(--xm-fill); border: 1px solid var(--xm-line); white-space: nowrap; }
+        .xm-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+        .xm-status--in_progress { color: var(--xm-warn); background: var(--xm-warn-soft); border-color: rgba(245,158,11,0.35); }
+        .xm-status--exited { color: #5b6577; }
+        .xm-status--cancelled { color: var(--xm-bad); background: var(--xm-bad-soft); border-color: rgba(220,60,60,0.3); }
+        .xm-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+        .xm-fact { background: rgba(255,255,255,0.55); border: 1px solid var(--xm-line-soft); border-radius: 10px; padding: 9px 12px; min-width: 0; }
+        .xm-fact-k { display: block; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6; }
+        .xm-fact-v { display: block; margin-top: 3px; font-size: 0.92rem; font-weight: 600; }
+        .xm-fact small { display: block; margin-top: 1px; font-size: 0.72rem; opacity: 0.7; font-weight: 400; }
+        .xm-fact small.late { color: var(--xm-bad); opacity: 1; font-weight: 600; }
+        .xm-meter { height: 7px; border-radius: 99px; background: var(--xm-line-soft); overflow: hidden; margin-top: 8px; }
+        .xm-meter > span { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--xm-accent), #35c28a); transition: width .3s; }
+
+        /* ---------- tabs ---------- */
+        .xm-nav { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--xm-line); margin-bottom: 18px; }
+        .xm-nav button { display: inline-flex; align-items: center; gap: 7px; background: none; border: 0; border-bottom: 3px solid transparent;
+            margin-bottom: -1px; padding: 10px 14px; border-radius: 8px 8px 0 0; font-size: 0.86rem; font-weight: 500; cursor: pointer;
+            color: inherit; opacity: 0.68; transition: background .15s, opacity .15s; }
+        .xm-nav button:hover { opacity: 1; background: var(--xm-fill); }
+        .xm-nav button.active { opacity: 1; font-weight: 700; color: var(--xm-accent); border-bottom-color: var(--xm-accent); background: var(--xm-accent-soft); }
+        .xm-nav ion-icon { font-size: 1.05rem; }
+        .xm-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(120,130,150,0.45); display: inline-block; flex: none; }
+        .xm-dot--doing { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.2); }
+        .xm-dot--done { background: var(--xm-ok); box-shadow: 0 0 0 3px rgba(34,160,90,0.18); }
+
+        /* ---------- section heading ---------- */
+        .xm-sec-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+        .xm-sec-ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: none; font-size: 1.3rem;
+            color: var(--xm-accent); background: var(--xm-accent-soft); }
+        .xm-sec-head h4 { margin: 0; font-size: 1rem; font-weight: 700; }
+        .xm-sec-head p { margin: 2px 0 0; font-size: 0.8rem; opacity: 0.68; }
+        .xm-sec-side { margin-left: auto; text-align: right; min-width: 150px; }
+        .xm-sec-side strong { font-size: 0.9rem; }
+
+        /* ---------- cards ---------- */
+        .xm-card { border: 1px solid var(--xm-line); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; font-size: 0.86rem; background: transparent; }
+        .xm-card-title { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.75; }
+        .xm-card-title ion-icon { font-size: 1.05rem; }
+        .xm-card dl { display: grid; grid-template-columns: 170px 1fr; gap: 9px 14px; margin: 0; }
+        .xm-card dt { opacity: 0.65; font-weight: 400; }
+        .xm-card dd { margin: 0; font-weight: 500; }
+        .xm-grid2 { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 14px; align-items: stretch; }
+        .xm-grid2 > .xm-card, .xm-grid2 > div > .xm-card:last-child { margin-bottom: 0; }
+        .xm-empty { text-align: center; padding: 34px 16px; border: 1.5px dashed var(--xm-line); border-radius: 14px; background: var(--xm-fill); }
+        .xm-empty .ic { width: 62px; height: 62px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 1.9rem; margin-bottom: 10px; }
+        .xm-empty .ic--ok { color: var(--xm-ok); background: var(--xm-ok-soft); }
+        .xm-empty .ic--muted { color: #6b7686; background: rgba(120,130,150,0.16); }
+        .xm-empty strong { display: block; font-size: 0.98rem; }
+        .xm-empty p { margin: 5px auto 0; max-width: 420px; opacity: 0.68; font-size: 0.82rem; }
+
+        /* ---------- tables ---------- */
+        .xm-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.85rem; border: 1px solid var(--xm-line); border-radius: 12px; overflow: hidden; }
+        .xm-table th { text-align: left; font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.4px; opacity: 0.8;
+            padding: 10px 14px; background: var(--xm-fill); border-bottom: 1px solid var(--xm-line); white-space: nowrap; }
+        .xm-table td { padding: 11px 14px; border-bottom: 1px solid var(--xm-line-soft); vertical-align: middle; }
+        .xm-table tbody tr:last-child > td { border-bottom: 0; }
+        .xm-table tbody tr:hover > td { background: rgba(120,130,150,0.045); }
+        .xm-table .xm-group td { background: var(--xm-accent-soft); color: var(--xm-accent); font-weight: 700; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 14px; }
+        .xm-table .xm-group:hover > td { background: var(--xm-accent-soft); }
+        .xm-thumb { display: inline-flex; align-items: center; gap: 10px; }
+        .xm-thumb .ic { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: var(--xm-accent-soft); color: var(--xm-accent); font-size: 1.1rem; flex: none; }
+        .xm-sub { font-size: 0.74rem; opacity: 0.65; }
+
+        /* ---------- chips, notices ---------- */
+        .xm-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 0.72rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: rgba(120,130,150,0.18); white-space: nowrap; }
+        .xm-chip--warn { background: var(--xm-warn-soft); color: #b36a00; }
+        .xm-chip--ok { background: var(--xm-ok-soft); color: #168049; }
+        .xm-chip--bad { background: var(--xm-bad-soft); color: #b82626; }
+        .xm-msg { display: flex; gap: 8px; align-items: flex-start; padding: 10px 14px; border-radius: 10px; font-size: 0.84rem; margin-bottom: 14px; border: 1px solid transparent; }
+        .xm-msg--ok { background: var(--xm-ok-soft); border-color: rgba(34,160,90,0.3); }
+        .xm-msg--bad { background: var(--xm-bad-soft); border-color: rgba(220,60,60,0.3); }
+        .xm-muted { opacity: 0.7; font-size: 0.84rem; }
+
+        /* ---------- progress tiles ---------- */
+        .xm-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+        .xm-step { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--xm-line-soft); border-radius: 10px; background: var(--xm-fill); }
+        .xm-step .ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 1.1rem; flex: none; background: rgba(120,130,150,0.18); color: #6b7686; }
+        .xm-step--doing .ic { background: var(--xm-warn-soft); color: var(--xm-warn); }
+        .xm-step--done .ic { background: var(--xm-ok-soft); color: var(--xm-ok); }
+        .xm-step b { display: block; font-size: 0.84rem; }
+        .xm-step span { font-size: 0.72rem; opacity: 0.65; }
+
+        /* ---------- history timeline ---------- */
+        /* the history card is exactly as tall as the column next to it; a long history scrolls inside it */
+        .xm-hist { display: flex; flex-direction: column; min-height: 0; }
+        .xm-hist-body { position: relative; flex: 1 1 auto; min-height: 150px; }
+        .xm-hist-body .xm-scroll { position: absolute; inset: 0; overflow-y: auto; padding-right: 6px; }
+
+        /* AI summary of the history */
+        .xm-ai-btn { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 999px; font-size: 0.74rem; font-weight: 600; cursor: pointer;
+            color: #6d4bd8; background: rgba(109,75,216,0.1); border: 1px solid rgba(109,75,216,0.3); text-transform: none; letter-spacing: 0; opacity: 1; }
+        .xm-ai-btn:hover { background: rgba(109,75,216,0.18); }
+        .xm-ai-btn:disabled { opacity: 0.55; cursor: progress; }
+        .xm-ai-btn--ghost { margin-left: auto; padding: 3px 7px; border-color: transparent; background: transparent; }
+        .xm-ai { margin: 0 0 14px; padding: 12px 14px; border-radius: 12px; font-size: 0.83rem; line-height: 1.5;
+            background: linear-gradient(135deg, rgba(109,75,216,0.1), rgba(27,155,224,0.07)); border: 1px solid rgba(109,75,216,0.25); }
+        .xm-ai-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; color: #6d4bd8; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.4px; }
+        .xm-ai-head ion-icon { font-size: 1.05rem; }
+        .xm-ai p { margin: 0 0 6px; }
+        .xm-ai ul { margin: 6px 0 4px; padding-left: 18px; }
+        .xm-ai li { margin-bottom: 3px; }
+        .xm-ai-foot { margin-top: 8px; font-size: 0.7rem; opacity: 0.6; }
+        .xm-ai--bad { background: var(--xm-bad-soft); border-color: rgba(220,60,60,0.3); }
+        .xm-ai--bad .xm-ai-head { color: var(--xm-bad); }
+        .xm-ai--empty { opacity: 0.75; }
+        .xm-ai--busy { display: none; align-items: center; gap: 10px; }
+        .xm-ai--busy.htmx-request { display: flex; opacity: 1; }
+        .xm-spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(109,75,216,0.3); border-top-color: #6d4bd8; animation: xmspin .8s linear infinite; flex: none; }
+        @keyframes xmspin { to { transform: rotate(360deg); } }
+        .xm-log { list-style: none; margin: 0; padding: 0 0 0 4px; }
+        .xm-log li { position: relative; padding: 0 0 14px 22px; font-size: 0.83rem; border-left: 2px solid var(--xm-line-soft); margin-left: 5px; }
+        .xm-log li:last-child { border-left-color: transparent; padding-bottom: 0; }
+        .xm-log li::before { content: ""; position: absolute; left: -7px; top: 3px; width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 3px solid var(--xm-accent); }
+        .xm-log li small { display: block; opacity: 0.6; font-size: 0.72rem; margin-top: 2px; }
+
+        /* ---------- buttons and footers ---------- */
+        .xm-actions { display: flex; gap: 6px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+        .xm-actions form { margin: 0; display: inline-flex; }
+        .xm-actions .oh-btn, .xm-bar .oh-btn, .xm-foot .oh-btn { width: auto; margin: 0; white-space: nowrap; }
+        .xm-actions .oh-btn--secondary { min-width: 92px; justify-content: center; text-align: center; }
+        .xm-bar { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 14px; align-items: center; }
+        .xm-bar form { margin: 0; display: inline-flex; }
+        .xm-foot { display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--xm-line-soft); }
+        .xm-foot .lead { margin-right: auto; font-size: 0.78rem; opacity: 0.6; }
+        .oh-btn.oh-btn--light-bg { background: rgba(120,130,150,0.16); color: inherit; border: 0; }
+        .oh-btn.oh-btn--light-bg:hover { background: rgba(120,130,150,0.28); }
+
+        /* ---------- forms ---------- */
+        .xm-form { border: 1px solid var(--xm-line); border-radius: 12px; padding: 16px 18px; margin: 8px 0 14px; background: var(--xm-fill); }
+        .xm-form-title { font-size: 0.95rem; font-weight: 700; margin: 0 0 2px; }
+        .xm-form-sub { margin: 0 0 14px; opacity: 0.7; font-size: 0.8rem; }
+        .xm-field { margin-bottom: 14px; }
+        .xm-field > label, .xm-label { display: block; font-size: 0.78rem; font-weight: 600; margin-bottom: 6px; opacity: 0.85; }
+        .xm-form input[type=text], .xm-form input[type=date], .xm-form input[type=number], .xm-form select, .xm-form textarea {
+            display: block; width: 100%; box-sizing: border-box; padding: 8px 10px; font: inherit; font-size: 0.86rem; color: inherit;
+            background: #fff; border: 1px solid rgba(120,130,150,0.55); border-radius: 8px; outline: none; }
+        .xm-form input[type=date] { max-width: 220px; }
+        .xm-form textarea { min-height: 84px; resize: vertical; line-height: 1.4; }
+        .xm-form input:focus, .xm-form select:focus, .xm-form textarea:focus { border-color: var(--xm-accent); box-shadow: 0 0 0 3px rgba(27,155,224,0.2); }
+        .xm-form ::placeholder { opacity: 0.5; }
+        .xm-form .errorlist { list-style: none; margin: 6px 0 0; padding: 0; color: var(--xm-bad); font-size: 0.78rem; }
+        .xm-choices > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+        .xm-choices > div > div { margin: 0; }
+        .xm-choices label { display: flex; align-items: center; gap: 8px; height: 100%; box-sizing: border-box; padding: 10px 12px; margin: 0;
+            border: 1px solid rgba(120,130,150,0.4); border-radius: 10px; font-size: 0.84rem; cursor: pointer; background: #fff; }
+        .xm-choices label:hover { background: rgba(120,130,150,0.1); }
+        .xm-choices input[type=radio] { margin: 0; flex: none; width: 16px; height: 16px; accent-color: var(--xm-accent); }
+        .xm-choices label:has(input:checked) { border-color: var(--xm-accent); background: var(--xm-accent-soft); font-weight: 600; }
+        .xm-choices > div > div:nth-child(1) label:has(input:checked) { border-color: var(--xm-ok); background: var(--xm-ok-soft); }
+        .xm-choices > div > div:nth-child(2) label:has(input:checked) { border-color: var(--xm-warn); background: var(--xm-warn-soft); }
+        .xm-choices > div > div:nth-child(3) label:has(input:checked) { border-color: var(--xm-bad); background: var(--xm-bad-soft); }
+        .xm-form-foot { display: flex; justify-content: flex-end; gap: 10px; padding-top: 14px; margin-top: 4px; border-top: 1px solid var(--xm-line-soft); }
+        .xm-form-foot .oh-btn { width: auto; margin: 0; white-space: nowrap; }
+
+        @media (max-width: 900px) { .xm-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .xm-grid2 { grid-template-columns: 1fr; } }
+        @media (max-width: 640px) { .xm-choices > div { grid-template-columns: 1fr; } .xm-card dl { grid-template-columns: 1fr; gap: 2px 0; } .xm-card dd { margin-bottom: 8px; } .xm-status { margin-left: 0; } }
+    </style>
+
+    <div class="xm-hero">
+        <div class="xm-hero-id">
+            <img class="xm-avatar" src="{{ employee.get_avatar }}" alt="">
+            <div>
+                <h3 class="xm-hero-name">{{ employee.get_full_name }}</h3>
+                <div class="xm-hero-role">{{ employee.get_department|default:"" }}{% if employee.get_job_position %} · {{ employee.get_job_position }}{% endif %}</div>
+            </div>
+            <span class="xm-status xm-status--{{ case.status }}">{{ case.get_status_display }}</span>
+        </div>
+        <div class="xm-facts">
+            <div class="xm-fact"><span class="xm-fact-k">{% trans "Exit type" %}</span><span class="xm-fact-v">{{ case.get_exit_type_display }}</span></div>
+            <div class="xm-fact"><span class="xm-fact-k">{% trans "Notice date" %}</span><span class="xm-fact-v">{{ case.notice_date|date:"d M Y"|default:"—" }}</span></div>
+            <div class="xm-fact"><span class="xm-fact-k">{% trans "Last working day" %}</span><span class="xm-fact-v">{{ case.last_working_day|date:"d M Y"|default:"—" }}</span>
+                {% if case.status == "in_progress" and days_left is not None %}
+                    {% if days_left > 0 %}<small>{% blocktrans count n=days_left %}{{ n }} day to go{% plural %}{{ n }} days to go{% endblocktrans %}</small>
+                    {% elif days_left == 0 %}<small class="late">{% trans "Today" %}</small>
+                    {% else %}<small class="late">{% blocktrans count n=days_left_abs %}{{ n }} day overdue{% plural %}{{ n }} days overdue{% endblocktrans %}</small>{% endif %}
+                {% endif %}
+            </div>
+            <div class="xm-fact"><span class="xm-fact-k">{% trans "Exit actions" %}</span>
+                {% if sections %}
+                    <span class="xm-fact-v">{{ steps_done }} / {{ steps_total }} {% trans "done" %}</span>
+                    <div class="xm-meter"><span style="width: {{ steps_percent }}%"></span></div>
+                {% else %}<span class="xm-fact-v">—</span>{% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if nav|length > 1 %}
+    <div class="xm-nav" role="tablist">
+        {% for item in nav %}
+        <button type="button" role="tab" class="{% if section == item.key %}active{% endif %}"
+            hx-get="{% url 'exit-manage' case.pk item.key %}" hx-target="#genericModalBody">
+            <ion-icon name="{{ item.icon }}"></ion-icon>
+            {{ item.label }}
+            {% if item.state %}<span class="xm-dot xm-dot--{{ item.state }}"></span>{% endif %}
+        </button>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if notice %}<div class="xm-msg xm-msg--ok"><ion-icon name="checkmark-circle" style="font-size:1.1rem; color:var(--xm-ok);"></ion-icon><span>{{ notice }}</span></div>{% endif %}
+    {% if error %}<div class="xm-msg xm-msg--bad"><ion-icon name="alert-circle" style="font-size:1.1rem; color:var(--xm-bad);"></ion-icon><span>{{ error }}</span></div>{% endif %}
+
+    {% if section == "summary" %}
+        {% include "offboarding/exit_process/section_summary.html" %}
+    {% elif section == "assets" %}
+        {% include "offboarding/exit_process/section_assets.html" %}
+    {% elif section == "team" %}
+        {% include "offboarding/exit_process/section_team.html" %}
+    {% elif section == "survey" %}
+        {% include "offboarding/exit_process/section_survey.html" %}
+    {% elif section == "tasks" %}
+        {% include "offboarding/exit_process/section_tasks.html" %}
+    {% elif section == "leave" %}
+        {% include "offboarding/exit_process/section_leave.html" %}
+    {% elif section == "finances" %}
+        <div class="xm-sec-head">
+            <span class="xm-sec-ic"><ion-icon name="cash-outline"></ion-icon></span>
+            <div><h4>{% trans "Full & final settlement" %}</h4><p>{% trans "Pay out what the employee is owed and recover what they owe." %}</p></div>
+        </div>
+        <div class="xm-empty">
+            <span class="ic ic--muted"><ion-icon name="hourglass-outline"></ion-icon></span>
+            <strong>{% trans "Coming soon" %}</strong>
+            <p>{% trans "Settlement of dues is not set up yet. It will appear here once it is switched on." %}</p>
+        </div>
+    {% endif %}
+</div>

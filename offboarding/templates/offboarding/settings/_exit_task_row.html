@@ -1,0 +1,46 @@
+{% load i18n %}
+<div class="xg-task">
+    <div class="xg-task-head">
+        <span>{% trans "Task" %}</span>
+        <span>
+            <span style="display:none;">{{ row.DELETE }}</span>
+            <button type="button" class="oh-btn oh-btn--danger-outline xg-remove">{% trans "Remove" %}</button>
+        </span>
+    </div>
+    {{ row.task_pk }}
+    {% if row.non_field_errors %}<div class="xg-err">{{ row.non_field_errors|join:" " }}</div>{% endif %}
+    <div class="xg-grid">
+        <div class="full">
+            <label>{% trans "Title" %}</label>
+            {{ row.title }}
+            {% for e in row.title.errors %}<div class="xg-err">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="full">
+            <label>{% trans "Instructions (optional)" %}</label>
+            {{ row.description }}
+            {% for e in row.description.errors %}<div class="xg-err">{{ e }}</div>{% endfor %}
+        </div>
+        <div>
+            <label>{% trans "Who does it" %}</label>
+            {{ row.owner_type }}
+            <div class="xg-owner-person" style="margin-top:6px;">{{ row.owner_person }}
+                {% for e in row.owner_person.errors %}<div class="xg-err">{{ e }}</div>{% endfor %}</div>
+        </div>
+        <div>
+            <label>{% trans "Who approves it" %}</label>
+            {{ row.approver_type }}
+            <div class="xg-approver-person" style="margin-top:6px;">{{ row.approver_person }}
+                {% for e in row.approver_person.errors %}<div class="xg-err">{{ e }}</div>{% endfor %}</div>
+        </div>
+        <div>
+            <label>{% trans "Hand it to the owner" %}</label>
+            <div class="xg-inline">{{ row.trigger_days }} {{ row.trigger_when }}</div>
+            {% for e in row.trigger_days.errors %}<div class="xg-err">{{ e }}</div>{% endfor %}
+        </div>
+        <div>
+            <label>{% trans "Due (days after it is handed over)" %}</label>
+            {{ row.due_after_days }}
+            <label class="xg-check" style="margin-top:8px;">{{ row.mandatory_attachment }} {% trans "A file must be attached to complete it" %}</label>
+        </div>
+    </div>
+</div>

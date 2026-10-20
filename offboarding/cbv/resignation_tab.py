@@ -9,9 +9,11 @@ from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 
 from employee.cbv.employee_profile import EmployeeProfileView
+from employee.models import Employee
 from horilla.methods import handle_no_permission
 from horilla_views.cbv_methods import check_feature_enabled, login_required
 from offboarding.cbv.resignation import ResignationLetterDetailView, ResignationListView
+from offboarding.exit_service import _settings_for
 from offboarding.models import OffboardingGeneralSetting, ResignationLetter
 
 
@@ -28,6 +30,18 @@ def may_view_letters_of(request, employee_pk):
     return own is not None and str(own.pk) == str(employee_pk)
 
 
+def status_hidden_from(request, employee_pk):
+    """
+    Exit settings' "Show approval status to employees": when it is off, the
+    employee does not see where their own request stands. HR (anyone who may
+    view resignations) always does.
+    """
+    if request.user.has_perm("offboarding.view_resignationletter"):
+        return False
+    employee = Employee.objects.entire().filter(pk=employee_pk).first()
+    return employee is not None and not _settings_for(employee).show_approval_status
+
+
 # @method_decorator(check_feature_enabled("resignation_request", OffboardingGeneralSetting), name="dispatch")
 class ResignationTabView(ResignationListView):
     """
@@ -36,10 +50,14 @@ class ResignationTabView(ResignationListView):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.action_method = None
+        self.action_method = "tab_actions_column"
+        # The profile tab is read-only apart from Withdraw: no edit / delete column.
+        self.option_method = ""
         self.bulk_select_option = False
         self.view_id = "resignation-container"
         pk = self.request.resolver_match.kwargs.get("pk")
+        if status_hidden_from(self.request, pk):
+            self.columns = [c for c in self.columns if c[1] != "get_status"]
         self.search_url = reverse("individual-resignation-tab-list", kwargs={"pk": pk})
 
     template_name = "cbv/resignation/resignation_tab.html"
@@ -93,6 +111,8 @@ class ResignationTabDetailView(ResignationLetterDetailView):
         )
         if owner_pk is not None and not may_view_letters_of(self.request, owner_pk):
             return handle_no_permission(self.request)
+        if owner_pk is not None and status_hidden_from(self.request, owner_pk):
+            self.body = [row for row in self.body if row[1] != "get_status_badge"]
         return super(ResignationLetterDetailView, self).dispatch(*args, **kwargs)
 
     def __init__(self, **kwargs: Any) -> None:

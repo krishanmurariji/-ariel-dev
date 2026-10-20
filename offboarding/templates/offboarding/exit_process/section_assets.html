@@ -1,0 +1,91 @@
+{% load i18n %}
+<div class="xm-sec-head">
+    <span class="xm-sec-ic"><ion-icon name="laptop-outline"></ion-icon></span>
+    <div>
+        <h4>{% trans "Company assets" %}</h4>
+        <p>{% trans "Company assets this employee still has. Get them back before the last working day." %}</p>
+    </div>
+    {% if holding %}<div class="xm-sec-side"><span class="xm-chip xm-chip--warn">{{ holding|length }} {% trans "still with the employee" %}</span></div>{% endif %}
+</div>
+
+{% if holding %}
+<table class="xm-table">
+    <thead><tr><th>{% trans "Asset" %}</th><th>{% trans "Given on" %}</th><th>{% trans "Status" %}</th><th></th></tr></thead>
+    <tbody>
+    {% for item in holding %}
+        <tr>
+            <td><span class="xm-thumb"><span class="ic"><ion-icon name="hardware-chip-outline"></ion-icon></span>
+                <span><strong>{{ item.asset_id.asset_name }}</strong>{% if item.asset_id.asset_tracking_id %}<div class="xm-sub">{{ item.asset_id.asset_tracking_id }}</div>{% endif %}</span></span></td>
+            <td>{{ item.assigned_date|date:"d M Y" }}</td>
+            <td>{% if item.return_request %}<span class="xm-chip xm-chip--warn"><ion-icon name="arrow-undo-outline"></ion-icon>{% trans "Return requested" %}</span>{% else %}<span class="xm-chip">{% trans "With employee" %}</span>{% endif %}</td>
+            <td><div class="xm-actions">
+                {% if can_change and not item.return_request %}
+                <form method="post" style="display:inline;" hx-post="{% url 'exit-asset-ask' case.pk item.pk %}" hx-target="#genericModalBody">{% csrf_token %}
+                    <button type="submit" class="oh-btn oh-btn--light-bg">{% trans "Ask to return" %}</button>
+                </form>
+                {% endif %}
+                {% if can_return %}
+                <button type="button" class="oh-btn oh-btn--secondary"
+                    hx-get="{% url 'exit-manage' case.pk 'assets' %}?return={{ item.pk }}" hx-target="#genericModalBody">{% trans "Mark returned" %}</button>
+                {% endif %}
+            </div></td>
+        </tr>
+        {% if returning and returning.pk == item.pk %}
+        <tr>
+            <td colspan="4" style="padding:0; border-bottom:0;">
+                <form class="xm-form" style="margin:10px;" method="post" hx-post="{% url 'exit-asset-return' case.pk item.pk %}" hx-target="#genericModalBody">{% csrf_token %}
+                    <h4 class="xm-form-title">{% blocktrans with name=item.asset_id.asset_name %}Return {{ name }}{% endblocktrans %}</h4>
+                    <p class="xm-form-sub">{% trans "Record the condition the asset came back in." %}</p>
+                    {% if return_form.non_field_errors %}<div class="xm-msg xm-msg--bad">{{ return_form.non_field_errors|join:" " }}</div>{% endif %}
+
+                    <div class="xm-field">
+                        <span class="xm-label">{% trans "Condition" %}</span>
+                        <div class="xm-choices">{{ return_form.return_status }}</div>
+                        {{ return_form.return_status.errors }}
+                    </div>
+                    <div class="xm-field">
+                        <label for="{{ return_form.return_date.id_for_label }}">{% trans "Return date" %}</label>
+                        {{ return_form.return_date }}
+                        {{ return_form.return_date.errors }}
+                    </div>
+                    <div class="xm-field">
+                        <label for="{{ return_form.return_condition.id_for_label }}">{% trans "Condition notes" %} <span class="xm-muted" style="font-weight:400;">({% trans "optional" %})</span></label>
+                        {{ return_form.return_condition }}
+                        {{ return_form.return_condition.errors }}
+                    </div>
+
+                    <div class="xm-form-foot">
+                        <button type="button" class="oh-btn oh-btn--light-bg" hx-get="{% url 'exit-manage' case.pk 'assets' %}" hx-target="#genericModalBody">{% trans "Cancel" %}</button>
+                        <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Save" %}</button>
+                    </div>
+                </form>
+            </td>
+        </tr>
+        {% endif %}
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="xm-empty">
+    <span class="ic ic--ok"><ion-icon name="checkmark-circle-outline"></ion-icon></span>
+    <strong>{% trans "All clear" %}</strong>
+    <p>{% trans "No company assets are pending with this employee." %}</p>
+</div>
+{% endif %}
+
+{% if returned %}
+<h5 class="xm-card-title" style="margin-top:22px;"><ion-icon name="checkmark-done-outline"></ion-icon>{% trans "Already returned" %}</h5>
+<table class="xm-table">
+    <thead><tr><th>{% trans "Asset" %}</th><th>{% trans "Returned on" %}</th><th>{% trans "Condition" %}</th></tr></thead>
+    <tbody>
+    {% for item in returned %}
+        <tr>
+            <td><span class="xm-thumb"><span class="ic"><ion-icon name="hardware-chip-outline"></ion-icon></span><strong>{{ item.asset_id.asset_name }}</strong></span></td>
+            <td>{{ item.return_date|date:"d M Y"|default:"—" }}</td>
+            <td><span class="xm-chip {% if item.return_status == 'Healthy' %}xm-chip--ok{% else %}xm-chip--bad{% endif %}">{{ item.get_return_status_display }}</span>
+                {% if item.return_condition %}<div class="xm-sub" style="margin-top:3px;">{{ item.return_condition }}</div>{% endif %}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}

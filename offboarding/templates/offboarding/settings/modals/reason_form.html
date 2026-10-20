@@ -1,0 +1,21 @@
+{% load i18n %}
+{% if reason %}{% trans "Rename exit reason" as head_title %}{% else %}{% trans "Add an exit reason" as head_title %}{% endif %}
+{% include "offboarding/exit_process/_modal_head.html" with title=head_title %}
+<div class="oh-modal__dialog-body oh-modal__dialog-relative">
+    <form class="xu-modal-body"
+          hx-post="{% if reason %}{% url 'exit-reason-update' reason.pk %}{% else %}{% url 'exit-reason-save' %}{% endif %}"
+          hx-swap="none" hx-disabled-elt="find button[type='submit']">
+        {% csrf_token %}
+        <input type="hidden" name="exit_type" value="{{ exit_type }}">
+        <div class="xu-field">
+            <label class="xu-label" for="xuReasonTitle">{% trans "Reason" %}</label>
+            <input type="text" id="xuReasonTitle" name="title" class="oh-input w-100" maxlength="100"
+                   value="{{ reason.title|default:'' }}" placeholder="{% trans 'e.g. Better opportunity' %}" required autofocus>
+            <div class="xu-hint">{% blocktrans %}Shown to people under "{{ type_label }}".{% endblocktrans %}</div>
+        </div>
+        <div class="xu-modal-actions">
+            <button type="submit" class="oh-btn oh-btn--secondary pl-4 pr-4">{% trans "Save" %}</button>
+            <button type="button" class="oh-btn oh-btn--light pl-4 pr-4" onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')">{% trans "Cancel" %}</button>
+        </div>
+    </form>
+</div>

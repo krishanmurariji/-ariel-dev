@@ -1,0 +1,32 @@
+{% extends 'settings.html' %}
+{% block settings %}{% load i18n %}
+{% include "offboarding/settings/_settings_ui.html" %}
+
+
+<div class="mb-4">
+    <h4 class="text-base font-semibold text-[#333]">{% trans "Exit Survey" %}</h4>
+    <p class="text-xs text-gray-500 mt-1">
+        {% trans "The feedback form a leaver fills in. Answers are read by HR only." %}
+        {% if scope_company %}{% trans "You are editing this company's questions; organisation-wide questions are shown read-only." %}{% else %}{% trans "You are editing the organisation-wide questions." %}{% endif %}
+    </p>
+</div>
+
+<div class="xu-card">
+    <div class="xu-card__head">
+        <div>
+            <h5>{% trans "Send the survey automatically" %}</h5>
+            <p>{% trans "On: the survey goes to the person by itself, at the time you choose, as a notification and an email. Off: HR sends it from Exit Process, Manage, Survey." %}</p>
+        </div>
+        <form hx-post="{% url 'exit-survey-auto-send' %}" hx-trigger="change" hx-swap="none" class="xu-card__actions">
+            {% csrf_token %}
+            <select name="send_before" class="oh-select xu-select" style="min-width:250px;" aria-label="{% trans 'When to send' %}">
+                <option value="" {% if not send_before %}selected{% endif %}>{% trans "When the exit starts" %}</option>
+                {% for days, label in send_times %}<option value="{{ days }}" {% if send_before == days %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+            <label class="toggle-label" title="{% trans 'Send automatically' %}"><input type="checkbox" class="toggle-input" name="auto_send" {% if auto_send %}checked{% endif %}><div class="toggle-switch"></div></label>
+        </form>
+    </div>
+</div>
+
+{% include "offboarding/settings/_xq_questions.html" %}
+{% endblock settings %}

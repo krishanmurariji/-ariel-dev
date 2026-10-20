@@ -11,6 +11,8 @@ class OffboardingConfig(AppConfig):
 
         from horilla.urls import urlpatterns
 
+        from offboarding import scheduler  # noqa: F401  (starts the daily job)
+
         settings.APPS.append("offboarding")
         urlpatterns.append(
             path("offboarding/", include("offboarding.urls")),

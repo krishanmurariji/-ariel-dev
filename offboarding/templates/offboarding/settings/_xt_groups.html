@@ -1,0 +1,80 @@
+{% load i18n %}
+<div id="xt-groups" class="xu-card"
+     hx-get="{% url 'exit-task-groups-section' %}" hx-trigger="exitSettingsChanged from:body" hx-swap="outerHTML">
+    <div class="xu-card__head">
+        <div>
+            <h5>{% trans "Task groups" %} <span class="xu-badge">{{ groups|length }}</span></h5>
+            <p>{% trans "A group that is turned off is not added to new exits. Exits already using its tasks keep them." %}</p>
+        </div>
+        <div class="xu-card__actions">
+            <button type="button" class="oh-btn oh-btn--secondary xu-btn"
+                    hx-get="{% url 'exit-task-group-new' %}" hx-target="#xsModalBody" hx-swap="innerHTML">
+                <ion-icon name="add-outline"></ion-icon>{% trans "New task group" %}
+            </button>
+        </div>
+    </div>
+    <div class="xu-card__body xu-flush">
+        {% if groups %}
+        <div class="xu-table-wrap">
+            <table class="xu-table">
+                <thead>
+                    <tr>
+                        <th>{% trans "Task group" %}</th>
+                        <th>{% trans "Applies to" %}</th>
+                        <th>{% trans "Tasks" %}</th>
+                        <th>{% trans "On" %}</th>
+                        <th class="xu-right">{% trans "Actions" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for group in groups %}
+                    <tr {% if not group.active %}style="opacity:.65;"{% endif %}>
+                        <td>
+                            <div class="xu-title">
+                                {{ group.title }}
+                                {% if not group.editable %}<span class="xu-badge" title="{% trans 'Organisation-wide groups are changed in All Company mode' %}">{% trans "Organisation-wide" %}</span>{% endif %}
+                            </div>
+                        </td>
+                        <td>{{ group.summary }}</td>
+                        <td>
+                            <div>{{ group.task_count }} {% trans "task(s)" %}</div>
+                            {% if group.preview %}<div class="xu-sub">{{ group.preview|slice:":3"|join:", " }}{% if group.preview|length > 3 %}, …{% endif %}</div>{% endif %}
+                        </td>
+                        <td>
+                            {% if group.editable %}
+                            <label class="toggle-label" title="{% if group.active %}{% trans 'Turn off' %}{% else %}{% trans 'Turn on' %}{% endif %}">
+                                <input type="checkbox" class="toggle-input" {% if group.active %}checked{% endif %}
+                                       hx-post="{% url 'exit-task-group-toggle' group.pk %}" hx-trigger="change" hx-swap="none"
+                                       hx-vals='{"csrfmiddlewaretoken": "{{ csrf_token }}"}'>
+                                <div class="toggle-switch"></div>
+                            </label>
+                            {% else %}
+                            {% if group.active %}<span class="xu-badge is-default" style="margin-left:0;">{% trans "On" %}</span>{% else %}<span class="xu-badge is-off" style="margin-left:0;">{% trans "Off" %}</span>{% endif %}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if group.editable %}
+                            <div class="xu-actions">
+                                <button type="button" class="xu-icon-btn" title="{% trans 'Edit this task group' %}" aria-label="{% trans 'Edit this task group' %}"
+                                        hx-get="{% url 'exit-task-group-edit' group.pk %}" hx-target="#xsModalBody" hx-swap="innerHTML">
+                                    <ion-icon name="create-outline"></ion-icon>
+                                </button>
+                                <button type="button" class="xu-icon-btn is-danger" title="{% trans 'Delete this task group' %}" aria-label="{% trans 'Delete this task group' %}"
+                                        hx-post="{% url 'exit-task-group-delete' group.pk %}" hx-swap="none"
+                                        hx-vals='{"csrfmiddlewaretoken": "{{ csrf_token }}"}'
+                                        hx-confirm="{% trans 'Delete this task group? Exits already using its tasks keep them.' %}">
+                                    <ion-icon name="trash-outline"></ion-icon>
+                                </button>
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="xu-empty">{% trans "No task groups yet. Create one to start building the exit checklist." %}</div>
+        {% endif %}
+    </div>
+</div>

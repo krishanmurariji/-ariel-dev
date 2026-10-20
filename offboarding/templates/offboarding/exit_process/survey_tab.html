@@ -1,0 +1,72 @@
+{% load i18n %}
+{# the controls of this tab live in the top bar, next to Search and Initiate exit #}
+<div id="xpTabTools" hx-swap-oob="true">
+    <select class="oh-select" name="status" style="width:220px;"
+        hx-get="{% url 'exit-process-tab' 'survey' %}" hx-include="#xpFilter [name=q], #xpFilter [name=type]" hx-target="#xpContent" hx-swap="innerHTML" hx-trigger="change">
+        {% for key, label in status_choices %}<option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    {% comment %}Export to Excel - hidden for now; the download address and its code are kept.
+    <a class="oh-btn oh-btn--light-bg" href="{% url 'exit-survey-export' %}?{{ querystring }}" title="{% trans 'Download the filled-in surveys' %}">
+        <ion-icon name="download-outline"></ion-icon> {% trans "Export to Excel" %}
+    </a>
+    {% endcomment %}
+</div>
+
+{% if not rows %}
+    <div style="text-align:center; padding:48px 0; opacity:0.75;">
+        <ion-icon name="chatbox-ellipses-outline" style="font-size:2.4rem;"></ion-icon>
+        <p style="margin-top:8px;">{% trans "No survey responses match." %}</p>
+    </div>
+{% else %}
+<div class="xp-table-wrap">
+    <table class="xp-table">
+        <thead>
+            <tr>
+                <th>{% trans "Employee" %}</th>
+                <th>{% trans "Type" %}</th>
+                <th>{% trans "Last working day" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th>{% trans "Filled in on" %}</th>
+                <th>{% trans "Actions" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            {% with employee=row.case_id.employee_id %}
+            <tr>
+                <td>
+                    <div class="xp-person">
+                        <div class="xp-avatar"><img src="{{ employee.get_avatar }}" class="xp-avatar-img" alt=""></div>
+                        <span class="xp-name">{{ employee.get_full_name }}</span>
+                    </div>
+                </td>
+                <td>{{ row.case_id.get_exit_type_display }}</td>
+                <td>{{ row.case_id.last_working_day|date:"d M Y"|default:"—" }}</td>
+                <td><span class="xp-badge {% if row.status == 'completed' %}xp-badge--on{% endif %}">{% if row.status == "completed" %}{% trans "Filled in" %}{% else %}{% trans "Waiting" %}{% endif %}</span></td>
+                <td>{{ row.completed_at|date:"d M Y"|default:"—" }}</td>
+                <td class="xp-actions">
+                    {% if row.status == "completed" %}
+                    <button class="oh-btn oh-btn--secondary" hx-get="{% url 'exit-survey-view' row.pk %}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal">{% trans "View" %}</button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endwith %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if page.paginator.num_pages > 1 %}
+<div style="display:flex; gap:8px; justify-content:flex-end; align-items:center;">
+    {% if page.has_previous %}<button class="oh-btn oh-btn--light-bg" hx-get="{% url 'exit-process-tab' 'survey' %}?{{ querystring }}&page={{ page.previous_page_number }}" hx-target="#xpContent" hx-swap="innerHTML">{% trans "Previous" %}</button>{% endif %}
+    <span style="font-size:0.85rem;">{{ page.number }} / {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<button class="oh-btn oh-btn--light-bg" hx-get="{% url 'exit-process-tab' 'survey' %}?{{ querystring }}&page={{ page.next_page_number }}" hx-target="#xpContent" hx-swap="innerHTML">{% trans "Next" %}</button>{% endif %}
+</div>
+{% endif %}
+{% endif %}
+
+<style>
+    .xp-actions { min-width: 200px; white-space: nowrap; }
+    .xp-badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; background: rgba(120,130,150,0.2); }
+    .xp-badge--on { background: rgba(34,160,90,0.25); }
+</style>

@@ -1,0 +1,64 @@
+{% load i18n %}
+<div class="xm-sec-head">
+    <span class="xm-sec-ic"><ion-icon name="chatbox-ellipses-outline"></ion-icon></span>
+    <div>
+        <h4>{% trans "Exit survey" %}</h4>
+        <p>{% trans "Feedback from the person leaving. Only HR can read the answers." %}</p>
+    </div>
+    {% if survey %}<div class="xm-sec-side">
+        <span class="xm-chip {% if survey.status == 'completed' %}xm-chip--ok{% else %}xm-chip--warn{% endif %}">{% if survey.status == "completed" %}{% trans "Filled in" %}{% else %}{% trans "Waiting for the employee" %}{% endif %}</span>
+    </div>{% endif %}
+</div>
+
+{% if survey %}
+<div class="xm-card">
+    <h5 class="xm-card-title"><ion-icon name="paper-plane-outline"></ion-icon>{% trans "Survey status" %}</h5>
+    <dl>
+        <dt>{% trans "Status" %}</dt>
+        <dd><span class="xm-chip {% if survey.status == 'completed' %}xm-chip--ok{% else %}xm-chip--warn{% endif %}">{% if survey.status == "completed" %}{% trans "Filled in" %}{% else %}{% trans "Waiting for the employee" %}{% endif %}</span></dd>
+        <dt>{% trans "Sent" %}</dt><dd>{{ survey.created_at|date:"d M Y" }}{% if survey.sent_by %} · {{ survey.sent_by.get_full_name }}{% else %} · {% trans "automatically" %}{% endif %}</dd>
+        {% if survey.completed_at %}<dt>{% trans "Filled in on" %}</dt><dd>{{ survey.completed_at|date:"d M Y" }}</dd>{% endif %}
+        <dt>{% trans "Questions" %}</dt><dd>{{ survey.questions|length }}</dd>
+    </dl>
+</div>
+<div class="xm-foot">
+    {% if survey.status == "completed" and is_admin %}
+    <button type="button" class="oh-btn oh-btn--secondary" hx-get="{% url 'exit-survey-view' survey.pk %}?from=panel&section=survey" hx-target="#genericModalBody"><ion-icon name="eye-outline" style="margin-right:6px;"></ion-icon>{% trans "View responses" %}</button>
+    {% endif %}
+    {% if survey.status == "sent" and can_change %}
+    <form method="post" hx-post="{% url 'exit-survey-remind' survey.pk %}" hx-target="#genericModalBody" style="margin:0;">{% csrf_token %}
+        <button type="submit" class="oh-btn oh-btn--light-bg"><ion-icon name="notifications-outline" style="margin-right:6px;"></ion-icon>{% trans "Remind" %}</button>
+    </form>
+    {% endif %}
+</div>
+{% else %}
+{% if survey_questions %}
+<div class="xm-card">
+    <h5 class="xm-card-title"><ion-icon name="help-circle-outline"></ion-icon>{% trans "The survey has not been sent." %}</h5>
+    <p class="xm-muted" style="margin:0 0 10px;">{% trans "This is what the employee would be asked:" %}</p>
+    <ol style="margin:0; padding:0; list-style:none; counter-reset:q; display:grid; gap:8px;">
+        {% for q in survey_questions %}
+        <li style="counter-increment:q; display:flex; align-items:center; gap:12px; padding:9px 12px; border:1px solid var(--xm-line-soft); border-radius:10px; background:var(--xm-fill);">
+            <span style="width:26px; height:26px; border-radius:50%; display:grid; place-items:center; flex:none; font-size:0.74rem; font-weight:700; color:var(--xm-accent); background:var(--xm-accent-soft);" class="qn"></span>
+            <span style="flex:1;">{{ q.question }}{% if q.is_mandatory %} <span style="color:var(--xm-bad);">*</span>{% endif %}</span>
+            <span class="xm-chip">{{ q.get_type_display }}</span>
+        </li>
+        {% endfor %}
+    </ol>
+    <style>.xm-wide .qn::before { content: counter(q); }</style>
+</div>
+{% else %}
+<div class="xm-empty">
+    <span class="ic ic--muted"><ion-icon name="chatbox-outline"></ion-icon></span>
+    <strong>{% trans "The survey has not been sent." %}</strong>
+    <p>{% trans "No exit survey questions have been added yet. Add them under Settings > Offboarding > Exit Survey." %}</p>
+</div>
+{% endif %}
+{% if can_change and survey_questions %}
+<div class="xm-foot">
+    <form method="post" hx-post="{% url 'exit-survey-send' case.pk %}" hx-target="#genericModalBody" style="margin:0;">{% csrf_token %}
+        <button type="submit" class="oh-btn oh-btn--secondary"><ion-icon name="paper-plane-outline" style="margin-right:6px;"></ion-icon>{% trans "Send survey to employee" %}</button>
+    </form>
+</div>
+{% endif %}
+{% endif %}

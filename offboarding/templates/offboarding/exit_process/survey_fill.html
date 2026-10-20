@@ -1,0 +1,60 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+{% include "offboarding/exit_process/_styles.html" %}
+<style>
+    .sv-card { max-width: 760px; margin: 0 auto; border: 1px solid rgba(120,130,150,0.3); border-radius: 8px; padding: 22px 24px; }
+    .sv-q { margin-bottom: 22px; }
+    .sv-q > label.sv-title { display: block; font-weight: 600; font-size: 0.92rem; margin-bottom: 8px; }
+    .sv-req { color: #dc3c3c; }
+    .sv-err { color: #dc3c3c; font-size: 0.78rem; margin-top: 4px; }
+    .sv-opt { display: flex; align-items: center; gap: 8px; font-size: 0.88rem; margin: 5px 0; cursor: pointer; }
+    .sv-stars { display: flex; gap: 14px; flex-wrap: wrap; }
+    .sv-note { font-size: 0.82rem; opacity: 0.75; margin-bottom: 20px; }
+</style>
+<div class="oh-wrapper">
+    <div class="sv-card">
+        <h1 style="font-size:1.15rem; font-weight:600; margin:0 0 6px;">{% trans "Exit survey" %}</h1>
+        <p class="sv-note">{% trans "Your honest feedback helps us improve. It is read by HR only, and you can answer once." %}</p>
+        {% if error %}<div style="padding:10px 14px; border-radius:6px; background:rgba(220,60,60,0.15); margin-bottom:16px; font-size:0.86rem;">{{ error }}</div>{% endif %}
+        <form method="post" data-xm-limits>
+            {% csrf_token %}
+            {% for item in items %}
+            <div class="sv-q">
+                <label class="sv-title" for="q_{{ item.q.id }}">{{ forloop.counter }}. {{ item.q.question }}{% if item.q.mandatory %} <span class="sv-req">*</span>{% endif %}</label>
+                {% if item.q.type == "text" %}
+                    <input type="text" class="oh-input w-100" id="q_{{ item.q.id }}" name="q_{{ item.q.id }}" maxlength="300" value="{{ item.value }}">
+                {% elif item.q.type == "textarea" %}
+                    <textarea class="oh-input w-100" id="q_{{ item.q.id }}" name="q_{{ item.q.id }}" rows="4" maxlength="2000">{{ item.value }}</textarea>
+                {% elif item.q.type == "number" %}
+                    <input type="number" step="any" class="oh-input w-100" id="q_{{ item.q.id }}" name="q_{{ item.q.id }}" value="{{ item.value }}">
+                {% elif item.q.type == "date" %}
+                    <input type="date" class="oh-input w-100" id="q_{{ item.q.id }}" name="q_{{ item.q.id }}" value="{{ item.value }}">
+                {% elif item.q.type == "checkbox" %}
+                    <label class="sv-opt"><input type="radio" name="q_{{ item.q.id }}" value="yes" {% if item.value == "yes" %}checked{% endif %}> {% trans "Yes" %}</label>
+                    <label class="sv-opt"><input type="radio" name="q_{{ item.q.id }}" value="no" {% if item.value == "no" %}checked{% endif %}> {% trans "No" %}</label>
+                {% elif item.q.type == "rating" %}
+                    <div class="sv-stars">
+                        {% for n in "12345" %}<label class="sv-opt"><input type="radio" name="q_{{ item.q.id }}" value="{{ n }}" {% if item.value == n %}checked{% endif %}> {{ n }}</label>{% endfor %}
+                    </div>
+                    <div style="font-size:0.72rem; opacity:0.65;">{% trans "1 = poor, 5 = excellent" %}</div>
+                {% elif item.q.type == "options" %}
+                    {% for option in item.q.options %}
+                    <label class="sv-opt"><input type="radio" name="q_{{ item.q.id }}" value="{{ option }}" {% if item.value == option %}checked{% endif %}> {{ option }}</label>
+                    {% endfor %}
+                {% elif item.q.type == "multiple" %}
+                    {% for option in item.q.options %}
+                    <label class="sv-opt"><input type="checkbox" name="q_{{ item.q.id }}" value="{{ option }}" {% if option in item.selected %}checked{% endif %}> {{ option }}</label>
+                    {% endfor %}
+                {% endif %}
+                {% if item.error %}<div class="sv-err">{{ item.error }}</div>{% endif %}
+            </div>
+            {% endfor %}
+            <div class="xm-bar-rev">
+                <button type="submit" class="oh-btn oh-btn--secondary pl-4 pr-4">{% trans "Submit survey" %}</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% include "offboarding/exit_process/_limits.html" %}
+{% endblock content %}

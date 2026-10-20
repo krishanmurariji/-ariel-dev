@@ -1,0 +1,9 @@
+{% load i18n %}
+{% if instance.can_withdraw %}
+<button type="button" class="oh-btn oh-btn--light" onclick="event.stopPropagation()"
+    hx-get="{% url 'exit-withdraw' instance.pk %}" hx-target="#genericModalBody"
+    data-toggle="oh-modal-toggle" data-target="#genericModal">
+    <ion-icon name="return-up-back-outline"></ion-icon>
+    <span class="ms-1">{% trans "Withdraw" %}</span>
+</button>
+{% endif %}

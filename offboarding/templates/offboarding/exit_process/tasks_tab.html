@@ -1,0 +1,110 @@
+{% load i18n %}
+{# the controls of this tab live in the top bar, next to Search and Initiate exit #}
+<div id="xpTabTools" hx-swap-oob="true">
+    {% if view == "task" %}
+    <select class="oh-select" name="status" style="width:220px;"
+        hx-get="{% url 'exit-process-tab' 'tasks' %}?view=task" hx-include="#xpFilter [name=q]" hx-target="#xpContent" hx-swap="innerHTML" hx-trigger="change">
+        {% for key, label in status_choices %}<option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    {% endif %}
+    <div class="xp-seg">
+        <button type="button" class="oh-btn {% if view == 'task' %}oh-btn--secondary{% else %}oh-btn--light{% endif %}"
+            hx-get="{% url 'exit-process-tab' 'tasks' %}?view=task&status={{ status }}" hx-include="#xpFilter [name=q]" hx-target="#xpContent" hx-swap="innerHTML">{% trans "By task" %}</button>
+        <button type="button" class="oh-btn {% if view == 'employee' %}oh-btn--secondary{% else %}oh-btn--light{% endif %}"
+            hx-get="{% url 'exit-process-tab' 'tasks' %}?view=employee" hx-include="#xpFilter [name=q]" hx-target="#xpContent" hx-swap="innerHTML">{% trans "By employee" %}</button>
+    </div>
+</div>
+
+{% if not rows %}
+    <div style="text-align:center; padding:48px 0; opacity:0.75;">
+        <ion-icon name="checkbox-outline" style="font-size:2.4rem;"></ion-icon>
+        <p style="margin-top:8px;">{% if view == "task" %}{% trans "No exit tasks match." %}{% else %}{% trans "Nobody is serving their notice period." %}{% endif %}</p>
+    </div>
+{% else %}
+<div class="xp-table-wrap">
+    <table class="xp-table">
+        <thead>
+            <tr>
+                <th>{% trans "Employee" %}</th>
+                {% if view == "task" %}
+                    <th>{% trans "Task" %}</th>
+                    <th>{% trans "Owner" %}</th>
+                    <th>{% trans "Due" %}</th>
+                    <th>{% trans "Status" %}</th>
+                {% else %}
+                    <th>{% trans "Last working day" %}</th>
+                    <th>{% trans "Progress" %}</th>
+                    <th>{% trans "Waiting on someone" %}</th>
+                {% endif %}
+                <th>{% trans "Actions" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                {% if view == "task" %}
+                    {% with employee=row.case_id.employee_id %}
+                    <td>
+                        <div class="xp-person">
+                            <div class="xp-avatar"><img src="{{ employee.get_avatar }}" class="xp-avatar-img" alt=""></div>
+                            <span class="xp-name">{{ employee.get_full_name }}</span>
+                        </div>
+                    </td>
+                    {% endwith %}
+                    <td>{{ row.title }}<div style="font-size:0.72rem; opacity:0.65;">{{ row.group_title }}</div></td>
+                    <td>{% if row.status == "review" %}{{ row.approver_id.get_full_name|default:"—" }} <span style="font-size:0.7rem; opacity:0.65;">({% trans "approver" %})</span>{% else %}{{ row.owner_id.get_full_name|default:"—" }}{% endif %}</td>
+                    <td>{{ row.due_date|date:"d M Y" }}{% if row.late %}<div style="font-size:0.72rem; color:#c0392b;">{% trans "overdue" %}</div>{% endif %}</td>
+                    <td><span class="xp-badge {% if row.status == 'done' %}xp-badge--on{% endif %}">{{ row.get_status_display }}</span></td>
+                    <td class="xp-actions">
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            {% if row.can_do %}<button class="oh-btn oh-btn--secondary" hx-get="{% url 'exit-task-action' row.pk 'complete' %}?next=mine" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal">{% trans "Complete" %}</button>{% endif %}
+                            {% if row.can_review %}<button class="oh-btn oh-btn--secondary" hx-get="{% url 'exit-task-action' row.pk 'review' %}?next=mine" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal">{% trans "Review" %}</button>{% endif %}
+                            {% if can_change and row.status == "pending" or can_change and row.status == "review" %}
+                            <form method="post" hx-post="{% url 'exit-task-remind' row.pk %}?next=mine" hx-swap="none">{% csrf_token %}
+                                <button type="submit" class="oh-btn oh-btn--light-bg" title="{% trans 'Remind' %}"><ion-icon name="notifications-outline"></ion-icon></button>
+                            </form>
+                            {% endif %}
+                            {% if can_change and row.status != "done" and row.status != "skipped" %}
+                            <button class="oh-btn oh-btn--light-bg" title="{% trans 'Skip' %}" hx-get="{% url 'exit-task-action' row.pk 'skip' %}?next=mine" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal"><ion-icon name="play-skip-forward-outline"></ion-icon></button>
+                            {% endif %}
+                        </div>
+                    </td>
+                {% else %}
+                    {% with employee=row.employee_id %}
+                    <td>
+                        <div class="xp-person">
+                            <div class="xp-avatar"><img src="{{ employee.get_avatar }}" class="xp-avatar-img" alt=""></div>
+                            <span class="xp-name">{{ employee.get_full_name }}</span>
+                        </div>
+                    </td>
+                    {% endwith %}
+                    <td>{{ row.last_working_day|date:"d M Y"|default:"—" }}</td>
+                    <td>{{ row.done_count }} / {{ row.total_count }}</td>
+                    <td>{{ row.open_count }}</td>
+                    <td class="xp-actions">
+                        <button class="oh-btn oh-btn--secondary" hx-get="{% url 'exit-manage' row.pk 'tasks' %}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal">{% trans "Open tasks" %}</button>
+                    </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if page.paginator.num_pages > 1 %}
+<div style="display:flex; gap:8px; justify-content:flex-end; align-items:center;">
+    {% if page.has_previous %}<button class="oh-btn oh-btn--light-bg" hx-get="{% url 'exit-process-tab' 'tasks' %}?{{ querystring }}&page={{ page.previous_page_number }}" hx-target="#xpContent" hx-swap="innerHTML">{% trans "Previous" %}</button>{% endif %}
+    <span style="font-size:0.85rem;">{{ page.number }} / {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<button class="oh-btn oh-btn--light-bg" hx-get="{% url 'exit-process-tab' 'tasks' %}?{{ querystring }}&page={{ page.next_page_number }}" hx-target="#xpContent" hx-swap="innerHTML">{% trans "Next" %}</button>{% endif %}
+</div>
+{% endif %}
+{% endif %}
+
+<style>
+    .xp-actions { min-width: 250px; white-space: nowrap; }
+    .xp-actions .oh-btn { white-space: nowrap; }
+    /* Complete / Review / Open tasks: one width, so the rows line up */
+    .xp-actions .oh-btn--secondary { min-width: 92px; justify-content: center; text-align: center; }
+    .xp-badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; background: rgba(120,130,150,0.2); }
+    .xp-badge--on { background: rgba(34,160,90,0.25); }
+</style>

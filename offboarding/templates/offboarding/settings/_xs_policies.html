@@ -1,0 +1,86 @@
+{% load i18n %}
+<div id="xs-policies" class="xu-card"
+     hx-get="{% url 'exit-settings-section' 'policies' %}" hx-trigger="exitSettingsChanged from:body" hx-swap="outerHTML">
+    <div class="xu-card__head">
+        <div>
+            <h5>{% trans "Notice period policies" %}</h5>
+            <p>{% trans "Each employee is on the policy assigned to them, otherwise the default policy. If there is no default, their contract's notice period or the fallback notice period is used." %}</p>
+        </div>
+        <div class="xu-card__actions">
+            <button type="button" class="oh-btn oh-btn--secondary xu-btn"
+                    hx-get="{% url 'notice-policy-form' %}" hx-target="#xsModalBody" hx-swap="innerHTML">
+                <ion-icon name="add-outline"></ion-icon>{% trans "New policy" %}
+            </button>
+        </div>
+    </div>
+    <div class="xu-card__body xu-flush">
+        {% if policies %}
+        <div class="xu-table-wrap">
+            <table class="xu-table">
+                <thead>
+                    <tr>
+                        <th>{% trans "Policy" %}</th>
+                        <th>{% trans "Notice period" %}</th>
+                        <th>{% trans "Employees" %}</th>
+                        <th class="xu-right">{% trans "Actions" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for policy in policies %}
+                    <tr>
+                        <td>
+                            <div class="xu-title">
+                                {{ policy.title }}
+                                {% if policy.is_default %}<span class="xu-badge is-default">{% trans "Default" %}</span>{% endif %}
+                                {% if not policy.editable %}<span class="xu-badge" title="{% trans 'Organisation-wide policies are changed in All Company mode' %}">{% trans "Organisation-wide" %}</span>{% endif %}
+                            </div>
+                            {% if policy.description %}<div class="xu-sub">{{ policy.description }}</div>{% endif %}
+                        </td>
+                        <td>{{ policy.days }} {% trans "days" %}</td>
+                        <td>
+                            <button type="button" class="xu-pill"
+                                    hx-get="{% url 'notice-policy-people' policy.pk %}" hx-target="#xsModalBody" hx-swap="innerHTML"
+                                    title="{% trans 'See who is on this policy' %}">
+                                <ion-icon name="people-outline"></ion-icon>
+                                {% if policy.people %}
+                                    {% blocktrans count n=policy.people %}{{ n }} employee{% plural %}{{ n }} employees{% endblocktrans %}
+                                {% else %}
+                                    {% trans "Add employees" %}
+                                {% endif %}
+                            </button>
+                        </td>
+                        <td>
+                            {% if policy.editable %}
+                            <div class="xu-actions">
+                                {% if not policy.is_default %}
+                                <button type="button" class="xu-icon-btn" title="{% trans 'Make this the default policy' %}" aria-label="{% trans 'Make this the default policy' %}"
+                                        hx-post="{% url 'notice-policy-default' policy.pk %}" hx-swap="none"
+                                        hx-vals='{"csrfmiddlewaretoken": "{{ csrf_token }}"}'>
+                                    <ion-icon name="star-outline"></ion-icon>
+                                </button>
+                                {% else %}
+                                <span class="xu-icon-btn is-on" title="{% trans 'This is the default policy' %}" style="cursor:default;"><ion-icon name="star"></ion-icon></span>
+                                {% endif %}
+                                <button type="button" class="xu-icon-btn" title="{% trans 'Edit' %}" aria-label="{% trans 'Edit' %}"
+                                        hx-get="{% url 'notice-policy-edit-form' policy.pk %}" hx-target="#xsModalBody" hx-swap="innerHTML">
+                                    <ion-icon name="create-outline"></ion-icon>
+                                </button>
+                                <button type="button" class="xu-icon-btn is-danger" title="{% trans 'Delete this policy' %}" aria-label="{% trans 'Delete this policy' %}"
+                                        hx-post="{% url 'notice-policy-delete' policy.pk %}" hx-swap="none"
+                                        hx-vals='{"csrfmiddlewaretoken": "{{ csrf_token }}"}'
+                                        hx-confirm="{% trans 'Delete this policy?' %}">
+                                    <ion-icon name="trash-outline"></ion-icon>
+                                </button>
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="xu-empty">{% trans "No policies yet. Create one to give some employees a different notice period." %}</div>
+        {% endif %}
+    </div>
+</div>

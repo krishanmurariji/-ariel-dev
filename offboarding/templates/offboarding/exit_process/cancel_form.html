@@ -1,0 +1,32 @@
+{% load i18n widget_tweaks %}
+{% if case.status == "exited" %}{% trans "Cancel exit / rejoin" as head_title %}{% else %}{% trans "Cancel exit" as head_title %}{% endif %}
+{% include "offboarding/exit_process/_modal_head.html" with title=head_title %}
+<div class="oh-modal__dialog-body oh-modal__dialog-relative xm-modal">
+    {% include "offboarding/exit_process/_modal_styles.html" %}
+    <div class="xm-task">
+        <span class="ic" style="color:var(--xm-bad);"><ion-icon name="{% if case.status == 'exited' %}return-up-back-outline{% else %}close-circle-outline{% endif %}"></ion-icon></span>
+        <div>
+            <strong>{{ employee.get_full_name }}</strong>
+            <div class="desc" style="margin-top:3px;">
+                {% if case.status == "exited" %}
+                    {% blocktrans with name=employee.get_full_name %}{{ name }} has already exited. Cancelling the exit brings them back as an active employee and re-enables their login.{% endblocktrans %}
+                {% else %}
+                    {% blocktrans with name=employee.get_full_name %}This calls off {{ name }}'s exit. They stay with the company and can raise a new resignation later.{% endblocktrans %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <form hx-post="{{ request.get_full_path }}" hx-target="#genericModalBody" hx-swap="innerHTML" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="xm-msg xm-msg--bad"><ion-icon name="alert-circle" style="font-size:1.1rem; color:var(--xm-bad);"></ion-icon><span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
+        <div class="xm-field">
+            <label class="oh-label required-star" for="{{ form.reason.id_for_label }}">{% trans "Reason" %}</label>
+            {{ form.reason|add_class:"oh-input w-100" }}
+            {% for error in form.reason.errors %}<div class="xm-err">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="xm-foot">
+            <button type="button" class="oh-btn oh-btn--light-bg pl-4 pr-4" {% if back_url %}hx-get="{{ back_url }}" hx-target="#genericModalBody"{% else %}onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')"{% endif %}>{% if back_url %}{% trans "Back" %}{% else %}{% trans "Close" %}{% endif %}</button>
+            <button type="submit" class="oh-btn oh-btn--danger pl-4 pr-4">{% if case.status == "exited" %}{% trans "Rejoin employee" %}{% else %}{% trans "Cancel exit" %}{% endif %}</button>
+        </div>
+    </form>
+</div>

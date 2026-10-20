@@ -1,0 +1,24 @@
+{% load i18n %}
+{% trans "Survey response" as head_title %}
+{% include "offboarding/exit_process/_modal_head.html" with title=head_title %}
+<div class="oh-modal__dialog-body oh-modal__dialog-relative xm-modal">
+    {% include "offboarding/exit_process/_modal_styles.html" %}
+    <div class="xm-task">
+        <span class="ic"><ion-icon name="chatbox-ellipses-outline"></ion-icon></span>
+        <div>
+            <strong>{{ survey.case_id.employee_id.get_full_name }}</strong>
+            <div class="who">{{ survey.case_id.get_exit_type_display }}{% if survey.completed_at %} · {{ survey.completed_at|date:"d M Y" }}{% endif %}</div>
+        </div>
+    </div>
+    <div style="display:grid; gap:10px;">
+    {% for q, answer in rows %}
+        <div style="padding:11px 14px; border:1px solid var(--xm-line-soft); border-radius:10px;">
+            <div style="font-size:0.76rem; font-weight:600; opacity:0.65;">{{ forloop.counter }}. {{ q.question }}</div>
+            <div style="font-size:0.9rem; margin-top:4px; white-space:pre-wrap;">{% if answer %}{{ answer }}{% else %}<span style="opacity:0.55;">{% trans "Not answered" %}</span>{% endif %}</div>
+        </div>
+    {% endfor %}
+    </div>
+    <div class="xm-foot" style="margin-top:16px;">
+        <button type="button" class="oh-btn oh-btn--light-bg pl-4 pr-4" {% if back_url %}hx-get="{{ back_url }}" hx-target="#genericModalBody"{% else %}onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')"{% endif %}>{% if back_url %}{% trans "Back" %}{% else %}{% trans "Close" %}{% endif %}</button>
+    </div>
+</div>

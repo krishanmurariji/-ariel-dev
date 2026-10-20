@@ -1,0 +1,8 @@
+{% load i18n %}
+{% if group %}{% trans "Edit task group" as head_title %}{% else %}{% trans "New task group" as head_title %}{% endif %}
+{% include "offboarding/exit_process/_modal_head.html" with title=head_title %}
+<div class="oh-modal__dialog-body oh-modal__dialog-relative" data-xu-wide>
+    <div class="xu-modal-body">
+        {% include "offboarding/settings/_xt_form_body.html" %}
+    </div>
+</div>

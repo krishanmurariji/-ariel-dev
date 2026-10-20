@@ -1,0 +1,13 @@
+{% load i18n %}
+{% trans "Withdraw resignation" as head_title %}
+{% include "offboarding/exit_process/_modal_head.html" with title=head_title %}
+<div class="oh-modal__dialog-body oh-modal__dialog-relative">
+    <form hx-post="{{ request.path }}" hx-target="#genericModalBody" hx-swap="innerHTML">
+        {% csrf_token %}
+        <p style="font-size:0.9rem;">{% trans "Take this resignation back? It will no longer be reviewed, and you can raise a new one later if you need to." %}</p>
+        <div class="d-flex flex-row-reverse" style="gap:10px; margin-top:16px;">
+            <button type="submit" class="oh-btn oh-btn--danger pl-4 pr-4">{% trans "Withdraw resignation" %}</button>
+            <button type="button" class="oh-btn oh-btn--light pl-4 pr-4" onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')">{% trans "Keep it" %}</button>
+        </div>
+    </form>
+</div>

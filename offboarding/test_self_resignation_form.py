@@ -64,7 +64,7 @@ class SelfResignationTestBase(IsolatedTestCase):
         data = {
             "discussed_with_manager": "yes",
             "discussion_summary": "Spoke with my manager about the move.",
-            "reason": "relocating",
+            "reason": "Relocating",
             "early_last_working_day": "no",
             "preferred_last_working_day": "",
             "additional_comment": "Thank you for the opportunity.",
@@ -112,6 +112,37 @@ class ModalContentTests(SelfResignationTestBase):
         self.assertNotIn("name=\"discussion_summary\"", body)
 
 
+class EarlyLastWorkingDaySettingTests(SelfResignationTestBase):
+    """HR can switch the "early last working day" question off in Exit Settings."""
+
+    def setUp(self):
+        super().setUp()
+        OffboardingGeneralSetting.objects.filter(company_id=None).update(
+            allow_early_last_working_day=False
+        )
+
+    def test_the_question_is_not_shown_when_it_is_switched_off(self):
+        body = self.client.get(reverse(URL), **HX).content.decode()
+        self.assertNotIn("Any preference of an early last working day?", body)
+        self.assertIn("Did you have discussion with manager", body)
+
+    def test_the_question_is_shown_when_it_is_switched_on(self):
+        OffboardingGeneralSetting.objects.filter(company_id=None).update(
+            allow_early_last_working_day=True
+        )
+        body = self.client.get(reverse(URL), **HX).content.decode()
+        self.assertIn("Any preference of an early last working day?", body)
+
+    def test_an_early_date_sent_anyway_is_ignored(self):
+        early = datetime.date.today() + datetime.timedelta(days=30)
+        self.submit(
+            early_last_working_day="yes", preferred_last_working_day=early.isoformat()
+        )
+        letter = self.letters().get()
+        self.assertIsNone(letter.preferred_last_working_day)
+        self.assertEqual(letter.planned_to_leave_on, self.notice_end)
+
+
 class SubmissionTests(SelfResignationTestBase):
     def test_a_valid_submission_files_the_resignation_with_every_answer(self):
         response = self.submit()
@@ -119,7 +150,7 @@ class SubmissionTests(SelfResignationTestBase):
         self.assertEqual(response.status_code, 200)
         letter = self.letters().get()
         self.assertEqual(letter.status, "requested")
-        self.assertEqual(letter.reason, "relocating")
+        self.assertEqual(letter.reason, "Relocating")
         self.assertTrue(letter.discussed_with_manager)
         self.assertEqual(letter.discussion_summary, "Spoke with my manager about the move.")
         self.assertIsNone(letter.preferred_last_working_day)

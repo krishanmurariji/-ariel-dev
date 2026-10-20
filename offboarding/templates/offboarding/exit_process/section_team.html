@@ -1,0 +1,33 @@
+{% load i18n %}
+<p class="xm-muted" style="margin-top:0;">{% trans "People and approvals that depend on this employee. Hand them to someone who is staying, so nothing is left without an owner." %}</p>
+
+{% if roles %}
+<div class="xm-card">
+    <strong>{% trans "To hand over" %}</strong>
+    <ul style="margin:8px 0 0; padding-left:18px;">
+        {% for role in roles %}<li>{{ role.label }}: <strong>{{ role.count }}</strong></li>{% endfor %}
+    </ul>
+    {% if reports %}
+    <div class="xm-muted" style="margin-top:10px; font-size:0.78rem;">
+        {% trans "Direct reports" %}: {% for person in reports %}{{ person.get_full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+{% if can_change %}
+<form method="post" class="xm-form" hx-post="{% url 'exit-team-handover' case.pk %}" hx-target="#genericModalBody">{% csrf_token %}
+    <h4 class="xm-form-title">{% trans "Hand everything over to" %}</h4>
+    {% if handover_form.non_field_errors %}<div class="xm-msg xm-msg--bad">{{ handover_form.non_field_errors|join:" " }}</div>{% endif %}
+    <div class="xm-field" style="margin-top:10px;">
+        {{ handover_form.new_owner }}
+        {{ handover_form.new_owner.errors }}
+    </div>
+    <div class="xm-form-foot">
+        <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Hand over" %}</button>
+    </div>
+</form>
+{% endif %}
+{% else %}
+<div class="xm-card" style="text-align:center;"><ion-icon name="checkmark-circle-outline" style="font-size:1.8rem; color:#22a05a;"></ion-icon>
+    <div>{% trans "Nobody reports to this employee and nothing is waiting on them." %}</div></div>
+{% endif %}

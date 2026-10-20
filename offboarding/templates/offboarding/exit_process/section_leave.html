@@ -1,0 +1,35 @@
+{% load i18n %}
+<p class="xm-muted" style="margin-top:0;">{% trans "Approved leave taken during the notice period. Days off do not count towards serving notice, so the last working day can be moved out to make them up." %}</p>
+
+<div class="xm-card">
+    <dl>
+        <dt>{% trans "Notice period" %}</dt><dd>{{ case.notice_date|date:"d M Y"|default:"—" }} → {{ case.last_working_day|date:"d M Y"|default:"—" }}</dd>
+        <dt>{% trans "Leave taken" %}</dt><dd>{{ leave_total }} {% trans "day(s)" %}</dd>
+        <dt>{% trans "Already made up" %}</dt><dd>{{ already_extended }} {% trans "day(s)" %}</dd>
+        <dt>{% trans "Still to make up" %}</dt><dd><strong>{{ to_extend }}</strong> {% trans "day(s)" %}</dd>
+    </dl>
+</div>
+
+{% if leave_rows %}
+<table class="xm-table">
+    <thead><tr><th>{% trans "Leave type" %}</th><th>{% trans "From" %}</th><th>{% trans "To" %}</th><th>{% trans "Days in notice" %}</th></tr></thead>
+    <tbody>
+    {% for leave, days in leave_rows %}
+        <tr>
+            <td>{{ leave.leave_type_id }}</td>
+            <td>{{ leave.start_date|date:"d M Y" }}</td>
+            <td>{{ leave.end_date|date:"d M Y" }}</td>
+            <td>{{ days|floatformat:"-1" }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="xm-card" style="text-align:center;">{% trans "No approved leave during the notice period." %}</div>
+{% endif %}
+
+{% if can_change and to_extend %}
+<form method="post" class="xm-bar" hx-post="{% url 'exit-leave-extend' case.pk %}" hx-target="#genericModalBody">{% csrf_token %}
+    <button type="submit" class="oh-btn oh-btn--secondary">{% blocktrans %}Extend notice by {{ to_extend }} day(s){% endblocktrans %}</button>
+</form>
+{% endif %}

@@ -1,0 +1,56 @@
+{# Look shared by the small exit windows (task actions, edit date, cancel exit, survey answers). #}
+{# They are loaded on their own into the modal, so they carry the styles they need. #}
+<style>
+    .xm-modal {
+        --xm-accent: #1b9be0; --xm-accent-soft: rgba(27,155,224,0.12);
+        --xm-ok: #22a05a; --xm-ok-soft: rgba(34,160,90,0.14);
+        --xm-warn: #e08a00; --xm-warn-soft: rgba(245,158,11,0.16);
+        --xm-bad: #d93636; --xm-bad-soft: rgba(220,60,60,0.13);
+        --xm-line: rgba(120,130,150,0.28); --xm-line-soft: rgba(120,130,150,0.16); --xm-fill: rgba(120,130,150,0.07);
+        font-size: 0.88rem; padding-top: 14px;
+    }
+    /* what the window is about */
+    .xm-modal .xm-task { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--xm-line-soft); border-radius: 12px;
+        background: linear-gradient(135deg, var(--xm-accent-soft), rgba(120,130,150,0.04) 70%); margin-bottom: 14px; }
+    .xm-modal .xm-task .ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex: none; font-size: 1.25rem; color: var(--xm-accent); background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .xm-modal .xm-task strong { display: block; font-size: 0.98rem; line-height: 1.3; }
+    .xm-modal .xm-task .who { margin-top: 2px; font-size: 0.78rem; opacity: 0.7; }
+    .xm-modal .xm-task .desc { margin-top: 6px; font-size: 0.82rem; opacity: 0.8; }
+    .xm-modal .xm-quote { position: relative; margin: 0 0 16px; padding: 10px 14px 10px 16px; border-radius: 10px; background: var(--xm-fill); border-left: 4px solid var(--xm-accent); font-size: 0.84rem; }
+    .xm-modal .xm-quote .by { display: block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; opacity: 0.6; margin-bottom: 3px; }
+    .xm-modal .xm-quote a { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; font-weight: 600; }
+
+    /* fields */
+    .xm-modal .xm-field { margin-bottom: 16px; }
+    .xm-modal .xm-field > label, .xm-modal .xm-label { display: block; font-size: 0.78rem; font-weight: 600; margin: 0 0 6px; opacity: 0.9; }
+    .xm-modal input[type=text], .xm-modal input[type=date], .xm-modal input[type=number], .xm-modal select, .xm-modal textarea {
+        display: block; width: 100%; box-sizing: border-box; padding: 9px 11px; font: inherit; font-size: 0.86rem; color: inherit;
+        background: #fff; border: 1px solid rgba(120,130,150,0.55); border-radius: 8px; outline: none; height: auto; }
+    .xm-modal textarea { min-height: 96px; resize: vertical; line-height: 1.45; }
+    .xm-modal input[type=file] { display: block; width: 100%; box-sizing: border-box; padding: 9px; font-size: 0.82rem; border: 1.5px dashed rgba(120,130,150,0.55); border-radius: 8px; background: var(--xm-fill); cursor: pointer; }
+    .xm-modal input:focus, .xm-modal select:focus, .xm-modal textarea:focus { border-color: var(--xm-accent); box-shadow: 0 0 0 3px rgba(27,155,224,0.2); }
+    .xm-modal ::placeholder { opacity: 0.5; }
+    .xm-modal .xm-err { margin-top: 6px; color: var(--xm-bad); font-size: 0.78rem; }
+    .xm-modal .xm-hint { margin-top: 5px; font-size: 0.76rem; opacity: 0.65; }
+    .xm-modal .required-star::after, .xm-modal .xm-star { color: var(--xm-bad); }
+    .xm-modal .xm-msg { display: flex; gap: 8px; align-items: flex-start; padding: 10px 14px; border-radius: 10px; font-size: 0.84rem; margin-bottom: 14px; border: 1px solid transparent; }
+    .xm-modal .xm-msg--bad { background: var(--xm-bad-soft); border-color: rgba(220,60,60,0.3); }
+    .xm-modal .xm-msg--warn { background: var(--xm-warn-soft); border-color: rgba(245,158,11,0.4); }
+
+    /* choice cards (Approve / Send back) */
+    .xm-modal .xt-radios { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .xm-modal .xt-radios label { display: flex; align-items: center; gap: 9px; margin: 0; padding: 11px 13px; border: 1px solid rgba(120,130,150,0.4); border-radius: 10px;
+        font-size: 0.86rem; cursor: pointer; background: #fff; transition: background .15s, border-color .15s; }
+    .xm-modal .xt-radios label:hover { background: rgba(120,130,150,0.08); }
+    .xm-modal .xt-radios input[type=radio] { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--xm-accent); }
+    .xm-modal .xt-radios label:has(input:checked) { font-weight: 600; border-color: var(--xm-accent); background: var(--xm-accent-soft); }
+    .xm-modal .xt-radios label:nth-child(1):has(input:checked) { border-color: var(--xm-ok); background: var(--xm-ok-soft); }
+    .xm-modal .xt-radios label:nth-child(2):has(input:checked) { border-color: var(--xm-warn); background: var(--xm-warn-soft); }
+
+    /* footer */
+    .xm-modal .xm-foot { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 6px; padding-top: 16px; border-top: 1px solid var(--xm-line-soft); }
+    .xm-modal .xm-foot .oh-btn { width: auto; margin: 0; white-space: nowrap; min-width: 92px; }
+    .xm-modal .oh-btn.oh-btn--light-bg { background: rgba(120,130,150,0.16); color: inherit; border: 0; }
+    .xm-modal .oh-btn.oh-btn--light-bg:hover { background: rgba(120,130,150,0.28); }
+    @media (max-width: 480px) { .xm-modal .xt-radios { grid-template-columns: 1fr; } }
+</style>

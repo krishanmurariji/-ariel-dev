@@ -315,3 +315,129 @@ def notify_exit_initiated(letter, initiator):
     return sent
 
 
+def review_reminder_content(letter, reviewer, sender):
+    employee = letter.employee_id
+    waiting = (date.today() - letter.created_at.date()).days if letter.created_at else 0
+    rows = [
+        _row(_("Employee"), "<strong>%s</strong>" % escape(employee.get_full_name())),
+        _row(_("Type"), escape(letter.get_exit_type_display())),
+        _row(_("Reason"), escape(letter.get_reason_col())),
+        _row(_("Requested last day"), escape(letter.planned_to_leave_on.strftime(_DATE_FORMAT))),
+        _row(_("Waiting for"), escape(_("%(days)s day(s)") % {"days": waiting})),
+    ]
+    if sender is not None:
+        rows.append(_row(_("Reminder sent by"), escape(sender.get_full_name())))
+    return (
+        '<p style="margin:0 0 16px;font-size:15px;color:#2d2d2d;">%(hi)s '
+        "<strong>%(name)s</strong>,</p>"
+        '<p style="margin:0 0 20px;font-size:14px;color:#444444;line-height:1.7;">%(intro)s</p>'
+        '<div style="margin:0 0 24px;padding:8px 20px;background:#f7f9fc;'
+        'border-left:4px solid #3b6fd4;border-radius:8px;">'
+        '<table role="presentation" cellpadding="0" cellspacing="0" width="100%%">%(rows)s</table></div>'
+        '<p style="margin:0 0 16px;font-size:14px;color:#444444;line-height:1.7;">%(next)s</p>'
+        '<p style="margin:0;font-size:13px;color:#888888;">%(footer)s</p>'
+    ) % {
+        "hi": escape(_("Hi")),
+        "name": escape(reviewer.get_full_name()),
+        "intro": escape(
+            _("%(employee)s's %(kind)s is still waiting for your review.")
+            % {"employee": employee.get_full_name(), "kind": letter.get_exit_type_display().lower()}
+        ),
+        "rows": "".join(rows),
+        "next": escape(_("Please open Exit Process in the HR portal and accept, reject or retain it.")),
+        "footer": escape(_("This is an automated message from the HR portal.")),
+    }
+
+
+def remind_reviewer(letter, reviewer, sender=None):
+    """
+    Email the person who has to review `letter`. Returns True if a mail went
+    out. Never raises: the in-app reminder has already been sent.
+    """
+    to_email = reviewer.get_mail() if reviewer else None
+    if not to_email:
+        logger.info("No email on record for the reviewer of request %s.", letter.pk)
+        return False
+    try:
+        employee = letter.employee_id
+        message = build_letterhead_email(
+            subject=_("Reminder: %(employee)s's %(kind)s is waiting for your review")
+            % {"employee": employee.get_full_name(), "kind": letter.get_exit_type_display().lower()},
+            content_html=review_reminder_content(letter, reviewer, sender),
+            to=to_email,
+            tag_label=_("Offboarding"),
+            team_label=_("HR Team"),
+            employee=employee,
+            from_email=ConfiguredEmailBackend().dynamic_from_email_with_display_name,
+            reply_to=None,
+            plain_text=_("%(employee)s's %(kind)s is waiting for your review. Please open Exit Process in the HR portal.")
+            % {"employee": employee.get_full_name(), "kind": letter.get_exit_type_display().lower()},
+        )
+        return bool(message.send())
+    except Exception as exc:
+        logger.error("Reminder mail for request %s not sent to %s: %s", letter.pk, to_email, exc)
+        return False
+
+
+def exit_survey_content(case, survey, reminder):
+    employee = case.employee_id
+    rows = []
+    if case.last_working_day:
+        rows.append(_row(_("Last working day"), escape(case.last_working_day.strftime(_DATE_FORMAT))))
+    rows.append(_row(_("Questions"), escape(str(len(survey.questions)))))
+    rows.append(_row(_("Where to find it"), escape(_("HR portal, Offboarding, My Exit Survey"))))
+    intro = (
+        _("This is a reminder to fill in your exit survey. It only takes a few minutes.")
+        if reminder
+        else _("Please take a few minutes to fill in your exit survey. Your honest feedback helps us improve.")
+    )
+    return (
+        '<p style="margin:0 0 16px;font-size:15px;color:#2d2d2d;">%(hi)s '
+        "<strong>%(name)s</strong>,</p>"
+        '<p style="margin:0 0 20px;font-size:14px;color:#444444;line-height:1.7;">%(intro)s</p>'
+        '<div style="margin:0 0 24px;padding:8px 20px;background:#f7f9fc;'
+        'border-left:4px solid #3b6fd4;border-radius:8px;">'
+        '<table role="presentation" cellpadding="0" cellspacing="0" width="100%%">%(rows)s</table></div>'
+        '<p style="margin:0 0 16px;font-size:14px;color:#444444;line-height:1.7;">%(next)s</p>'
+        '<p style="margin:0;font-size:13px;color:#888888;">%(footer)s</p>'
+    ) % {
+        "hi": escape(_("Hi")),
+        "name": escape(employee.get_full_name()),
+        "intro": escape(intro),
+        "rows": "".join(rows),
+        "next": escape(_("Only HR can read your answers.")),
+        "footer": escape(_("This is an automated message from the HR portal.")),
+    }
+
+
+def send_exit_survey_mail(case, survey, reminder=False):
+    """
+    Email the leaver that their exit survey is waiting. Returns True if a
+    mail went out. Never raises: the in-app notification is already sent.
+    """
+    employee = case.employee_id
+    to_email = employee.get_mail()
+    if not to_email:
+        logger.info("No email on record for employee %s; exit survey mail not sent.", employee.pk)
+        return False
+    try:
+        subject = (
+            _("Reminder: please fill in your exit survey")
+            if reminder
+            else _("Please fill in your exit survey")
+        )
+        message = build_letterhead_email(
+            subject=subject,
+            content_html=exit_survey_content(case, survey, reminder),
+            to=to_email,
+            tag_label=_("Offboarding"),
+            team_label=_("HR Team"),
+            employee=employee,
+            from_email=ConfiguredEmailBackend().dynamic_from_email_with_display_name,
+            reply_to=None,
+            plain_text=_("Please fill in your exit survey. You will find it in the HR portal under Offboarding, My Exit Survey."),
+        )
+        return bool(message.send())
+    except Exception as exc:
+        logger.error("Exit survey mail for employee %s not sent to %s: %s", employee.pk, to_email, exc)
+        return False

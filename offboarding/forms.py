@@ -22,10 +22,13 @@ from employee.models import Employee
 from horilla import horilla_middlewares
 from horilla.models import has_xss
 from notifications.signals import notify
+from offboarding.form_fields import TextCharField
 from offboarding.exit_policy import notice_period_days, notice_period_end
+from offboarding.exit_service import _settings_for, settle_new_request
 from offboarding.mailers import notify_manager_of_resignation
 from offboarding.models import (
     EmployeeTask,
+    ExitReasonOption,
     Offboarding,
     OffboardingEmployee,
     OffboardingNote,
@@ -296,6 +299,11 @@ class ResignationLetterForm(ModelForm):
             "notice_period_days",
             "notice_period_ends",
             "additional_comment",
+            "exit_type",
+            "notice_date",
+            "review_comment",
+            "reviewed_at",
+            "attachment",
         ]
 
     def clean_description(self):
@@ -410,7 +418,7 @@ class SelfResignationForm(ModelForm):
         initial="yes",
         widget=forms.RadioSelect,
     )
-    discussion_summary = forms.CharField(
+    discussion_summary = TextCharField(
         label=_("Please write the summary of your discussion"),
         required=False,
         max_length=2000,
@@ -418,7 +426,7 @@ class SelfResignationForm(ModelForm):
     )
     reason = forms.ChoiceField(
         label=_("Please select a reason for your resignation"),
-        choices=[("", _("Select reason"))] + ResignationLetter.reasons,
+        choices=[("", _("Select reason"))],
         error_messages={"required": _("Resignation reason is required")},
     )
     early_last_working_day = forms.ChoiceField(
@@ -434,7 +442,7 @@ class SelfResignationForm(ModelForm):
         widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
         input_formats=["%Y-%m-%d"],
     )
-    additional_comment = forms.CharField(
+    additional_comment = TextCharField(
         label=_("Additional comment"),
         required=False,
         max_length=2000,
@@ -466,12 +474,33 @@ class SelfResignationForm(ModelForm):
         # normal form error instead of failing later at save time.
         self.instance.employee_id = self.employee
 
+        company_id = getattr(
+            getattr(self.employee, "employee_work_info", None), "company_id_id", None
+        )
+        titles = list(
+            ExitReasonOption.for_company("resignation", company_id).values_list(
+                "title", flat=True
+            )
+        ) or [str(label) for label in ResignationLetter.legacy_reasons.values()]
+        self.fields["reason"].choices = [("", _("Select reason"))] + [
+            (title, title) for title in titles
+        ]
+
         self.today = date.today()
         self.notice_days = notice_period_days(self.employee)
         self.notice_end = notice_period_end(self.notice_days, self.today)
         # With no notice policy to default to, the employee has to say when
         # they want to leave - there is no "early" about it.
         self.date_is_mandatory = self.notice_end is None
+        # HR can switch the question off in Exit Settings
+        settings = _settings_for(self.employee)
+        self.early_allowed = settings.allow_early_last_working_day
+        # "Consider the resignation date as the start of the notice period" off:
+        # the notice only starts once the resignation is accepted, so its end
+        # is not known yet (the date below is just the latest an early day can be).
+        self.notice_from_approval = (
+            not settings.notice_starts_on_resignation_date and self.notice_end is not None
+        )
         self.fields["preferred_last_working_day"].initial = None
 
     @staticmethod
@@ -508,8 +537,8 @@ class SelfResignationForm(ModelForm):
         ).strip():
             self.add_error("discussion_summary", _("Summary is required"))
 
-        wants_date = (
-            self.date_is_mandatory or cleaned.get("early_last_working_day") == "yes"
+        wants_date = self.date_is_mandatory or (
+            self.early_allowed and cleaned.get("early_last_working_day") == "yes"
         )
         chosen = cleaned.get("preferred_last_working_day")
         if wants_date:
@@ -543,11 +572,14 @@ class SelfResignationForm(ModelForm):
         letter.employee_id = employee
         letter.title = f"Resignation - {employee.get_full_name()}"[:100]
         letter.reason = data["reason"]
+        letter.reason_option = ExitReasonOption.objects.entire().filter(
+            title=data["reason"], exit_type="resignation"
+        ).first()
         letter.discussed_with_manager = discussed
         letter.discussion_summary = (data.get("discussion_summary") or "") if discussed else ""
         letter.preferred_last_working_day = preferred
         letter.notice_period_days = self.notice_days
-        letter.notice_period_ends = self.notice_end
+        letter.notice_period_ends = None if self.notice_from_approval else self.notice_end
         letter.additional_comment = data.get("additional_comment") or ""
         letter.planned_to_leave_on = preferred or self.notice_end
         # Shown in the Resignations list/detail, which render a free-text
@@ -586,4 +618,6 @@ class SelfResignationForm(ModelForm):
                     icon="information",
                 )
         self.manager_mailed = notify_manager_of_resignation(letter)
+        # Under "Acknowledgement" review mode the exit starts straight away.
+        settle_new_request(letter)
         return letter

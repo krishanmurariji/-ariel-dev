@@ -1,0 +1,144 @@
+{% load i18n %}
+<div id="xpTabTools" hx-swap-oob="true"></div>
+{% if not rows %}
+    <div style="text-align:center; padding:48px 0; opacity:0.75;">
+        <ion-icon name="people-outline" style="font-size:2.4rem;"></ion-icon>
+        <p style="margin-top:8px;">
+            {% if tab == "review" %}{% trans "Nothing is waiting for review." %}
+            {% elif tab == "progress" %}{% trans "Nobody is serving their notice period." %}
+            {% else %}{% trans "No one has exited yet." %}{% endif %}
+        </p>
+    </div>
+{% else %}
+<div class="xp-table-wrap">
+    <table class="xp-table">
+        <thead>
+            <tr>
+                <th>{% trans "Employee" %}</th>
+                <th>{% trans "Type" %}</th>
+                {% if tab == "review" %}
+                    <th>{% trans "Reason" %}</th>
+                    <th>{% trans "Requested last day" %}</th>
+                    <th>{% trans "Reviewer" %}</th>
+                    <th>{% trans "Waiting" %}</th>
+                {% elif tab == "progress" %}
+                    <th>{% trans "Notice date" %}</th>
+                    <th>{% trans "Last working day" %}</th>
+                    <th>{% trans "Exit actions" %}</th>
+                {% else %}
+                    <th>{% trans "Last working day" %}</th>
+                    <th>{% trans "Exited on" %}</th>
+                    <th>{% trans "Rehire" %}</th>
+                    <th>{% trans "Account" %}</th>
+                {% endif %}
+                <th>{% trans "Actions" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            {% with employee=row.employee_id %}
+            <tr>
+                <td>
+                    <div class="xp-person">
+                        <div class="xp-avatar"><img src="{{ employee.get_avatar }}" class="xp-avatar-img" alt=""></div>
+                        <div>
+                            <span class="xp-name">{{ employee.get_full_name }}</span>
+                            <div style="font-size:0.75rem; opacity:0.7;">{{ employee.get_department|default:"" }}{% if employee.get_job_position %} / {{ employee.get_job_position }}{% endif %}</div>
+                        </div>
+                    </div>
+                </td>
+                <td>{{ row.get_exit_type_display }}</td>
+
+                {% if tab == "review" %}
+                    <td>{{ row.get_reason_col }}</td>
+                    <td>{{ row.planned_to_leave_on|date:"d M Y" }}</td>
+                    <td>{% for m in row.reviewers %}{{ m.get_full_name }}{% if not forloop.last %}, {% endif %}{% empty %}{{ row.reviewer.get_full_name|default:"—" }}{% endfor %}</td>
+                    <td>{{ row.waiting_days }} {% trans "day(s)" %}</td>
+                    <td class="xp-actions">
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            {% if row.can_review %}
+                            <button class="oh-btn oh-btn--secondary" hx-get="{% url 'exit-review' row.pk %}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal">{% trans "Review" %}</button>
+                            {% else %}
+                            <button type="button" class="oh-btn oh-btn--secondary" disabled aria-disabled="true" style="opacity:0.45; cursor:not-allowed;" title="{% trans 'You can see this request but only the assigned approvers can review it.' %}">{% trans "Review" %}</button>
+                            {% endif %}
+                            {% if is_admin %}
+                            <form method="post" action="{% url 'exit-remind' row.pk %}">{% csrf_token %}
+                                <button type="submit" class="oh-btn oh-btn--light-bg" title="{% trans 'Send a reminder to the reviewer' %}"><ion-icon name="notifications-outline"></ion-icon></button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                {% elif tab == "progress" %}
+                    <td>{{ row.notice_date|date:"d M Y"|default:"—" }}</td>
+                    <td>{{ row.last_working_day|date:"d M Y"|default:"—" }}
+                        {% if row.days_left is not None %}<div style="font-size:0.72rem; opacity:0.7;">{% if row.days_left >= 0 %}{{ row.days_left }} {% trans "day(s) left" %}{% else %}{% trans "overdue" %}{% endif %}</div>{% endif %}
+                    </td>
+                    <td>
+                        <div style="display:flex; gap:8px;">
+                            {% for section in row.sections %}
+                                <span title="{{ section.label }} - {% if section.state == 'done' %}{% trans 'Done' %}{% elif section.state == 'doing' %}{% trans 'In progress' %}{% else %}{% trans 'Not started' %}{% endif %}" class="xp-sec xp-sec--{{ section.state }}"><ion-icon name="{{ section.icon }}"></ion-icon></span>
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td class="xp-actions">
+                        <button class="oh-btn oh-btn--secondary" hx-get="{% url 'exit-summary' row.pk %}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal">{% trans "Manage" %}</button>
+                    </td>
+                {% else %}
+                    <td>{{ row.last_working_day|date:"d M Y"|default:"—" }}</td>
+                    <td>{{ row.exited_on|date:"d M Y"|default:"—" }}</td>
+                    <td>{% if row.rehire_eligible is None %}—{% elif row.rehire_eligible %}{% trans "Eligible" %}{% else %}{% trans "Not eligible" %}{% endif %}</td>
+                    <td>{% if employee.is_active %}<span class="xp-badge xp-badge--on">{% trans "Active" %}</span>{% else %}<span class="xp-badge">{% trans "Deactivated" %}</span>{% endif %}</td>
+                    <td class="xp-actions">
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            <button class="oh-btn oh-btn--light-bg" hx-get="{% url 'exit-summary' row.pk %}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal">{% trans "Details" %}</button>
+                            {% if is_admin %}
+                            <button class="oh-btn oh-btn--light-bg" title="{% trans 'Edit the last working day' %}" hx-get="{% url 'exit-change-date' row.pk %}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal"><ion-icon name="create-outline"></ion-icon></button>
+                            <button class="oh-btn oh-btn--light-bg" title="{% trans 'Cancel exit / rejoin' %}" hx-get="{% url 'exit-cancel' row.pk %}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal"><ion-icon name="refresh-outline"></ion-icon></button>
+                            {% if employee.is_active %}
+                            <form method="post" action="{% url 'exit-deactivate' row.pk %}" onsubmit="return confirm('{% trans 'Deactivate this account? They will no longer be able to log in.' %}');">{% csrf_token %}
+                                <button type="submit" class="oh-btn oh-btn--danger-outline" title="{% trans 'Deactivate account' %}"><ion-icon name="lock-closed-outline"></ion-icon></button>
+                            </form>
+                            {% endif %}
+                            {% endif %}
+                        </div>
+                    </td>
+                {% endif %}
+            </tr>
+            {% endwith %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if tab == "progress" %}
+<div class="xp-legend">
+    <span><i class="xp-sec xp-sec--todo"></i> {% trans "Not started" %}</span>
+    <span><i class="xp-sec xp-sec--doing"></i> {% trans "In progress" %}</span>
+    <span><i class="xp-sec xp-sec--done"></i> {% trans "Done / nothing to do" %}</span>
+    {# <span class="xp-legend-note">{% trans "Icons: Assets, Survey, Team, Tasks, Leave settings - hover an icon for its name." %}</span> #}
+</div>
+{% endif %}
+
+{% if page.paginator.num_pages > 1 %}
+<div style="display:flex; gap:8px; justify-content:flex-end; align-items:center;">
+    {% if page.has_previous %}<button class="oh-btn oh-btn--light-bg" hx-get="{% url 'exit-process-tab' tab %}?{{ querystring }}&page={{ page.previous_page_number }}" hx-target="#xpContent" hx-swap="innerHTML">{% trans "Previous" %}</button>{% endif %}
+    <span style="font-size:0.85rem;">{{ page.number }} / {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<button class="oh-btn oh-btn--light-bg" hx-get="{% url 'exit-process-tab' tab %}?{{ querystring }}&page={{ page.next_page_number }}" hx-target="#xpContent" hx-swap="innerHTML">{% trans "Next" %}</button>{% endif %}
+</div>
+{% endif %}
+{% endif %}
+
+<style>
+    .xp-actions { min-width: 250px; white-space: nowrap; }
+    .xp-actions .oh-btn { white-space: nowrap; }
+    .xp-sec { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; }
+    .xp-sec--todo { background: rgba(120,130,150,0.2); }
+    .xp-sec--doing { background: rgba(245,158,11,0.28); }
+    .xp-sec--done { background: rgba(34,160,90,0.28); }
+    .xp-badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; background: rgba(120,130,150,0.2); }
+    .xp-badge--on { background: rgba(34,160,90,0.25); }
+    .xp-legend { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; font-size: 0.78rem; margin: -6px 0 14px; opacity: 0.85; }
+    .xp-legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .xp-legend .xp-sec { width: 14px; height: 14px; }
+    .xp-legend-note { opacity: 0.7; }
+</style>

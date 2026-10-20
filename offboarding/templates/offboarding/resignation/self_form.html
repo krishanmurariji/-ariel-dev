@@ -74,7 +74,7 @@
                 {% for error in form.reason.errors %}<div class="sr-error">{{ error }}</div>{% endfor %}
             </div>
 
-            {% if not form.date_is_mandatory %}
+            {% if form.early_allowed and not form.date_is_mandatory %}
                 <div class="sr-group">
                     <label class="oh-label">{{ form.early_last_working_day.label }} <span class="sr-optional">({% trans "Optional" %})</span></label>
                     <div class="sr-radios">
@@ -97,7 +97,11 @@
             {% if form.notice_end %}
                 <div class="sr-notice sr-notice--info sr-group">
                     <ion-icon name="information-circle-outline" style="vertical-align: -2px;"></ion-icon>
-                    {% blocktrans with days=form.notice_days date=form.notice_end|date:"d M Y" %}Note: As per the company policy, you are required to serve notice period of {{ days }} days, that is till {{ date }}.{% endblocktrans %}
+                    {% if form.notice_from_approval %}
+                        {% blocktrans with days=form.notice_days %}Note: As per the company policy, you are required to serve notice period of {{ days }} days. It starts when your resignation is accepted.{% endblocktrans %}
+                    {% else %}
+                        {% blocktrans with days=form.notice_days date=form.notice_end|date:"d M Y" %}Note: As per the company policy, you are required to serve notice period of {{ days }} days, that is till {{ date }}.{% endblocktrans %}
+                    {% endif %}
                 </div>
             {% endif %}
 
@@ -137,6 +141,8 @@
             $("#srDiscussionWrap").toggle(discussed === "yes");
             {% if form.date_is_mandatory %}
                 $("#srEarlyDateWrap").show();
+            {% elif not form.early_allowed %}
+                $("#srEarlyDateWrap").hide();
             {% else %}
                 var early = form.find("[name=early_last_working_day]:checked").val();
                 $("#srEarlyDateWrap").toggle(early === "yes");
@@ -155,3 +161,4 @@
         }
     })();
 </script>
+{% include "offboarding/exit_process/_limits.html" %}

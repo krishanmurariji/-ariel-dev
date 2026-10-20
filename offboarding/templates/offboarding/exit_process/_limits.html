@@ -1,0 +1,49 @@
+{# Shows how many characters a field allows, live, as the person types - so a limit is #}
+{# seen before saving, not as an error after it. Works on any text box or text area that #}
+{# has a maxlength inside a modal (or inside something marked data-xm-limits). #}
+<style>
+    .xm-count { text-align: right; font-size: 0.72rem; line-height: 1; margin-top: 5px; opacity: 0.6; font-variant-numeric: tabular-nums; transition: color .15s, opacity .15s; }
+    .xm-count.is-near { opacity: 1; color: #b36a00; }
+    .xm-count.is-full, .xm-count.is-over { opacity: 1; color: #d93636; font-weight: 600; }
+</style>
+<script>
+(function () {
+    if (window.xmLimits) { window.xmLimits.scan(); return; }
+    var SCOPE = ".oh-modal, #genericModal, [data-xm-limits]";
+    function limitOf(el) { var n = parseInt(el.getAttribute("maxlength"), 10); return n > 0 ? n : 0; }
+    function update(el) {
+        var box = el.xmCounter, max = limitOf(el);
+        if (!box || !max) { return; }
+        var used = el.value.length;
+        box.textContent = used + " / " + max;
+        box.classList.remove("is-near", "is-full", "is-over");
+        if (used > max) { box.classList.add("is-over"); box.textContent += " - " + (used - max) + " too long"; }
+        else if (used === max) { box.classList.add("is-full"); box.textContent += " - limit reached"; }
+        else if (used >= max * 0.9) { box.classList.add("is-near"); }
+        // a form with a field that is over its limit cannot be sent
+        var form = el.form;
+        if (form) {
+            var over = Array.prototype.some.call(form.querySelectorAll("[data-xm-counted]"), function (f) { return f.value.length > limitOf(f); });
+            Array.prototype.forEach.call(form.querySelectorAll("button[type=submit]"), function (b) { b.disabled = over; });
+        }
+    }
+    function attach(el) {
+        if (el.hasAttribute("data-xm-counted") || !limitOf(el) || !el.closest(SCOPE)) { return; }
+        el.setAttribute("data-xm-counted", "1");
+        var box = document.createElement("div");
+        box.className = "xm-count";
+        box.setAttribute("aria-live", "polite");
+        el.xmCounter = box;
+        el.insertAdjacentElement("afterend", box);
+        update(el);
+    }
+    function scan() {
+        Array.prototype.forEach.call(document.querySelectorAll("textarea[maxlength], input[type=text][maxlength]"), attach);
+    }
+    document.addEventListener("input", function (e) { if (e.target && e.target.hasAttribute && e.target.hasAttribute("data-xm-counted")) { update(e.target); } });
+    document.addEventListener("htmx:afterSettle", scan);
+    document.addEventListener("htmx:load", scan);
+    window.xmLimits = { scan: scan };
+    scan();
+})();
+</script>

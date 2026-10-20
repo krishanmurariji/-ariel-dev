@@ -1,0 +1,31 @@
+{% load i18n widget_tweaks %}
+{% trans "Edit last working day" as head_title %}
+{% include "offboarding/exit_process/_modal_head.html" with title=head_title %}
+<div class="oh-modal__dialog-body oh-modal__dialog-relative xm-modal">
+    {% include "offboarding/exit_process/_modal_styles.html" %}
+    <div class="xm-task">
+        <span class="ic"><ion-icon name="calendar-outline"></ion-icon></span>
+        <div>
+            <strong>{{ employee.get_full_name }}</strong>
+            <div class="who">{% trans "Current last working day" %}: <b>{{ case.last_working_day|date:"d M Y"|default:"—" }}</b></div>
+        </div>
+    </div>
+    <form hx-post="{{ request.get_full_path }}" hx-target="#genericModalBody" hx-swap="innerHTML" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="xm-msg xm-msg--bad"><ion-icon name="alert-circle" style="font-size:1.1rem; color:var(--xm-bad);"></ion-icon><span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
+        <div class="xm-field">
+            <label class="oh-label required-star" for="{{ form.last_working_day.id_for_label }}">{% trans "New last working day" %}</label>
+            {{ form.last_working_day|add_class:"oh-input w-100" }}
+            {% for error in form.last_working_day.errors %}<div class="xm-err">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="xm-field">
+            <label class="oh-label required-star" for="{{ form.reason.id_for_label }}">{% trans "Reason for the change" %}</label>
+            {{ form.reason|add_class:"oh-input w-100" }}
+            {% for error in form.reason.errors %}<div class="xm-err">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="xm-foot">
+            <button type="button" class="oh-btn oh-btn--light-bg pl-4 pr-4" {% if back_url %}hx-get="{{ back_url }}" hx-target="#genericModalBody"{% else %}onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')"{% endif %}>{% trans "Cancel" %}</button>
+            <button type="submit" class="oh-btn oh-btn--secondary pl-4 pr-4">{% trans "Save" %}</button>
+        </div>
+    </form>
+</div>

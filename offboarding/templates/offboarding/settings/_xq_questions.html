@@ -1,0 +1,75 @@
+{% load i18n %}
+<div id="xq-questions" class="xu-card"
+     hx-get="{% url 'exit-survey-questions-section' %}" hx-trigger="exitSettingsChanged from:body" hx-swap="outerHTML">
+    <div class="xu-card__head">
+        <div>
+            <h5>{% trans "Questions" %} <span class="xu-badge">{{ questions|length }}</span></h5>
+            <p>{% trans "Asked in this order. A question that is turned off is skipped; surveys already sent keep the questions they were sent with." %}</p>
+        </div>
+        <div class="xu-card__actions">
+            {% if templates %}
+            <button type="button" class="oh-btn oh-btn--light-bg xu-btn"
+                    hx-get="{% url 'exit-survey-import-form' %}" hx-target="#xsModalBody" hx-swap="innerHTML">
+                <ion-icon name="copy-outline"></ion-icon>{% trans "Copy from a Recruitment survey" %}
+            </button>
+            {% endif %}
+            <button type="button" class="oh-btn oh-btn--secondary xu-btn"
+                    hx-get="{% url 'exit-survey-question-form' %}" hx-target="#xsModalBody" hx-swap="innerHTML">
+                <ion-icon name="add-outline"></ion-icon>{% trans "Add question" %}
+            </button>
+        </div>
+    </div>
+    <div class="xu-card__body xu-flush">
+        {% if questions %}
+        <div class="xu-table-wrap">
+            <table class="xu-table">
+                <thead>
+                    <tr>
+                        <th class="xu-num">#</th>
+                        <th>{% trans "Question" %}</th>
+                        <th>{% trans "Answer type" %}</th>
+                        <th>{% trans "Required" %}</th>
+                        <th>{% trans "Status" %}</th>
+                        <th class="xu-right">{% trans "Actions" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for q in questions %}
+                    <tr {% if not q.is_active %}style="opacity:.6;"{% endif %}>
+                        <td class="xu-num">{{ forloop.counter }}</td>
+                        <td>
+                            <div class="xu-title">{{ q.question }}</div>
+                            {% if q.choices %}<div class="xu-sub">{% trans "Choices" %}: {{ q.choices|join:", " }}</div>{% endif %}
+                        </td>
+                        <td>{{ q.get_type_display }}</td>
+                        <td>{% if q.is_mandatory %}<span class="xu-badge is-warn" style="margin-left:0;">{% trans "Required" %}</span>{% else %}<span class="xu-sub">{% trans "Optional" %}</span>{% endif %}</td>
+                        <td>
+                            {% if q.is_active %}<span class="xu-badge is-default" style="margin-left:0;">{% trans "On" %}</span>{% else %}<span class="xu-badge is-off" style="margin-left:0;">{% trans "Off" %}</span>{% endif %}
+                            {% if not q.editable %}<span class="xu-badge">{% trans "Organisation-wide" %}</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if q.editable %}
+                            <div class="xu-actions">
+                                <button type="button" class="xu-icon-btn" title="{% trans 'Edit this question' %}" aria-label="{% trans 'Edit this question' %}"
+                                        hx-get="{% url 'exit-survey-question-edit-form' q.pk %}" hx-target="#xsModalBody" hx-swap="innerHTML">
+                                    <ion-icon name="create-outline"></ion-icon>
+                                </button>
+                                <button type="button" class="xu-icon-btn is-danger" title="{% trans 'Delete this question' %}" aria-label="{% trans 'Delete this question' %}"
+                                        hx-post="{% url 'exit-survey-question-delete' q.pk %}" hx-swap="none"
+                                        hx-vals='{"csrfmiddlewaretoken": "{{ csrf_token }}"}'
+                                        hx-confirm="{% trans 'Delete this question? Surveys already sent keep it.' %}">
+                                    <ion-icon name="trash-outline"></ion-icon>
+                                </button>
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="xu-empty">{% trans "No questions yet. Add one, or copy questions from a Recruitment survey." %}</div>
+        {% endif %}
+    </div>
+</div>

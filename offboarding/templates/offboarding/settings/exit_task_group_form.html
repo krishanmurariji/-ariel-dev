@@ -1,0 +1,11 @@
+{% extends 'settings.html' %}
+{% block settings %}{% load i18n %}
+{% include "offboarding/settings/_settings_ui.html" %}
+
+<div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+    <h4 class="text-base font-semibold text-[#333]">{% if group %}{% trans "Edit task group" %}{% else %}{% trans "New task group" %}{% endif %}</h4>
+    <a href="{% url 'exit-task-groups' %}" class="oh-btn oh-btn--light">{% trans "Back" %}</a>
+</div>
+
+{% include "offboarding/settings/_xt_form_body.html" %}
+{% endblock settings %}

@@ -43,6 +43,8 @@ from offboarding.filters import (
     PipelineFilter,
     PipelineStageFilter,
 )
+from offboarding import exit_service
+from offboarding.exit_service import ExitError
 from offboarding.forms import (
     NoteForm,
     OffboardingEmployeeForm,
@@ -1027,6 +1029,35 @@ def resignation_tab(request, pk):
     )
 
 
+@login_required
+def legacy_resignations_retired(request, *args, **kwargs):
+    """
+    The old "Resignations" list page and the buttons on it (approve, reject, edit,
+    delete, single view) are switched off: resignation requests are reviewed under
+    Exit Process > Under Review, which also keeps the exit's history and tasks.
+
+    The old addresses still answer, so bookmarks and links on other pages (the
+    dashboard cards) land on the new place instead of an error.
+    """
+    from django.contrib import messages as django_messages
+    from django.http import HttpResponse
+    from django.shortcuts import redirect
+    from django.utils.html import format_html
+
+    target = reverse("exit-process") + "?tab=review"
+    if request.headers.get("HX-Request"):
+        return HttpResponse(
+            format_html(
+                '<div style="padding:18px; font-size:0.9rem;">{} <a href="{}">{}</a></div>',
+                _("Resignation requests are now handled in Exit Process."),
+                target,
+                _("Open Exit Process"),
+            )
+        )
+    django_messages.info(request, _("Resignation requests are now handled in Exit Process."))
+    return redirect(target)
+
+
 def resignation_list_swap_response(original_request):
     """
     Render the resignation list CBV fragment for hx-target=\"#listContainer\" swaps.
@@ -1189,25 +1220,21 @@ def update_status(request):
                     % {"name": letter.employee_id.get_full_name()},
                 )
                 continue
-            letter.status = status
-            letter.save()
-            if status == "approved":
-                letter.to_offboarding_employee(
-                    offboarding, notice_period_starts, notice_period_ends
+            try:
+                exit_service.review_request(
+                    letter,
+                    reviewer=request.user.employee_get,
+                    decision="accept" if status == "approved" else "reject",
+                    comment=_("Reviewed from the Resignations list."),
+                    last_working_day=notice_period_ends
+                    if isinstance(notice_period_ends, date)
+                    else letter.planned_to_leave_on,
                 )
+            except ExitError as error:
+                messages.error(request, str(error))
+                continue
             messages.success(
                 request, f"Resignation request has been {letter.get_status_display()}"
-            )
-            notify.send(
-                request.user.employee_get,
-                recipient=letter.employee_id.employee_user_id,
-                verb=f"Resignation request has been {letter.get_status_display()}",
-                verb_ar=f"تم {letter.get_status_display()} طلب الاستقالة",
-                verb_de=f"Der Rücktrittsantrag wurde {letter.get_status_display()}",
-                verb_es=f"La solicitud de renuncia ha sido {letter.get_status_display()}",
-                verb_fr=f"La demande de démission a été {letter.get_status_display()}",
-                redirect="#",
-                icon="information",
             )
     if request.headers.get("HX-Request"):
         return resignation_list_swap_response(request)
@@ -1275,13 +1302,11 @@ def enable_resignation_request(request):
 @login_required
 def offboarding_rules_settings_view(request):
     """
-    Merged "Offboarding Rules" settings page that groups the Resignation
-    Request toggle and the Notice Period setting under a single header. Each
-    section reuses its existing toggle/save endpoint; the current state is
-    provided by the global context processors (enabled_resignation_request and
-    get_initial_notice_period).
+    The old "Offboarding Rules" page. Its settings (resignation switch,
+    notice period) now live on the Exit Settings page; old links and
+    bookmarks land there.
     """
-    return render(request, "offboarding/settings/offboarding_rules.html")
+    return redirect("exit-settings")
 
 
 @login_required

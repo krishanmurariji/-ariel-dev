@@ -1,0 +1,9 @@
+<div class="oh-modal__dialog-header">
+    <h2 class="oh-modal__dialog-title">{{ title }}</h2>
+    <button type="button" class="oh-modal__close--custom"
+        onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')" aria-label="Close">
+        <ion-icon name="close-outline" role="img" class="md hydrated" aria-label="close outline"></ion-icon>
+    </button>
+</div>
+
+{% include "offboarding/exit_process/_limits.html" %}

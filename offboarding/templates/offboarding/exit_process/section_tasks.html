@@ -1,0 +1,63 @@
+{% load i18n %}
+<div class="xm-sec-head">
+    <span class="xm-sec-ic"><ion-icon name="checkbox-outline"></ion-icon></span>
+    <div>
+        <h4>{% trans "Exit tasks" %}</h4>
+        <p>{% trans "Things that have to be done before this person leaves." %}</p>
+    </div>
+    {% if task_total %}
+    <div class="xm-sec-side">
+        <strong>{{ task_done }} / {{ task_total }}</strong> <span class="xm-muted">{% trans "finished" %}</span>
+        <div class="xm-meter"><span style="width: {% widthratio task_done task_total 100 %}%"></span></div>
+    </div>
+    {% endif %}
+</div>
+
+{% if task_rows %}
+<table class="xm-table">
+    <thead><tr><th>{% trans "Task" %}</th><th>{% trans "Owner" %}</th><th>{% trans "Due" %}</th><th>{% trans "Status" %}</th><th></th></tr></thead>
+    <tbody>
+    {% regroup task_rows by group_title as groups %}
+    {% for group in groups %}
+        <tr class="xm-group"><td colspan="5">{{ group.grouper|default:_("Tasks") }}</td></tr>
+        {% for item in group.list %}
+        <tr>
+            <td><strong>{{ item.title }}</strong>
+                {% if item.mandatory_attachment %}<span class="xm-chip" title="{% trans 'A file must be attached' %}">📎</span>{% endif %}
+                {% if item.description %}<div class="xm-sub">{{ item.description|truncatechars:90 }}</div>{% endif %}
+                {% if item.status == "review" %}<div class="xm-sub">{% trans "Approver" %}: {{ item.approver_id.get_full_name|default:"—" }}</div>{% endif %}
+                {% if item.review_comment and item.status == "pending" %}<div class="xm-sub" style="color:var(--xm-bad); opacity:1;">{% trans "Sent back" %}: {{ item.review_comment }}</div>{% endif %}
+                {% if item.skipped_reason %}<div class="xm-sub">{% trans "Skipped" %}: {{ item.skipped_reason }}</div>{% endif %}
+                {% if item.attachment and item.status != "scheduled" %}<div class="xm-sub"><a href="{{ item.attachment.url }}" target="_blank" rel="noopener">{% trans "Attachment" %}</a></div>{% endif %}
+            </td>
+            <td>{% if item.owner_id %}<span class="xm-thumb"><img src="{{ item.owner_id.get_avatar }}" alt="" style="width:26px; height:26px; border-radius:50%; object-fit:cover;"><span>{{ item.owner_id.get_full_name }}</span></span>{% else %}<span class="xm-chip xm-chip--bad">{% trans "No owner" %}</span>{% endif %}</td>
+            <td style="white-space:nowrap;">{{ item.due_date|date:"d M Y" }}
+                {% if item.status == "scheduled" %}<div class="xm-sub">{% blocktrans with day=item.trigger_date|date:"d M" %}starts {{ day }}{% endblocktrans %}</div>{% endif %}</td>
+            <td><span class="xm-chip {% if item.status == 'done' %}xm-chip--ok{% elif item.status == 'pending' or item.status == 'review' %}xm-chip--warn{% endif %}">{{ item.get_status_display }}</span></td>
+            <td><div class="xm-actions">
+                {% if item.can_do %}<button type="button" class="oh-btn oh-btn--secondary" hx-get="{% url 'exit-task-action' item.pk 'complete' %}?next=panel" hx-target="#genericModalBody">{% trans "Complete" %}</button>{% endif %}
+                {% if item.can_review %}<button type="button" class="oh-btn oh-btn--secondary" hx-get="{% url 'exit-task-action' item.pk 'review' %}?next=panel" hx-target="#genericModalBody">{% trans "Review" %}</button>{% endif %}
+                {% if item.can_manage %}
+                    {% if item.status == "pending" or item.status == "review" %}
+                    <form method="post" style="display:inline;" hx-post="{% url 'exit-task-remind' item.pk %}" hx-target="#genericModalBody">{% csrf_token %}
+                        <button type="submit" class="oh-btn oh-btn--light-bg" title="{% trans 'Remind' %}"><ion-icon name="notifications-outline"></ion-icon></button>
+                    </form>
+                    {% endif %}
+                    {% if item.status == "scheduled" or item.status == "pending" %}
+                    <button type="button" class="oh-btn oh-btn--light-bg" title="{% trans 'Change owner' %}" hx-get="{% url 'exit-task-action' item.pk 'owner' %}?next=panel" hx-target="#genericModalBody"><ion-icon name="person-outline"></ion-icon></button>
+                    {% endif %}
+                    <button type="button" class="oh-btn oh-btn--light-bg" title="{% trans 'Skip' %}" hx-get="{% url 'exit-task-action' item.pk 'skip' %}?next=panel" hx-target="#genericModalBody"><ion-icon name="play-skip-forward-outline"></ion-icon></button>
+                {% endif %}
+            </div></td>
+        </tr>
+        {% endfor %}
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="xm-empty">
+    <span class="ic ic--ok"><ion-icon name="checkmark-circle-outline"></ion-icon></span>
+    <strong>{% trans "Nothing to do" %}</strong>
+    <p>{% trans "No exit tasks apply to this exit." %}</p>
+</div>
+{% endif %}

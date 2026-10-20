@@ -1,0 +1,54 @@
+{% load i18n widget_tweaks %}
+{% include "offboarding/exit_process/_modal_head.html" with title=title %}
+<div class="oh-modal__dialog-body oh-modal__dialog-relative xm-modal">
+    {% include "offboarding/exit_process/_modal_styles.html" %}
+
+    <div class="xm-task">
+        <span class="ic"><ion-icon name="{% if action == 'review' %}shield-checkmark-outline{% elif action == 'skip' %}play-skip-forward-outline{% elif action == 'owner' %}person-outline{% else %}checkmark-done-outline{% endif %}"></ion-icon></span>
+        <div>
+            <strong>{{ task.title }}</strong>
+            <div class="who">{{ task.case_id.employee_id.get_full_name }}</div>
+            {% if task.description %}<div class="desc">{{ task.description|linebreaksbr }}</div>{% endif %}
+        </div>
+    </div>
+    {% if action == "review" and task.note %}
+        <div class="xm-quote">
+            <span class="by">{{ task.done_by.get_full_name|default:"" }}</span>
+            {{ task.note }}
+            {% if task.attachment %}<br><a href="{{ task.attachment.url }}" target="_blank" rel="noopener"><ion-icon name="attach-outline"></ion-icon>{% trans "View attachment" %}</a>{% endif %}
+        </div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" hx-post="{% url 'exit-task-action' task.pk action %}"
+          hx-encoding="multipart/form-data" hx-target="#genericModalBody" hx-swap="innerHTML">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
+        {% if form.non_field_errors %}<div class="xm-msg xm-msg--bad"><ion-icon name="alert-circle" style="font-size:1.1rem; color:var(--xm-bad);"></ion-icon><span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
+        {% for field in form %}
+            <div class="xm-field">
+                <label class="oh-label{% if field.field.required and field.name != "attachment" and field.name != "decision" %} required-star{% endif %}"{% if field.widget_type != "radioselect" %} for="{{ field.id_for_label }}"{% endif %}>
+                    {% if field.name == "attachment" %}
+                        {% trans "Attachment" %}{% if task.mandatory_attachment %} <span class="xm-star">*</span>{% endif %}
+                    {% elif field.name == "comment" and action == "review" %}{% trans "Comment (required when sending back)" %}
+                    {% elif field.name == "decision" %}{% trans "Decision" %}
+                    {% elif field.name == "note" %}{% trans "Note" %}
+                    {% elif field.name == "reason" %}{% trans "Reason" %}
+                    {% elif field.name == "new_owner" %}{% trans "New owner" %}
+                    {% endif %}
+                </label>
+                {% if field.widget_type == "radioselect" %}
+                    <div class="xt-radios">
+                        {% for radio in field %}<label for="{{ radio.id_for_label }}">{{ radio.tag }} <span>{{ radio.choice_label }}</span></label>{% endfor %}
+                    </div>
+                {% elif field.name == "new_owner" %}{{ field|add_class:"oh-select w-100" }}
+                {% else %}{{ field|add_class:"oh-input w-100" }}{% endif %}
+                {% if field.name == "attachment" and task.attachment %}<div class="xm-hint">{% trans "A file is already attached." %}</div>{% endif %}
+                {% for error in field.errors %}<div class="xm-err">{{ error }}</div>{% endfor %}
+            </div>
+        {% endfor %}
+        <div class="xm-foot">
+            <button type="button" class="oh-btn oh-btn--light-bg pl-4 pr-4" {% if back_url %}hx-get="{{ back_url }}" hx-target="#genericModalBody"{% else %}onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')"{% endif %}>{% trans "Cancel" %}</button>
+            <button type="submit" class="oh-btn oh-btn--secondary pl-4 pr-4">{% trans "Save" %}</button>
+        </div>
+    </form>
+</div>

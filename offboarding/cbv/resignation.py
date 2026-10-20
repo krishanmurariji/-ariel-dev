@@ -220,9 +220,10 @@ class ResignationLettersFormView(HorillaFormView):
         pk = kwargs.get("pk")
         if pk:
             instance = ResignationLetter.objects.filter(pk=pk).first()
-            if instance and not (
-                request.user.has_perm("offboarding.change_resignationletter")
-                or instance.employee_id == request.user.employee_get
+            # Editing a letter is HR's job. An employee cannot rewrite their own
+            # request - they can only withdraw it (or file a new one).
+            if instance and not request.user.has_perm(
+                "offboarding.change_resignationletter"
             ):
                 return render(request, "no_perm.html")
         return super().dispatch(request, *args, **kwargs)

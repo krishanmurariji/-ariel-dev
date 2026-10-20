@@ -1,0 +1,51 @@
+{% load i18n %}
+<div id="xs-reasons" class="xu-card"
+     hx-get="{% url 'exit-settings-section' 'reasons' %}" hx-trigger="exitSettingsChanged from:body" hx-swap="outerHTML">
+    <div class="xu-card__head">
+        <div>
+            <h5>{% trans "Exit reasons" %}</h5>
+            <p>{% trans "The choices a person picks from when they resign, and HR picks from when they end someone's employment. Removing a reason does not change requests that already used it." %}</p>
+        </div>
+    </div>
+    <div class="xu-cols">
+        {% for exit_type, label, reasons in reason_groups %}
+        <div class="xu-col">
+            <div class="xu-col__head">
+                <h6>{{ label }} <span class="xu-badge">{{ reasons|length }}</span></h6>
+                <button type="button" class="oh-btn oh-btn--light-bg xu-btn"
+                        hx-get="{% url 'exit-reason-form' %}?type={{ exit_type }}" hx-target="#xsModalBody" hx-swap="innerHTML">
+                    <ion-icon name="add-outline"></ion-icon>{% trans "Add reason" %}
+                </button>
+            </div>
+            {% for reason in reasons %}
+            <div class="xu-list-row">
+                <div style="min-width:0;">
+                    <div class="xu-title">{{ reason.title }}</div>
+                    <div class="xu-sub">
+                        {% if reason.used %}{% blocktrans count n=reason.used %}Used by {{ n }} request{% plural %}Used by {{ n }} requests{% endblocktrans %}{% else %}{% trans "Not used yet" %}{% endif %}
+                    </div>
+                </div>
+                {% if reason.editable %}
+                <div class="xu-actions">
+                    <button type="button" class="xu-icon-btn" title="{% trans 'Rename' %}" aria-label="{% trans 'Rename' %}"
+                            hx-get="{% url 'exit-reason-edit-form' reason.pk %}" hx-target="#xsModalBody" hx-swap="innerHTML">
+                        <ion-icon name="create-outline"></ion-icon>
+                    </button>
+                    <button type="button" class="xu-icon-btn is-danger" title="{% trans 'Remove this reason' %}" aria-label="{% trans 'Remove this reason' %}"
+                            hx-post="{% url 'exit-reason-delete' reason.pk %}" hx-swap="none"
+                            hx-vals='{"csrfmiddlewaretoken": "{{ csrf_token }}"}'
+                            hx-confirm="{% trans 'Remove this reason? Requests that already used it keep it.' %}">
+                        <ion-icon name="trash-outline"></ion-icon>
+                    </button>
+                </div>
+                {% else %}
+                <span class="xu-badge" title="{% trans 'Organisation-wide reasons are changed in All Company mode' %}">{% trans "Organisation-wide" %}</span>
+                {% endif %}
+            </div>
+            {% empty %}
+            <p class="xu-sub" style="padding:10px 0;">{% trans "No reasons yet. Add the first one." %}</p>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+</div>

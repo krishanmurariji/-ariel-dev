@@ -1,0 +1,76 @@
+{% load i18n %}
+{% blocktrans asvar head_title with name=policy.title %}People on "{{ name }}"{% endblocktrans %}
+{% include "offboarding/exit_process/_modal_head.html" with title=head_title %}
+<div class="oh-modal__dialog-body oh-modal__dialog-relative">
+    <div class="xu-modal-body">
+        <p class="xu-note" style="margin-bottom:10px;">
+            {{ policy.days }} {% trans "days notice" %}{% if policy.is_default %} · <span class="xu-badge is-default" style="margin-left:0;">{% trans "Default policy" %}</span>{% endif %}
+            {% if policy.is_default and on_default_count %}
+                <br>{% blocktrans count n=on_default_count %}{{ n }} more employee has no policy of their own, so they are on this one automatically.{% plural %}{{ n }} more employees have no policy of their own, so they are on this one automatically.{% endblocktrans %}
+            {% endif %}
+        </p>
+
+        {% if assigned %}
+        <div class="xu-people">
+            {% for row in assigned %}
+            {% with person=row.employee_id %}
+            <div class="xu-list-row">
+                <div class="xu-person">
+                    <img src="{{ person.get_avatar }}" alt="">
+                    <div style="min-width:0;">
+                        <div class="xu-title">{{ person.get_full_name }}</div>
+                        <div class="xu-sub">{{ person.get_department|default:"" }}{% if person.employee_work_info.job_position_id %} / {{ person.employee_work_info.job_position_id.job_position }}{% endif %}</div>
+                    </div>
+                </div>
+                <div class="xu-people-controls">
+                    <select class="oh-select xu-select" name="policy" aria-label="{% trans 'Move to another policy' %}"
+                            hx-post="{% url 'notice-policy-assign' %}" hx-trigger="change"
+                            hx-target="#xsModalBody" hx-swap="innerHTML"
+                            hx-vals='{"employees": "{{ person.pk }}", "viewing": "{{ policy.pk }}", "csrfmiddlewaretoken": "{{ csrf_token }}"}'>
+                        <option value="x" selected disabled hidden>{% trans "Move to…" %}</option>
+                        {% for other in others %}<option value="{{ other.pk }}">{{ other.title }} ({{ other.days }} {% trans "days" %})</option>{% endfor %}
+                        {% if not policy.is_default %}<option value="">{% trans "Default policy" %}</option>{% endif %}
+                    </select>
+                    {% if not policy.is_default %}
+                    <button type="button" class="oh-btn oh-btn--danger-outline xu-btn" style="height:32px;"
+                            hx-post="{% url 'notice-policy-assign' %}" hx-target="#xsModalBody" hx-swap="innerHTML"
+                            hx-vals='{"employees": "{{ person.pk }}", "policy": "", "viewing": "{{ policy.pk }}", "csrfmiddlewaretoken": "{{ csrf_token }}"}'
+                            hx-confirm="{% trans 'Take this employee off the policy? They will be on the default policy.' %}"
+                            title="{% trans 'Take off this policy (they go back to the default policy)' %}">
+                        <ion-icon name="close-circle-outline"></ion-icon>{% trans "Remove" %}
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endwith %}
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="xu-empty" style="border:1px dashed rgba(120,130,150,0.35); border-radius:8px;">
+            {% trans "Nobody has been put on this policy yet." %}
+        </div>
+        {% endif %}
+
+        <form hx-post="{% url 'notice-policy-assign' %}" hx-target="#xsModalBody" hx-swap="innerHTML"
+              hx-disabled-elt="find button[type='submit']" style="margin-top:18px;">
+            {% csrf_token %}
+            <input type="hidden" name="policy" value="{{ policy.pk }}">
+            <input type="hidden" name="viewing" value="{{ policy.pk }}">
+            <label class="xu-label" for="xuPeopleAdd" style="display:block; font-size:0.8rem; font-weight:500; margin-bottom:5px;">{% trans "Put more employees on this policy" %}</label>
+            <select name="employees" id="xuPeopleAdd" class="oh-select w-100" multiple required data-placeholder="{% trans 'Search and pick employees' %}">
+                {% for person in candidates %}<option value="{{ person.pk }}">{{ person.get_full_name }}{% if person.badge_id %} ({{ person.badge_id }}){% endif %}</option>{% endfor %}
+            </select>
+            <div class="xu-modal-actions">
+                <button type="submit" class="oh-btn oh-btn--secondary pl-4 pr-4">{% trans "Add to this policy" %}</button>
+                <button type="button" class="oh-btn oh-btn--light pl-4 pr-4" onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')">{% trans "Close" %}</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+    (function () {
+        if (window.jQuery && $.fn.select2) {
+            $("#xuPeopleAdd").select2({ width: "100%", dropdownParent: $("#xsModal"), placeholder: $("#xuPeopleAdd").data("placeholder") });
+        }
+    })();
+</script>
