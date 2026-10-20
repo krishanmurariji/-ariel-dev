@@ -1617,6 +1617,15 @@ def document_upload(request, token):
                 continue
             candidate_document.save()
             submitted_docs_by_request[doc_request.pk] = candidate_document
+            # tell the employee who made the request that it has been submitted
+            from base.mail_helpers import run_in_background
+            from onboarding.document_mails import notify_document_submitted
+
+            run_in_background(
+                notify_document_submitted,
+                candidate_document,
+                request.build_absolute_uri("/onboarding/"),
+            )
         if upload_errors:
             messages.error(request, " ".join(upload_errors))
         missing_mandatory = [

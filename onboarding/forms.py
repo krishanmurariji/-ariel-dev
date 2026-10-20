@@ -59,6 +59,7 @@ from base.models import (
     WorkType,
 )
 from onboarding.models import (
+    PHASE_CHOICES,
     CandidateChecklistTask,
     CandidateStage,
     CandidateTask,
@@ -966,6 +967,8 @@ class TaskTemplateForm(HorillaModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Exit (offboarding) groups are built under Settings > Offboarding.
+        self.fields["phase"].choices = PHASE_CHOICES
         self.fields["default_assignee_id"].queryset = Employee.objects.filter(is_active=True)
         self.fields["default_assignee_id"].required = False
         self.fields["default_due_offset"].required = False
@@ -1044,7 +1047,7 @@ class ChecklistTemplateSelectForm(HorillaForm):
     """
 
     templates = forms.ModelMultipleChoiceField(
-        queryset=TaskTemplate.objects.all(),
+        queryset=TaskTemplate.objects.exclude(phase="offboarding"),
         label=_("Task Groups"),
         required=False,
         widget=forms.CheckboxSelectMultiple,

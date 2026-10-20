@@ -214,7 +214,7 @@ def _records_with_calc(run):
 def _exiting_employees(records, run):
     """
     [(record, OffboardingEmployee), ...] for run records whose employee's
-    notice period has actually started (not archived, and not merely added
+    notice period has actually started (in progress (not exited or cancelled), and not merely added
     to Offboarding tracking with no notice period started yet), wired to the
     real offboarding module rather than a placeholder.
     """
@@ -224,13 +224,13 @@ def _exiting_employees(records, run):
     if not records_by_employee:
         return []
     offboarding_qs = (
-        OffboardingEmployee.objects.exclude(stage_id__type="archived")
-        .filter(
+        OffboardingEmployee.objects.filter(
+            status="in_progress",
             employee_id_id__in=records_by_employee.keys(),
             notice_period_starts__isnull=False,
             notice_period_starts__lte=run.period_end,
         )
-        .select_related("employee_id", "stage_id")
+        .select_related("employee_id")
     )
     return [
         (records_by_employee[ob.employee_id_id], ob) for ob in offboarding_qs

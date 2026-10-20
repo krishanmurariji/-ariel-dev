@@ -1,0 +1,55 @@
+{% extends 'settings.html' %}
+{% block settings %}{% load i18n %}
+<div class="mb-4">
+    <h4 class="text-base font-semibold text-[#333]">{% trans "Manager of Manager" %}</h4>
+    <p class="text-xs text-gray-500 mt-1">
+        {% trans "Let the manager of an employee's reporting manager see that employee's requests as well." %}
+    </p>
+</div>
+
+<div class="border border-[#ebebeb] rounded-md overflow-hidden mb-5">
+    <h5 class="text-sm font-semibold bg-[#f3f3f3] px-4 py-3 text-[#333]">{% trans "Access for the manager of manager" %}</h5>
+    <div class="p-4">
+        <form hx-post="{% url 'manager-of-manager-toggle' %}" hx-trigger="change" hx-swap="none"
+              hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+            <input type="hidden" name="field" value="enabled">
+            <div class="flex items-center justify-between mb-2">
+                <div>
+                    <h3 class="text-sm font-medium">{% trans "Enable manager of manager" %}</h3>
+                    <p class="text-xs text-gray-500 mt-1">
+                        {% trans "When on, the manager of the reporting manager can see the requests of everyone below them, and gets the same notifications. Off by default." %}
+                    </p>
+                </div>
+                <label class="toggle-label">
+                    <input type="checkbox" class="toggle-input" name="value" value="true" {% if setting.enabled %}checked{% endif %}>
+                    <div class="toggle-switch"></div>
+                </label>
+            </div>
+        </form>
+
+        <hr class="my-4 border-[#ebebeb]">
+
+        <form hx-post="{% url 'manager-of-manager-toggle' %}" hx-trigger="change" hx-swap="none"
+              hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+            <input type="hidden" name="field" value="can_approve">
+            <div class="flex items-center justify-between mb-2" {% if not setting.enabled %}style="opacity:0.5;"{% endif %}>
+                <div>
+                    <h3 class="text-sm font-medium">{% trans "Allow approve / reject" %}</h3>
+                    <p class="text-xs text-gray-500 mt-1">
+                        {% if setting.enabled %}
+                            {% trans "When on, the manager of manager can approve or reject these requests too. When off, they can only view them." %}
+                        {% else %}
+                            {% trans "Turn on Enable manager of manager first." %}
+                        {% endif %}
+                    </p>
+                </div>
+                <label class="toggle-label">
+                    <input type="checkbox" class="toggle-input" name="value" value="true"
+                           {% if setting.can_approve %}checked{% endif %} {% if not setting.enabled %}disabled{% endif %}>
+                    <div class="toggle-switch"></div>
+                </label>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock settings %}

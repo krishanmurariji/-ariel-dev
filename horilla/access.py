@@ -69,6 +69,155 @@ def is_manager_in_chain(user, employee, nested=None):
     return False
 
 
+# --------------------------------------------------------------------------
+# managers: the reporting manager and an optional second manager
+# --------------------------------------------------------------------------
+#
+# Every employee has a reporting manager, who keeps full access to their requests.
+# HR may also give an employee any number of second managers (employee.SecondaryManager) and
+# choose, per second manager and kind of request, whether that person may only see the
+# requests ("view") or see and decide on them ("approve"). Any of the managers may decide;
+# the first decision stands.
+#
+# Optionally (Settings > Approvals > Manager of Manager) the manager of the reporting manager
+# can see - and, if the setting allows it, approve or reject - the requests as well.
+#
+# To bring another kind of request under this (leave, regularization, ...): add its name to
+# REQUEST_TYPES, then use manager_access / managers_for / manager_q where that area now
+# checks "is this the reporting manager".
+
+VIEW, APPROVE = "view", "approve"
+ACCESS_LEVELS = (VIEW, APPROVE)
+
+REQUEST_TYPES = (("resignation", "Resignation / exit"),)
+
+
+def _secondary_level(manager, employee, request_type):
+    """What ``manager``, if they are one of ``employee``'s second managers, may do for this kind."""
+    link = employee.secondary_manager_links.filter(manager_id=manager).first()
+    if link is None:
+        return None
+    level = (link.access or {}).get(request_type)
+    return level if level in ACCESS_LEVELS else None
+
+
+def manager_of_manager_setting():
+    """``(enabled, may_approve)`` of the company-wide "manager of manager" setting."""
+    from employee.models import ManagerOfManagerSetting
+
+    row = ManagerOfManagerSetting.objects.first()
+    enabled = bool(row and row.enabled)
+    return enabled, bool(enabled and row.can_approve)
+
+
+def manager_of_manager(employee):
+    """The reporting manager of ``employee``'s reporting manager, or None."""
+    primary = getattr(getattr(employee, "employee_work_info", None), "reporting_manager_id", None)
+    if primary is None:
+        return None
+    above = getattr(getattr(primary, "employee_work_info", None), "reporting_manager_id", None)
+    # a loop in the hierarchy (A manages B who manages A) must not give anyone access to themselves
+    if above is None or above.pk == employee.pk:
+        return None
+    return above
+
+
+def _manager_of_manager_level(me, employee):
+    """What the manager of manager may do, per the setting: None, ``view`` or ``approve``."""
+    enabled, may_approve = manager_of_manager_setting()
+    if not enabled:
+        return None
+    above = manager_of_manager(employee)
+    if above is None or above.pk != me.pk:
+        return None
+    return APPROVE if may_approve else VIEW
+
+
+def _higher(first, second):
+    """The stronger of two access levels (either may be None)."""
+    levels = [level for level in (first, second) if level in ACCESS_LEVELS]
+    return max(levels, key=ACCESS_LEVELS.index) if levels else None
+
+
+def manager_access(user, employee, request_type):
+    """
+    ``"approve"``, ``"view"`` or None: what ``user`` may do with ``employee``'s requests of
+    this kind as a manager. The reporting manager always gets ``"approve"``.
+    """
+    me = current_employee(user)
+    if me is None or employee is None:
+        return None
+    if is_reporting_manager_of(user, employee):
+        return APPROVE
+    return _higher(
+        _secondary_level(me, employee, request_type),
+        _manager_of_manager_level(me, employee),
+    )
+
+
+def can_manager_view(user, employee, request_type):
+    return manager_access(user, employee, request_type) is not None
+
+
+def can_manager_approve(user, employee, request_type):
+    return manager_access(user, employee, request_type) == APPROVE
+
+
+def managers_for(employee, request_type, level=VIEW):
+    """
+    The managers to tell (or to ask) about ``employee``'s request: the reporting manager,
+    plus every second manager who has at least ``level`` for this kind of request.
+    """
+    found = []
+    primary = getattr(getattr(employee, "employee_work_info", None), "reporting_manager_id", None)
+    if primary is not None:
+        found.append(primary)
+    for link in employee.secondary_manager_links.select_related("manager_id").order_by("pk"):
+        have = (link.access or {}).get(request_type)
+        if (
+            have in ACCESS_LEVELS
+            and ACCESS_LEVELS.index(have) >= ACCESS_LEVELS.index(level)
+            and all(link.manager_id_id != m.pk for m in found)
+        ):
+            found.append(link.manager_id)
+    enabled, may_approve = manager_of_manager_setting()
+    if enabled and (level == VIEW or may_approve):
+        above = manager_of_manager(employee)
+        if above is not None and all(above.pk != m.pk for m in found):
+            found.append(above)
+    return found
+
+
+def manager_q(me, request_type, level=VIEW, path=""):
+    """
+    A ``Q`` for "the employees ``me`` manages at this level", for filtering a queryset
+    that reaches the employee through ``path`` (e.g. ``"employee_id"``; empty for a
+    queryset of employees).
+    """
+    from django.db.models import Q
+
+    prefix = f"{path}__" if path else ""
+    levels = list(ACCESS_LEVELS[ACCESS_LEVELS.index(level):])
+    primary = Q(**{f"{prefix}employee_work_info__reporting_manager_id": me})
+    # both conditions are on the same link row, because they sit in one filter() call
+    secondary = Q(
+        **{
+            f"{prefix}secondary_manager_links__manager_id": me,
+            f"{prefix}secondary_manager_links__access__{request_type}__in": levels,
+        }
+    )
+    condition = primary | secondary
+    enabled, may_approve = manager_of_manager_setting()
+    if enabled and (level == VIEW or may_approve):
+        condition |= Q(
+            **{
+                f"{prefix}employee_work_info__reporting_manager_id__"
+                "employee_work_info__reporting_manager_id": me
+            }
+        )
+    return condition
+
+
 def can_access_employee(user, employee, perm="employee.view_employee"):
     """
     May ``user`` see or change data that belongs to ``employee``?

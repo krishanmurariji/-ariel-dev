@@ -6,7 +6,32 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
-from horilla_meet.models import GoogleCredential
+from horilla_meet.models import GoogleCloudCredential, GoogleCredential
+
+
+def cloud_credential_for(request):
+    """
+    The Google Cloud credential (client id / secret / redirect addresses) that this user's
+    "sign in with Google" should use.
+
+    Their own company's credential comes first, then one that is not tied to any company.
+    An account that belongs to no company - the admin account usually - uses the credential
+    when there is exactly one in the system, so it is not "not found" just because the
+    credential was saved against a company. Another company's credential is never used
+    for someone who does belong to a company.
+    """
+    credentials = GoogleCloudCredential.objects.entire()
+    company = request.user.employee_get.get_company()
+    if company is not None:
+        return (
+            credentials.filter(company_id=company).first()
+            or credentials.filter(company_id__isnull=True).first()
+        )
+    shared = credentials.filter(company_id__isnull=True).first()
+    if shared is not None:
+        return shared
+    only = list(credentials[:2])
+    return only[0] if len(only) == 1 else None
 
 
 def get_google_credentials(request):

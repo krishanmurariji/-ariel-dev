@@ -316,6 +316,11 @@ PHASE_CHOICES = [
     ("employee_checklist", _("Employee Checklist")),
 ]
 
+# Task Groups are also used by the Exit Process ("offboarding"). That type is
+# deliberately NOT in PHASE_CHOICES: candidates' checklist tasks can only be
+# pre-joining / post-joining / employee-checklist, and every onboarding screen
+# lists only those three kinds of group.
+TEMPLATE_PHASE_CHOICES = PHASE_CHOICES + [("offboarding", _("Offboarding"))]
 
 
 class TaskTemplate(HorillaModel):
@@ -330,7 +335,7 @@ class TaskTemplate(HorillaModel):
     )
     phase = models.CharField(
         max_length=20,
-        choices=PHASE_CHOICES,
+        choices=TEMPLATE_PHASE_CHOICES,
         default="pre_joining",
         verbose_name=_("Phase"),
     )

@@ -43,6 +43,8 @@ from onboarding.forms import (
     RolesResponsibilityForm,
     WelcomeMessageForm,
 )
+from base.mail_helpers import run_in_background
+from onboarding.document_mails import notify_candidate_document_approved
 from onboarding.mailers import (
     notify_candidate_document_reminder,
     notify_onboarding_buddy_assigned,
@@ -213,7 +215,9 @@ def _task_groups(candidate, phase, template_ids):
     # HorillaCompanyManager-scoped) first, so a request naming another
     # company's TaskTemplate silently drops it instead of leaking that
     # company's group/task titles into this candidate's checklist.
-    visible_template_ids = TaskTemplate.objects.filter(pk__in=template_ids)
+    visible_template_ids = TaskTemplate.objects.filter(pk__in=template_ids).exclude(
+        phase="offboarding"
+    )
     tasks = (
         TaskTemplateTask.objects.filter(template_id__in=visible_template_ids)
         .select_related("template_id")
@@ -555,7 +559,7 @@ def _save_checklist_tasks(request, candidate, phase):
     template_tasks = {
         str(task.pk): task
         for task in TaskTemplateTask.objects.filter(
-            pk__in=task_ids, template_id__in=TaskTemplate.objects.all()
+            pk__in=task_ids, template_id__in=TaskTemplate.objects.exclude(phase="offboarding")
         ).select_related("template_id")
     }
     assignee_ids = {
@@ -686,7 +690,7 @@ def document_request_modal(request, pk):
             # (candidate_id is a ManyToManyField, so there's no direct FK
             # to lock on CandidateDocumentRequest itself).
             with transaction.atomic():
-                Candidate.objects.select_for_update().get(pk=candidate.pk)
+                Candidate.objects.entire().select_for_update().get(pk=candidate.pk)
                 duplicate = CandidateDocumentRequest.objects.filter(
                     candidate_id=candidate, title__iexact=data["title"]
                 ).exists()
@@ -719,6 +723,7 @@ def document_request_modal(request, pk):
                     "onboarding/stepper/_document_list.html",
                     {"candidate": candidate, **_document_context(candidate)},
                 )
+            # (the candidate is mailed by recruitment.signals.mail_candidates_when_document_requested)
             messages.success(request, _("Document request created"))
             return render(
                 request,
@@ -732,6 +737,32 @@ def document_request_modal(request, pk):
         "onboarding/stepper/document_request_modal.html",
         {"candidate": candidate, "form": form},
     )
+
+
+def candidate_upload_link(request, candidate):
+    """
+    The link the candidate uploads documents through (their onboarding portal). A used or
+    missing portal gets a fresh token, exactly like the main "Send Portal Link" action does.
+    """
+    portal, created = OnboardingPortal.objects.get_or_create(candidate_id=candidate)
+    if created or portal.used:
+        # No portal link yet, or the candidate already finished the whole
+        # self-onboarding flow with it (used=True blocks re-entry) - either
+        # way the old token (if any) won't get them in.
+        portal.token = secrets.token_hex(15)
+        portal.used = False
+        portal.save(update_fields=["token", "used"])
+    if request is not None:
+        protocol = "https" if request.is_secure() else "http"
+        origin = f"{protocol}://{request.get_host()}"
+    else:  # no request (e.g. the API): the site's configured address, if there is one
+        from django.conf import settings
+
+        origin = next(
+            (o.rstrip("/") for o in (getattr(settings, "CSRF_TRUSTED_ORIGINS", None) or []) if o.startswith("http")),
+            "",
+        )
+    return f"{origin}/onboarding/document-upload/{portal.token}/"
 
 
 @login_required
@@ -818,19 +849,7 @@ def send_document_reminder(request, pk, doc_id):
             {"error": str(_("This candidate has no email address on file."))},
             status=400,
         )
-    portal, created = OnboardingPortal.objects.get_or_create(candidate_id=candidate)
-    if created or portal.used:
-        # No portal link yet, or the candidate already finished the whole
-        # self-onboarding flow with it (used=True blocks re-entry) - either
-        # way the old token (if any) won't get them in, so mint a fresh one
-        # exactly like the main "Send Portal Link" action does.
-        portal.token = secrets.token_hex(15)
-        portal.used = False
-        portal.save(update_fields=["token", "used"])
-    protocol = "https" if request.is_secure() else "http"
-    portal_url = (
-        f"{protocol}://{request.get_host()}/onboarding/document-upload/{portal.token}/"
-    )
+    portal_url = candidate_upload_link(request, candidate)
     notify_candidate_document_reminder(candidate, document, portal_url)
     return JsonResponse({"success": True})
 
@@ -927,6 +946,7 @@ def document_status_update(request, pk, doc_id, action):
         elif action == "verified":
             document.status = "approved"
             document.save()
+            run_in_background(notify_candidate_document_approved, document)
         elif action == "rejected":
             document.reject_reason = request.POST.get("reject_reason", "")
             document.status = "rejected"

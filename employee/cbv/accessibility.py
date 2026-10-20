@@ -9,6 +9,37 @@ from employee.models import Employee
 from horilla_audit.models import AccountBlockUnblock
 
 
+def second_manager_accessibility(
+    request, instance: object = None, user_perms: PermWrapper = [], *args, **kwargs
+) -> bool:
+    """HR (who may change work information) sees "Second Manager" on someone who is still here."""
+    return (
+        instance is not None
+        and instance.is_active
+        and request.user.has_perm("employee.change_employeeworkinformation")
+    )
+
+
+def initiate_exit_accessibility(
+    request, instance: object = None, user_perms: PermWrapper = [], *args, **kwargs
+) -> bool:
+    """
+    Show "Initiate Exit" to people who run exits, on someone who is still
+    here and not already leaving.
+    """
+    from django.apps import apps
+
+    if not apps.is_installed("offboarding") or instance is None:
+        return False
+    if not request.user.has_perm("offboarding.change_offboardingemployee"):
+        return False
+    from offboarding.models import OffboardingEmployee
+
+    return instance.is_active and not OffboardingEmployee.objects.entire().filter(
+        employee_id=instance, status__in=["in_progress", "exited"]
+    ).exists()
+
+
 def edit_accessibility(
     request, instance: object = None, user_perms: PermWrapper = [], *args, **kwargs
 ) -> bool:

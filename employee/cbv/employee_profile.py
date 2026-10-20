@@ -19,6 +19,7 @@ from employee import views
 from employee.filters import EmployeeFilter
 from employee.models import Employee
 from horilla import settings
+from horilla.access import can_access_employee
 from horilla.http.response import HorillaRedirect
 from horilla_views.cbv_methods import login_required, permission_required
 from horilla_views.generic.cbv.views import HorillaProfileView
@@ -48,9 +49,19 @@ class EmployeeProfileView(HorillaProfileView):
             return redirect("login")
 
         obj_id = kwargs.get("pk")
-        if not Employee.objects.entire().filter(id=obj_id).exists():
+        profile_owner = Employee.objects.entire().filter(id=obj_id).first()
+        if profile_owner is None:
             return HorillaRedirect(
                 request, message=_("No employee found matching the query.")
+            )
+        # The tabs of a profile (About, ...) refuse people who may not see this employee's
+        # details. Say so up front instead of opening a page of empty tabs that fail one by one.
+        if not can_access_employee(request.user, profile_owner):
+            return HorillaRedirect(
+                request,
+                message=_(
+                    "You do not have permission to view this employee's profile."
+                ),
             )
 
         employee = request.user.employee_get
@@ -87,6 +98,30 @@ class EmployeeProfileView(HorillaProfileView):
                     "src": f"/{settings.STATIC_URL}images/ui/key.png",
                     "accessibility": "employee.cbv.accessibility.password_reset_accessibility",
                     "attrs": """onclick="$('#reset-button').click();" """,
+                },
+                {
+                    "title": _("Second Manager"),
+                    "src": f"/{settings.STATIC_URL}images/ui/employees.svg",
+                    "accessibility": "employee.cbv.accessibility.second_manager_accessibility",
+                    "attrs": """
+                        href="#"
+                        hx-get="{get_second_manager_url}"
+                        hx-target="#genericModalBody"
+                        data-toggle="oh-modal-toggle"
+                        data-target="#genericModal"
+                    """,
+                },
+                {
+                    "title": _("Initiate Exit"),
+                    "src": f"/{settings.STATIC_URL}images/ui/exit-outline.svg",
+                    "accessibility": "employee.cbv.accessibility.initiate_exit_accessibility",
+                    "attrs": """
+                        href="#"
+                        hx-get="{get_initiate_exit_url}"
+                        hx-target="#genericModalBody"
+                        data-toggle="oh-modal-toggle"
+                        data-target="#genericModal"
+                    """,
                 },
             ]
         elif employee.pk == kwargs.get("pk") and enable_profile_edit(request).get(

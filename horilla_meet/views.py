@@ -16,18 +16,20 @@ from horilla.decorators import (
     permission_required,
 )
 from horilla.http.response import HorillaRedirect
-from horilla_meet.methods import get_google_credentials
+from horilla_meet.methods import cloud_credential_for, get_google_credentials
 from horilla_meet.models import *
 
 
 @login_required
 def google_authenticate(request):
 
-    cred = GoogleCloudCredential.objects.filter(
-        company_id=request.user.employee_get.get_company()
-    ).first()
+    cred = cloud_credential_for(request)
     if not cred:
-        messages.error(request, "Google Cloud Credential not found.")
+        messages.error(
+            request,
+            "No Google Cloud Credential is set up for your company. "
+            "Add one under Settings > Integrations > Google Meet.",
+        )
         return redirect("gmeet-view")
 
     redirect_uri = request.build_absolute_uri("/meet/auth-callback/")
@@ -72,9 +74,10 @@ def google_auth_callback(request):
     if not state or state != request.GET.get("state"):
         return HttpResponse("Invalid state", status=400)
 
-    cred = GoogleCloudCredential.objects.filter(
-        company_id=request.user.employee_get.get_company()
-    ).first()
+    cred = cloud_credential_for(request)
+    if not cred:
+        messages.error(request, "Google Cloud Credential not found.")
+        return redirect("gmeet-view")
 
     redirect_uri = request.build_absolute_uri("/meet/auth-callback/")
     flow = Flow.from_client_config(

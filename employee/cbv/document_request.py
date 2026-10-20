@@ -3,6 +3,12 @@ This page handles the cbv methods for document request page
 """
 
 import os
+from base.mail_helpers import run_in_background
+from horilla_documents.mails import (
+    notify_document_reviewed,
+    notify_document_submitted,
+    notify_documents_requested,
+)
 from typing import Any, Optional
 from urllib.parse import urlparse
 
@@ -133,6 +139,11 @@ class DocumentRequestCreateForm(HorillaFormView):
                     icon="chatbox-ellipses",
                 )
                 form.save()
+                run_in_background(
+                    notify_documents_requested,
+                    form.instance,
+                    self.request.build_absolute_uri(reverse("employee-profile")),
+                )
             refreshed = htmx_refresh_document_request_container(self.request)
             if refreshed is not None:
                 return refreshed
@@ -201,6 +212,7 @@ class DocumentRejectCbvForm(HorillaFormView):
             if self.form.instance.document:
                 self.form.instance.status = "rejected"
                 form.save()
+                run_in_background(notify_document_reviewed, self.form.instance, False)
                 messages.success(self.request, _("Document request rejected"))
             else:
                 messages.error(self.request, _("No document uploaded"))
@@ -271,6 +283,12 @@ class DocumentUploadForm(HorillaFormView):
                     pass
             form.instance.status = "requested"
             form.save()
+            if uploaded_file and form.instance.document_request_id_id:
+                run_in_background(
+                    notify_document_submitted,
+                    form.instance,
+                    self.request.build_absolute_uri(reverse("document-request-view")),
+                )
             refreshed = htmx_refresh_document_request_container(self.request)
             if refreshed is not None:
                 return refreshed

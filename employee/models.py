@@ -326,6 +326,18 @@ class Employee(models.Model):
             getattr(self, "employee_work_info", None), "reporting_manager_id", None
         )
 
+    def get_additional_managers(self):
+        """The second managers set for this employee (see SecondaryManager), as employees."""
+        return [link.manager_id for link in self.secondary_manager_links.select_related("manager_id")]
+
+    def get_second_manager_url(self):
+        """The window where HR sets this employee's second manager and what they may do."""
+        return reverse("secondary-manager-edit", args=[self.pk])
+
+    def get_initiate_exit_url(self):
+        """The Exit Process 'Initiate exit' window, preselecting this employee."""
+        return f"{reverse('exit-initiate')}?employee={self.pk}"
+
     def get_avatar(self):
         if self.employee_profile_thumbnail and default_storage.exists(
             self.employee_profile_thumbnail.name
@@ -1580,3 +1592,68 @@ ACCESSBILITY_FEATURE.append(("gender_chart", _("Can view Gender Chart")))
 ACCESSBILITY_FEATURE.append(("department_chart", _("Can view Department Chart")))
 ACCESSBILITY_FEATURE.append(("employees_chart", _("Can view Employees Chart")))
 ACCESSBILITY_FEATURE.append(("birthday_view", _("Can view Birthdays")))
+
+
+class SecondaryManager(models.Model):
+    """
+    An extra manager for one employee, next to their reporting manager. An employee can
+    have several, each with their own access.
+
+    What each of them may do is chosen per employee and per kind of request in
+    ``access`` - for example ``{"resignation": "approve"}`` - where ``view`` lets them
+    see those requests and ``approve`` lets them decide on them as well. A kind that
+    is missing means no access. The reporting manager is never changed by this: they
+    keep full access, and any of the managers may decide; the first decision stands.
+    See ``horilla.access.manager_access``.
+    """
+
+    employee_id = models.ForeignKey(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name="secondary_manager_links",
+        verbose_name=_("Employee"),
+    )
+    manager_id = models.ForeignKey(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name="secondary_manager_of",
+        verbose_name=_("Second manager"),
+    )
+    access = models.JSONField(default=dict, blank=True, verbose_name=_("Access"))
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Second manager")
+        verbose_name_plural = _("Second managers")
+        unique_together = ("employee_id", "manager_id")
+
+    def __str__(self):
+        return f"{self.manager_id} -> {self.employee_id}"
+
+
+class ManagerOfManagerSetting(models.Model):
+    """
+    The company-wide switch for "manager of manager" access (Settings > Approvals > Manager of
+    Manager). One row. When ``enabled``, the manager of an employee's reporting manager can see
+    that employee's requests; when ``can_approve`` is also on they may approve or reject them as
+    well, otherwise they can only look. It applies to the kinds of request listed in
+    ``horilla.access.REQUEST_TYPES`` and sits next to - never replaces - the reporting manager
+    and the second managers (see SecondaryManager).
+    """
+
+    enabled = models.BooleanField(default=False, verbose_name=_("Enable manager of manager"))
+    can_approve = models.BooleanField(
+        default=False, verbose_name=_("Manager of manager may approve / reject")
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Manager of manager setting")
+        verbose_name_plural = _("Manager of manager setting")
+
+    @classmethod
+    def current(cls):
+        """The one row (an unsaved all-off default when nobody has changed it yet)."""
+        return cls.objects.first() or cls()
+

@@ -43,7 +43,9 @@ class TaskTemplateListView(View):
     """
 
     def get(self, request):
-        templates = TaskTemplate.objects.prefetch_related("tasks")
+        templates = TaskTemplate.objects.exclude(phase="offboarding").prefetch_related(
+            "tasks"
+        )
         return render(
             request,
             "onboarding/task_templates/list.html",
@@ -75,7 +77,9 @@ class TaskTemplateViewModal(View):
     """
 
     def get(self, request, pk):
-        template = get_object_or_404(TaskTemplate, pk=pk)
+        template = get_object_or_404(
+            TaskTemplate.objects.exclude(phase="offboarding"), pk=pk
+        )
         return render(
             request,
             "onboarding/task_templates/_view_modal.html",
@@ -93,10 +97,14 @@ class TaskTemplateFormView(View):
     """
 
     def get(self, request, pk=None):
-        instance = TaskTemplate.objects.filter(pk=pk).first() if pk else None
+        instance = (
+            TaskTemplate.objects.exclude(phase="offboarding").filter(pk=pk).first()
+            if pk
+            else None
+        )
         duplicate_source = None
         if not instance:
-            duplicate_source = TaskTemplate.objects.filter(
+            duplicate_source = TaskTemplate.objects.exclude(phase="offboarding").filter(
                 pk=request.GET.get("duplicate")
             ).first()
 
@@ -137,7 +145,11 @@ class TaskTemplateFormView(View):
         )
 
     def post(self, request, pk=None):
-        instance = TaskTemplate.objects.filter(pk=pk).first() if pk else None
+        instance = (
+            TaskTemplate.objects.exclude(phase="offboarding").filter(pk=pk).first()
+            if pk
+            else None
+        )
         form = TaskTemplateForm(request.POST, instance=instance)
         formset = TaskTemplateTaskFormSet(request.POST, instance=instance, prefix="tasks")
         _lock_saved_task_forms(formset)
@@ -168,7 +180,7 @@ class TaskTemplateFormView(View):
 @login_required
 @permission_required("onboarding.delete_tasktemplate")
 def task_template_delete(request, pk):
-    TaskTemplate.objects.filter(pk=pk).delete()
+    TaskTemplate.objects.exclude(phase="offboarding").filter(pk=pk).delete()
     messages.success(request, _("Task group deleted"))
     return redirect("task-template-list")
 

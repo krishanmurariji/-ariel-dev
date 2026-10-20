@@ -839,11 +839,11 @@ class CandidateUpdateStatusFormView(HorillaFormView):
         rejected = False
         unrejected = False
         if adding_to_reject:
-            rejected_candidate, _created = models.RejectedCandidate.objects.update_or_create(
-                candidate_id=candidate,
-                defaults={"description": form.cleaned_data.get("description", "")},
+            rejected_candidate = _save_rejection(
+                candidate,
+                form.cleaned_data.get("description", ""),
+                form.cleaned_data["reject_reason_id"],
             )
-            rejected_candidate.reject_reason_id.set(form.cleaned_data["reject_reason_id"])
             rejected = True
         elif reject_eligible:
             # "Add to Reject" started checked (see init_form's
@@ -877,6 +877,26 @@ class CandidateUpdateStatusFormView(HorillaFormView):
                 _("Candidate moved to %(job)s.") % {"job": target_recruitment},
             )
         return self.HttpResponse()
+
+
+def _save_rejection(candidate, description, reasons):
+    """
+    Create or update the candidate's rejection record and its reasons.
+
+    Not ``update_or_create``: that locks the row (SELECT ... FOR UPDATE), and while a company
+    is selected in the company switcher the company-scoped manager adds DISTINCT to every
+    query - PostgreSQL refuses the two together ("FOR UPDATE is not allowed with DISTINCT
+    clause"), which made "Add to Reject" fail with a 500. The unscoped manager is used here:
+    the candidate is already known, and one rejection exists per candidate.
+    """
+    rejected_candidate, created = models.RejectedCandidate.objects.entire().get_or_create(
+        candidate_id=candidate, defaults={"description": description}
+    )
+    if not created:
+        rejected_candidate.description = description
+        rejected_candidate.save()
+    rejected_candidate.reject_reason_id.set(reasons)
+    return rejected_candidate
 
 
 @method_decorator(login_required, name="dispatch")

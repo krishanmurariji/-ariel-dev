@@ -101,6 +101,10 @@ def multiple_approval_rules_accessibility(
     )
 
 
+def manager_of_manager_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("employee.change_employeeworkinformation")
+
+
 def outlook_mail_accessibility(request, submenu, user_perms, *args, **kwargs):
     return request.user.has_perm(
         "base.view_dynamicemailconfiguration"
@@ -294,12 +298,18 @@ class MailSettings:
 class ApprovalsSettings:
     title = _("Approvals")
     order = 4
-    condition = lambda self, request: apps.is_installed("leave")
+    # also holds Manager of Manager, which does not depend on the leave app
+    condition = lambda self, request: True
     items = [
         {
             "label": _("Multiple Approval Rules"),
             "url": reverse_lazy("multiple-approval-rules-view"),
             "accessibility": multiple_approval_rules_accessibility,
+        },
+        {
+            "label": _("Manager of Manager"),
+            "url": reverse_lazy("manager-of-manager-settings"),
+            "accessibility": manager_of_manager_accessibility,
         },
     ]
 

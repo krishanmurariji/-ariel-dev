@@ -33,6 +33,14 @@ def _split_path(self, path=None):
 BREADCRUMB_URL_NAMES = {
     "ess": "Employee",
     "offboarding": "Offboarding",
+    "exit-process": "Exit Process",
+    "exit-survey": "My Exit Survey",
+    "exit-settings": "Exit Settings",
+    "exit-survey-settings": "Exit Survey Settings",
+    "exit-tasks": "Exit Task Settings",
+    "offboarding-rules-view": "Offboarding Rules",
+    "offboarding-pipeline": "Offboarding Pipeline",
+    "resignation-requests-view": "Resignations",
     "helpdesk": "Helpdesk",
     "policies-discipline": "Policies & Discipline",
     "work-schedules": "Work Schedules",
@@ -136,6 +144,11 @@ sidebar_urls = [
     "department-manager-view",
     "date-settings",
     "offboarding-pipeline",
+    "exit-process",
+    "exit-survey",
+    "exit-settings",
+    "exit-survey-settings",
+    "exit-tasks",
     "pagination-settings-view",
     "organisation-chart",
     "disciplinary-actions",
@@ -238,6 +251,11 @@ remove_urls = [
     "dashboard",
 ]
 
+# A page that is a menu item of its own although its address sits under another page's:
+# "My Exit Tasks" is /offboarding/exit-process/my-tasks/, but it is not part of Exit Process,
+# so the trail must not show "Exit Process" in front of it.
+SEPARATE_PAGES = {("exit-process", "my-tasks"): "My Exit Tasks"}
+
 user_breadcrumbs = {}
 
 
@@ -322,6 +340,7 @@ def breadcrumbs(request):
             last_path = parts[-1]
             if (
                 last_path in sidebar_urls
+                or tuple(parts[-2:]) in SEPARATE_PAGES
                 or parts[-2] == "employee-view"
                 or parts[-2] == "candidate-view"
                 or parts[-2] == "view-payslip"
@@ -331,6 +350,8 @@ def breadcrumbs(request):
                 request.session["breadcrumbs"].append(first_path)
         for i, item in enumerate(parts):
             path = path + item + "/"
+            if tuple(parts[i : i + 2]) in SEPARATE_PAGES:
+                continue  # shown as the page that follows, not as a step of its own
             parsed_url = urlparse(path)
             check_path = parsed_url.path
             try:
@@ -363,6 +384,13 @@ def breadcrumbs(request):
                 "found": found,
                 "clickable": clickable,
             }
+
+            if i > 0 and tuple(parts[i - 1 : i + 1]) in SEPARATE_PAGES:
+                new_dict["name"] = SEPARATE_PAGES[tuple(parts[i - 1 : i + 1])]
+            elif item == "dashboard" and i > 0 and parts[i - 1] == "offboarding":
+                # a bare "dashboard" crumb is hidden (see remove_urls), which left the trail
+                # reading "Offboarding" only, as if this were a landing page
+                new_dict["name"] = "Offboarding Dashboard"
 
             if item == "attendance":
                 from base.templatetags.basefilters import is_reportingmanager

@@ -1,0 +1,77 @@
+{% load i18n %}
+<div class="oh-modal__dialog-header">
+    <h2 class="oh-modal__dialog-title">{% trans "Second managers" %}</h2>
+    <button type="button" class="oh-modal__close--custom"
+        onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')" aria-label="Close">
+        <ion-icon name="close-outline" role="img" class="md hydrated" aria-label="close outline"></ion-icon>
+    </button>
+</div>
+<div class="oh-modal__dialog-body oh-modal__dialog-relative sm-modal">
+    <style>
+        .sm-modal { padding-top: 14px; font-size: 0.88rem; }
+        .sm-card { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid rgba(120,130,150,0.2); border-radius: 12px; margin-bottom: 14px;
+            background: linear-gradient(135deg, rgba(27,155,224,0.12), rgba(120,130,150,0.04) 70%); }
+        .sm-card img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; }
+        .sm-card small { display: block; opacity: 0.7; }
+        .sm-help { margin: 0 0 14px; font-size: 0.78rem; opacity: 0.7; }
+        .sm-msg { padding: 9px 13px; border-radius: 10px; margin-bottom: 12px; font-size: 0.82rem; background: rgba(34,160,90,0.14); border: 1px solid rgba(34,160,90,0.3); }
+        .sm-h { margin: 0 0 8px; font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.7; }
+        .sm-row { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; padding: 11px 13px; border: 1px solid rgba(120,130,150,0.28); border-radius: 12px; margin-bottom: 10px; }
+        .sm-who { display: flex; align-items: center; gap: 9px; min-width: 190px; flex: 1 1 190px; font-weight: 600; }
+        .sm-who img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
+        .sm-acc { flex: 0 1 190px; }
+        .sm-acc label, .sm-field label { display: block; font-size: 0.72rem; font-weight: 600; margin-bottom: 4px; opacity: 0.8; }
+        .sm-modal select { display: block; width: 100%; box-sizing: border-box; padding: 8px 10px; font: inherit; border: 1px solid rgba(120,130,150,0.55); border-radius: 8px; background: #fff; }
+        .sm-modal select:focus { outline: none; border-color: #1b9be0; box-shadow: 0 0 0 3px rgba(27,155,224,0.2); }
+        .sm-btn { padding: 8px 14px; border-radius: 8px; border: 0; font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; background: #1b9be0; color: #fff; }
+        .sm-btn--light { background: rgba(120,130,150,0.16); color: inherit; }
+        .sm-btn--del { background: rgba(220,60,60,0.12); color: #d93636; }
+        .sm-empty { padding: 16px; text-align: center; border: 1.5px dashed rgba(120,130,150,0.35); border-radius: 12px; opacity: 0.75; margin-bottom: 14px; }
+        .sm-add { border: 1px solid rgba(120,130,150,0.28); border-radius: 12px; padding: 13px 14px; margin-top: 16px; background: rgba(120,130,150,0.05); }
+        .sm-add .sm-line { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+        .sm-add .sm-field { flex: 1 1 200px; margin: 0; }
+        .sm-err { margin-top: 6px; color: #d93636; font-size: 0.78rem; }
+        .sm-foot { display: flex; justify-content: flex-end; padding-top: 14px; margin-top: 16px; border-top: 1px solid rgba(120,130,150,0.18); }
+    </style>
+    <div class="sm-card">
+        <img src="{{ employee.get_avatar }}" alt="">
+        <div><strong>{{ employee.get_full_name }}</strong>
+            <small>{% trans "Reporting manager" %}: {{ employee.get_reporting_manager|default:"—" }}</small></div>
+    </div>
+    <p class="sm-help">{% trans "Add as many managers as you need. For each one choose what they can do. View only: they see the requests. Can approve: they can also decide on them. Any manager may decide - the first decision stands." %}</p>
+    {% if notice %}<div class="sm-msg">{{ notice }}</div>{% endif %}
+
+    <h5 class="sm-h">{% trans "Second managers" %} ({{ rows|length }})</h5>
+    {% for link, form in rows %}
+    <form class="sm-row" hx-post="{% url 'secondary-manager-edit' employee.pk %}" hx-target="#genericModalBody" hx-swap="innerHTML">
+        {% csrf_token %}
+        <input type="hidden" name="link" value="{{ link.pk }}">
+        <div class="sm-who"><img src="{{ link.manager_id.get_avatar }}" alt="">{{ link.manager_id.get_full_name }}</div>
+        {% for field in form %}
+        <div class="sm-acc"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}</div>
+        {% endfor %}
+        <button type="submit" name="action" value="save" class="sm-btn">{% trans "Save" %}</button>
+        <button type="submit" name="action" value="remove" class="sm-btn sm-btn--del">{% trans "Remove" %}</button>
+    </form>
+    {% empty %}
+    <div class="sm-empty">{% trans "No second managers yet." %}</div>
+    {% endfor %}
+
+    <form class="sm-add" hx-post="{% url 'secondary-manager-edit' employee.pk %}" hx-target="#genericModalBody" hx-swap="innerHTML">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add">
+        <h5 class="sm-h">{% trans "Add a manager" %}</h5>
+        <div class="sm-line">
+            <div class="sm-field"><label for="{{ add_form.manager.id_for_label }}">{% trans "Manager" %}</label>{{ add_form.manager }}</div>
+            {% for label, field in add_access %}
+            <div class="sm-field"><label for="{{ field.id_for_label }}">{{ label }}</label>{{ field }}</div>
+            {% endfor %}
+            <button type="submit" class="sm-btn">{% trans "Add" %}</button>
+        </div>
+        {% for error in add_form.manager.errors %}<div class="sm-err">{{ error }}</div>{% endfor %}
+    </form>
+
+    <div class="sm-foot">
+        <button type="button" class="sm-btn sm-btn--light" onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')">{% trans "Done" %}</button>
+    </div>
+</div>

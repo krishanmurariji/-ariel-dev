@@ -35,6 +35,9 @@ from django.forms import DateInput, HiddenInput, Select
 from django.http import HttpResponse, JsonResponse
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django import forms as django_forms
+from base.mail_helpers import run_in_background
+from horilla_documents.mails import notify_document_reviewed
 from horilla.access import can_access_employee
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -405,6 +408,14 @@ def employee_view_individual(request, obj_id, **kwargs):
                 return redirect("employee-view")
         except Exception as e:
             return render(request, "404.html", status=404)
+
+    # The profile's tabs (About, ...) refuse people who may not see this employee's details, so
+    # say so here instead of opening a page of empty tabs that fail one by one.
+    if not can_access_employee(request.user, employee):
+        messages.error(
+            request, _("You do not have permission to view this employee's profile.")
+        )
+        return HorillaRedirect(request)
 
     # request_ids_str = json.dumps(
     #     [
@@ -1112,6 +1123,7 @@ def document_approve(request, id):
     if document_obj.document:
         document_obj.status = "approved"
         document_obj.save()
+        run_in_background(notify_document_reviewed, document_obj, True)
         messages.success(request, _("Document request approved"))
     else:
         messages.error(request, _("No document uploaded"))
@@ -1158,6 +1170,7 @@ def document_reject(request, id):
                 test = form.save()
                 document_obj.status = "rejected"
                 document_obj.save()
+                run_in_background(notify_document_reviewed, document_obj, False)
                 messages.error(request, _("Document request rejected"))
 
                 return HorillaRedirect(request)
@@ -1189,7 +1202,10 @@ def document_bulk_approve(request):
 
         # Documents with uploaded files
         approved_docs = Document.objects.filter(id__in=ids).exclude(document="")
+        approved_ids = list(approved_docs.values_list("pk", flat=True))
         count_approved = approved_docs.update(status="approved")
+        for approved in Document.objects.filter(pk__in=approved_ids):
+            run_in_background(notify_document_reviewed, approved, True)
 
         # Documents without uploaded files
         not_uploaded_count = len(ids) - approved_docs.count()
@@ -1210,6 +1226,20 @@ def document_bulk_approve(request):
     return HorillaRedirect(request)
 
 
+class BulkRejectForm(django_forms.Form):
+    """
+    The reason for rejecting several documents at once. A plain form: the model form
+    (DocumentRejectForm) validates a blank Document, whose empty title fails the model's
+    title rule, so submitting it crashed instead of saving the reason.
+    """
+
+    reject_reason = django_forms.CharField(
+        label=_("Reject Reason"),
+        max_length=255,
+        widget=django_forms.Textarea(attrs={"class": "oh-input w-100", "rows": 3}),
+    )
+
+
 @login_required
 @hx_request_required
 @manager_can_enter("horilla_documents.add_document")
@@ -1226,15 +1256,15 @@ def document_bulk_reject(request):
         if request.method == "POST"
         else request.GET.getlist("ids")
     )
-    form = DocumentRejectForm(request.POST or None)
+    form = BulkRejectForm(request.POST or None)
 
     if request.method == "POST" and form.is_valid():
         reject_reason = form.cleaned_data["reject_reason"]
-        updated_count = (
-            Document.objects.filter(id__in=ids)
-            .exclude(status="rejected")
-            .update(status="rejected", reject_reason=reject_reason)
-        )
+        to_reject = Document.objects.filter(id__in=ids).exclude(status="rejected")
+        rejected_ids = list(to_reject.values_list("pk", flat=True))
+        updated_count = to_reject.update(status="rejected", reject_reason=reject_reason)
+        for rejected in Document.objects.filter(pk__in=rejected_ids):
+            run_in_background(notify_document_reviewed, rejected, False)
         messages.success(
             request, _("{} Document request rejected").format(updated_count)
         )
@@ -2435,7 +2465,7 @@ def employee_archive(request, obj_id):
     message = "Employee un-archived"
     if not employee.is_active:
 
-        emp = Employee.objects.get(id=obj_id)
+        emp =Employee.objects.get(id=obj_id)
         if emp.employee_user_id.is_superuser:
             count = 0
             employees = Employee.objects.filter(is_active=True)
@@ -2565,7 +2595,7 @@ def replace_employee(request, emp_id):
     related_models = employee.get_archive_condition()
     if title == "Change the Designations":
         messages.success(request, _("Designation changed."))
-        return redirect("/offboarding/offboarding-pipeline")
+        return redirect("/offboarding/exit-process/")
     if related_models is False and title != "Change the Designations":
         employee.is_active = False
         employee.save()

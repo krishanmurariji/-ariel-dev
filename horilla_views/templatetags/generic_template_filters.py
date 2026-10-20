@@ -16,6 +16,7 @@ from django.contrib.auth.context_processors import PermWrapper
 from django.db.models.utils import AltersData
 from django.template.defaultfilters import register
 from django.utils.html import conditional_escape
+from django.utils.functional import Promise
 from django.utils.safestring import SafeData, mark_safe
 from django.utils.translation import gettext_lazy as _
 
@@ -115,8 +116,10 @@ def cell_value(value, attr: str):
             result = getattr(value, part)
             if isinstance(result, (types.MethodType, functools.partial)):
                 result = result()
-                if isinstance(result, str) and "<" in result:
-                    result = mark_safe(result)
+                # built by the method; translated text built with format_lazy is a lazy
+                # proxy, not a str, so it has to be recognised here or its tags show as text
+                if isinstance(result, (str, Promise)) and "<" in str(result):
+                    result = mark_safe(str(result))
             value = result
         else:
             return getattr(value, part, "")

@@ -10,7 +10,9 @@ from base.templatetags.horillafilters import app_installed
 from base.views import object_delete, object_duplicate
 from employee import dashboard as emp_dashboard
 from employee import (
+    manager_of_manager,
     not_in_out_dashboard,
+    secondary_manager,
     policies,
     requests,
     views,
@@ -33,6 +35,21 @@ from employee.models import DisciplinaryAction, Employee, EmployeeTag
 from horilla_documents.models import DocumentRequest
 
 urlpatterns = [
+    path(
+        "manager-of-manager/",
+        manager_of_manager.manager_of_manager_settings,
+        name="manager-of-manager-settings",
+    ),
+    path(
+        "manager-of-manager/toggle/",
+        manager_of_manager.manager_of_manager_toggle,
+        name="manager-of-manager-toggle",
+    ),
+    path(
+        "secondary-manager/<int:emp_id>/",
+        secondary_manager.secondary_manager_edit,
+        name="secondary-manager-edit",
+    ),
     path(
         "allocation-view/<int:pk>/",
         allocations.AllocationView.as_view(),

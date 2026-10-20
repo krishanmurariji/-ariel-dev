@@ -5165,6 +5165,10 @@ def document_approve(request, id):
     if document_obj.document:
         document_obj.status = "approved"
         document_obj.save()
+        from base.mail_helpers import run_in_background
+        from onboarding.document_mails import notify_candidate_document_approved
+
+        run_in_background(notify_candidate_document_approved, document_obj)
         messages.success(request, _("Document request approved"))
     else:
         messages.error(request, _("No document uploaded"))

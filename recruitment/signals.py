@@ -8,6 +8,7 @@ from recruitment.models import (
     Candidate,
     CandidateDocument,
     CandidateDocumentRequest,
+    RejectedCandidate,
     Recruitment,
     Stage,
 )
@@ -39,6 +40,52 @@ def create_initial_stage(sender, instance, created, **kwargs):
                 stage=stage_name,
                 stage_type=stage_type,
             )
+
+
+def _in_background(send, *args, **kwargs):
+    """
+    Mail never holds up the person who clicked: it is sent from a background thread, so a slow
+    or unreachable mail server cannot delay or break saving an application or a rejection.
+    """
+
+    def _run():
+        from django.db import close_old_connections
+
+        try:
+            send(*args, **kwargs)
+        finally:
+            close_old_connections()
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+@receiver(post_save, sender=Candidate)
+def send_portal_mail_to_new_candidate(sender, instance, created, **kwargs):
+    """
+    The built-in "application received" mail with the candidate portal login, for every new
+    candidate however they were created (the application form, staff, email intake). It follows
+    Settings > Recruitment > "Send Candidate Portal Mail" and is sent once the candidate is
+    safely saved. See recruitment/portal_mail.py.
+    """
+    if not created:
+        return
+    from recruitment.portal_mail import portal_link, send_portal_mail
+
+    link = portal_link()  # needs the request, which the background thread does not have
+    transaction.on_commit(lambda: _in_background(send_portal_mail, instance, link=link))
+
+
+@receiver(post_save, sender=RejectedCandidate)
+def send_rejection_mail_to_candidate(sender, instance, created, **kwargs):
+    """
+    The built-in "Application Status - Not Selected" mail, sent when a candidate is rejected,
+    once the rejection is safely saved. See recruitment/rejection_mail.py.
+    """
+    if not created:
+        return
+    from recruitment.rejection_mail import send_rejection_mail
+
+    transaction.on_commit(lambda: _in_background(send_rejection_mail, instance.candidate_id))
 
 
 @receiver(post_save, sender=Candidate)
@@ -90,6 +137,19 @@ def auto_score_new_candidate(sender, instance, created, **kwargs):
             close_old_connections()
 
     transaction.on_commit(lambda: threading.Thread(target=_run, daemon=True).start())
+
+
+@receiver(m2m_changed, sender=CandidateDocumentRequest.candidate_id.through)
+def mail_candidates_when_document_requested(sender, instance, action, reverse, pk_set, **kwargs):
+    """
+    Mail each candidate a document is newly requested from - whichever screen (onboarding,
+    the candidate's profile, the API) made the request. See onboarding/document_mails.py.
+    """
+    if action != "post_add" or not pk_set:
+        return
+    from onboarding.document_mails import mail_newly_requested
+
+    transaction.on_commit(lambda: mail_newly_requested(instance, pk_set, reverse))
 
 
 @receiver(m2m_changed, sender=CandidateDocumentRequest.candidate_id.through)
