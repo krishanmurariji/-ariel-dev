@@ -7462,6 +7462,12 @@ def protected_media(request, path):
                 "You must be logged in or provide a valid token to access this file.",
             )
             return redirect("login")
+        # Signed in is not enough for files that hold personal data: the user must
+        # also be allowed to see the record that owns the file (horilla/media_access.py).
+        from horilla.media_access import may_open
+
+        if not may_open(request.user if request.user.is_authenticated else jwt_user, path):
+            raise Http404("File not found")
 
     # Determine the content type from the extension and decide whether the
     # browser may render it inline. User-uploaded content that browsers treat
