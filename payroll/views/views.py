@@ -4,6 +4,7 @@ views.py
 This module is used to define the method for the path in the urls
 """
 
+from horilla.access import check_employee_access
 from horilla.post_only import post_only
 import json
 from collections import defaultdict
@@ -1702,6 +1703,10 @@ def create_payrollrequest_comment(request, payroll_id):
     from payroll.forms.forms import ReimbursementRequestCommentForm
 
     payroll = Reimbursement.objects.filter(id=payroll_id).first()
+    if payroll is not None:
+        check_employee_access(
+            request.user, payroll.employee_id, "payroll.view_reimbursement"
+        )
     emp = request.user.employee_get
     form = ReimbursementRequestCommentForm(
         initial={"employee_id": emp.id, "request_id": payroll_id}
@@ -1809,11 +1814,11 @@ def view_payrollrequest_comment(request, payroll_id):
     """
     This method is used to show Reimbursement request comments
     """
+    req = get_object_or_404(Reimbursement, id=payroll_id)
+    check_employee_access(request.user, req.employee_id, "payroll.view_reimbursement")
     comments = ReimbursementrequestComment.objects.filter(
         request_id=payroll_id
     ).order_by("-created_at")
-
-    req = Reimbursement.objects.get(id=payroll_id)
     no_comments = False
     if not comments.exists():
         no_comments = True
@@ -1821,7 +1826,10 @@ def view_payrollrequest_comment(request, payroll_id):
     if request.FILES:
         files = request.FILES.getlist("files")
         comment_id = request.GET["comment_id"]
-        comment = ReimbursementrequestComment.objects.get(id=comment_id)
+        # the comment must belong to the request this page was opened for
+        comment = get_object_or_404(
+            ReimbursementrequestComment, id=comment_id, request_id=payroll_id
+        )
         attachments = []
         for file in files:
             file_instance = ReimbursementFile()
@@ -1852,6 +1860,12 @@ def delete_payrollrequest_comment(request, comment_id):
     if not comment.exists():
         messages.error(request, _("Comment not found."))
         return HorillaRedirect(request)
+    first = comment.first()
+    # the author, or someone allowed to see that reimbursement
+    if first.employee_id.employee_user_id_id != request.user.pk:
+        check_employee_access(
+            request.user, first.request_id.employee_id, "payroll.change_reimbursement"
+        )
     comment.delete()
     return HorillaRedirect(request, message=_("Comment deleted successfully!"))
 

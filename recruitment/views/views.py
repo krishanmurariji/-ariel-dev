@@ -1313,6 +1313,7 @@ def note_update_individual(request, note_id):
 
 @login_required
 @hx_request_required
+@manager_can_enter(perm="recruitment.change_stagenote")
 def add_more_files(request, id):
     """
     This method is used to Add more files to the stage candidate note.
@@ -1333,6 +1334,7 @@ def add_more_files(request, id):
 
 @login_required
 @hx_request_required
+@manager_can_enter(perm="recruitment.change_stagenote")
 def add_more_individual_files(request, id):
     """
     This method is used to Add more files to the stage candidate note.
@@ -1354,6 +1356,7 @@ def add_more_individual_files(request, id):
 @post_only
 @login_required
 @hx_request_required
+@manager_can_enter(perm="recruitment.delete_stagenote")
 def delete_stage_note_file(request, id):
     """
     This method is used to delete the stage note file
@@ -1372,6 +1375,7 @@ def delete_stage_note_file(request, id):
 @post_only
 @login_required
 @hx_request_required
+@manager_can_enter(perm="recruitment.delete_stagenote")
 def delete_individual_note_file(request, id):
     """
     This method is used to delete the stage note file
@@ -1635,6 +1639,7 @@ def add_candidate(request):
 @login_required
 @require_http_methods(["POST"])
 @hx_request_required
+@manager_can_enter(perm="recruitment.change_stage")
 def stage_title_update(request, stage_id):
     """
     This method is used to update the name of recruitment stage
@@ -4985,6 +4990,7 @@ def candidate_document_request(request):
 
 @login_required
 @hx_request_required
+@manager_can_enter(perm="recruitment.add_candidatedocument")
 def document_create(request, id):
     """
     This function is used to create documents from employee individual & profile view.
@@ -5013,6 +5019,7 @@ def document_create(request, id):
 
 
 @login_required
+@manager_can_enter(perm="recruitment.change_candidatedocument")
 def update_document_title(request, id):
     """
     This function is used to create documents from employee individual & profile view.
@@ -5289,6 +5296,12 @@ def candidate_add_notes(request, cand_id):
     session_candidate_id = request.session.get("candidate_id")
     if session_candidate_id and session_candidate_id != candidate.pk:
         raise Http404
+    if not session_candidate_id:
+        # signed-in staff: only those who deal with this candidate may add notes
+        from horilla.media_access import manages_candidate
+
+        if not manages_candidate(request.user, candidate, "recruitment.add_stagenote"):
+            raise Http404
 
     updated_by = request.user.employee_get if request.user.is_authenticated else None
     label = (

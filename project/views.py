@@ -10,6 +10,7 @@ import pandas as pd
 from django.contrib import messages
 from django.core import serializers
 from django.http import Http404, HttpResponse, JsonResponse
+from horilla.access import can_access_employee, check_employee_access, is_manager_in_chain
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -937,6 +938,21 @@ def task_details(request, task_id):
     task = Task.objects.filter(id=task_id).first()
     if not task:
         return HorillaRedirect(request, message=_("Task not found"))
+    # the task's managers and members, its project's managers and members, or the permission
+    me = getattr(request.user, "employee_get", None)
+    if not (
+        request.user.has_perm("project.view_task")
+        or (
+            me is not None
+            and (
+                task.task_managers.filter(pk=me.pk).exists()
+                or task.task_members.filter(pk=me.pk).exists()
+                or task.project.managers.filter(pk=me.pk).exists()
+                or task.project.members.filter(pk=me.pk).exists()
+            )
+        )
+    ):
+        raise Http404
     return render(request, "task/new/task_details.html", context={"task": task})
 
 
@@ -1974,6 +1990,7 @@ def personal_time_sheet_view(request, emp_id):
     if not emp:
         messages.error(request, _("Employee not found."))
         return HorillaRedirect(request)
+    check_employee_access(request.user, emp, "project.view_timesheet")
     context = {
         "emp_id": emp_id,
         "emp_name": emp.get_full_name(),
@@ -1999,6 +2016,22 @@ def time_sheet_single_view(request, time_sheet_id):
     if not timesheet:
         messages.error(request, _("Timesheet doesn't exist."))
         return HorillaRedirect(request)
+    # the employee, their managers, the task's and project's managers, or the permission
+    me = getattr(request.user, "employee_get", None)
+    if not (
+        request.user.has_perm("project.view_timesheet")
+        or can_access_employee(request.user, timesheet.employee_id, "project.view_timesheet")
+        or is_manager_in_chain(request.user, timesheet.employee_id)
+        or (
+            me is not None
+            and timesheet.task_id is not None
+            and (
+                timesheet.task_id.task_managers.filter(pk=me.pk).exists()
+                or timesheet.task_id.project.managers.filter(pk=me.pk).exists()
+            )
+        )
+    ):
+        raise Http404
     context = {"time_sheet": timesheet}
     return render(request, "time_sheet/time_sheet_single_view.html", context)
 

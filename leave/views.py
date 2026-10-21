@@ -4293,6 +4293,8 @@ def create_leaverequest_comment(request, leave_id):
     This method renders form and template to create Leave request comments
     """
     leave = LeaveRequest.objects.filter(id=leave_id).first()
+    if leave is not None:
+        check_employee_access(request.user, leave.employee_id, "leave.view_leaverequest")
     emp = request.user.employee_get
     form = LeaverequestcommentForm(
         initial={"employee_id": emp.id, "request_id": leave_id}
@@ -4464,6 +4466,10 @@ def create_allocationrequest_comment(request, leave_id):
     """
     previous_data = request.GET.urlencode()
     leave = LeaveAllocationRequest.objects.filter(id=leave_id).first()
+    if leave is not None:
+        check_employee_access(
+            request.user, leave.employee_id, "leave.view_leaveallocationrequest"
+        )
     emp = request.user.employee_get
     form = LeaveallocationrequestcommentForm(
         initial={"employee_id": emp.id, "request_id": leave_id}

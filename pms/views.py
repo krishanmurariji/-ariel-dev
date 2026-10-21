@@ -5,6 +5,7 @@ This module contains the view functions for handling HTTP requests and rendering
 responses in pms app.
 """
 
+from horilla.access import check_employee_access
 from horilla.post_only import post_only
 import datetime
 import json
@@ -19,7 +20,7 @@ from django.core.paginator import Paginator
 from django.db.models import ProtectedError, Q
 from django.db.utils import IntegrityError
 from django.forms import modelformset_factory
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -875,6 +876,19 @@ def objective_detailed_view_activity(request, id):
         return HorillaRedirect(request)
 
 
+def _check_can_update_objective(request, employee_objective):
+    """
+    Only the employee the objective belongs to, the objective's managers, the employee's
+    reporting managers, or a holder of change_employeeobjective may change its status or values.
+    """
+    check_employee_access(
+        request.user,
+        employee_objective.employee_id,
+        "pms.change_employeeobjective",
+        also_allow=list(employee_objective.objective_id.managers.all()),
+    )
+
+
 @login_required
 @hx_request_required
 def objective_detailed_view_comment(request, id):
@@ -887,7 +901,14 @@ def objective_detailed_view_comment(request, id):
     """
     comment_form = ObjectiveCommentForm(request.POST)
     if comment_form.is_valid():
-        objective = EmployeeObjective.objects.get(id=id)
+        objective = get_object_or_404(EmployeeObjective, id=id)
+        # the employee, the objective's managers, their reporting managers, or the permission
+        check_employee_access(
+            request.user,
+            objective.employee_id,
+            "pms.view_employeeobjective",
+            also_allow=list(objective.objective_id.managers.all()),
+        )
         form = comment_form.save(commit=False)
         form.employee_id = request.user.employee_get
         form.employee_objective_id = objective
@@ -974,7 +995,8 @@ def objective_detailed_view_objective_status(request, id):
         All the filtered and searched object will based on userlevel.
     """
 
-    objective = EmployeeObjective.objects.get(id=id)
+    objective = get_object_or_404(EmployeeObjective, id=id)
+    _check_can_update_objective(request, objective)
     status = request.POST.get("objective_status")
     objective.status = status
     objective.save()
@@ -1000,7 +1022,8 @@ def objective_detailed_view_key_result_status(request, obj_id, kr_id):
     """
 
     status = request.POST.get("key_result_status")
-    employee_key_result = EmployeeKeyResult.objects.get(id=kr_id)
+    employee_key_result = get_object_or_404(EmployeeKeyResult, id=kr_id)
+    _check_can_update_objective(request, employee_key_result.employee_objective_id)
 
     current_value = employee_key_result.current_value
     target_value = employee_key_result.target_value
@@ -1030,7 +1053,8 @@ def objective_detailed_view_current_value(request, kr_id):
     """
     if request.method == "POST":
         current_value = request.POST.get("current_value")
-        employee_key_result = EmployeeKeyResult.objects.get(id=kr_id)
+        employee_key_result = get_object_or_404(EmployeeKeyResult, id=kr_id)
+        _check_can_update_objective(request, employee_key_result.employee_objective_id)
         target_value = employee_key_result.target_value
         objective_id = employee_key_result.employee_objective_id.id
         if int(current_value) < target_value:
@@ -1067,6 +1091,7 @@ def objective_detailed_view_current_value(request, kr_id):
 
 @post_only
 @login_required
+@permission_required("pms.change_objective")
 def objective_archive(request, id):
     """
     this function is used to archive the objective
@@ -2160,6 +2185,23 @@ def feedback_detailed_view_answer(request, id, emp_id):
     return handle_no_permission(request)
 
 
+def _feedback_participant(user, feedback):
+    """
+    Whether the signed-in user is one of the people this feedback was sent to: the employee
+    it is about, their manager, a colleague, a subordinate, or one of the other reviewers.
+    Anyone else must not read or answer it.
+    """
+    me = getattr(user, "employee_get", None)
+    if me is None:
+        return False
+    if me.pk in (feedback.employee_id_id, feedback.manager_id_id):
+        return True
+    return any(
+        group.filter(pk=me.pk).exists()
+        for group in (feedback.colleague_id, feedback.subordinate_id, feedback.others_id)
+    )
+
+
 @login_required
 def feedback_answer_get(request, id, **kwargs):
     """
@@ -2175,6 +2217,8 @@ def feedback_answer_get(request, id, **kwargs):
         return HorillaRedirect(
             request, message=_("No Feedback found matching the query.")
         )
+    if not _feedback_participant(request.user, feedback):
+        raise Http404
 
     # check if the feedback start_date is not started yet
     if feedback.start_date > datetime.date.today():
@@ -2240,6 +2284,8 @@ def feedback_answer_post(request, id):
         return HorillaRedirect(
             request, message=_("No Feedback found matching the query.")
         )
+    if not _feedback_participant(request.user, feedback):
+        raise Http404
 
     user = request.user
     employee = Employee.objects.filter(employee_user_id=user).first()
@@ -2293,6 +2339,8 @@ def feedback_answer_view(request, id, **kwargs):
         return HorillaRedirect(
             request, message=_("No Feedback found matching the query.")
         )
+    if not _feedback_participant(request.user, feedback):
+        raise Http404
 
     user = request.user
     employee = Employee.objects.filter(employee_user_id=user).first()
@@ -2386,6 +2434,8 @@ def feedback_detailed_view_status(request, id):
     """
     status = request.POST.get("feedback_status")
     feedback = get_object_or_404(Feedback, id=id)
+    if not (request.user.has_perm("pms.change_feedback") or _feedback_participant(request.user, feedback)):
+        raise Http404
     answer = Answer.objects.filter(feedback_id=feedback)
     if status == "Not Started" and answer:
         messages.warning(request, _("Feedback is already started"))
@@ -4228,6 +4278,19 @@ def meeting_single_view(request, id):
         return HorillaRedirect(
             request, message=_("No Meetings found matching the query.")
         )
+    me = getattr(request.user, "employee_get", None)
+    if not (
+        request.user.has_perm("pms.view_meetings")
+        or (
+            me is not None
+            and (
+                meeting.employee_id.filter(pk=me.pk).exists()
+                or meeting.manager.filter(pk=me.pk).exists()
+                or meeting.answer_employees.filter(pk=me.pk).exists()
+            )
+        )
+    ):
+        raise Http404
 
     context = {"meeting": meeting}
     requests_ids_json = request.GET.get("requests_ids")

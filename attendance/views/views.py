@@ -2352,6 +2352,10 @@ def create_attendancerequest_comment(request, attendance_id):
     """
     previous_data = request.GET.urlencode()
     attendance = Attendance.objects.filter(id=attendance_id).first()
+    if attendance is not None:
+        check_employee_access(
+            request.user, attendance.employee_id, "attendance.view_attendance"
+        )
     emp = request.user.employee_get
     form = AttendanceRequestCommentForm(
         initial={"employee_id": emp.id, "request_id": attendance_id}
@@ -2535,7 +2539,18 @@ def delete_comment_file(request):
     """
     script = ""
     ids = request.GET.getlist("ids")
-    AttendanceRequestFile.objects.filter(id__in=ids).delete()
+    # a file may be removed only by someone allowed to see the request it was attached to
+    allowed = []
+    for file in AttendanceRequestFile.objects.filter(id__in=ids):
+        comment = AttendanceRequestComment.objects.filter(files=file).first()
+        if comment is None:
+            continue
+        if comment.employee_id.employee_user_id_id != request.user.pk:
+            check_employee_access(
+                request.user, comment.request_id.employee_id, "attendance.change_attendance"
+            )
+        allowed.append(file.pk)
+    AttendanceRequestFile.objects.filter(id__in=allowed).delete()
     messages.success(request, _("File deleted successfully"))
     return HttpResponse(script)
 

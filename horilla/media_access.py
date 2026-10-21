@@ -25,40 +25,53 @@ def _employees_of(instance, field):
     return [owners]
 
 
-def _employee_owned(owner_field, perm):
-    """The file belongs to employee(s): them, their managers, or a holder of ``perm``."""
+def _employee_owned(owner_field, perm, request_type=None):
+    """
+    The file belongs to employee(s): them, their managers, or a holder of ``perm``. With a
+    ``request_type`` the employee's second managers and manager-of-manager, who may be given
+    access to that kind of request, count as managers too.
+    """
 
     def check(user, instance):
-        from horilla.access import can_access_employee, is_manager_in_chain
+        from horilla.access import can_access_employee, can_manager_view, is_manager_in_chain
 
         for owner in _employees_of(instance, owner_field):
             if can_access_employee(user, owner, perm) or is_manager_in_chain(user, owner):
+                return True
+            if request_type and can_manager_view(user, owner, request_type):
                 return True
         return False
 
     return check
 
 
+def manages_candidate(user, candidate, perm="recruitment.view_candidate"):
+    """
+    Staff who may deal with ``candidate``: holders of ``perm`` and the managers and heads of the
+    candidate's recruitment, and the managers of the candidate's stage.
+    """
+    from horilla.access import current_employee
+
+    if user.has_perm(perm):
+        return True
+    me = current_employee(user)
+    if candidate is None or me is None:
+        return False
+    recruitment = candidate.recruitment_id
+    if recruitment is not None and (
+        recruitment.recruitment_managers.filter(pk=me.pk).exists()
+        or recruitment.recruitment_heads.filter(pk=me.pk).exists()
+    ):
+        return True
+    stage = candidate.stage_id
+    return stage is not None and stage.stage_managers.filter(pk=me.pk).exists()
+
+
 def _candidate_file(candidate_of):
     """A candidate's file: holders of view_candidate and the managers of that recruitment."""
 
     def check(user, instance):
-        from horilla.access import current_employee
-
-        if user.has_perm("recruitment.view_candidate"):
-            return True
-        candidate = candidate_of(instance)
-        me = current_employee(user)
-        if candidate is None or me is None:
-            return False
-        recruitment = candidate.recruitment_id
-        if recruitment is not None and (
-            recruitment.recruitment_managers.filter(pk=me.pk).exists()
-            or recruitment.recruitment_heads.filter(pk=me.pk).exists()
-        ):
-            return True
-        stage = candidate.stage_id
-        return stage is not None and stage.stage_managers.filter(pk=me.pk).exists()
+        return manages_candidate(user, candidate_of(instance))
 
     return check
 
@@ -75,7 +88,7 @@ RULES = {
         "employee_id", "employee.view_disciplinaryaction"
     ),
     ("offboarding", "resignationletter", "attachment"): _employee_owned(
-        "employee_id", "offboarding.view_resignationletter"
+        "employee_id", "offboarding.view_resignationletter", request_type="resignation"
     ),
     ("recruitment", "candidate", "resume"): _candidate_file(lambda candidate: candidate),
     ("recruitment", "candidatedocument", "document"): _candidate_file(lambda document: document.candidate_id),

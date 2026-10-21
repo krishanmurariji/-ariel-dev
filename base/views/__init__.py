@@ -35,7 +35,7 @@ from django.core.management import call_command
 from django.core.validators import validate_ipv46_address
 from django.db.models import ProtectedError, Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
-from horilla.access import check_employee_access
+from horilla.access import check_employee_access, is_manager_in_chain
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
@@ -4378,6 +4378,9 @@ def work_type_request_delete(request, obj_id):
 
     try:
         work_type_request = WorkTypeRequest.objects.get(id=obj_id)
+        check_employee_access(
+            request.user, work_type_request.employee_id, "base.delete_worktyperequest"
+        )
         employee = work_type_request.employee_id
         messages.success(request, _("Work type request deleted."))
         work_type_request.delete()
@@ -5127,6 +5130,12 @@ def shift_allocation_request_cancel(request, id):
         return HorillaRedirect(
             request, message=_("No shift request found matching the query.")
         )
+    check_employee_access(
+        request.user,
+        shift_request.employee_id,
+        "base.change_shiftrequest",
+        also_allow=[shift_request.reallocate_to],
+    )
 
     shift_request.reallocate_canceled = True
     shift_request.reallocate_approved = False
@@ -5301,6 +5310,16 @@ def shift_allocation_request_approve(request, id):
         return HorillaRedirect(
             request, message=_("No shift request found matching the query.")
         )
+    # the colleague asked to take the shift answers it; managers and holders of the
+    # permission may too - nobody else
+    me = getattr(request.user, "employee_get", None)
+    asked = shift_request.reallocate_to
+    if not (
+        (me is not None and asked is not None and me.pk == asked.pk)
+        or request.user.has_perm("base.change_shiftrequest")
+        or is_manager_in_chain(request.user, shift_request.employee_id)
+    ):
+        raise Http404
 
     if not shift_request.is_any_request_exists():
         shift_request.reallocate_approved = True
@@ -5389,6 +5408,11 @@ def shift_request_delete(request, id):
 
     try:
         shift_request = ShiftRequest.find(id)
+        if shift_request is not None:
+            # only the employee, their managers and holders of the permission may delete it
+            check_employee_access(
+                request.user, shift_request.employee_id, "base.delete_shiftrequest"
+            )
         user = shift_request.employee_id.employee_user_id
         messages.success(request, "Shift request deleted")
         shift_request.delete()
@@ -6668,6 +6692,13 @@ def create_shiftrequest_comment(request, shift_id):
     This method renders form and template to create shift request comments
     """
     shift = ShiftRequest.find(shift_id)
+    if shift is not None:
+        check_employee_access(
+            request.user,
+            shift.employee_id,
+            "base.view_shiftrequest",
+            also_allow=[shift.reallocate_to],
+        )
     emp = request.user.employee_get
     form = ShiftRequestCommentForm(
         initial={"employee_id": emp.id, "request_id": shift_id}
@@ -6965,6 +6996,10 @@ def create_worktyperequest_comment(request, worktype_id):
     This method renders form and template to create Work type request comments
     """
     work_type = WorkTypeRequest.objects.filter(id=worktype_id).first()
+    if work_type is not None:
+        check_employee_access(
+            request.user, work_type.employee_id, "base.view_worktyperequest"
+        )
     emp = request.user.employee_get
     form = WorkTypeRequestCommentForm(
         initial={"employee_id": emp.id, "request_id": worktype_id}
