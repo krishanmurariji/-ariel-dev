@@ -7,6 +7,7 @@ This module is used to map url pattens with django views or methods
 from horilla.post_only import post_only
 import csv
 import hmac
+from functools import wraps
 import json
 import mimetypes
 import os
@@ -295,6 +296,40 @@ def initialize_database_condition():
     return init_database
 
 
+def setup_only(view):
+    """
+    The first-run setup screens create the first administrator and the first
+    company. They have no login, so once the system is set up they must not
+    answer at all - otherwise anyone who can open the login page could create a
+    superuser or change the master data.
+    """
+
+    @wraps(view)
+    def wrapped(request, *args, **kwargs):
+        if not initialize_database_condition():
+            raise Http404
+        return view(request, *args, **kwargs)
+
+    return wrapped
+
+
+def setup_step(view):
+    """
+    The steps after "create the administrator". The administrator who has just
+    been created is signed in by then, so setup is also open to a signed-in
+    superuser; anybody else only while the system is still empty.
+    """
+
+    @wraps(view)
+    def wrapped(request, *args, **kwargs):
+        user = request.user
+        if not (user.is_authenticated and user.is_superuser) and not initialize_database_condition():
+            raise Http404
+        return view(request, *args, **kwargs)
+
+    return wrapped
+
+
 def _shift_fixture_dates(file_path):
     """
     Return a date-shifted version of a JSON fixture as a string.
@@ -423,6 +458,7 @@ def initialize_database(request):
         return redirect("/")
 
 
+@setup_only
 @hx_request_required
 def initialize_database_user(request):
     """
@@ -470,6 +506,7 @@ def initialize_database_user(request):
     return render(request, "initialize_database/horilla_user_signup.html")
 
 
+@setup_step
 @hx_request_required
 def initialize_database_company(request):
     """
@@ -500,6 +537,7 @@ def initialize_database_company(request):
     return render(request, "initialize_database/horilla_company.html", {"form": form})
 
 
+@setup_step
 @hx_request_required
 def initialize_database_department(request):
     """
@@ -526,6 +564,7 @@ def initialize_database_department(request):
     )
 
 
+@setup_step
 @hx_request_required
 def initialize_department_edit(request, obj_id):
     """
@@ -564,6 +603,7 @@ def initialize_department_edit(request, obj_id):
     )
 
 
+@setup_step
 @post_only
 @hx_request_required
 def initialize_department_delete(request, obj_id):
@@ -582,6 +622,7 @@ def initialize_department_delete(request, obj_id):
     return redirect(initialize_database_department)
 
 
+@setup_step
 @hx_request_required
 def initialize_database_job_position(request):
     """
@@ -616,6 +657,7 @@ def initialize_database_job_position(request):
     )
 
 
+@setup_step
 @hx_request_required
 def initialize_job_position_edit(request, obj_id):
     """
@@ -656,6 +698,8 @@ def initialize_job_position_edit(request, obj_id):
     )
 
 
+@setup_step
+@post_only
 @hx_request_required
 def initialize_job_position_delete(request, obj_id):
     """
