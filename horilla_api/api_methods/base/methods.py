@@ -115,6 +115,25 @@ def owned_object(user, perm, model, pk, owner_field="employee_id", managers=True
     return None
 
 
+def can_act_on_employee(user, perm, employee, allow_self=False):
+    """
+    May ``user`` act (approve, validate, delete...) on a record that belongs to ``employee``?
+    Yes for a holder of ``perm`` and for the employee's managers (nested while
+    NESTED_SUBORDINATE_VISIBILITY is on); the employee themselves only with ``allow_self``,
+    so nobody approves their own request just by being logged in.
+    """
+    from horilla.access import current_employee, is_manager_in_chain
+
+    if employee is None:
+        return False
+    if user.has_perm(perm):
+        return True
+    me = current_employee(user)
+    if me is not None and me.pk == employee.pk:
+        return allow_self
+    return is_manager_in_chain(user, employee)
+
+
 def permitted_object(user, perm, model, pk):
     """
     Single-record counterpart of permission_based_queryset: the object with

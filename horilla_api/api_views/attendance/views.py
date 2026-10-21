@@ -32,7 +32,11 @@ from ...api_decorators.base.decorators import (
     manager_permission_required,
     permission_required,
 )
-from ...api_methods.base.methods import groupby_queryset, permission_based_queryset
+from ...api_methods.base.methods import (
+    can_act_on_employee,
+    groupby_queryset,
+    permission_based_queryset,
+)
 from ...api_serializers.attendance.serializers import (
     AttendanceActivitySerializer,
     AttendanceLateComeEarlyOutSerializer,
@@ -340,6 +344,11 @@ class ValidateAttendanceView(APIView):
     permission_classes = [IsAuthenticated]
 
     def put(self, request, pk):
+        target = Attendance.objects.filter(id=pk).first()
+        if target is None:
+            return Response({"error": "Attendance not found"}, status=404)
+        if not can_act_on_employee(request.user, "attendance.change_attendance", target.employee_id):
+            return Response({"error": "You do not have permission to do this"}, status=403)
         attendance = Attendance.objects.filter(id=pk).update(attendance_validated=True)
         attendance = Attendance.objects.filter(id=pk).first()
         try:
@@ -371,6 +380,12 @@ class OvertimeApproveView(APIView):
     permission_classes = [IsAuthenticated]
 
     def put(self, request, pk):
+        target = Attendance.objects.filter(id=pk).first()
+        if target is None:
+            return Response({"error": "Attendance not found"}, status=404)
+        # holders of the permission and the employee managers - not any signed-in user
+        if not can_act_on_employee(request.user, "attendance.change_attendance", target.employee_id):
+            return Response({"error": "You do not have permission to do this"}, status=403)
         try:
             attendance = Attendance.objects.filter(id=pk).update(
                 attendance_overtime_approve=True
@@ -949,6 +964,10 @@ class ConvertedMailTemplateConvert(APIView):
         employee_id = request.data.get("employee_id", None)
         employee = Employee.objects.filter(id=employee_id).first()
         bdy = HorillaMailTemplate.objects.filter(id=template_id).first()
+        if employee is None or bdy is None:
+            return Response({"error": "Employee or template not found"}, status=404)
+        if not can_act_on_employee(request.user, "employee.view_employee", employee):
+            return Response({"error": "You do not have permission to do this"}, status=403)
         template_bdy = template.Template(sanitize_mail_template_body(bdy.body))
         context = template.Context(
             {"instance": employee, "self": request.user.employee_get}
@@ -977,7 +996,12 @@ class OfflineEmployeeMailsend(APIView):
         ]
         email_backend = ConfiguredEmailBackend()
         host = email_backend.dynamic_username
-        employee = Employee.objects.get(id=employee_id)
+        employee = Employee.objects.filter(id=employee_id).first()
+        if employee is None:
+            return Response({"error": "Employee not found"}, status=404)
+        # mailing an employee from the company address is for HR and their managers
+        if not can_act_on_employee(request.user, "employee.view_employee", employee):
+            return Response({"error": "You do not have permission to do this"}, status=403)
         template_attachment_ids = request.POST.getlist("template_attachments")
         bodys = list(
             HorillaMailTemplate.objects.filter(

@@ -45,6 +45,7 @@ from ...api_decorators.base.decorators import (
     permission_required,
 )
 from ...api_methods.base.methods import (
+    can_act_on_employee,
     groupby_queryset,
     permission_based_queryset,
     permitted_object,
@@ -1201,15 +1202,27 @@ class ShiftRequestDeleteView(APIView):
         if pk is None:
             try:
                 ids = request.data["ids"]
-                shift_requests = ShiftRequest.objects.filter(id__in=ids)
+                # only the requests the user may delete: their own, their reports, or all with the permission
+                allowed = [
+                    shift_request.pk
+                    for shift_request in ShiftRequest.objects.filter(id__in=ids)
+                    if can_act_on_employee(
+                        request.user, "base.delete_shiftrequest", shift_request.employee_id, allow_self=True
+                    )
+                ]
+                shift_requests = ShiftRequest.objects.filter(id__in=allowed)
                 shift_requests.delete()
             except Exception as e:
                 return Response({"status": "failed", "error": str(e)}, status=400)
             return Response({"status": "success"}, status=200)
         try:
             shift_request = ShiftRequest.objects.get(id=pk)
+            if not can_act_on_employee(
+                request.user, "base.delete_shiftrequest", shift_request.employee_id, allow_self=True
+            ):
+                return Response({"status": "failed", "error": "You do not have permission to do this"}, status=403)
             if not shift_request.approved:
-                raise
+                return Response({"status": "failed", "error": "Only an approved shift request can be deleted here"}, status=400)
             shift_request.delete()
 
         except ShiftRequest.DoesNotExist:
@@ -1231,7 +1244,17 @@ class ShiftRequestAllocationView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, id):
-        shift_request = ShiftRequest.objects.get(id=id)
+        shift_request = ShiftRequest.objects.filter(id=id).first()
+        if shift_request is None:
+            return Response({"error": "Shift request not found"}, status=404)
+        # the colleague asked to take the shift answers it; managers and permission holders may too
+        me = getattr(request.user, "employee_get", None)
+        asked = shift_request.reallocate_to
+        if not (
+            (me is not None and asked is not None and me.pk == asked.pk)
+            or can_act_on_employee(request.user, "base.change_shiftrequest", shift_request.employee_id)
+        ):
+            return Response({"error": "You do not have permission to do this"}, status=403)
         if not shift_request.is_any_request_exists():
             shift_request.reallocate_approved = True
             shift_request.reallocate_canceled = False
@@ -1251,6 +1274,8 @@ class RotatingShiftAssignBulkArchive(APIView):
     permission_classes = [IsAuthenticated]
 
     def put(self, request, status):
+        if not request.user.has_perm("base.change_rotatingshiftassign"):
+            return Response({"error": "You do not have permission to do this"}, status=403)
         ids = request.data.get("ids", None)
         try:
             rotating_shift_asssign = RotatingShiftAssign.objects.filter(id__in=ids)
@@ -1264,6 +1289,8 @@ class RotatingShiftAssignBulkDelete(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request):
+        if not request.user.has_perm("base.delete_rotatingshiftassign"):
+            return Response({"error": "You do not have permission to do this"}, status=403)
         ids = request.data.get("ids", None)
         try:
             rotating_shift_asssign = RotatingShiftAssign.objects.filter(id__in=ids)

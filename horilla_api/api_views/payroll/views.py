@@ -29,7 +29,11 @@ from payroll.models.tax_models import TaxBracket
 from payroll.threadings.mail import MailSendThread
 from payroll.views.views import payslip_pdf
 
-from ...api_methods.base.methods import groupby_queryset, owned_object
+from ...api_methods.base.methods import (
+    can_act_on_employee,
+    groupby_queryset,
+    owned_object,
+)
 from ...api_serializers.payroll.serializers import (
     AllowanceSerializer,
     ContractSerializer,
@@ -346,12 +350,17 @@ class ReimbusementApproveRejectView(APIView):
 
     def post(self, request, pk):
         status = request.data.get("status", None)
-        amount = request.data.get("amount", None)
-        amount = (
-            eval_validate(request.data.get("amount"))
-            if request.data.get("amount")
-            else 0
-        )
+        # approving, rejecting and changing the amount is for HR and the employee manager
+        target = Reimbursement.objects.filter(id=pk).first()
+        if target is None:
+            return Response({"error": "Reimbursement not found"}, status=404)
+        if not can_act_on_employee(request.user, "payroll.change_reimbursement", target.employee_id):
+            return Response({"error": "You do not have permission to do this"}, status=403)
+        try:
+            # a JSON number and a string both work (eval_validate only accepted strings)
+            amount = float(request.data.get("amount") or 0)
+        except (TypeError, ValueError):
+            return Response({"error": "Amount must be a number"}, status=400)
         amount = max(0, amount)
         reimbursement = Reimbursement.objects.filter(id=pk)
         if amount:
