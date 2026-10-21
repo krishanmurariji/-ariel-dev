@@ -3476,7 +3476,7 @@ def employee_leave_details(request):
             balance_count = i.available_days
         if date:
             try:
-                balance_count += balance.first().forcasted_leaves()[date[:7]]
+                balance_count += balance.first().forcasted_leaves_by_month()[date[:7]]
             except:
                 pass
     return JsonResponse({"leave_count": balance_count, "employee": employee})

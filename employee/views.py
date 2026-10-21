@@ -498,7 +498,7 @@ def about_tab(request, pk, **kwargs):
 
 @login_required
 @hx_request_required
-def allowances_deductions_tab(request, pk):
+def allowances_deductions_tab(request, emp_id):
     """
     Retrieve and render the allowances and deductions applicable to an employee.
 
@@ -508,7 +508,7 @@ def allowances_deductions_tab(request, pk):
     condition-based rules. The results are then rendered in the allowance and
     deduction tab template.
     """
-    employee = get_object_or_404(Employee, id=pk)
+    employee = get_object_or_404(Employee, id=emp_id)
     if not can_access_employee(request.user, employee):
         raise Http404
     active_contracts = (

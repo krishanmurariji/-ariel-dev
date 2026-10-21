@@ -710,7 +710,7 @@ class AvailableLeave(HorillaModel):
         """
         return f"{self.employee_id.get_department()} / {self.employee_id.get_job_position()}"
 
-    def forcasted_leaves(self):
+    def forcasted_leaves_by_month(self):
         forecasted_leave = {}
         if self.leave_type_id.reset_based == "monthly":
             today = datetime.now()

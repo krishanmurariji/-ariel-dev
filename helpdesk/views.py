@@ -407,7 +407,7 @@ def faq_delete(request, id):
         message = _("No FAQ found matching the query.")
 
     except ProtectedError:
-        messages = _("You cannot delete this FAQ.")
+        message = _("You cannot delete this FAQ.")
 
     return HorillaRedirect(request, message=message)
 
@@ -1477,9 +1477,9 @@ def approve_claim_request(request, req_id):
     if not (
         request.user.has_perm("helpdesk.change_claimrequest")
         or request.user.has_perm("helpdesk.change_ticket")
-        or is_department_manager(request, ticket)
+        or is_department_manager(request, claim_request.ticket_id)
     ):
-        handle_no_permission(request)
+        return handle_no_permission(request)
 
     approve = strtobool(
         request.GET.get("approve", "False")

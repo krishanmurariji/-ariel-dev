@@ -2178,6 +2178,7 @@ def assign_shift(request, grace_id):
             "attendance/grace_time/assign_shift.html",
             {"form": form, "grace_time": gracetime},
         )
+    return HorillaRedirect(request, message=_("Grace time not found."))
 
 
 @login_required
