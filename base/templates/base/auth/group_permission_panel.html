@@ -1,0 +1,15 @@
+{% load basefilters %}
+{% include "base/auth/permission_table.html" %}
+<script>
+  (function () {
+    checkSelected(`{{group.permissions.all|user_perms|safe}}`, "#panel{{group.id}}", true);
+    updateBadge();
+    // The themed accordion fixes the panel height when it opens, before this table arrived.
+    setTimeout(function () {
+      var panel = $("#panel{{group.id}}");
+      if (panel.hasClass("accordion-panel-gp") && panel.css("max-height") !== "0px") {
+        panel.css("max-height", panel[0].scrollHeight + "px");
+      }
+    }, 0);
+  })();
+</script>

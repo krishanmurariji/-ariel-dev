@@ -7,6 +7,7 @@
             id="groupPanel{{group.id}}"
         >
             <button
+                id="groupBtn{{group.id}}"
                 onclick="event.preventDefault()"
                 class="accordion-btn-gp w-full flex justify-between gap-5 md:gap-0 items-center flex-wrap px-4 py-2 bg-primary-100 text-primary-600 text-sm transition-all"
             >
@@ -83,16 +84,13 @@
                 data-group-name="{{group.name}}"
             >
                 <div class="py-3">
-                    <script>
-                        $(document).ready(function () {
-                            checkSelected(
-                                `{{group.permissions.all|user_perms|safe}}`,
-                                "#panel{{group.id}}",
-                                true,
-                            );
-                        });
-                    </script>
-                    {% include "base/auth/permission_table.html" %}
+                    <div
+                        hx-get="{% url 'user-group-permissions' group.id %}"
+                        hx-trigger="click from:#groupBtn{{group.id}} once"
+                        hx-swap="innerHTML"
+                    >
+                        <span class="text-xs text-[#666]">{% trans "Loading..." %}</span>
+                    </div>
                 </div>
             </div>
         </div>

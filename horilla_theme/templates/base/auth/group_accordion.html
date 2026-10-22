@@ -30,6 +30,7 @@
         </div>
         {% if perms.auth.add_group %}
             <button
+                id="groupCreateBtn"
                 class="px-4 py-2 bg-primary-600 text-white rounded-md text-xs flex flex-wrap items-center gap-2 hover:bg-primary-800 transition duration-300"
                 data-toggle="oh-modal-toggle"
                 data-target="#Permissions"
@@ -85,7 +86,9 @@
                 class="oh-profile-section perm-form"
                 id="permissionForm"
             >
-                {% include "base/auth/group_assign.html" %}
+                <div hx-get="{% url 'user-group-create' %}" hx-trigger="click from:#groupCreateBtn once" hx-swap="outerHTML">
+          <span>{% trans "Loading..." %}</span>
+        </div>
             </form>
         </div>
     </div>
@@ -198,9 +201,10 @@
     $(document).ready(function () {
         updateBadge();
         var timeout;
-        $("#permissionContainer [name=permissions]").on("change", function (e) {
+        // Delegated: each group's permission table is fetched when it is first opened.
+    $(document).off("change.groupPerm").on("change.groupPerm", "#permissionContainer [name=permissions]", function (e) {
             e.preventDefault();
-            clearTimeout();
+            clearTimeout(timeout);
             timeout = setTimeout(function () {
                 updateBadge($(this));
                 updateGroupPermissions($(e.target));

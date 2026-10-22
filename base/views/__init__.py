@@ -7,7 +7,7 @@ This module is used to map url pattens with django views or methods
 from horilla.post_only import post_only
 import csv
 import hmac
-from functools import wraps
+from functools import lru_cache, wraps
 import json
 import mimetypes
 import os
@@ -44,6 +44,7 @@ from django.utils._os import safe_join
 from django.utils.decorators import method_decorator
 from django.utils.html import format_html, strip_tags
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.translation import get_language
 from django.utils.translation import gettext as _
 from django.views import View
 from django.views.decorators.http import require_http_methods
@@ -1223,18 +1224,10 @@ class SettingsView(LoginRequiredMixin, RedirectView):
     pattern_name = "system-preferences-view"
 
 
-@login_required
-@hx_request_required
-@permission_required("auth.add_group")
-def user_group_table(request):
-    """
-    Group assign htmx view
-    """
+@lru_cache(maxsize=None)
+def _permission_tree_for(language, tidy_names):
     permissions = []
-    apps = settings.APPS
-    no_permission_models = settings.NO_PERMISSION_MODALS
-    form = UserGroupForm()
-    for app_name in apps:
+    for app_name in settings.APPS:
         app_models = []
         for model in get_models_in_app(app_name):
             app_models.append(
@@ -1243,7 +1236,54 @@ def user_group_table(request):
                     "model_name": model._meta.model_name,
                 }
             )
-        permissions.append({"app": app_name.capitalize(), "app_models": app_models})
+        label = app_name.capitalize()
+        permissions.append(
+            {
+                "app": label.replace("_", " ") if tidy_names else label,
+                "app_models": app_models,
+            }
+        )
+    return permissions
+
+
+def _permission_tree(tidy_names=False):
+    """
+    Apps and their models for the permission tables. The model list only
+    changes with a deploy, so it is built once per language and reused.
+    """
+    return _permission_tree_for(get_language(), tidy_names)
+
+
+@login_required
+@hx_request_required
+@permission_required("auth.view_group")
+def user_group_permissions(request, group_id):
+    """
+    Permission table of one group, fetched when its panel is first opened so
+    the group list page does not carry a full table for every group.
+    """
+    group = get_object_or_404(Group, id=group_id)
+    return render(
+        request,
+        "base/auth/group_permission_panel.html",
+        {
+            "group": group,
+            "permissions": _permission_tree(),
+            "no_permission_models": settings.NO_PERMISSION_MODALS,
+        },
+    )
+
+
+@login_required
+@hx_request_required
+@permission_required("auth.add_group")
+def user_group_table(request):
+    """
+    Group assign htmx view
+    """
+    permissions = _permission_tree()
+    no_permission_models = settings.NO_PERMISSION_MODALS
+    form = UserGroupForm()
     if request.method == "POST":
         form = UserGroupForm(request.POST)
         if form.is_valid():
@@ -1304,23 +1344,9 @@ def user_group(request):
     """
     This method is used to create user permission group
     """
-    permissions = []
-
-    apps = settings.APPS
+    permissions = _permission_tree(tidy_names=True)
     no_permission_models = settings.NO_PERMISSION_MODALS
     form = UserGroupForm()
-    for app_name in apps:
-        app_models = []
-        for model in get_models_in_app(app_name):
-            app_models.append(
-                {
-                    "verbose_name": model._meta.verbose_name.capitalize(),
-                    "model_name": model._meta.model_name,
-                }
-            )
-        permissions.append(
-            {"app": app_name.capitalize().replace("_", " "), "app_models": app_models}
-        )
     groups = Group.objects.all()
     return render(
         request,
@@ -1341,21 +1367,9 @@ def user_group_search(request):
     """
     This method is used to create user permission group
     """
-    permissions = []
-
-    apps = settings.APPS
+    permissions = _permission_tree()
     no_permission_models = settings.NO_PERMISSION_MODALS
     form = UserGroupForm()
-    for app_name in apps:
-        app_models = []
-        for model in get_models_in_app(app_name):
-            app_models.append(
-                {
-                    "verbose_name": model._meta.verbose_name.capitalize(),
-                    "model_name": model._meta.model_name,
-                }
-            )
-        permissions.append({"app": app_name.capitalize(), "app_models": app_models})
     search = ""
     if request.GET.get("search"):
         search = str(request.GET["search"])

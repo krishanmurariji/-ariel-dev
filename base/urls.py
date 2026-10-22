@@ -336,6 +336,11 @@ urlpatterns = [
     ),
     path("settings/user-group-view/", views.user_group, name="user-group-view"),
     path(
+        "settings/user-group-permissions/<int:group_id>/",
+        views.user_group_permissions,
+        name="user-group-permissions",
+    ),
+    path(
         "settings/user-group-search/", views.user_group_search, name="user-group-search"
     ),
     path(
