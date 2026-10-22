@@ -170,7 +170,7 @@ def _log(
     )
     if resume_content is not None:
         defaults["resume"] = ContentFile(resume_content, name=resume_name)
-    CandidateIntakeLog.objects.update_or_create(
+    CandidateIntakeLog.objects.entire().update_or_create(
         message_id=message.id,
         defaults=defaults,
     )

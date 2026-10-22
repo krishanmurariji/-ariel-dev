@@ -402,7 +402,9 @@ def notice_policy_assign(request):
         message = _("%(n)s employee(s) are back on the default policy.") % {"n": len(employees)}
     else:
         for employee in employees:
-            EmployeeNoticePolicy.objects.update_or_create(
+            # .entire(): update_or_create locks the row, and PostgreSQL refuses FOR UPDATE with the
+            # DISTINCT the company filter adds once a company is selected
+            EmployeeNoticePolicy.objects.entire().update_or_create(
                 employee_id=employee, defaults={"policy_id": policy}
             )
         message = _("%(n)s employee(s) assigned to '%(name)s'.") % {

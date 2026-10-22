@@ -360,3 +360,33 @@ class PersonalDetailsLoginTests(IsolatedTestCase):
         start = text.index("def employee_creation")
         end = text.index("def employee_education")
         self.assertIn('backend="django.contrib.auth.backends.ModelBackend"', text[start:end])
+
+
+# ------------------------------------- 6. forms that crashed on an empty choice
+
+
+class EmptyChoiceFormTests(IsolatedTestCase):
+    def setUp(self):
+        user, _ = make_employee("ec_hr")
+        user.is_superuser = True
+        user.is_staff = True
+        user.save()
+        self.client = Client(raise_request_exception=False)
+        self.client.force_login(user)
+        self.candidate = CandidateFactory()
+
+    def test_adding_a_candidate_without_a_recruitment_shows_a_field_error(self):
+        response = self.client.post(
+            reverse("candidate-create"),
+            {"name": "No Recruitment", "email": "no.recruitment@example.com", "recruitment_id": ""},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(b"missing from the request", response.content)
+        self.assertContains(response, "This field is required")
+
+    def test_adding_a_candidate_to_a_skill_zone_without_choosing_one_does_not_crash(self):
+        response = self.client.post(
+            reverse("to-skill-zone", args=[self.candidate.pk]), {"reason": "x"}, HTTP_HX_REQUEST="true"
+        )
+        self.assertEqual(response.status_code, 200)

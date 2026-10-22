@@ -62,6 +62,17 @@ logger = logging.getLogger(__name__)
 
 
 @method_decorator(hx_request_required, name="dispatch")
+
+def _locking_manager(model):
+    """
+    The manager to use with update_or_create (which locks the row): the company-scoped managers add
+    DISTINCT once a company is selected, and PostgreSQL refuses FOR UPDATE with DISTINCT, so they are
+    bypassed with .entire() where they have it.
+    """
+    manager = model.objects
+    return manager.entire() if hasattr(manager, "entire") else manager
+
+
 class HorillaListView(ListView):
     """
     HorillaListView
@@ -1124,7 +1135,7 @@ class HorillaListView(ListView):
                                 view=self,
                             )
                         for o2o_instance in records:
-                            related_model.objects.update_or_create(
+                            _locking_manager(related_model).update_or_create(
                                 id=o2o_instance.id,
                                 defaults={
                                     field: getattr(o2o_instance, field)
@@ -1150,7 +1161,7 @@ class HorillaListView(ListView):
                     )
                 else:
                     for model_obj in bulk_update_base_grouping:
-                        self.model.objects.update_or_create(
+                        _locking_manager(self.model).update_or_create(
                             id=model_obj.id,
                             defaults={
                                 field: getattr(model_obj, field)
@@ -1186,7 +1197,7 @@ class HorillaListView(ListView):
                             for (
                                 reverse_related_obj
                             ) in bulk_update_reverse_related_grouping[field]:
-                                related_model.objects.update_or_create(
+                                _locking_manager(related_model).update_or_create(
                                     id=reverse_related_obj.id,
                                     defaults={
                                         field: getattr(reverse_related_obj, field)
@@ -1223,7 +1234,7 @@ class HorillaListView(ListView):
                                 field
                             ]:
                                 # reverse_related_obj.save()
-                                related_model.objects.update_or_create(
+                                _locking_manager(related_model).update_or_create(
                                     id=reverse_related_obj.id,
                                     defaults={
                                         field: getattr(reverse_related_obj, field)

@@ -1773,7 +1773,7 @@ def employee_creation(request, token):
             emergency_contact_formset.instance = employee_personal_info
             emergency_contact_formset.save()
 
-            EmployeeWorkInformation.objects.update_or_create(
+            EmployeeWorkInformation.objects.entire().update_or_create(
                 employee_id=employee_personal_info,
                 defaults={
                     "department_id": candidate.job_position_id.department_id,

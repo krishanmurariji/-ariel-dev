@@ -573,9 +573,10 @@ class CandidateCreationForm(BaseModelForm):
 
     def clean(self):
         errors = {}
-        resume = self.cleaned_data["resume"]
-        recruitment: Recruitment = self.cleaned_data["recruitment_id"]
-        if not resume and not recruitment.optional_resume:
+        resume = self.cleaned_data.get("resume")
+        recruitment: Recruitment = self.cleaned_data.get("recruitment_id")
+        # a missing recruitment is reported on its own field; do not crash on it here
+        if recruitment is not None and not resume and not recruitment.optional_resume:
             errors["resume"] = _("This field is required")
         if self.instance.name is not None:
             self.errors.pop("job_position_id", None)
@@ -585,8 +586,9 @@ class CandidateCreationForm(BaseModelForm):
             ):
                 errors["job_position_id"] = _("This field is required")
             if (
-                self.instance.job_position_id
-                not in self.instance.recruitment_id.open_positions.all()
+                recruitment is not None
+                and self.instance.job_position_id
+                not in recruitment.open_positions.all()
             ):
                 errors["job_position_id"] = _("Choose valid choice")
         if errors:
@@ -1682,7 +1684,7 @@ class ToSkillZoneForm(ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         candidate = cleaned_data.get("candidate_id")
-        skill_zones = cleaned_data.get("skill_zone_ids")
+        skill_zones = cleaned_data.get("skill_zone_ids") or []
         skill_zone_list = []
         for skill_zone in skill_zones:
             # Check for the unique together constraint manually
