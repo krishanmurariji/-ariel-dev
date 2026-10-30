@@ -45,6 +45,8 @@ from base.methods import (
 from base.models import CompanyLeaves, Holidays, PenaltyAccounts
 from employee.models import Employee
 from horilla.decorators import (
+    employees_of_ids,
+    employee_of,
     hx_request_required,
     logger,
     login_required,
@@ -931,7 +933,7 @@ def leave_request_filter(request):
 
 @login_required
 @hx_request_required
-@manager_can_enter("leave.change_leaverequest")
+@manager_can_enter("leave.change_leaverequest", target=employee_of("leave.LeaveRequest", "id"))
 def leave_request_update(request, id):
     """
     function used to update leave request.
@@ -979,7 +981,7 @@ def leave_request_update(request, id):
 @post_only
 @login_required
 @hx_request_required
-@manager_can_enter("leave.delete_leaverequest")
+@manager_can_enter("leave.delete_leaverequest", target=employee_of("leave.LeaveRequest", "id"))
 def leave_request_delete(request, id):
     """
     function used to delete leave request.
@@ -1145,7 +1147,7 @@ def _leave_request_approve_locked(request, leave_request, available_leave, emplo
 
 
 @login_required
-@manager_can_enter("leave.change_leaverequest")
+@manager_can_enter("leave.change_leaverequest", target=employee_of("leave.LeaveRequest", "id"))
 def leave_request_approve(request, id, emp_id=None):
     """
     function used to approve a leave request.
@@ -1213,7 +1215,7 @@ def leave_request_approve(request, id, emp_id=None):
 
 
 @login_required
-@manager_can_enter("leave.change_leaverequest")
+@manager_can_enter("leave.change_leaverequest", bulk=employees_of_ids("leave.LeaveRequest"))
 def leave_request_bulk_approve(request):
     if request.method == "POST":
         request_ids = request.POST.getlist("ids")
@@ -1264,7 +1266,7 @@ def leave_request_bulk_approve(request):
 
 
 @login_required
-@manager_can_enter("leave.change_leaverequest")
+@manager_can_enter("leave.change_leaverequest", bulk=employees_of_ids("leave.LeaveRequest", "request_ids"))
 def leave_bulk_reject(request):
     request_ids = request.POST.getlist("request_ids")
 
@@ -1279,7 +1281,7 @@ def leave_bulk_reject(request):
 
 @login_required
 @hx_request_required
-@manager_can_enter("leave.change_leaverequest")
+@manager_can_enter("leave.change_leaverequest", target=employee_of("leave.LeaveRequest", "id"))
 def leave_request_cancel(request, id, emp_id=None):
     """
     function used to Reject leave request.
@@ -1429,7 +1431,7 @@ def user_leave_cancel(request, id):
 
 @login_required
 @hx_request_required
-@manager_can_enter("leave.view_leaverequest")
+@manager_can_enter("leave.view_leaverequest", target=employee_of("leave.LeaveRequest", "id"))
 def one_request_view(request, id):
     """
     function used to view one leave request.
@@ -1647,7 +1649,7 @@ def leave_assign_view(request):
 
 @login_required
 @hx_request_required
-@manager_can_enter("leave.view_availableleave")
+@manager_can_enter("leave.view_availableleave", target=employee_of("leave.AvailableLeave", "obj_id"))
 def available_leave_single_view(request, obj_id):
     get_data = request.GET.copy()
     get_data.pop("instances_ids", None)
@@ -1831,7 +1833,7 @@ def leave_assign(request):
 
 @login_required
 @hx_request_required
-@manager_can_enter("leave.change_availableleave")
+@manager_can_enter("leave.change_availableleave", target=employee_of("leave.AvailableLeave", "id"))
 def available_leave_update(request, id):
     """
     function used to update available leave of an assigned leave type of an employee.
@@ -1874,7 +1876,7 @@ def available_leave_update(request, id):
 @post_only
 @login_required
 @hx_request_required
-@manager_can_enter("leave.delete_availableleave")
+@manager_can_enter("leave.delete_availableleave", target=employee_of("leave.AvailableLeave", "obj_id"))
 def leave_assign_delete(request, obj_id):
     """
     Function to delete an assigned leave type of an employee.
@@ -4003,7 +4005,7 @@ def assigned_leave_select_filter(request):
 
 @login_required
 @require_http_methods(["POST"])
-@manager_can_enter("leave.delete_leaverequest")
+@manager_can_enter("leave.delete_leaverequest", bulk=employees_of_ids("leave.LeaveRequest"))
 def leave_request_bulk_delete(request):
     """
     This method is used to delete a bulk of leave requests.
@@ -4165,7 +4167,7 @@ def employee_available_leave_count(request):
 
     try:
         start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-    except:
+    except (TypeError, ValueError):
         leave_type_id = None
     hx_target = request.META.get("HTTP_HX_TARGET", None)
     employee_id = (

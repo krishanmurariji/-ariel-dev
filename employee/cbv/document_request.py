@@ -24,7 +24,7 @@ from django.utils.translation import gettext_lazy as _
 from base.methods import choosesubordinates, is_reportingmanager
 from employee.filters import DocumentPipelineFilter, DocumentRequestFilter
 from employee.models import Employee
-from horilla.decorators import manager_can_enter
+from horilla.decorators import employee_of, manager_can_enter
 from horilla.http.response import HorillaRedirect
 from horilla_documents.forms import DocumentForm
 from horilla_documents.forms import DocumentRejectCbvForm as RejectForm
@@ -191,7 +191,13 @@ class DocumentCreateForm(HorillaFormView):
 
 
 @method_decorator(login_required, name="dispatch")
-@method_decorator(manager_can_enter("horilla_documents.add_document"), name="dispatch")
+@method_decorator(
+    manager_can_enter(
+        "horilla_documents.add_document",
+        target=employee_of("horilla_documents.Document", "pk"),
+    ),
+    name="dispatch",
+)
 class DocumentRejectCbvForm(HorillaFormView):
     """
     form view for rejecting document on document request and employee individual view

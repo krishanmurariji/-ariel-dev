@@ -75,6 +75,15 @@ status_choices = {
 }
 
 
+
+def employer_contribution_total(group):
+    """
+    The employer's share across one deduction's payslip entries. An entry with no employer share
+    (older payslips, or deductions that have none) counts as 0; the other entries still add up.
+    """
+    return sum(item.get("employer_contribution_amount", 0) for item in group)
+
+
 @login_required
 @permission_required("payroll.add_contract")
 def contract_create(request):
@@ -731,6 +740,7 @@ def view_payroll_dashboard(request):
 
 
 @login_required
+@permission_required("payroll.view_contract")
 def dashboard_employee_chart(request):
     """
     payroll dashboard employee chart data
@@ -838,6 +848,7 @@ def payslip_details(request):
 
 
 @login_required
+@permission_required("payroll.view_contract")
 def dashboard_department_chart(request):
     """
     payroll dashboard department chart data
@@ -937,6 +948,7 @@ def contract_ending(request):
 
 
 @login_required
+@permission_required("payroll.view_contract")
 def payslip_export(request):
     """
     payroll dashboard exporting to excell data
@@ -981,6 +993,8 @@ def payslip_export(request):
     if status:
         employee_payslip_list = employee_payslip_list.filter(status=status)
 
+    # one query for the employees named in the table, not one per row
+    employees_by_id = Employee.objects.in_bulk([int(pk) for pk in contributions])
     for employ in contributions:
         payslips = Payslip.objects.filter(employee_id__id=employ)
         if end_date:
@@ -1023,16 +1037,12 @@ def payslip_export(request):
 
         for deduction_id, group in grouped_deductions.items():
             employee_contribution = sum(item["amount"] for item in group)
-            try:
-                employer_contribution = sum(
-                    item["employer_contribution_amount"] for item in group
-                )
-            except:
-                employer_contribution = 0
+            employer_contribution = employer_contribution_total(group)
             if employer_contribution > 0:
                 table5_data.append(
                     {
-                        "Employee": Employee.objects.get(id=employ),
+                        "Employee": employees_by_id.get(int(employ))
+                        or Employee.objects.get(id=employ),
                         "Employer Contribution": employer_contribution,
                         "Employee Contribution": employee_contribution,
                     }

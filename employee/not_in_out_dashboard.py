@@ -185,6 +185,7 @@ def employee_data_export(request, emp_id=None):
         filter_class=AttendanceFilters,
         form_class=AttendanceExportForm,
         file_name="Attendance_export",
+        perm="attendance.view_attendance",
     )
 
 

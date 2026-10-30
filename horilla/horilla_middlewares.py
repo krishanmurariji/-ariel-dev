@@ -80,7 +80,10 @@ class SVGSecurityMiddleware:
         response = self.get_response(request)
 
         # Apply security headers to SVG files
-        if request.path.endswith(".svg") and response.status_code == 200:
+        is_svg = request.path.lower().endswith(".svg") or str(
+            response.get("Content-Type", "")
+        ).lower().startswith("image/svg+xml")
+        if is_svg and response.status_code == 200:
             response["Content-Security-Policy"] = (
                 "default-src 'none'; style-src 'unsafe-inline';"
             )

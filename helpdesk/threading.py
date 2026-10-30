@@ -54,8 +54,8 @@ class TicketSendThread(Thread):
         if self.request:
             try:
                 display_email_name = f"{self.request.user.employee_get.get_full_name()} <{self.request.user.employee_get.email}>"
-            except:
-                logger.error(Exception)
+            except Exception:
+                logger.exception("Helpdesk mail: could not build the sender name")
 
         if ticket_id != "#":
             link = f"{protocol}://{host}/helpdesk/ticket-detail/{ticket_id}/"
@@ -90,7 +90,12 @@ class TicketSendThread(Thread):
             attach_letterhead_images(email, company)
             try:
                 email.send()
-            except:
+            except Exception:
+                logger.exception(
+                    "Helpdesk mail not sent to %s (ticket %s)",
+                    recipient.get_full_name(),
+                    getattr(self.ticket, "pk", None),
+                )
                 messages.error(
                     self.request, f"Mail not sent to {recipient.get_full_name()}"
                 )
@@ -171,8 +176,8 @@ class AddAssigneeThread(Thread):
         if self.request:
             try:
                 display_email_name = f"{self.request.user.employee_get.get_full_name()} <{self.request.user.employee_get.email}>"
-            except:
-                pass
+            except Exception:
+                logger.exception("Helpdesk mail: could not build the sender name")
         link = f"{protocol}://{host}/helpdesk/ticket-detail/{self.ticket.id}/"
         for recipient in self.recipients:
             company = resolve_letterhead_company(employee=recipient)
@@ -205,7 +210,12 @@ class AddAssigneeThread(Thread):
             attach_letterhead_images(email, company)
             try:
                 email.send()
-            except:
+            except Exception:
+                logger.exception(
+                    "Helpdesk mail not sent to %s (ticket %s)",
+                    recipient.get_full_name(),
+                    getattr(self.ticket, "pk", None),
+                )
                 messages.error(
                     self.request, f"Mail not sent to {recipient.get_full_name()}"
                 )
@@ -235,8 +245,8 @@ class RemoveAssigneeThread(Thread):
         if self.request:
             try:
                 display_email_name = f"{self.request.user.employee_get.get_full_name()} <{self.request.user.employee_get.email}>"
-            except:
-                pass
+            except Exception:
+                logger.exception("Helpdesk mail: could not build the sender name")
         host = self.host
         protocol = self.protocol
         link = f"{protocol}://{host}/helpdesk/ticket-detail/{self.ticket.id}/"
@@ -271,7 +281,12 @@ class RemoveAssigneeThread(Thread):
             attach_letterhead_images(email, company)
             try:
                 email.send()
-            except:
+            except Exception:
+                logger.exception(
+                    "Helpdesk mail not sent to %s (ticket %s)",
+                    recipient.get_full_name(),
+                    getattr(self.ticket, "pk", None),
+                )
                 messages.error(
                     self.request, f"Mail not sent to {recipient.get_full_name()}"
                 )

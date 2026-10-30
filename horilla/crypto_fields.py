@@ -13,12 +13,20 @@ import base64
 import hashlib
 import json
 import logging
+import secrets
 
 from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from django.conf import settings
 from django.db import models
 
 logger = logging.getLogger(__name__)
+
+# What a field reads as when its stored value is encrypted but no key we hold opens it. It is not the
+# ciphertext (that would be sent on as if it were the secret) and not an empty string (code that treats
+# "no secret" as "nothing to check", such as the WhatsApp webhook signature check, would then switch
+# its protection off): it is a non-empty value nobody can guess, so a signature made with it never
+# matches and a login with it is refused. It differs for every process, so it cannot be learned.
+UNDECRYPTABLE = "undecryptable-" + secrets.token_urlsafe(24)
 
 
 def _legacy_key() -> str:
@@ -47,10 +55,23 @@ def _get_fernet() -> MultiFernet:
     return MultiFernet([Fernet(key) for key in keys])
 
 
+def _looks_like_fernet_token(value) -> bool:
+    """
+    True for a Fernet token (urlsafe base64 of version byte 0x80, timestamp, IV, at least one
+    cipher block and a 32-byte HMAC), whether or not any key we hold can open it.
+    """
+    try:
+        raw = base64.urlsafe_b64decode(value.encode() + b"=" * (-len(value) % 4))
+    except (ValueError, TypeError):
+        return False
+    return len(raw) >= 73 and raw[0] == 0x80
+
+
 class EncryptedTextField(models.TextField):
     """
-    Encrypts on write, decrypts on read. A value that fails to decrypt is
-    treated as a legacy plaintext row written before this field existed.
+    Encrypts on write, decrypts on read. A value that is not a Fernet token at all is treated
+    as a legacy plaintext row written before this field existed; a token that cannot be
+    decrypted reads as the UNDECRYPTABLE placeholder (see from_db_value).
     """
 
     def get_prep_value(self, value):
@@ -64,17 +85,27 @@ class EncryptedTextField(models.TextField):
         try:
             return _get_fernet().decrypt(value.encode()).decode()
         except InvalidToken:
-            # Either a legacy plaintext row written before this field
-            # existed, or ciphertext that no longer decrypts under the
-            # current SECRET_KEY (e.g. after a key rotation) - the two are
-            # indistinguishable from here, so we still return the raw value
-            # rather than raising, but log it so a rotation that silently
-            # blanks out every stored credential doesn't go unnoticed.
+            if _looks_like_fernet_token(value):
+                # Ciphertext that no key we hold can open (e.g. SECRET_KEY or
+                # FIELD_ENCRYPTION_KEYS changed). Handing it back would send
+                # garbage to LDAP / OAuth / a device as if it were the real
+                # secret. Give UNDECRYPTABLE instead - truthy, so checks that
+                # key off "is a secret set" stay on, and never a valid
+                # credential - and log loudly. The stored ciphertext is
+                # untouched until someone saves a new value.
+                logger.error(
+                    "%s.%s: stored value is encrypted but cannot be decrypted with "
+                    "the current keys (was SECRET_KEY / FIELD_ENCRYPTION_KEYS "
+                    "changed?) - it reads as an unusable placeholder.",
+                    getattr(getattr(self, "model", None), "__name__", "?"),
+                    getattr(self, "name", "?"),
+                )
+                return UNDECRYPTABLE
+            # Not a token at all: a legacy plaintext row written before this
+            # field existed. Returned as is.
             logger.warning(
-                "%s.%s: stored value failed to decrypt - returning it "
-                "unchanged. Expected for legacy plaintext rows written "
-                "before this field existed; unexpected (and a sign "
-                "SECRET_KEY was rotated) for anything written since.",
+                "%s.%s: stored value is not encrypted (legacy plaintext row) - "
+                "returning it unchanged; it is encrypted the next time it is saved.",
                 getattr(getattr(self, "model", None), "__name__", "?"),
                 getattr(self, "name", "?"),
             )

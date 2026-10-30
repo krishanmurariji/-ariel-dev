@@ -13,6 +13,7 @@ from django.utils.translation import gettext_lazy as _
 
 from base.cbv.settings_rotatingwork import DynamicRotatingWorkTypeCreate
 from base.decorators import manager_can_enter
+from horilla.decorators import employee_of
 from base.filters import RotatingWorkTypeAssignFilter
 from base.forms import RotatingWorkTypeAssignExportForm, RotatingWorkTypeAssignForm
 from base.methods import choosesubordinates, filtersubordinates, is_reportingmanager
@@ -290,7 +291,13 @@ class RotatingWorkExport(TemplateView):
 
 
 @method_decorator(login_required, name="dispatch")
-@method_decorator(manager_can_enter("base.add_rotatingworktypeassign"), name="dispatch")
+@method_decorator(
+    manager_can_enter(
+        "base.add_rotatingworktypeassign",
+        target=employee_of("base.RotatingWorkTypeAssign", "pk"),
+    ),
+    name="dispatch",
+)
 class RotatingWorkTypeFormView(HorillaFormView):
     """
     form view
@@ -360,7 +367,13 @@ class RotatingWorkTypeFormView(HorillaFormView):
 
 
 @method_decorator(login_required, name="dispatch")
-@method_decorator(manager_can_enter("base.add_rotatingworktypeassign"), name="dispatch")
+@method_decorator(
+    manager_can_enter(
+        "base.add_rotatingworktypeassign",
+        target=employee_of("base.RotatingWorkTypeAssign", "pk"),
+    ),
+    name="dispatch",
+)
 class RotatingWorkTypeDuplicateForm(HorillaFormView):
     """
     duplicate from view

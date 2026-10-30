@@ -4,6 +4,7 @@ from functools import wraps
 from urllib.parse import urlencode
 
 from django.apps import apps
+from django.core.exceptions import FieldDoesNotExist
 from django.contrib import messages
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
@@ -70,16 +71,135 @@ decorator_with_arguments = (
 )
 
 
+def _employee_of_record(record):
+    """The Employee a record belongs to (the record itself if it is one), or None."""
+    from employee.models import Employee
+
+    if isinstance(record, Employee):
+        return record
+    employee = getattr(record, "employee_id", None)
+    return employee if isinstance(employee, Employee) else None
+
+
+def _find_record(model, record_id):
+    """The row with this id, ignoring the selected-company filter; None if there is none."""
+    try:
+        return model._base_manager.filter(pk=record_id).first()
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def employee_of(model, kwarg="obj_id"):
+    """
+    For ``manager_can_enter(target=...)``: the view's ``kwarg`` is the id of a ``model`` row
+    (``"app_label.ModelName"``), and that row belongs to an employee.
+    """
+
+    def resolve(request, kwargs):
+        record = _find_record(apps.get_model(model), kwargs.get(kwarg))
+        return record, _employee_of_record(record)
+
+    return resolve
+
+
+def employee_by_id(kwarg="obj_id"):
+    """For ``manager_can_enter(target=...)``: the view's ``kwarg`` is an Employee id."""
+
+    def resolve(request, kwargs):
+        record = _find_record(apps.get_model("employee.Employee"), kwargs.get(kwarg))
+        return record, record
+
+    return resolve
+
+
+MAX_BULK_IDS = 5000
+
+
+def employee_from(*resolvers):
+    """For ``manager_can_enter(target=...)``: the first resolver whose record exists decides."""
+
+    def resolve(request, kwargs):
+        for resolver in resolvers:
+            record, owner = resolver(request, kwargs)
+            if record is not None:
+                return record, owner
+        return None, None
+
+    return resolve
+
+
+def employees_of_ids(model, key="ids"):
+    """
+    For ``manager_can_enter(bulk=...)``: the request carries ``model`` ids under ``key``. Every
+    value in POST *and* GET is read, as a JSON list or as single ids, so repeating the parameter
+    cannot hide a row from this check that the view will still act on. Returns one
+    ``(record, employee)`` pair per row that exists; anything that cannot be understood as an
+    id (or too many ids) adds a pair with no owner, which only a permission holder gets past.
+    """
+    import json
+
+    def resolve(request, kwargs):
+        unreadable = False
+        ids = []
+        for value in request.POST.getlist(key) + request.GET.getlist(key):
+            text = str(value).strip()
+            if text.startswith("["):
+                try:
+                    items = json.loads(text)
+                except ValueError:
+                    unreadable = True
+                    continue
+                if not isinstance(items, list):
+                    unreadable = True
+                    continue
+                ids.extend(items)
+            else:
+                ids.append(text)
+        if len(ids) > MAX_BULK_IDS:
+            return [(True, None)]
+        model_class = apps.get_model(model)
+        numbers = []
+        for value in ids:
+            if isinstance(value, (bool, float, dict, list)):
+                unreadable = True
+                continue
+            try:
+                number = int(value)
+            except (TypeError, ValueError):
+                unreadable = True
+                continue
+            if abs(number) < 2**62:  # a larger number is no row's id
+                numbers.append(number)
+        # one query for the whole list (with the owner), not one per id
+        rows = model_class._base_manager.filter(pk__in=numbers)
+        try:
+            if model_class._meta.get_field("employee_id").is_relation:
+                rows = rows.select_related("employee_id")
+        except FieldDoesNotExist:
+            pass
+        pairs = [(record, _employee_of_record(record)) for record in rows]
+        if unreadable:
+            pairs.append((True, None))
+        return pairs
+
+    return resolve
+
+
+def _manages(user, employee):
+    """True if ``user`` manages ``employee`` the way the list pages count it."""
+    from horilla.access import is_manager_in_chain
+
+    return is_manager_in_chain(user, employee)
+
+
 @decorator_with_arguments
 def delete_permission(function):
-    from employee.models import EmployeeWorkInformation
-
     def _function(request, *args, **kwargs):
         user = request.user
-        employee = user.employee_get
-        is_manager = EmployeeWorkInformation.objects.filter(
-            reporting_manager_id=employee
-        ).exists()
+        record = _find_record(kwargs["model"], kwargs.get("obj_id"))
+        employee = _employee_of_record(record)
+        # a manager may act only on records of the people they manage
+        is_manager = employee is not None and _manages(user, employee)
         if (
             request.user.has_perm(
                 kwargs["model"]._meta.app_label
@@ -106,14 +226,12 @@ decorator_with_arguments = (
 
 @decorator_with_arguments
 def duplicate_permission(function):
-    from employee.models import EmployeeWorkInformation
-
     def _function(request, *args, **kwargs):
         user = request.user
         employee = user.employee_get
-        is_manager = EmployeeWorkInformation.objects.filter(
-            reporting_manager_id=employee
-        ).exists()
+        record = _find_record(kwargs["model"], kwargs.get("obj_id"))
+        record_employee = _employee_of_record(record)
+        is_manager = record_employee is not None and _manages(user, record_employee)
 
         app_label = kwargs["model"]._meta.app_label
         model_name = kwargs["model"]._meta.model_name
@@ -142,35 +260,76 @@ decorator_with_arguments = (
 )
 
 
-@decorator_with_arguments
-def manager_can_enter(function, perm):
+def manager_may_enter(request, perm, pairs):
+    """
+    Whether the signed-in user may run a view that needs ``perm`` and acts on ``pairs``
+    (``(record, employee)`` rows, see ``employee_of`` / ``employees_of_ids``): anyone holding
+    the permission; otherwise a manager of every one of those employees. With no rows to look
+    at (list pages, forms that create), anyone who manages somebody.
+    """
     from base.models import MultipleApprovalManagers
     from employee.models import EmployeeWorkInformation
 
+    leave_perm = [
+        "leave.view_leaverequest",
+        "leave.change_leaverequest",
+        "leave.delete_leaverequest",
+    ]
+    user = request.user
+    employee = user.employee_get
+    # a row that does not exist is left to the view to report
+    pairs = [(record, owner) for record, owner in pairs if record is not None]
+
+    def names_approver(record):
+        approvals = getattr(record, "multiple_approvals", None)
+        approvals = approvals() if callable(approvals) else None
+        return bool(approvals and employee in approvals["managers"])
+
+    if perm in leave_perm:
+        is_approval_manager = MultipleApprovalManagers.objects.filter(
+            employee_id=employee.id
+        ).exists()
+        if is_approval_manager:
+            if not pairs:
+                return True
+            # only for the requests that name them as an approver
+            if all(names_approver(record) for record, _owner in pairs):
+                return True
+    if user.has_perm(perm):
+        return True
+    if pairs:
+        managed = {}
+
+        def manages(owner):
+            if owner is None:
+                return False
+            if owner.pk not in managed:
+                managed[owner.pk] = _manages(user, owner)
+            return managed[owner.pk]
+
+        return all(manages(owner) for _record, owner in pairs)
+    return EmployeeWorkInformation.objects.filter(reporting_manager_id=employee).exists()
+
+
+@decorator_with_arguments
+def manager_can_enter(function, perm, target=None, bulk=None):
     """
-    This method is used to check permission to employee for enter to the function if the employee
-    do not have permission also checks, has reporting manager.
+    Lets in users who have ``perm`` and, otherwise, managers.
+
+    Pass ``target`` (``employee_of`` / ``employee_by_id``) whenever the view acts on one employee's
+    record, or ``bulk`` (``employees_of_ids``) when it acts on a list of them: a manager then gets in
+    only if they manage every one of those people. Without either, anyone who manages somebody
+    gets in, as before.
     """
 
     @wraps(function)
     def _function(request, *args, **kwargs):
-        leave_perm = [
-            "leave.view_leaverequest",
-            "leave.change_leaverequest",
-            "leave.delete_leaverequest",
-        ]
-        user = request.user
-        employee = user.employee_get
-        if perm in leave_perm:
-            is_approval_manager = MultipleApprovalManagers.objects.filter(
-                employee_id=employee.id
-            ).exists()
-            if is_approval_manager:
-                return function(request, *args, **kwargs)
-        is_manager = EmployeeWorkInformation.objects.filter(
-            reporting_manager_id=employee
-        ).exists()
-        if user.has_perm(perm) or is_manager:
+        pairs = []
+        if target is not None:
+            pairs = [target(request, kwargs)]
+        elif bulk is not None:
+            pairs = bulk(request, kwargs)
+        if manager_may_enter(request, perm, pairs):
             return function(request, *args, **kwargs)
 
         return handle_no_permission(request)

@@ -14,6 +14,7 @@ from django.utils.translation import gettext_lazy as _
 from base.cbv.shift_request import ShiftRequestList
 from base.cbv.work_type_request import WorkRequestListView
 from base.decorators import manager_can_enter
+from horilla.decorators import employee_of
 from base.filters import AnnouncementFilter, AnnouncementViewFilter
 from base.methods import filtersubordinates
 from base.models import Announcement, AnnouncementView
@@ -162,7 +163,11 @@ class EmployeeWorkInformationList(HorillaListView):
 
 @method_decorator(login_required, name="dispatch")
 @method_decorator(
-    manager_can_enter("employee.change_employeeworkinformation"), name="dispatch"
+    manager_can_enter(
+        "employee.change_employeeworkinformation",
+        target=employee_of("employee.EmployeeWorkInformation", "pk"),
+    ),
+    name="dispatch"
 )
 class EmployeeWorkInformationFormView(HorillaFormView):
     """

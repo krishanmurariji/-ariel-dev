@@ -15,6 +15,7 @@ from attendance.filters import AttendanceOverTimeFilter
 from attendance.forms import AttendanceOverTimeExportForm, AttendanceOverTimeForm
 from attendance.models import AttendanceOverTime
 from base.decorators import manager_can_enter
+from horilla.decorators import employee_of
 from base.methods import choosesubordinates, filtersubordinates, is_reportingmanager
 from horilla_views.cbv_methods import hx_request_required, login_required
 from horilla_views.generic.cbv.views import (
@@ -229,7 +230,11 @@ class HourAccountDetailView(HorillaDetailedView):
 
 @method_decorator(login_required, name="dispatch")
 @method_decorator(
-    manager_can_enter("attendance.add_attendanceovertime"), name="dispatch"
+    manager_can_enter(
+        "attendance.add_attendanceovertime",
+        target=employee_of("attendance.AttendanceOverTime", "pk"),
+    ),
+    name="dispatch"
 )
 class HourAccountFormView(HorillaFormView):
     """

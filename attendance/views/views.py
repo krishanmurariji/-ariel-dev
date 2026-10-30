@@ -76,6 +76,7 @@ from attendance.forms import (
 )
 from attendance.methods.utils import (
     Request,
+    attendance_lookup,
     attendance_day_checking,
     format_time,
     is_reportingmanger,
@@ -123,6 +124,8 @@ from base.models import (
 from employee.filters import EmployeeFilter
 from employee.models import Employee, EmployeeWorkInformation
 from horilla.decorators import (
+    employees_of_ids,
+    employee_of,
     hx_request_required,
     install_required,
     login_required,
@@ -329,6 +332,7 @@ def attendance_export(request):
         filter_class=AttendanceFilters,
         form_class=AttendanceExportForm,
         file_name="Attendance_export",
+        perm="attendance.view_attendance",
     )
 
 
@@ -429,7 +433,7 @@ def attendance_view(request):
 
 @login_required
 @hx_request_required
-@manager_can_enter("attendance.change_attendance")
+@manager_can_enter("attendance.change_attendance", target=employee_of("attendance.Attendance"))
 def attendance_update(request, obj_id):
     """
     This method render form to update attendance and save if the form is valid
@@ -685,11 +689,12 @@ def attendance_account_export(request):
         filter_class=AttendanceOverTimeFilter,
         form_class=AttendanceOverTimeExportForm,
         file_name="Attendance_Account",
+        perm="attendance.view_attendanceovertime",
     )
 
 
 @login_required
-@manager_can_enter("attendance.change_attendanceovertime")
+@manager_can_enter("attendance.change_attendanceovertime", target=employee_of("attendance.AttendanceOvertime"))
 @hx_request_required
 def attendance_overtime_update(request, obj_id):
     """
@@ -1357,7 +1362,7 @@ def validation_condition_delete(request, obj_id):
 
 @login_required
 @require_http_methods(["POST"])
-@manager_can_enter("attendance.change_attendance")
+@manager_can_enter("attendance.change_attendance", bulk=employees_of_ids("attendance.Attendance"))
 def validate_bulk_attendance(request):
     """
     This method is used to validate a bulk of attendances.
@@ -1367,10 +1372,11 @@ def validate_bulk_attendance(request):
     success_messages = []
     error_messages = []
     filtered_ids = []
+    get_attendance = attendance_lookup(ids)
 
     for obj_id in ids:
         try:
-            attendance = Attendance.objects.get(id=obj_id)
+            attendance = get_attendance(obj_id)
             if attendance.employee_id.id != request.user.employee_get.id:
                 filtered_ids.append(obj_id)
         except Attendance.DoesNotExist:
@@ -1383,7 +1389,7 @@ def validate_bulk_attendance(request):
 
     for obj_id in filtered_ids:
         try:
-            attendance = Attendance.objects.get(id=obj_id)
+            attendance = get_attendance(obj_id)
 
             if attendance.is_validate_request:
                 error_messages.append(
@@ -1441,7 +1447,7 @@ def validate_bulk_attendance(request):
 
 @post_only
 @login_required
-@manager_can_enter("attendance.change_attendance")
+@manager_can_enter("attendance.change_attendance", target=employee_of("attendance.Attendance"))
 def validate_this_attendance(request, obj_id):
     """
     This method is used to validate attendance
@@ -1538,7 +1544,7 @@ def revalidate_this_attendance(request, obj_id):
 
 @post_only
 @login_required
-@manager_can_enter("attendance.change_attendance")
+@manager_can_enter("attendance.change_attendance", target=employee_of("attendance.Attendance"))
 @require_http_methods(["GET", "POST"])
 def approve_overtime(request, obj_id):
     """
@@ -1583,7 +1589,7 @@ def approve_overtime(request, obj_id):
 
 
 @login_required
-@manager_can_enter("attendance.change_attendance")
+@manager_can_enter("attendance.change_attendance", bulk=employees_of_ids("attendance.Attendance"))
 def approve_bulk_overtime(request):
     """
     This method is used to approve bulk of attendance
@@ -1591,9 +1597,10 @@ def approve_bulk_overtime(request):
     ids = json.loads(request.POST.get("ids", "[]"))
     otapprove_ids = []
     filtered_ids = []
+    get_attendance = attendance_lookup(ids)
     for attendance_id in ids:
         try:
-            attendance = Attendance.objects.get(id=attendance_id)
+            attendance = get_attendance(attendance_id)
             if attendance.employee_id.employee_user_id != request.user:
                 filtered_ids.append(attendance_id)
         except (Attendance.DoesNotExist, OverflowError, ValueError):
@@ -1602,7 +1609,7 @@ def approve_bulk_overtime(request):
         filtered_ids = ids
     for attendance_id in filtered_ids:
         try:
-            attendance = Attendance.objects.get(id=attendance_id)
+            attendance = get_attendance(attendance_id)
             attendance.attendance_overtime_approve = True
             attendance.save()
             otapprove_ids.append(attendance)

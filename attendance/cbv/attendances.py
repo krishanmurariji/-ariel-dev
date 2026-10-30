@@ -20,6 +20,7 @@ from attendance.filters import AttendanceFilters
 from attendance.forms import AttendanceExportForm, AttendanceForm, AttendanceUpdateForm
 from attendance.models import Attendance, AttendanceValidationCondition, strtime_seconds
 from base.decorators import manager_can_enter
+from horilla.decorators import employee_of
 from base.filters import PenaltyFilter
 from base.methods import choosesubordinates, filtersubordinates, is_reportingmanager
 from base.models import PenaltyAccounts
@@ -548,7 +549,12 @@ class AttendancesFormView(HorillaFormView):
 
 
 @method_decorator(login_required, name="dispatch")
-@method_decorator(manager_can_enter("attendance.change__attendance"), name="dispatch")
+@method_decorator(
+    manager_can_enter(
+        "attendance.change_attendance", target=employee_of("attendance.Attendance", "pk")
+    ),
+    name="dispatch",
+)
 class AttendanceUpdateFormView(HorillaFormView):
     """
     form for update

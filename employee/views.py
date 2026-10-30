@@ -116,6 +116,9 @@ from employee.models import (
     NoteFiles,
 )
 from horilla.decorators import (
+    employees_of_ids,
+    employee_of,
+    employee_by_id,
     hx_request_required,
     logger,
     login_required,
@@ -1106,7 +1109,7 @@ def view_file(request, id):
 
 @login_required
 @hx_request_required
-@manager_can_enter("horilla_documents.add_document")
+@manager_can_enter("horilla_documents.add_document", target=employee_of("horilla_documents.Document", "id"))
 def document_approve(request, id):
     """
     This function used to view the approve uploaded document.
@@ -1150,7 +1153,7 @@ def document_approve(request, id):
 
 @login_required
 @hx_request_required
-@manager_can_enter("horilla_documents.add_document")
+@manager_can_enter("horilla_documents.add_document", target=employee_of("horilla_documents.Document", "id"))
 def document_reject(request, id):
     """
     This function used to view the reject uploaded document.
@@ -1186,7 +1189,7 @@ def document_reject(request, id):
 
 
 @login_required
-@manager_can_enter("horilla_documents.add_document")
+@manager_can_enter("horilla_documents.add_document", bulk=employees_of_ids("horilla_documents.Document"))
 def document_bulk_approve(request):
     """
     This function is used to bulk-approve uploaded documents.
@@ -1242,7 +1245,7 @@ class BulkRejectForm(django_forms.Form):
 
 @login_required
 @hx_request_required
-@manager_can_enter("horilla_documents.add_document")
+@manager_can_enter("horilla_documents.add_document", bulk=employees_of_ids("horilla_documents.Document"))
 def document_bulk_reject(request):
     """
     Handle bulk rejection of documents.
@@ -1713,7 +1716,7 @@ def employee_view_new(request):
 
 
 @login_required
-@manager_can_enter("employee.change_employee")
+@manager_can_enter("employee.change_employee", target=employee_by_id("obj_id"))
 def employee_view_update(request, obj_id, **kwargs):
     """
     This method is used to render update form for employee.
@@ -2044,7 +2047,7 @@ def remove_own_profile_image(request):
 
 
 @login_required
-@manager_can_enter("employee.change_employee")
+@manager_can_enter("employee.change_employee", target=employee_by_id("obj_id"))
 @require_http_methods(["POST"])
 def employee_create_update_personal_info(request, obj_id=None):
     """
@@ -2099,7 +2102,7 @@ def employee_create_update_personal_info(request, obj_id=None):
 
 
 @login_required
-@manager_can_enter("employee.change_employeeworkinformation")
+@manager_can_enter("employee.change_employeeworkinformation", target=employee_by_id("obj_id"))
 @require_http_methods(["POST"])
 def employee_update_work_info(request, obj_id=None):
     """
@@ -2137,7 +2140,7 @@ def employee_update_work_info(request, obj_id=None):
 
 
 @login_required
-@manager_can_enter("employee.change_employeebankdetails")
+@manager_can_enter("employee.change_employeebankdetails", target=employee_by_id("obj_id"))
 @require_http_methods(["POST"])
 def employee_update_bank_details(request, obj_id=None):
     """
@@ -2690,7 +2693,7 @@ def employee_search(request):
 
 
 @login_required
-@manager_can_enter("employee.add_employeeworkinformation")
+@manager_can_enter("employee.add_employeeworkinformation", target=employee_by_id("obj_id"))
 @require_http_methods(["POST"])
 def employee_work_info_view_create(request, obj_id):
     """
@@ -2726,7 +2729,7 @@ def employee_work_info_view_create(request, obj_id):
 
 
 @login_required
-@manager_can_enter("employee.change_employeeworkinformation")
+@manager_can_enter("employee.change_employeeworkinformation", target=employee_of("employee.EmployeeWorkInformation"))
 @require_http_methods(["POST"])
 def employee_work_info_view_update(request, obj_id):
     """
@@ -2755,7 +2758,7 @@ def employee_work_info_view_update(request, obj_id):
 
 
 @login_required
-@manager_can_enter("employee.add_employeebankdetails")
+@manager_can_enter("employee.add_employeebankdetails", target=employee_by_id("obj_id"))
 @require_http_methods(["POST"])
 def employee_bank_details_view_create(request, obj_id):
     """
@@ -2785,7 +2788,7 @@ def employee_bank_details_view_create(request, obj_id):
 
 
 @login_required
-@manager_can_enter("employee.change_employeebankdetails")
+@manager_can_enter("employee.change_employeebankdetails", target=employee_of("employee.EmployeeBankDetails"))
 @require_http_methods(["POST"])
 def employee_bank_details_view_update(request, obj_id):
     """
@@ -3494,7 +3497,7 @@ def history_tab(request, pk):
 
 @login_required
 @hx_request_required
-@manager_can_enter(perm="employee.add_employeenote")
+@manager_can_enter(perm="employee.add_employeenote", target=employee_by_id("emp_id"))
 def add_note(request, emp_id=None):
     """
     Handles the addition of a note to a specific employee, including file attachments.
@@ -3530,7 +3533,7 @@ def add_note(request, emp_id=None):
 
 
 @login_required
-@manager_can_enter(perm="employee.change_employeenote")
+@manager_can_enter(perm="employee.change_employeenote", target=employee_of("employee.EmployeeNote", "note_id"))
 def employee_note_update(request, note_id):
     """
     This method is used to update the note
@@ -3567,7 +3570,7 @@ def employee_note_update(request, note_id):
 
 @post_only
 @login_required
-@manager_can_enter(perm="employee.delete_employeenote")
+@manager_can_enter(perm="employee.delete_employeenote", target=employee_of("employee.EmployeeNote", "note_id"))
 def employee_note_delete(request, note_id):
     """
     This method is used to delete the note
@@ -3589,7 +3592,7 @@ def employee_note_delete(request, note_id):
 
 @login_required
 @hx_request_required
-@manager_can_enter(perm="employee.add_notefiles")
+@manager_can_enter(perm="employee.add_notefiles", target=employee_of("employee.EmployeeNote", "note_id"))
 def add_more_employee_files(request, note_id):
     """
     This method is used to Add more files to the Employee note.
@@ -3707,7 +3710,7 @@ def bonus_points_tab(request, pk):
 
 
 @login_required
-@manager_can_enter(perm="employee.add_bonuspoint")
+@manager_can_enter(perm="employee.add_bonuspoint", target=employee_by_id("emp_id"))
 def add_bonus_points(request, emp_id):
     """
     This function is used to add bonus points to an employee

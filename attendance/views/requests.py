@@ -26,6 +26,7 @@ from attendance.forms import (
     NewRequestForm,
 )
 from attendance.methods.utils import (
+    attendance_lookup,
     get_diff_dict,
     get_employee_last_name,
     paginator_qry,
@@ -49,6 +50,8 @@ from base.methods import (
 from base.models import EmployeeShift, EmployeeShiftDay
 from employee.models import Employee
 from horilla.decorators import (
+    employees_of_ids,
+    employee_of,
     hx_request_required,
     login_required,
     manager_can_enter,
@@ -477,7 +480,7 @@ def validate_attendance_request(request, attendance_id):
 
 @post_only
 @login_required
-@manager_can_enter("attendance.change_attendance")
+@manager_can_enter("attendance.change_attendance", target=employee_of("attendance.Attendance", "attendance_id"))
 def approve_validate_attendance_request(request, attendance_id):
     """
     This method is used to validate the attendance requests
@@ -703,21 +706,22 @@ def select_all_filter_attendance_request(request):
 
 
 @login_required
-@manager_can_enter("attendance.change_attendance")
+@manager_can_enter("attendance.change_attendance", bulk=employees_of_ids("attendance.Attendance"))
 def bulk_approve_attendance_request(request):
     """
     This method is used to validate the attendance requests
     """
     ids = json.loads(request.POST.get("ids", "[]"))
     filtered_ids = []
+    get_attendance = attendance_lookup(ids)
     for attendance_id in ids:
-        attendance = Attendance.objects.get(id=attendance_id)
+        attendance = get_attendance(attendance_id)
         if attendance.employee_id != request.user.employee_get:
             filtered_ids.append(attendance_id)
     if request.user.is_superuser:
         filtered_ids = ids
     for attendance_id in filtered_ids:
-        attendance = Attendance.objects.get(id=attendance_id)
+        attendance = get_attendance(attendance_id)
         prev_attendance_date = attendance.attendance_date
         prev_attendance_clock_in_date = attendance.attendance_clock_in_date
         prev_attendance_clock_in = attendance.attendance_clock_in
@@ -836,7 +840,7 @@ def bulk_approve_attendance_request(request):
 
 
 @login_required
-@manager_can_enter("attendance.delete_attendance")
+@manager_can_enter("attendance.delete_attendance", bulk=employees_of_ids("attendance.Attendance"))
 def bulk_reject_attendance_request(request):
     """
     This method is used to delete bulk attendance request
@@ -882,7 +886,7 @@ def bulk_reject_attendance_request(request):
 
 
 @login_required
-@manager_can_enter("attendance.change_attendance")
+@manager_can_enter("attendance.change_attendance", target=employee_of("attendance.Attendance", "attendance_id"))
 def edit_validate_attendance(request, attendance_id):
     """
     This method is used to edit and update the validate request attendance

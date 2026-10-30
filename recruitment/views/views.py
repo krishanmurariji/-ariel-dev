@@ -1882,6 +1882,7 @@ def interview_employee_remove(request, interview_id, employee_id):
 
 
 @login_required
+@permission_required(perm="recruitment.view_candidate")
 def candidate_export(request):
     """
     This method is used to Export candidate data
@@ -3537,11 +3538,30 @@ def open_recruitments(request):
     """
     This method is used to render the open recruitment page
     """
-    recruitments = Recruitment.default.filter(
-        closed=False, is_published=True, is_active=True
+    recruitments = list(
+        Recruitment.default.filter(closed=False, is_published=True, is_active=True)
+        .select_related("job_position_id__department_id", "company_id")
+        .prefetch_related("skills", "open_positions__department_id")
+    )
+    # A department is only offered as a filter when an open role belongs to it.
+    for recruitment in recruitments:
+        position = recruitment.job_position_id or next(
+            iter(recruitment.open_positions.all()), None
+        )
+        recruitment.department_name = (
+            position.department_id.department if position else ""
+        )
+    departments = sorted(
+        {r.department_name for r in recruitments if r.department_name}
     )
     context = {
         "recruitments": recruitments,
+        "departments": departments,
+        "open_count": len(recruitments),
+        "positions_to_fill": sum(r.vacancy or 0 for r in recruitments),
+        "latest_opening": max(
+            (r.start_date for r in recruitments if r.start_date), default=None
+        ),
     }
     response = render(request, "recruitment/open_recruitments.html", context)
     response["X-Frame-Options"] = "ALLOW-FROM *"

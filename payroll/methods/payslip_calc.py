@@ -235,7 +235,8 @@ def calculate_allowance(**kwargs):
                     Attendance = get_horilla_model_class(
                         app_label="attendance", model="attendance"
                     )
-                    if Attendance.objects.filter(**filter_params):
+                    # exists(), not truthiness: the latter loads every matching row
+                    if Attendance.objects.filter(**filter_params).exists():
                         employee_allowances.append(allowance)
             else:
                 employee_allowances.append(allowance)

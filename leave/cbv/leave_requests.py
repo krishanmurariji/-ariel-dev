@@ -17,6 +17,7 @@ from django.utils.translation import gettext_lazy as _
 
 from base.cbv.penalty import ViewPenaltyList
 from base.decorators import manager_can_enter
+from horilla.decorators import employee_by_id, employee_from, employee_of
 from base.filters import PenaltyFilter
 from base.methods import choosesubordinates, filtersubordinates, is_reportingmanager
 from base.models import PenaltyAccounts
@@ -352,7 +353,15 @@ class LeaveRequestsDetailView(HorillaDetailedView):
 
 
 @method_decorator(login_required, name="dispatch")
-@method_decorator(manager_can_enter("leave.add_leaverequest"), name="dispatch")
+@method_decorator(
+    manager_can_enter(
+        "leave.add_leaverequest",
+        target=employee_from(
+            employee_of("leave.LeaveRequest", "pk"), employee_by_id("emp_id")
+        ),
+    ),
+    name="dispatch",
+)
 class LeaveRequestFormView(HorillaFormView):
     """
     form view

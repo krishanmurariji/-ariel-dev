@@ -183,6 +183,8 @@ from employee.models import (
     ProfileEditFeature,
 )
 from horilla.decorators import (
+    employees_of_ids,
+    employee_of,
     delete_permission,
     duplicate_permission,
     hx_request_required,
@@ -2580,7 +2582,7 @@ def rotating_work_individual_view(request, instance_id):
 
 @login_required
 @hx_request_required
-@manager_can_enter("base.change_rotatingworktypeassign")
+@manager_can_enter("base.change_rotatingworktypeassign", target=employee_of("base.RotatingWorkTypeAssign", "id"))
 def rotating_work_type_assign_update(request, id):
     """
     This method is used to update rotating work type instance
@@ -2625,6 +2627,7 @@ def rotating_work_type_assign_export(request):
         filter_class=RotatingWorkTypeAssignFilter,
         form_class=RotatingWorkTypeAssignExportForm,
         file_name="Rotating_work_type_assign",
+        perm="base.view_rotatingworktypeassign",
     )
 
 
@@ -2691,7 +2694,7 @@ def rotating_work_type_assign_redirect(request, obj_id=None, employee_id=None):
 @post_only
 @login_required
 @hx_request_required
-@manager_can_enter("base.change_rotatingworktypeassign")
+@manager_can_enter("base.change_rotatingworktypeassign", target=employee_of("base.RotatingWorkTypeAssign"))
 def rotating_work_type_assign_archive(request, obj_id):
     """
     Archive or un-archive rotating work type assigns
@@ -2718,7 +2721,7 @@ def rotating_work_type_assign_archive(request, obj_id):
 
 
 @login_required
-@manager_can_enter("base.change_rotatingworktypeassign")
+@manager_can_enter("base.change_rotatingworktypeassign", bulk=employees_of_ids("base.RotatingWorkTypeAssign"))
 def rotating_work_type_assign_bulk_archive(request):
     """
     This method is used to archive/un-archive bulk rotating work type assigns.
@@ -3274,7 +3277,7 @@ def rotating_shift_individual_view(request, instance_id):
 
 @login_required
 @hx_request_required
-@manager_can_enter("base.change_rotatingshiftassign")
+@manager_can_enter("base.change_rotatingshiftassign", target=employee_of("base.RotatingShiftAssign", "id"))
 def rotating_shift_assign_update(request, id):
     """
     This method is used to update rotating shift assign instance
@@ -3322,6 +3325,7 @@ def rotating_shift_assign_export(request):
         filter_class=RotatingShiftAssignFilters,
         form_class=RotatingShiftAssignExportForm,
         file_name="Rotating_shift_assign_export",
+        perm="base.view_rotatingshiftassign",
     )
 
 
@@ -3567,7 +3571,7 @@ def rotating_shift_assign_redirect(request, obj_id, employee_id):
 @post_only
 @login_required
 @hx_request_required
-@manager_can_enter("base.change_rotatingshiftassign")
+@manager_can_enter("base.change_rotatingshiftassign", target=employee_of("base.RotatingShiftAssign"))
 def rotating_shift_assign_archive(request, obj_id):
     """
     This method is used to archive and unarchive rotating shift assign records
@@ -3592,7 +3596,7 @@ def rotating_shift_assign_archive(request, obj_id):
 
 
 @login_required
-@manager_can_enter("base.change_rotatingshiftassign")
+@manager_can_enter("base.change_rotatingshiftassign", bulk=employees_of_ids("base.RotatingShiftAssign"))
 def rotating_shift_assign_bulk_archive(request):
     """
     This method is used to archive/un-archive bulk rotating shift assigns
@@ -3641,7 +3645,7 @@ def rotating_shift_assign_bulk_archive(request):
 
 
 @login_required
-@manager_can_enter("base.delete_rotatingshiftassign")
+@manager_can_enter("base.delete_rotatingshiftassign", bulk=employees_of_ids("base.RotatingShiftAssign"))
 def rotating_shift_assign_bulk_delete(request):
     """
     This method is used to bulk delete for rotating shift assign
@@ -3676,7 +3680,7 @@ def rotating_shift_assign_bulk_delete(request):
 
 @login_required
 @hx_request_required
-@manager_can_enter("base.delete_rotatingshiftassign")
+@manager_can_enter("base.delete_rotatingshiftassign", target=employee_of("base.RotatingShiftAssign"))
 @require_http_methods(["POST"])
 def rotating_shift_assign_delete(request, obj_id):
     """
@@ -3967,6 +3971,7 @@ def work_type_request_export(request):
         WorkTypeRequestColumnForm,
         WorkTypeRequestFilter,
         "Work_type_request",
+        perm="base.view_worktyperequest",
     )
 
 
@@ -4212,7 +4217,7 @@ def work_type_request_cancel(request, id):
 
 
 @login_required
-@manager_can_enter("base.change_worktyperequest")
+@manager_can_enter("base.change_worktyperequest", bulk=employees_of_ids("base.WorkTypeRequest"))
 def work_type_request_bulk_cancel(request):
     """
     This method is used to cancel a bunch work type request
@@ -4772,6 +4777,7 @@ def shift_request_export(request):
         ShiftRequestColumnForm,
         ShiftRequestFilter,
         "Shift_requests",
+        perm="base.view_shiftrequest",
     )
 
 
@@ -5179,7 +5185,7 @@ def shift_allocation_request_cancel(request, id):
 
 
 @login_required
-@manager_can_enter("base.change_shiftrequest")
+@manager_can_enter("base.change_shiftrequest", bulk=employees_of_ids("base.ShiftRequest"))
 @require_http_methods(["POST"])
 def shift_request_bulk_cancel(request):
     """
@@ -5240,7 +5246,7 @@ def shift_request_bulk_cancel(request):
 
 @post_only
 @login_required
-@manager_can_enter("base.change_shiftrequest")
+@manager_can_enter("base.change_shiftrequest", target=employee_of("base.ShiftRequest", "id"))
 def shift_request_approve(request, id):
     """
     Approve shift request
@@ -5362,7 +5368,7 @@ def shift_allocation_request_approve(request, id):
 
 @login_required
 @require_http_methods(["POST"])
-@manager_can_enter("base.change_shiftrequest")
+@manager_can_enter("base.change_shiftrequest", bulk=employees_of_ids("base.ShiftRequest"))
 def shift_request_bulk_approve(request):
     """
     This method is used to approve a bunch of shift request

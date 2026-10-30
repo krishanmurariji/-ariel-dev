@@ -897,8 +897,20 @@ def export_data(request, model, form_class, filter_class, file_name, perm=None):
     if not selected_fields:
         selected_fields = form.fields["selected_fields"].initial
         ids = request.GET.get("ids", "[]")
-        id_list = json.loads(ids)
+        try:
+            id_list = json.loads(ids)
+        except (TypeError, ValueError):
+            id_list = []
+        # only whole numbers can be ids; anything else in the list is ignored
+        id_list = [
+            value
+            for value in (id_list if isinstance(id_list, list) else [])
+            if isinstance(value, int) and not isinstance(value, bool)
+        ]
         export_objects = model.objects.filter(id__in=id_list)
+        if perm:
+            # the ids come from the request, so they get the same team limit as the filter above
+            export_objects = filtersubordinates(request, export_objects, perm)
 
     for field in form.fields["selected_fields"].choices:
         value = field[0]

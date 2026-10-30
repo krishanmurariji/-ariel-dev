@@ -73,33 +73,25 @@ def work_type_request_change_permission(function=None, *args, **kwargs):
 
 
 @decorator_with_arguments
-def manager_can_enter(function, perm):
+def manager_can_enter(function, perm, target=None, bulk=None):
     """
-    This method is used to check permission to employee for enter to the function if the employee
-    do not have permission also checks, has reporting manager.
+    Class-based-view version of horilla.decorators.manager_can_enter: users who have ``perm``
+    get in; otherwise a manager does - of the people the record (``target``) or the list of
+    records (``bulk``) belongs to, or of anybody when the view names no record.
     """
 
     def _function(self, *args, **kwargs):
-        leave_perm = [
-            "leave.view_leaverequest",
-            "leave.change_leaverequest",
-            "leave.delete_leaverequest",
-        ]
+        from horilla.decorators import manager_may_enter
+
         request = getattr(_thread_locals, "request")
         if not getattr(self, "request", None):
             self.request = request
-        user = request.user
-        employee = user.employee_get
-        if perm in leave_perm:
-            is_approval_manager = MultipleApprovalManagers.objects.filter(
-                employee_id=employee.id
-            ).exists()
-            if is_approval_manager:
-                return function(self, *args, **kwargs)
-        is_manager = EmployeeWorkInformation.objects.filter(
-            reporting_manager_id=employee
-        ).exists()
-        if user.has_perm(perm) or is_manager:
+        pairs = []
+        if target is not None:
+            pairs = [target(request, kwargs)]
+        elif bulk is not None:
+            pairs = bulk(request, kwargs)
+        if manager_may_enter(request, perm, pairs):
             return function(self, *args, **kwargs)
 
         return handle_no_permission(request)

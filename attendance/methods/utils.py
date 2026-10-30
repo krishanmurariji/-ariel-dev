@@ -654,3 +654,35 @@ def sort_activity_dicts(activity_dicts):
     ]
     sorted_activity_dicts = sorted(activity_dicts, key=lambda x: x["Attendance Date"])
     return sorted_activity_dicts
+
+
+def attendance_lookup(ids):
+    """
+    A stand-in for ``Attendance.objects.get(id=...)`` that answers every id of a bulk request from
+    one query (with the employee loaded). It raises what ``get`` raised: Attendance.DoesNotExist for
+    an id with no row, ValueError/TypeError for a value that is not a number, OverflowError for a
+    number too large to be an id - so the callers' error handling is unchanged.
+    """
+    from attendance.models import Attendance
+
+    limit = 2**62
+    wanted = []
+    for value in ids:
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            continue
+        if abs(number) < limit:
+            wanted.append(number)
+    found = Attendance.objects.select_related("employee_id").in_bulk(wanted)
+
+    def get(value):
+        number = int(value)
+        if abs(number) >= limit:
+            raise OverflowError("attendance id out of range")
+        try:
+            return found[number]
+        except KeyError:
+            raise Attendance.DoesNotExist("Attendance matching query does not exist.") from None
+
+    return get

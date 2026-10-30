@@ -15,6 +15,7 @@ from django.utils.translation import gettext_lazy as _
 
 from base.cbv.rotating_shift import DynamicRotatingShiftTypeFormView
 from base.decorators import manager_can_enter
+from horilla.decorators import employee_of
 from base.filters import RotatingShiftAssignFilters
 from base.forms import RotatingShiftAssignExportForm, RotatingShiftAssignForm
 from base.methods import choosesubordinates, filtersubordinates, is_reportingmanager
@@ -292,7 +293,13 @@ class RotatingExportView(TemplateView):
 
 
 @method_decorator(login_required, name="dispatch")
-@method_decorator(manager_can_enter("base.add_rotatingshiftassign"), name="dispatch")
+@method_decorator(
+    manager_can_enter(
+        "base.add_rotatingshiftassign",
+        target=employee_of("base.RotatingShiftAssign", "pk"),
+    ),
+    name="dispatch",
+)
 class RotatingShiftFormView(HorillaFormView):
     """
     Create and edit form
