@@ -1,0 +1,28 @@
+{% load static %}
+        <script type="module" src="{% static 'images/ionicons/ui_icons/ionicons/ionicons.esm.js' %}"></script>
+        <script>
+            document.querySelectorAll('.oh-password-input--toggle').forEach(toggle => {
+                toggle.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const container = this.closest('.oh-password-input-container');
+
+                    if (!container) return;
+
+                    const passwordInput = container.querySelector('.oh-input--password');
+                    const showIcon = container.querySelector('.oh-password-input__show-icon, .oh-passowrd-input__show-icon');
+                    const hideIcon = container.querySelector('.oh-password-input__hide-icon, .oh-passowrd-input__hide-icon');
+
+                    if (!passwordInput || !showIcon || !hideIcon) return;
+
+                    if (passwordInput.type === 'password') {
+                        passwordInput.type = 'text';
+                        showIcon.classList.add('hidden', 'd-none');
+                        hideIcon.classList.remove('hidden', 'd-none');
+                    } else {
+                        passwordInput.type = 'password';
+                        showIcon.classList.remove('hidden', 'd-none');
+                        hideIcon.classList.add('hidden', 'd-none');
+                    }
+                });
+            });
+        </script>
