@@ -2,12 +2,14 @@
 this page handles cbv of interview page
 """
 
+from datetime import timedelta
 from typing import Any
 
 from django.contrib import messages
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.urls import resolve, reverse, reverse_lazy
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 
@@ -42,6 +44,57 @@ class InterviewViewPage(TemplateView):
 @method_decorator(
     recruitment_manager_can_enter(perm="recruitment.view_recruitment"), name="dispatch"
 )
+class InterviewWeekView(TemplateView):
+    """
+    "This week" strip above the interview list: Monday to Sunday with the
+    interviews of each day (the same ones the list shows to this user).
+    """
+
+    template_name = "cbv/interview/interview_week.html"
+
+    def get_context_data(self, **kwargs: Any) -> dict:
+        context = super().get_context_data(**kwargs)
+        today = timezone.localdate()
+        start = today - timedelta(days=today.weekday())
+        end = start + timedelta(days=6)
+
+        queryset = InterviewSchedule.objects.filter(
+            interview_date__range=(start, end)
+        ).select_related("candidate_id")
+        if not self.request.user.has_perm("recruitment.view_interviewschedule"):
+            queryset = queryset.filter(employee_id=self.request.user.employee_get.id)
+        queryset = queryset.distinct().order_by("interview_date", "interview_time")
+
+        by_day = {}
+        for interview in queryset:
+            if interview.completed:
+                tone = "done"
+            elif interview.interview_date < today:
+                tone = "late"
+            else:
+                tone = "open"
+            by_day.setdefault(interview.interview_date, []).append(
+                {
+                    "interview": interview,
+                    "tone": tone,
+                    "first_name": (interview.candidate_id.name or "").split(" ")[0],
+                }
+            )
+
+        days = []
+        for offset in range(7):
+            day = start + timedelta(days=offset)
+            days.append(
+                {"date": day, "is_today": day == today, "items": by_day.get(day, [])}
+            )
+        context.update({"days": days, "start": start, "end": end})
+        return context
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(
+    recruitment_manager_can_enter(perm="recruitment.view_recruitment"), name="dispatch"
+)
 class InterviewNavView(HorillaNavView):
     """
     nav bar of the page
@@ -62,6 +115,9 @@ class InterviewNavView(HorillaNavView):
             self.create_attrs = None
 
     nav_title = _("Interviews")
+    create_label = _("Schedule Interview")
+    filter_icon_only = True
+    show_clear_filter = True
     filter_instance = InterviewFilter()
     filter_body_template = "cbv/interview/interview_filter.html"
     filter_form_context_name = "form"
@@ -103,34 +159,85 @@ class InterviewLIstView(HorillaListView):
 
     filter_class = InterviewFilter
     model = InterviewSchedule
+    show_filter_tags = False
     records_per_page = 10
     template_name = "cbv/interview/inherit_script.html"
 
+    # The old Job Opening, Interview Date / Time / End Time columns are folded into the
+    # Candidate (with its job position) and When (date, time, length) columns.
     columns = [
         (_("Candidate"), "candidate_custom_col"),
-        (_("Job Opening"), "candidate_id__recruitment_id__title"),
+        (_("Stage"), "candidate_stage"),
+        (_("When"), "when_custom_col"),
+        (_("Mode"), "mode_custom_col"),
         (_("Interviewer"), "interviewer_custom_col"),
-        (_("Interview Date"), "interview_date"),
-        (_("Interview Time"), "interview_time"),
-        (_("Interview End Time"), "get_end_time"),
-        (_("Description"), "get_description"),
         (_("Status"), "status_custom_col"),
     ]
     header_attrs = {
         "candidate_custom_col": """
-                                style="width:200px !important;"
-                                """
+                                style="width:200px !important; min-width:200px !important;"
+                                """,
+        "candidate_stage": """
+                                style="width:150px !important; min-width:130px !important;"
+                                """,
+        "when_custom_col": """
+                                style="width:120px !important; min-width:110px !important;"
+                                """,
+        "mode_custom_col": """
+                                style="width:110px !important; min-width:100px !important;"
+                                """,
+        "interviewer_custom_col": """
+                                style="width:120px !important; min-width:110px !important;"
+                                """,
+        "status_custom_col": """
+                                style="width:180px !important; min-width:170px !important;"
+                                """,
+        "action": """
+                                style="width:70px !important; min-width:70px !important;"
+                                """,
     }
 
     sortby_mapping = [
-        (_("Interview Date"), "interview_date"),
-        (_("Interview Time"), "interview_time"),
+        (_("When"), "interview_date"),
+    ]
+
+    # The chips right of the "Select" button: click one to list only those interviews.
+    row_status_indications = [
+        (
+            "iv-dot iv-dot--cancelled",
+            _("Cancelled"),
+            """
+            onclick="
+                $('#applyFilter').closest('form').find('[name=status]').val('cancelled');
+                $('#applyFilter').click();
+            "
+            """,
+        ),
+        (
+            "iv-dot iv-dot--scheduled",
+            _("Scheduled"),
+            """
+            onclick="
+                $('#applyFilter').closest('form').find('[name=status]').val('scheduled');
+                $('#applyFilter').click();
+            "
+            """,
+        ),
+        (
+            "iv-dot iv-dot--completed",
+            _("Completed"),
+            """
+            onclick="
+                $('#applyFilter').closest('form').find('[name=status]').val('completed');
+                $('#applyFilter').click();
+            "
+            """,
+        ),
     ]
     action_method = "custom_action_col"
 
     row_attrs = """
                 {custom_color}
-                class="oh-permission-table--collapsed"
                 hx-get='{detail_view}?instance_ids={ordered_ids}'
                 hx-target="#genericModalBody"
                 data-target="#genericModal"

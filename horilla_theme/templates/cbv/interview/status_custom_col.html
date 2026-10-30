@@ -1,26 +1,11 @@
 {% load i18n %}
 
 {% if instance.completed %}
-    <div class="flex items-center gap-2 w-full text-xs font-semibold text-green-600">
-        <i class="material-icons text-[17px]">check_circle</i>
-        <span>{% trans "Interview Completed" %}</span>
-    </div>
+    <span class="iv-pill iv-pill--done">{% trans "Interview Completed" %}</span>
 {% elif instance.interview_date|date:"Y-m-d" < now|date:"Y-m-d" %}
-    <div class="flex items-center gap-2 w-full text-xs font-semibold text-red-600">
-        <i class="material-icons text-[17px]">dangerous</i>
-        <span>{% trans "Expired Interview" %}</span>
-    </div>
+    <span class="iv-pill iv-pill--late">{% trans "Cancelled" %}</span>
 {% elif instance.interview_date|date:"Y-m-d" == now|date:"Y-m-d" and not instance.completed %}
-    <div class="flex items-center gap-2 w-full text-xs font-semibold text-blue-600">
-        <i class="material-symbols-outlined text-[17px]">today</i>
-        <span>{% trans "Interview Today" %}</span>
-    </div>
+    <span class="iv-pill iv-pill--today">{% trans "Interview Today" %}</span>
 {% elif instance.interview_date|date:"Y-m-d" > now|date:"Y-m-d" %}
-    <div
-        class="flex items-center gap-2 w-full text-xs font-semibold text-orange-500"
-        title="{{instance.interview_date|timeuntil}}"
-    >
-        <i class="material-icons text-[17px]">schedule</i>
-        <span>{% trans "Upcoming Interview" %}</span>
-    </div>
+    <span class="iv-pill iv-pill--open" title="{{instance.interview_date|timeuntil}}">{% trans "Upcoming Interview" %}</span>
 {% endif %}

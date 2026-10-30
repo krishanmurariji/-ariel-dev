@@ -1,10 +1,8 @@
 {% load i18n %}
-<div class="oh-sticky-table__tr oh-permission-table--toggle" data-toggle-count="">
-    <div class="d-flex align-items-center">
-        <button class="oh-permission-table__collapse me-2">
-            <span title="{% trans 'Reveal' %}"><ion-icon class="oh-permission-table__collapse-down md hydrated" name="chevron-down-outline" role="img" aria-label="chevron down outline"></ion-icon></span>
-            <span title="{% trans 'Collapse' %}"><ion-icon class="oh-permission-table__collapse-up md hydrated" name="chevron-up-outline" role="img" aria-label="chevron up outline"></ion-icon></span>
-        </button>
-        <span class="oh-permission-table__user">{{instance.candidate_id}} </span>
+<div class="iv-person">
+    <img class="iv-person__img" src="{{ instance.candidate_id.get_avatar }}" alt="" width="36" height="36">
+    <div class="iv-person__text">
+        <span class="iv-person__name">{{ instance.candidate_id }}</span>
+        <span class="iv-person__sub">{{ instance.candidate_id.job_position_id|default:instance.candidate_id.recruitment_id|default_if_none:"" }}</span>
     </div>
 </div>

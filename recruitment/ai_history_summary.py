@@ -11,6 +11,7 @@ account a layperson can follow, rather than a handful of highlights.
 
 import json
 import logging
+import re
 
 from horilla_audit.methods import get_diff
 from recruitment import ai_client
@@ -33,7 +34,62 @@ def _who(entry: dict) -> str:
         name = get_full_name()
         if name:
             return name
-    return str(updated_by)
+    name = str(updated_by)
+    return "Ariel Bot" if name in ("None", "") else name
+
+
+def _plain_value(value):
+    """
+    Strips the technical dressing a layperson does not need: the
+    "- (Job Opening)" suffix on stage names and Python-style booleans.
+    """
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if text in ("True", "False"):
+        return "Yes" if text == "True" else "No"
+    if text in ("None", ""):
+        return ""
+    return re.sub(r"\s*-\s*\(.*\)\s*$", "", text).strip()
+
+
+def _plain_change(record: dict) -> str:
+    """
+    One short, everyday-English sentence for a change, e.g. "Admin User
+    marked the candidate as hired." Used both as the model's input (so it
+    only has to polish, not decode field names) and as the fallback.
+    """
+    who = record["who"]
+    field = record["field"]
+    key = field.lower()
+    old = _plain_value(record["old"])
+    new = _plain_value(record["new"])
+    if key == "stage":
+        if old and new:
+            return f"{who} moved the candidate from {old} to {new}."
+        return f"{who} moved the candidate to {new}."
+    if new in ("Yes", "No") and old in ("Yes", "No", ""):
+        flags = {
+            "hired": ("marked the candidate as hired", "took off the hired mark"),
+            "canceled": ("cancelled the candidate", "reopened the cancelled candidate"),
+            "start onboard": ("started onboarding", "stopped onboarding"),
+            "joining date confirmed": (
+                "confirmed the joining date",
+                "un-confirmed the joining date",
+            ),
+        }
+        yes, no = flags.get(
+            key, (f"turned on {key}", f"turned off {key}")
+        )
+        return f"{who} {yes if new == 'Yes' else no}."
+    if key in ("profile", "resume"):
+        what = "profile picture" if key == "profile" else "resume"
+        return f"{who} updated the candidate's {what}."
+    if not new:
+        return f"{who} cleared the {key}."
+    if not old:
+        return f"{who} set the {key} to {new}."
+    return f"{who} changed the {key} from {old} to {new}."
 
 
 def _resolve_fk_value(pair_record, change: dict):
@@ -60,7 +116,7 @@ def _event_records(candidate: Candidate) -> list[dict]:
     # `tracking` is newest-first; reverse for a chronological narrative.
     for entry in reversed(tracking):
         newer, older = entry["pair"]
-        when = newer.history_date.strftime("%b %d, %Y")
+        when = newer.history_date.strftime("%d %b %Y").lstrip("0")
         who = _who(entry)
         if entry["type"] != "Changes":
             records.append(
@@ -88,11 +144,8 @@ def _event_records(candidate: Candidate) -> list[dict]:
 
 def _prompt_line(record: dict) -> str:
     if record["kind"] == "created":
-        return f"{record['when']} - {record['who']}: {record['text']}"
-    return (
-        f"{record['when']} - {record['who']}: {record['field']} changed "
-        f"from '{record['old']}' to '{record['new']}'"
-    )
+        return f"{record['when']} - {record['who']} created the candidate record."
+    return f"{record['when']} - {_plain_change(record)}"
 
 
 def _fallback_sentence(record: dict) -> str:
@@ -104,10 +157,7 @@ def _fallback_sentence(record: dict) -> str:
     """
     if record["kind"] == "created":
         return f"On {record['when']}, {record['who']} created this candidate record."
-    return (
-        f"On {record['when']}, {record['who']} changed the "
-        f"{record['field'].lower()} from '{record['old']}' to '{record['new']}'."
-    )
+    return f"On {record['when']}, {_plain_change(record)}"
 
 
 def _call_llm(records: list[dict], candidate_name: str) -> list[str]:
@@ -120,14 +170,16 @@ def _call_llm(records: list[dict], candidate_name: str) -> list[str]:
         f"numbered, chronological list of every recorded change to "
         f"{candidate_name}'s candidate record (stage moves, field "
         "edits, who made them, and when).\n\n"
-        "For EVERY numbered event, write exactly one clear, formal, "
-        "plain-language sentence describing what happened - phrased so "
-        "a layperson with no HR background can understand it "
-        "immediately (e.g. \"On Aug 10, 2026, Amit Chawla moved the "
-        "candidate from the Applied stage to the Screening stage.\"). Do "
-        "not skip, merge, or summarize multiple events into a single "
-        "sentence - there must be exactly as many sentences as there "
-        "are numbered events below, in the same order.\n\n"
+        "For EVERY numbered event, write exactly one short, friendly "
+        "sentence in everyday words, as if explaining to a friend who has "
+        "never worked in HR. Start with the date, keep each event's own "
+        "meaning, and keep names and stage names exactly as given. Never "
+        "use quotation marks, the words 'True' or 'False', field names, "
+        "or technical terms (e.g. \"On 10 Aug 2026, Amit Chawla moved "
+        "the candidate from Applied to Screening.\"). Do not skip, "
+        "merge, or summarize multiple events into a single sentence - "
+        "there must be exactly as many sentences as there are numbered "
+        "events below, in the same order.\n\n"
         "CRITICAL - grounding rule: base every sentence ONLY on the "
         "event it corresponds to. Do not invent stages, dates, or "
         "people not present in that event.\n\n"

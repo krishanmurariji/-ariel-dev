@@ -1,0 +1,29 @@
+{% load i18n %}
+{% comment %}
+    Shown in a pipeline stage that has no candidates. `group.instance` is the stage.
+{% endcomment %}
+<div class="ke">
+    <div class="ke-icon">
+        {% if group.instance.stage_type == "applied" %}
+            <i class="fa-regular fa-file-lines"></i>
+        {% else %}
+            <i class="fa-solid fa-user-group"></i>
+        {% endif %}
+    </div>
+    <p class="ke-title">{% trans "No candidates yet" %}</p>
+    <p class="ke-text">
+        {% if group.instance.stage_type == "applied" %}
+            {% trans "Candidates will appear here once they apply." %}
+        {% else %}
+            {% trans "Candidates will appear here once they move to this stage." %}
+        {% endif %}
+    </p>
+</div>
+<style>
+    .ke { display: flex; flex-direction: column; align-items: center; max-width: 13rem; text-align: center; }
+    .ke-icon { display: flex; align-items: center; justify-content: center; width: 4rem; height: 4rem; margin-bottom: 0.875rem; border-radius: 9999px; background: color-mix(in srgb, {{ theme_obj.primary_600|default:"#2563eb" }} 10%, #ffffff); color: {{ theme_obj.primary_600|default:"#2563eb" }}; font-size: 1.5rem; }
+    .ke-title { margin: 0; font-size: 0.8125rem; font-weight: 700; color: #111827; }
+    .ke-text { margin: 0.375rem 0 0; font-size: 0.6875rem; line-height: 1.5; color: #9ca3af; }
+    body.dark .ke-icon { background: color-mix(in srgb, {{ theme_obj.primary_600|default:"#2563eb" }} 22%, #2a2a2a); }
+    body.dark .ke-title { color: #f3f4f6; }
+</style>

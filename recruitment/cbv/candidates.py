@@ -88,6 +88,9 @@ class ListCandidates(HorillaListView):
 
     model = Candidate
     filter_class = CandidateFilter
+    actions_menu = True
+    centered_columns = ["ai_score_number"]
+    show_filter_tags = False
     bulk_template = "cbv/employees_view/bulk_update_page.html"
     bulk_update_fields = [
         "gender",
@@ -139,10 +142,12 @@ class ListCandidates(HorillaListView):
         super().__init__(**kwargs)
         self.export_fields = []
         self.search_url = reverse("list-candidate")
-        if self.request.user.has_perm("recruitment.change_candidate"):
-            self.option_method = "options"
-        else:
-            self.option_method = None
+        # The "Options" column is hidden on the list (its entries stay on the card view).
+        # if self.request.user.has_perm("recruitment.change_candidate"):
+        #     self.option_method = "options"
+        # else:
+        #     self.option_method = None
+        self.option_method = None
 
         unique_questions = RecruitmentSurvey.objects.values("question").annotate(
             pk=Min("pk")
@@ -188,7 +193,10 @@ class ListCandidates(HorillaListView):
                    style ="width : 230px !important;"
                    """,
         "action": """
-                   style ="width : 200px !important;"
+                   style ="width : 90px !important; min-width : 90px !important;"
+                   """,
+        "ai_score_number": """
+                   style ="text-align : center; justify-content : center;"
                    """,
         "email": """
                    style ="width : 200px !important;"
@@ -199,6 +207,18 @@ class ListCandidates(HorillaListView):
     }
 
     actions = [
+        {
+            "action": _("View"),
+            "icon": "eye-outline",
+            "attrs": """
+                class="oh-btn oh-btn--light-bkg w-100"
+                hx-get="{get_profile_url}?instance_ids={ordered_ids}"
+                hx-target="#listContainer"
+                hx-swap="innerHTML"
+                hx-push-url="{get_individual_url}"
+                onclick="event.stopPropagation();"
+            """,
+        },
         {
             "action": _("Edit"),
             "icon": "create-outline",
@@ -221,27 +241,32 @@ class ListCandidates(HorillaListView):
             """,
         },
         {
-            "action": _("View Candidate Self Tracking"),
-            "accessibility": "recruitment.cbv.accessibility.check_candidate_self_tracking",
-            "icon": "footsteps-outline",
+            "action": _("Schedule"),
+            "accessibility": "recruitment.cbv.accessibility.schedule_interview",
+            "icon": "calendar-outline",
             "attrs": """
-                class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100"
-                href="{get_self_tracking_url}"
+                class="oh-btn oh-btn--light-bkg w-100"
+                hx-get="{get_schedule_interview}"
+                hx-target="#genericModalBody"
+                hx-swap="innerHTML"
+                data-toggle="oh-modal-toggle"
+                data-target="#genericModal"
                 onclick="event.stopPropagation();"
             """,
         },
-        {
-            "action": _("Archive"),
-            "accessibility": "recruitment.cbv.accessibility.archive_status",
-            "icon": "archive",
-            "attrs": """
-                class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100"
-                hx-post="{get_archive_action_url}"
-                hx-swap="none"
-                hx-confirm="Do you want to archive this candidate?"
-                onclick="event.stopPropagation();"
-            """,
-        },
+        # Archive is hidden from the row menu (list and card views).
+        # {
+        #     "action": _("Archive"),
+        #     "accessibility": "recruitment.cbv.accessibility.archive_status",
+        #     "icon": "archive",
+        #     "attrs": """
+        #         class="oh-btn oh-btn--danger-outline oh-btn--light-bkg w-100"
+        #         hx-post="{get_archive_action_url}"
+        #         hx-swap="none"
+        #         hx-confirm="Do you want to archive this candidate?"
+        #         onclick="event.stopPropagation();"
+        #     """,
+        # },
         {
             "action": _("Un-archive"),
             "accessibility": "recruitment.cbv.accessibility.unarchive_status",
@@ -270,13 +295,18 @@ class ListCandidates(HorillaListView):
     sortby_mapping = [
         (_("Candidates"), "name", "get_avatar"),
     ]
+    # Each chip sets its own filters, so clicking Canceled and then Not Hired does not leave both
+    # applied ("unknown" = not chosen). They follow the colour of the strip at the left of a row:
+    # red = canceled, green = hired, grey = neither (not hired and not canceled).
     row_status_indications = [
         (
             "canceled--dot",
             _("Canceled"),
             """
             onclick="
-                $('#applyFilter').closest('form').find('[name=canceled]').val('true');
+                var f = $('#applyFilter').closest('form');
+                f.find('[name=hired]').val('unknown');
+                f.find('[name=canceled]').val('true');
                 $('#applyFilter').click();
             "
             """,
@@ -286,7 +316,9 @@ class ListCandidates(HorillaListView):
             _("Not Hired"),
             """
             onclick="
-                $('#applyFilter').closest('form').find('[name=hired]').val('false');
+                var f = $('#applyFilter').closest('form');
+                f.find('[name=canceled]').val('false');
+                f.find('[name=hired]').val('false');
                 $('#applyFilter').click();
             "
             """,
@@ -295,7 +327,10 @@ class ListCandidates(HorillaListView):
             "hired--dot",
             _("Hired"),
             """
-            onclick="$('#applyFilter').closest('form').find('[name=hired]').val('true');
+            onclick="
+                var f = $('#applyFilter').closest('form');
+                f.find('[name=canceled]').val('unknown');
+                f.find('[name=hired]').val('true');
                 $('#applyFilter').click();
             "
             """,
@@ -342,6 +377,9 @@ class CardCandidates(HorillaCardView):
 
     model = Candidate
     filter_class = CandidateFilter
+    show_filter_tags = False
+    actions_menu = True
+    custom_body_template = "cbv/candidates/candidate_card_body.html"
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
@@ -353,7 +391,12 @@ class CardCandidates(HorillaCardView):
         "subtitle": "{email} <br> {get_job_position} <br> AI Score: {ai_score_number}",
     }
 
-    actions = [
+    # Same actions and hover menu as the list view.
+    actions = ListCandidates.actions
+
+    # The card's previous menu entries (Convert to Employee, Add to Skill Zone,
+    # Request Document, Add to Rejected, ...) are no longer shown.
+    hidden_actions = [
         {
             "action": _("Convert to Employee"),
             "accessibility": "recruitment.cbv.accessibility.convert_emp",
@@ -601,6 +644,9 @@ class CandidateNav(HorillaNavView):
         self.filter_instance = CandidateFilter()
 
     nav_title = _("Candidates")
+    hide_actions_button = True
+    filter_icon_only = True
+    show_clear_filter = True
     filter_body_template = "cbv/candidates/filter.html"
     filter_form_context_name = "form"
     search_swap_target = "#listContainer"

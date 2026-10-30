@@ -198,3 +198,44 @@ def check_candidate_self_tracking(request, instance, user_perm):
             company_id__isnull=True
         ).first()
     return setting.candidate_self_tracking if setting else False
+
+
+def change_recruitment(request, instance, user_perm):
+    """
+    Edit and dynamic link entries of the recruitment row menu.
+    """
+    return request.user.has_perm("recruitment.change_recruitment")
+
+
+def archive_recruitment(request, instance, user_perm):
+    """
+    "Archive" entry: only for an active recruitment, needs the delete permission
+    (the same rule the old action buttons used).
+    """
+    return instance.is_active and request.user.has_perm(
+        "recruitment.delete_recruitment"
+    )
+
+
+def unarchive_recruitment(request, instance, user_perm):
+    """
+    "Unarchive" entry: only for an archived recruitment.
+    """
+    return (not instance.is_active) and request.user.has_perm(
+        "recruitment.delete_recruitment"
+    )
+
+
+def delete_recruitment(request, instance, user_perm):
+    """
+    Delete entry of the recruitment row menu.
+    """
+    return request.user.has_perm("recruitment.delete_recruitment")
+
+
+def schedule_interview(request, instance, user_perm):
+    """
+    Scheduling an interview from the candidate list needs the same permission
+    as the Create button on the interview page.
+    """
+    return request.user.has_perm("recruitment.add_interviewschedule")

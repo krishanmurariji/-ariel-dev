@@ -11,6 +11,7 @@ import uuid
 import django_filters
 from django import forms
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 
@@ -798,6 +799,16 @@ class InterviewFilter(HorillaFilterSet):
         field_name="candidate_id__name", lookup_expr="icontains"
     )
 
+    status = django_filters.ChoiceFilter(
+        method="filter_status",
+        label=_("Status"),
+        choices=[
+            ("scheduled", _("Scheduled")),
+            ("completed", _("Completed")),
+            ("cancelled", _("Cancelled")),
+        ],
+    )
+
     scheduled_from = django_filters.DateFilter(
         field_name="interview_date",
         lookup_expr="gte",
@@ -820,6 +831,20 @@ class InterviewFilter(HorillaFilterSet):
             "employee_id",
             "interview_date",
         ]
+
+    def filter_status(self, queryset, _name, value):
+        """
+        Completed: marked complete. Cancelled: not completed and the date has passed.
+        Scheduled: not completed and today or later.
+        """
+        today = timezone.localdate()
+        if value == "completed":
+            return queryset.filter(completed=True)
+        if value == "cancelled":
+            return queryset.filter(completed=False, interview_date__lt=today)
+        if value == "scheduled":
+            return queryset.filter(completed=False, interview_date__gte=today)
+        return queryset
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

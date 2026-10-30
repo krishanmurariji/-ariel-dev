@@ -498,6 +498,36 @@ class Recruitment(HorillaModel):
         else:
             return "Open"
 
+    def get_dynamic_link_url(self):
+        """
+        Url of the "Create Dynamic Link" pop-up
+        """
+        return reverse("recruitment-dynamic-link", kwargs={"pk": self.pk})
+
+    def get_update_url(self):
+        """
+        Url of the edit form
+        """
+        return reverse("recruitment-update", kwargs={"pk": self.pk})
+
+    def get_duplicate_url(self):
+        """
+        Url of the duplicate form
+        """
+        return reverse("recruitment-duplicate", kwargs={"pk": self.pk})
+
+    def get_archive_url(self):
+        """
+        Url that archives / un-archives the recruitment
+        """
+        return reverse("recruitment-archive", kwargs={"rec_id": self.pk})
+
+    def get_delete_url(self):
+        """
+        Url that deletes the recruitment
+        """
+        return reverse("recruitment-delete", kwargs={"rec_id": self.pk})
+
     def rec_actions(self):
         """
         This method for get custom column for actions.
@@ -2468,6 +2498,31 @@ class InterviewSchedule(HorillaModel):
         """
         return render_template(
             path="cbv/interview/candidate_custom_col.html",
+            context={"instance": self},
+        )
+
+    def candidate_stage(self):
+        """
+        Current stage of the candidate in its recruitment pipeline
+        """
+        stage = self.candidate_id.stage_id
+        return stage.stage if stage else "-"
+
+    def when_custom_col(self):
+        """
+        Date, start time and length in one column
+        """
+        return render_template(
+            path="cbv/interview/when_custom_col.html",
+            context={"instance": self},
+        )
+
+    def mode_custom_col(self):
+        """
+        Online / offline with its icon
+        """
+        return render_template(
+            path="cbv/interview/mode_custom_col.html",
             context={"instance": self},
         )
 

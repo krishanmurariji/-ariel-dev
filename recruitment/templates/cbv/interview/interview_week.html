@@ -1,0 +1,34 @@
+{% load i18n %}
+<section class="iv-week" aria-label="{% trans 'This week' %}">
+    <div class="iv-week__head">
+        <h3>{% trans "This week" %}</h3>
+        <p>{{ start|date:"l j M" }} {% trans "to" %} {{ end|date:"l j M Y" }}</p>
+    </div>
+    <div class="iv-week__grid">
+        {% for day in days %}
+            <div class="iv-day{% if day.is_today %} iv-day--today{% endif %}">
+                <div class="iv-day__top">
+                    <span class="iv-day__name">{{ day.date|date:"D" }}</span>
+                    <span class="iv-day__num">{{ day.date.day }}</span>
+                </div>
+                {% for item in day.items %}
+                    <a
+                        href="#"
+                        class="iv-chip iv-chip--{{ item.tone }}"
+                        hx-get="{{ item.interview.detail_view }}"
+                        hx-target="#genericModalBody"
+                        hx-push-url="false"
+                        data-target="#genericModal"
+                        data-toggle="oh-modal-toggle"
+                        title="{{ item.interview.candidate_id }}{% if item.interview.description %} - {{ item.interview.description|truncatechars:60 }}{% endif %}"
+                    >
+                        <b>{{ item.interview.interview_time|time:"H:i" }} &middot; {{ item.first_name }}</b>
+                        {% if item.interview.description %}<span>{{ item.interview.description }}</span>{% endif %}
+                    </a>
+                {% empty %}
+                    <span class="iv-day__free">{% trans "Free" %}</span>
+                {% endfor %}
+            </div>
+        {% endfor %}
+    </div>
+</section>

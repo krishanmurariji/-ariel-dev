@@ -149,11 +149,89 @@ class RecruitmentList(HorillaListView):
         (_("End date"), "end_date"),
         (_("Status"), "status_col"),
     ]
-    action_method = "rec_actions"
+    actions_menu = True
+    show_filter_tags = False
+
+    actions = [
+        {
+            "action": _("Create Dynamic Link"),
+            "accessibility": "recruitment.cbv.accessibility.change_recruitment",
+            "icon": "link-outline",
+            "attrs": """
+                hx-get="{get_dynamic_link_url}"
+                hx-target="#genericModalBody"
+                hx-swap="innerHTML"
+                data-toggle="oh-modal-toggle"
+                data-target="#genericModal"
+                onclick="event.stopPropagation();"
+            """,
+        },
+        {
+            "action": _("Edit"),
+            "accessibility": "recruitment.cbv.accessibility.change_recruitment",
+            "icon": "create-outline",
+            "attrs": """
+                hx-get="{get_update_url}?instance_ids={ordered_ids}"
+                hx-target="#genericModalBody"
+                hx-swap="innerHTML"
+                data-toggle="oh-modal-toggle"
+                data-target="#genericModal"
+                onclick="event.stopPropagation();"
+            """,
+        },
+        {
+            "action": _("Duplicate"),
+            "icon": "copy-outline",
+            "attrs": """
+                hx-get="{get_duplicate_url}"
+                hx-target="#genericModalBody"
+                hx-swap="innerHTML"
+                data-toggle="oh-modal-toggle"
+                data-target="#genericModal"
+                onclick="event.stopPropagation();"
+            """,
+        },
+        {
+            "action": _("Archive"),
+            "accessibility": "recruitment.cbv.accessibility.archive_recruitment",
+            "icon": "archive",
+            "attrs": """
+                hx-post="{get_archive_url}"
+                hx-swap="none"
+                hx-confirm="Are you sure you want to archive this recruitment?"
+                hx-on::after-request="event.detail.successful && ($('#applyFilter').click(), $('#reloadMessagesButton').click())"
+                onclick="event.stopPropagation();"
+            """,
+        },
+        {
+            "action": _("Unarchive"),
+            "accessibility": "recruitment.cbv.accessibility.unarchive_recruitment",
+            "icon": "archive",
+            "attrs": """
+                hx-post="{get_archive_url}"
+                hx-swap="none"
+                hx-confirm="Are you sure you want to unarchive this recruitment?"
+                hx-on::after-request="event.detail.successful && ($('#applyFilter').click(), $('#reloadMessagesButton').click())"
+                onclick="event.stopPropagation();"
+            """,
+        },
+        {
+            "action": _("Delete"),
+            "accessibility": "recruitment.cbv.accessibility.delete_recruitment",
+            "icon": "trash-outline",
+            "attrs": """
+                hx-post="{get_delete_url}"
+                hx-swap="none"
+                hx-confirm="Are you sure you want to delete this recruitment?"
+                hx-on::after-request="event.detail.successful && ($('#applyFilter').click(), $('#reloadMessagesButton').click())"
+                onclick="event.stopPropagation();"
+            """,
+        },
+    ]
 
     header_attrs = {
         "recruitment_column": 'style="width : 200px !important"',
-        "action": 'style="width : 300px !important"',
+        "action": 'style="width : 90px !important; min-width : 90px !important;"',
     }
 
     row_status_indications = [
@@ -224,6 +302,8 @@ class RecruitmentNav(HorillaNavView):
     filter_form_context_name = "form"
     search_swap_target = "#listContainer"
     filter_body_template = "cbv/recruitment/filters.html"
+    filter_icon_only = True
+    show_clear_filter = True
 
 
 class RecruitmentCreationFormExtended(RecruitmentCreationForm):

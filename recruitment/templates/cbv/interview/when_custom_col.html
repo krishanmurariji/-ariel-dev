@@ -1,0 +1,5 @@
+{% load i18n %}
+<div class="iv-when">
+    <b>{{ instance.interview_date|date:"j M" }}</b>
+    <span>{{ instance.interview_time|time:"H:i" }}{% if instance.interview_end_time %} &middot; {{ instance.duration_minutes }} {% trans "min" %}{% endif %}</span>
+</div>

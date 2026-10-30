@@ -1,0 +1,8 @@
+{% load i18n %}
+<div class="iv-mode">
+    {% if instance.interview_mode == "offline" %}
+        <ion-icon name="business-outline"></ion-icon><span>{% trans "Offline" %}</span>
+    {% else %}
+        <ion-icon name="videocam-outline"></ion-icon><span>{% trans "Online" %}</span>
+    {% endif %}
+</div>

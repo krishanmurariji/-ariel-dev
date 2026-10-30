@@ -1,0 +1,105 @@
+{% load horillafilters %}
+{% get_def_theme as theme_obj %}
+{% comment %}Look of the Interviews page: the "This week" strip and the cells of the list table.{% endcomment %}
+<style>
+    :root {
+        --iv-accent: {{ theme_obj.primary_600|default:"#0b82f0" }};
+        --iv-accent-soft: color-mix(in srgb, var(--iv-accent) 11%, white);
+    }
+
+    /* ---------- This week ---------- */
+    /* same box as the table card below: full width, 8px padding, 6px corners, same shadow */
+    .iv-week-wrap { margin: .25rem 0 .75rem; }
+    .iv-week {
+        background: #fff;
+        border-radius: .375rem;
+        padding: .5rem;
+        box-shadow: 0 0 10px 0 rgba(0, 0, 0, .05);
+    }
+    .iv-week__head { padding: .25rem .75rem 0; }
+    .iv-week__head h3 { margin: 0; font-size: 1.05rem; font-weight: 700; color: #0f172a; }
+    .iv-week__head p { margin: .1rem 0 .6rem; font-size: .72rem; color: #7b8aa3; }
+    .iv-week__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .55rem; }
+    .iv-day {
+        min-height: 6.4rem;
+        padding: .6rem .55rem .65rem;
+        border: 1px solid #e8eef7;
+        border-radius: .7rem;
+        background: #fbfdff;
+        display: flex;
+        flex-direction: column;
+        gap: .35rem;
+    }
+    .iv-day--today { border-color: var(--iv-accent); box-shadow: 0 0 0 1px var(--iv-accent); background: #fff; }
+    .iv-day__top { display: flex; align-items: baseline; gap: .4rem; }
+    .iv-day__name { font-size: .64rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #7b8aa3; }
+    .iv-day__num { font-size: 1.15rem; font-weight: 700; color: #0f172a; }
+    .iv-day__free { font-size: .8rem; color: #94a3b8; }
+    .iv-chip {
+        display: block;
+        padding: .5rem .65rem .5rem .7rem;
+        border-radius: .45rem;
+        border-left: 3px solid transparent;
+        font-size: .8rem;
+        line-height: 1.3;
+        text-decoration: none;
+        overflow: hidden;
+    }
+    .iv-chip b { display: block; font-weight: 700; font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .iv-chip span { display: block; margin-top: .15rem; font-size: .76rem; font-weight: 400; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .iv-chip--open { background: #e3effd; border-left-color: #2f7de1; color: #0f2a4d; }
+    .iv-chip--done { background: #e1f5ea; border-left-color: #17a05b; color: #0f3d24; }
+    .iv-chip--late { background: #fdeaea; border-left-color: #e5484d; color: #5c1414; }
+    .iv-chip:hover { filter: brightness(.97); }
+    @media (max-width: 1100px) { .iv-week__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+    @media (max-width: 640px) { .iv-week__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+    /* ---------- List table: default table look (same as the candidate list); only the cell contents below are specific ---------- */
+    .iv-person { display: flex; align-items: center; gap: .65rem; min-width: 0; }
+    .iv-person__img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: #e8eef7; }
+    .iv-person__text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+    .iv-person__name { font-weight: 600; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .iv-person__sub { font-size: .72rem; color: #7b8aa3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .iv-when { display: flex; flex-wrap: wrap; align-items: baseline; gap: .1rem .4rem; white-space: nowrap; }
+    .iv-when b { font-weight: 700; color: #0f172a; }
+    .iv-when span { font-size: .78rem; color: #64748b; }
+
+    .iv-mode { display: inline-flex; align-items: center; gap: .4rem; color: #475569; white-space: nowrap; }
+    .iv-mode ion-icon { font-size: 1.05rem; color: #64748b; }
+
+    .iv-stack { display: flex; align-items: center; }
+    .iv-stack__img { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 2px solid #fff; margin-left: -8px; background: #e8eef7; }
+    .iv-stack__img:first-child { margin-left: 0; }
+    .iv-stack__more {
+        margin-left: -8px; min-width: 26px; height: 26px; padding: 0 .3rem; border-radius: 13px; border: 2px solid #fff;
+        background: #eaf0fa; color: #475569; font-size: .68rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center;
+    }
+    .iv-muted { color: #a3afc2; }
+
+    .iv-dot--cancelled { background-color: #e5484d; }
+    .iv-dot--scheduled { background-color: #3b82f6; }
+    .iv-dot--completed { background-color: #22a05b; }
+
+    .iv-pill { display: inline-block; padding: .2rem .65rem; border-radius: 999px; font-size: .72rem; font-weight: 600; white-space: nowrap; }
+    .iv-pill--open { background: #e6f1ff; color: #1b5fc2; }
+    .iv-pill--today { background: #d4e6ff; color: #1450b8; }
+    .iv-pill--done { background: #e3f6ea; color: #17803f; }
+    .iv-pill--late { background: #fde8e8; color: #c0262d; }
+
+    /* ---------- Dark mode ---------- */
+    body.dark .iv-week { background: #1b2433; box-shadow: none; }
+    body.dark .iv-week__head h3, body.dark .iv-day__num, body.dark .iv-person__name, body.dark .iv-when b { color: #f1f5f9; }
+    body.dark .iv-day { background: #1f293a; border-color: #2c3850; }
+    body.dark .iv-day--today { background: #1b2433; border-color: var(--iv-accent); }
+    body.dark .iv-chip--open { background: #1e3a5f; color: #dbeafe; }
+    body.dark .iv-chip--done { background: #1a3d2a; color: #d5f5e1; }
+    body.dark .iv-chip--late { background: #4a2024; color: #ffdede; }
+    body.dark .iv-chip span { color: #cbd5e1; }
+    body.dark .iv-stack__img, body.dark .iv-stack__more { border-color: #1b2433; }
+    body.dark .iv-mode, body.dark .iv-when span { color: #cbd5e1; }
+    body.dark .iv-pill--open { background: #1e3a5f; color: #bcd9ff; }
+    body.dark .iv-pill--today { background: #1f4478; color: #cfe3ff; }
+    body.dark .iv-pill--done { background: #1a3d2a; color: #b5ecc9; }
+    body.dark .iv-pill--late { background: #4a2024; color: #ffc9c9; }
+</style>

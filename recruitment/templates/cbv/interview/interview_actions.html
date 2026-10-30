@@ -1,37 +1,43 @@
 {% load i18n horillafilters %}
-<div class="oh-btn-group" onclick="event.stopPropagation()">
+{% comment %}
+    Row actions of the interview list as the three-dot hover menu (styles and script come from
+    generic/row_action_menu_assets.html, included once by inherit_script.html).
+{% endcomment %}
+<div class="row-action-menu" onclick="event.stopPropagation()">
+	<button type="button" class="row-action-btn" aria-label="{% trans 'Actions' %}" aria-haspopup="true">
+		<i class="fa-solid fa-ellipsis-vertical"></i>
+	</button>
+	<div class="row-action-list" role="menu">
 	{% if check_default_meeting_provider == "teams" %}
 		{% if "outlook_auth"|app_installed %}
 			{% if perms.recruitment.change_interviewschedule or request.user.employee_get in instance.employee_id.all %}
 				{% if instance.outlook_interviews.meeting.join_url %}
 					<a
-						title="{% trans 'Join Meeting' %}"
+						role="menuitem"
 						href="{{instance.outlook_interviews.meeting.join_url}}"
 						target="_blank"
-						class="oh-btn oh-btn--light-bkg w-100"
-						><ion-icon name="link-outline"></ion-icon
-					></a>
+						class="row-action-item"
+						><ion-icon name="link-outline"></ion-icon><span>{% trans 'Join Meeting' %}</span></a>
 				{% else %}
 					<a
-						title="{% trans 'Join Meeting' %}"
+						role="menuitem"
 						href="#"
-						class="oh-btn oh-btn--disabled oh-btn--light-bkg w-100"
-						><ion-icon name="link-outline"></ion-icon
-					></a>
+						class="row-action-item"
+						style="opacity:.45;pointer-events:none"
+						><ion-icon name="link-outline"></ion-icon><span>{% trans 'Join Meeting' %}</span></a>
 				{% endif %}
 			{% endif %}
 			{% if perms.outlook_auth.add_outlookmeeting %}
 				{% if perms.recruitment.change_interviewschedule or request.user.employee_get in instance.employee_id.all %}
 					<a
-						title="{% trans 'Send Meeting Link' %}"
+						role="menuitem"
 						href="#"
 						data-id="{{instance.id}}"
 						data-date="{{instance.interview_date}}"
 						data-time="{{instance.interview_time}}"
 						data-employees="{{instance.employee_id.all|length}}"
-						class="oh-btn oh-btn--light-bkg w-100 createMeeting"
-						><ion-icon name="share-outline"></ion-icon
-					></a>
+						class="row-action-item createMeeting"
+						><ion-icon name="share-outline"></ion-icon><span>{% trans 'Send Meeting Link' %}</span></a>
 				{% endif %}
 			{% endif %}
 		{% endif %}
@@ -40,59 +46,61 @@
 			{% if perms.recruitment.change_interviewschedule or request.user.employee_get in instance.employee_id.all %}
 				{% if instance.google_interviews.meeting.meet_url %}
 					<a
-						title="{% trans 'Join Meeting' %}"
+						role="menuitem"
 						href="{{instance.google_interviews.meeting.meet_url}}"
 						target="_blank"
-						class="oh-btn oh-btn--light-bkg w-100"
-						><ion-icon name="link-outline"></ion-icon
-					></a>
+						class="row-action-item"
+						><ion-icon name="link-outline"></ion-icon><span>{% trans 'Join Meeting' %}</span></a>
 				{% else %}
 					<a
-						title="{% trans 'Join Meeting' %}"
+						role="menuitem"
 						href="#"
-						class="oh-btn oh-btn--disabled oh-btn--light-bkg w-100"
-						><ion-icon name="link-outline"></ion-icon
-					></a>
+						class="row-action-item"
+						style="opacity:.45;pointer-events:none"
+						><ion-icon name="link-outline"></ion-icon><span>{% trans 'Join Meeting' %}</span></a>
 				{% endif %}
 			{% endif %}
 			{% if perms.horilla_meet.add_googlemeeting %}
 				{% if perms.recruitment.change_interviewschedule or request.user.employee_get in instance.employee_id.all %}
 					<a
-						title="{% trans 'Send Meeting Link' %}"
+						role="menuitem"
 						href="#"
 						data-id="{{instance.id}}"
 						data-date="{{instance.interview_date}}"
 						data-time="{{instance.interview_time}}"
 						data-employees="{{instance.employee_id.all|length}}"
-						class="oh-btn oh-btn--light-bkg w-100 createMeeting"
-						><ion-icon name="share-outline"></ion-icon
-					></a>
+						class="row-action-item createMeeting"
+						><ion-icon name="share-outline"></ion-icon><span>{% trans 'Send Meeting Link' %}</span></a>
 				{% endif %}
 			{% endif %}
 		{% endif %}
 	{% endif %}
 	{% if perms.recruitment.change_interviewschedule or request.user.employee_get in instance.employee_id.all %}
 		<a
-			title="{% trans 'Edit' %}"
+			role="menuitem"
+			href="#"
 			hx-get="{% url 'edit-interview' instance.id %}?view=true&instance_ids={{instance.ordered_ids}}"
+			hx-push-url="false"
 			data-target="#genericModal"
 			hx-swap="innerHTML"
 			hx-target="#genericModalBody"
 			data-toggle="oh-modal-toggle"
-			class="oh-btn oh-btn--light-bkg w-100"
-			><ion-icon name="create-outline"></ion-icon
-		></a>
+			class="row-action-item"
+			><ion-icon name="create-outline"></ion-icon><span>{% trans 'Edit' %}</span></a>
 	{% endif %}
 	{% if perms.recruitment.delete_interviewschedule %}
+		<div class="row-action-sep"></div>
 		<a
+			role="menuitem"
+			href="#"
 			hx-post="{% url 'delete-interview' instance.id %}?view=true"
+			hx-push-url="false"
 			hx-target="#interviewdelete"
 			hx-confirm="{% trans 'Are you sure you want to delete this interview?' %}"
-			class="oh-btn oh-btn--light-bkg oh-btn--danger-outline"
-			title="{% trans 'Delete' %}"
-			><ion-icon name="trash-outline"></ion-icon
-		></a>
+			class="row-action-item is-danger"
+			><ion-icon name="trash-outline"></ion-icon><span>{% trans 'Delete' %}</span></a>
 	{% endif %}
+	</div>
 </div>
 
 <script>
@@ -103,7 +111,7 @@
 		// renders never stack up duplicate click handlers - that stacking
 		// was causing the SweetAlert2 dialog to fire N times per click and
 		// appear to "refresh". Binding must stay direct (not delegated to
-		// document/an ancestor) because the wrapping .oh-btn-group div calls
+		// document/an ancestor) because the wrapping .row-action-menu div calls
 		// event.stopPropagation(), which would stop a delegated handler on
 		// document from ever seeing the click.
 		$(".createMeeting").off("click.createMeeting").on("click.createMeeting", function(e){

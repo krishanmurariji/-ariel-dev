@@ -227,7 +227,8 @@ class RecruitmentTabView(HorillaTabView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["show_filter_tags"] = True
+        # the applied filter is shown as a red dot on the Filter button instead
+        context["show_filter_tags"] = False
 
         return context
 
@@ -290,7 +291,7 @@ class CandidateList(HorillaListView):
     filter_selected = False
     quick_export = False
     next_prev = False
-    show_filter_tags = True
+    show_filter_tags = False
     filter_keys_to_remove = ["rec_id", "obj_id"]
     records_per_page = 10
     records_count_in_tab = False
@@ -465,6 +466,7 @@ class CandidateList(HorillaListView):
 class CandidateCard(HorillaKanbanView):
     model = models.Candidate
     filter_class = filters.CandidateFilter
+    show_filter_tags = False
     group_filter_class = filters.StageFilter
     group_key = "stage_id"
     records_per_page = 10
@@ -493,6 +495,8 @@ class CandidateCard(HorillaKanbanView):
     # - so this row is rendered separately with the label spelled out
     # correctly instead of going through `details`.
     custom_card_content_template = "cbv/pipeline/ai_score_kanban_row.html"
+    kanban_card_template = "cbv/pipeline/candidate_kanban_card.html"
+    kanban_empty_template = "cbv/pipeline/candidate_kanban_empty.html"
 
     group_actions = [
         {
@@ -912,6 +916,8 @@ class PipelineNav(HorillaNavView):
     nav_title = _("Pipeline")
     search_swap_target = "#pipelineContainer"
     filter_body_template = "cbv/pipeline/pipeline_filter.html"
+    filter_icon_only = True
+    show_clear_filter = True
     filter_instance = filters.RecruitmentFilter()
     filter_form_context_name = "form"
     apply_first_filter = False

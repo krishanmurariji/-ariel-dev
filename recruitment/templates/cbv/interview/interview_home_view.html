@@ -3,7 +3,14 @@
 {% load i18n %}
 {% block content %}
 <meta name="csrf-token" content="{{ csrf_token }}">
+{% include "cbv/interview/interview_style.html" %}
 <div hx-get="{% url "interview-nav-view" %}" hx-trigger="load">
+</div>
+
+<div class="iv-week-wrap"
+     hx-get="{% url 'interview-week' %}"
+     hx-trigger="load, htmx:afterSwap from:#listContainer"
+     hx-swap="innerHTML">
 </div>
 
 

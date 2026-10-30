@@ -1,102 +1,169 @@
 {% load static i18n audit_filters %}
-<div class="p-4 lg:flex lg:items-start gap-6">
+<style>
+    .hx-wrap { padding: 1.25rem; background: #f4f7fb; border-radius: .75rem; }
+    .hx-grid { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+    @media (min-width: 1024px) { .hx-grid { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); } }
+    .hx-card {
+        background: #fff; border: 1px solid #e6ebf3; border-radius: .9rem;
+        box-shadow: 0 1px 3px rgba(16, 24, 40, .06); padding: 1.25rem;
+    }
+    .hx-title { display: flex; align-items: center; gap: .55rem; margin: 0; font-size: 1.1rem; font-weight: 700; color: #1b2430; }
+    .hx-title__icon { font-size: 1.5rem; color: #2f7de1; }
+    .hx-btn {
+        display: inline-flex; align-items: center; gap: .4rem; padding: .5rem 1rem; border: 0; border-radius: .5rem;
+        background: #2f7de1; color: #fff; font-size: .8rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .hx-btn:hover { background: #2169c4; }
+    .hx-sub { display: flex; align-items: center; gap: .4rem; margin-top: .25rem; font-size: .78rem; color: #5b6676; }
+    .hx-steps { margin-top: 1rem; background: #eef4fd; border: 1px solid #dde9fb; border-radius: .7rem; padding: .9rem; }
+    .hx-steps__title { margin: 0 0 .75rem; font-size: .9rem; font-weight: 700; color: #1b2430; }
+    .hx-steps__list { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+    .hx-step { display: flex; align-items: center; gap: .75rem; }
+    .hx-step__num {
+        flex: 0 0 auto; display: grid; place-items: center; width: 1.9rem; height: 1.9rem; border-radius: 50%;
+        background: #d6e6fb; color: #2f7de1; font-size: .85rem; font-weight: 700;
+    }
+    .hx-step__text {
+        flex: 1; min-width: 0; padding: .6rem .8rem; border-radius: .55rem; background: #f6f9fe;
+        font-size: .8rem; line-height: 1.45; color: #2a3442;
+    }
+    .hx-tl-head { display: flex; align-items: center; gap: .5rem; margin: 0 0 1rem; font-size: 1.1rem; font-weight: 700; color: #1b2430; }
+    .hx-tl-head ion-icon { font-size: 1.35rem; color: #5b6676; }
+    .hx-tl { position: relative; padding-left: 2.9rem; }
+    .hx-tl::before { content: ""; position: absolute; left: 1rem; top: .4rem; bottom: .4rem; width: 1px; background: #dbe1ea; }
+    .hx-tl ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; }
+    .hx-tl li { position: relative; }
+    .hx-avatar {
+        position: absolute; left: -2.9rem; top: 0; width: 2.1rem; height: 2.1rem; border-radius: 50%; overflow: hidden;
+        border: 2px solid #fff; box-shadow: 0 1px 3px rgba(16, 24, 40, .2); background: #e8eef7;
+        display: grid; place-items: center; font-size: .72rem; font-weight: 700; color: #3b4a2a;
+    }
+    .hx-avatar--bot { background: #e7ee6a; }
+    .hx-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .hx-entry { background: #fff; border: 1px solid #e6ebf3; border-radius: .7rem; padding: .75rem .85rem; }
+    .hx-entry__top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .25rem .75rem; }
+    .hx-entry__name { margin: 0; font-size: .82rem; font-weight: 700; color: #1b2430; }
+    .hx-entry__when { font-size: .74rem; color: #6b7686; }
+    .hx-entry__note { margin: .3rem 0 0; font-size: .76rem; color: #6b7686; }
+    .hx-changes { margin-top: .6rem; background: #f6f7fb; border: 1px solid #e3e7ef; border-radius: .5rem; padding: .55rem .7rem; }
+    .hx-changes__title { margin: 0 0 .4rem; font-size: .76rem; font-weight: 600; color: #2f7de1; }
+    .hx-changes ul { display: grid; gap: .35rem; }
+    .hx-entry, .hx-changes, .hx-change span { min-width: 0; overflow-wrap: anywhere; }
+    .hx-change { display: flex; align-items: flex-start; gap: .5rem; font-size: .76rem; line-height: 1.4; color: #2a3442; }
+    .hx-change::before {
+        content: ""; flex: 0 0 auto; width: .95rem; height: .95rem; margin-top: .05rem; border-radius: 50%; background: #e5484d;
+        background-image: linear-gradient(#fff, #fff); background-repeat: no-repeat; background-position: center; background-size: 50% 2px;
+    }
+    @media (max-width: 640px) {
+        .hx-wrap { padding: .5rem; }
+        .hx-grid { gap: .75rem; }
+        .hx-card { padding: .85rem; }
+        .hx-steps { padding: .6rem; }
+        .hx-step { gap: .5rem; }
+        .hx-step__num { width: 1.5rem; height: 1.5rem; font-size: .75rem; }
+        .hx-step__text { padding: .5rem .6rem; }
+        .hx-tl { padding-left: 2.4rem; }
+        .hx-avatar { left: -2.4rem; width: 1.9rem; height: 1.9rem; }
+        .hx-tl::before { left: .85rem; }
+    }
+    body.dark .hx-wrap { background: #1a2230; }
+    body.dark .hx-card, body.dark .hx-entry { background: #232d3f; border-color: #324058; }
+    body.dark .hx-title, body.dark .hx-tl-head, body.dark .hx-entry__name, body.dark .hx-steps__title { color: #e6ecf5; }
+    body.dark .hx-steps { background: #1f2c44; border-color: #2d4166; }
+    body.dark .hx-step__text { background: #26344f; color: #dbe5f3; }
+    body.dark .hx-changes { background: #1d2636; border-color: #324058; }
+    body.dark .hx-change { color: #dbe5f3; }
+</style>
+<div class="hx-wrap">
+    <div class="hx-grid">
 
-    {# ============ AI SUMMARY (left column) ============ #}
-    <div class="lg:w-[320px] lg:shrink-0 lg:sticky lg:top-4 mb-6 lg:mb-0">
-        <div
-            id="historyAiSummaryStatus"
-            hx-get="{% url 'candidate-history-summary-status' candidate.id %}"
-            hx-trigger="load"
-        >
-            <div class="border border-dark-50 rounded-md p-4 bg-white">
-                <div class="animated-background" style="height:140px;"></div>
-            </div>
-        </div>
-    </div>
-
-    {# ============ TRADITIONAL TIMELINE (right column) ============ #}
-    <div class="flex-1 min-w-0">
-        <h5 class="mb-4 font-medium text-sm flex items-center gap-1.5 text-[#565E6C]">
-            <ion-icon name="time-outline" class="text-slate-400"></ion-icon>
-            {% trans "Timeline" %}
-        </h5>
-
-        {% if candidate.tracking %}
-            <div class="relative pl-9">
-                <div class="absolute left-[13px] top-1 bottom-1 w-px bg-[#dbdbdb]"></div>
-                <ul class="space-y-6">
-                    {% for history in candidate.tracking %}
-                        <li class="relative">
-                            <div class="absolute -left-9 top-0 w-7 h-7 rounded-full bg-primary-600 border-2 border-white shadow-card overflow-hidden">
-                                <img
-                                    src="{{ history.updated_by.get_avatar }}"
-                                    class="w-full h-full object-cover"
-                                >
-                            </div>
-
-                            <div class="border border-dark-50 rounded-md p-3 bg-white">
-                                <div class="flex flex-wrap items-baseline justify-between gap-x-2 mb-1">
-                                    <h5 class="text-xs font-semibold">
-                                        {{ history.updated_by.get_full_name|default:"Ariel Bot" }}
-                                    </h5>
-                                    <span class="text-[11px] text-[#565E6C]">
-                                        <span class="dateformat_changer">{{ history.pair.1.history_date|date }}</span>
-                                        &nbsp;
-                                        <span class="timeformat_changer">{{ history.pair.1.history_date|time }}</span>
-                                    </span>
-                                </div>
-                                {% if history.pair.0.history_title %}
-                                    <p class="text-xs text-[#777777] mb-1">
-                                        {{ history.pair.0.history_title }}
-                                    </p>
-                                {% endif %}
-                                {% if history.pair.0.history_description %}
-                                    <p class="text-xs text-[#777777] mb-1">
-                                        {{ history.pair.0.history_description }}
-                                    </p>
-                                {% endif %}
-                                <div class="oh-history_tabs">
-                                    {% for tag in history.pair.0.history_tags.all %}
-                                        <a
-                                            href="#"
-                                            class="oh-history_msging-email oh-history_tabs-items"
-                                        >{{ tag.title }}</a>
-                                    {% endfor %}
-                                </div>
-                                {% if history.changes %}
-                                    <div class="bg-[#f7f7f7] p-2 px-3 rounded border border-dark-50 mt-2">
-                                        <h3 class="text-primary-600 font-semibold text-[11px] mb-1">
-                                            {% trans "Changes" %}
-                                        </h3>
-                                        <ul class="list-checked">
-                                            {% for change in history.changes %}
-                                                <li class="text-xs">
-                                                    {{ history.pair.1|fk_history:change }} →
-                                                    {{ history.pair.0|fk_history:change }} ({{ change.field }})
-                                                </li>
-                                            {% endfor %}
-                                        </ul>
-                                    </div>
-                                {% endif %}
-                            </div>
-                        </li>
-                    {% endfor %}
-                </ul>
-            </div>
-        {% else %}
-            <div class="oh-wrapper h-full" align="center">
-                <div class="xl:col-span-4 md:col-span-6 col-span-12 bg-white p-6 rounded-md shadow-card h-[70%]">
-                    <div class="flex flex-col items-center justify-center h-full">
-                        <img
-                            src="/static/horilla_theme/assets/img/no-records.svg"
-                            alt=""
-                            width="300"
-                            class="mb-4"
-                        >
-                        <p class="text-[#666] mb-5">{% trans "No history found." %}</p>
-                    </div>
+        {# ============ AI SUMMARY (left column) ============ #}
+        <div>
+            <div
+                id="historyAiSummaryStatus"
+                hx-get="{% url 'candidate-history-summary-status' candidate.id %}"
+                hx-trigger="load"
+            >
+                <div class="hx-card">
+                    <div class="animated-background" style="height:140px;"></div>
                 </div>
             </div>
-        {% endif %}
+        </div>
+
+        {# ============ TRADITIONAL TIMELINE (right column) ============ #}
+        <div class="hx-card">
+            <h5 class="hx-tl-head">
+                <ion-icon name="time-outline"></ion-icon>
+                {% trans "Timeline" %}
+            </h5>
+
+            {% if candidate.tracking %}
+                <div class="hx-tl">
+                    <ul>
+                        {% for history in candidate.tracking %}
+                            <li>
+                                {% if history.updated_by %}
+                                    <div class="hx-avatar"><img src="{{ history.updated_by.get_avatar }}" alt=""></div>
+                                {% else %}
+                                    <div class="hx-avatar hx-avatar--bot">AB</div>
+                                {% endif %}
+
+                                <div class="hx-entry">
+                                    <div class="hx-entry__top">
+                                        <h5 class="hx-entry__name">
+                                            {{ history.updated_by.get_full_name|default:"Ariel Bot" }}
+                                        </h5>
+                                        <span class="hx-entry__when">
+                                            <span class="dateformat_changer">{{ history.pair.1.history_date|date }}</span>
+                                            &nbsp;
+                                            <span class="timeformat_changer">{{ history.pair.1.history_date|time }}</span>
+                                        </span>
+                                    </div>
+                                    {% if history.pair.0.history_title %}
+                                        <p class="hx-entry__note">{{ history.pair.0.history_title }}</p>
+                                    {% endif %}
+                                    {% if history.pair.0.history_description %}
+                                        <p class="hx-entry__note">{{ history.pair.0.history_description }}</p>
+                                    {% endif %}
+                                    <div class="oh-history_tabs">
+                                        {% for tag in history.pair.0.history_tags.all %}
+                                            <a
+                                                href="#"
+                                                class="oh-history_msging-email oh-history_tabs-items"
+                                            >{{ tag.title }}</a>
+                                        {% endfor %}
+                                    </div>
+                                    {% if history.changes %}
+                                        <div class="hx-changes">
+                                            <h3 class="hx-changes__title">{% trans "Changes" %}</h3>
+                                            <ul>
+                                                {% for change in history.changes %}
+                                                    <li class="hx-change">
+                                                        <span>
+                                                            {{ history.pair.1|fk_history:change }} →
+                                                            {{ history.pair.0|fk_history:change }} ({{ change.field }})
+                                                        </span>
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% else %}
+                <div class="flex flex-col items-center justify-center py-6">
+                    <img
+                        src="/static/horilla_theme/assets/img/no-records.svg"
+                        alt=""
+                        width="260"
+                        class="mb-4"
+                    >
+                    <p class="text-[#666]">{% trans "No history found." %}</p>
+                </div>
+            {% endif %}
+        </div>
     </div>
 </div>

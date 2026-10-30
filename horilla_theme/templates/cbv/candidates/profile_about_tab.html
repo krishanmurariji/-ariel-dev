@@ -1,5 +1,5 @@
 {% load i18n horillafilters %}
-{% with theme_primary_600=theme_obj.primary_600|default:"#E54F38" theme_primary_700=theme_obj.primary_700|default:"#ce4732" theme_primary_100=theme_obj.primary_100|default:"#FFF5F1" %}
+{% with theme_primary_300=theme_obj.primary_300|default:"#FCEDEB" theme_primary_800=theme_obj.primary_800|default:"#AC3B2A" theme_primary_600=theme_obj.primary_600|default:"#E54F38" theme_primary_700=theme_obj.primary_700|default:"#ce4732" theme_primary_100=theme_obj.primary_100|default:"#FFF5F1" %}
 
 <style>
   .cp-reveal { opacity: 0; transform: translateY(10px); transition: opacity .5s cubic-bezier(.16,1,.3,1), transform .5s cubic-bezier(.16,1,.3,1); }
@@ -8,6 +8,18 @@
   .cp-card { transition: box-shadow .3s ease, border-color .3s ease; }
   .cp-card:hover { box-shadow: 0 6px 20px -8px rgba(15,23,42,.12); border-color: #cbd5e1; }
 
+  .cp-collapse { width: 1.75rem; height: 1.75rem; display: inline-flex; align-items: center; justify-content: center; border-radius: .5rem; color: #6b7280; font-size: .7rem; transition: background-color .15s ease, transform .2s ease; }
+  .cp-collapse:hover { background: #f3f4f6; color: #111827; }
+  .cp-collapse.is-shut i { transform: rotate(180deg); }
+  /* Dark theme: the collapse arrow keeps a visible hover, and skill chips get a contrasting fill instead of grey on grey. */
+  body.dark .cp-collapse { color: #d1d5db; }
+  body.dark .cp-collapse i { color: inherit !important; }
+  body.dark .cp-collapse:hover { background: rgba(255,255,255,.14); color: #ffffff; }
+  body.dark .cp-chip {
+    background: color-mix(in srgb, {{ theme_primary_600 }} 30%, #242424) !important;
+    color: #f3f4f6 !important;
+    border: 1px solid color-mix(in srgb, {{ theme_primary_600 }} 55%, transparent);
+  }
   .cp-chip { transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease; }
   .cp-chip:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 4px 10px -4px rgba(15,23,42,.25); }
 
@@ -50,7 +62,16 @@
     {# ============ PRIMARY DETAILS ============ #}
     <div class="cp-reveal cp-card mb-4 lg:mb-0" style="transition-delay:0ms">
         <div class="border border-dark-50 rounded-md p-4 h-full bg-white">
-            <h5 class="font-semibold text-sm mb-4">{% trans 'Primary Details' %}</h5>
+            <div class="cp-card-head flex items-center justify-between pb-3 mb-4 border-b border-dark-50">
+                <h5 class="font-semibold text-sm flex items-center gap-2.5">
+                    <i class="fa-solid fa-user" style="color: {{ theme_primary_600 }};"></i>
+                    {% trans 'Primary Details' %}
+                </h5>
+                <button type="button" class="cp-collapse" aria-expanded="true" aria-label="{% trans 'Collapse' %}"
+                    onclick="var body=this.closest('.cp-card-head').nextElementSibling; var shut=body.style.display!=='none'; body.style.display=shut?'none':''; this.setAttribute('aria-expanded', shut ? 'false' : 'true'); this.classList.toggle('is-shut', shut);">
+                    <i class="fa-solid fa-chevron-up"></i>
+                </button>
+            </div>
             <div class="grid grid-cols-2 gap-x-4 gap-y-4">
                 <div>
                     <p class="cp-field-label">{% trans 'Date of Birth' %}</p>
@@ -91,7 +112,16 @@
     {# ============ RECRUITMENT DETAILS ============ #}
     <div class="cp-reveal cp-card mb-4 lg:mb-0" style="transition-delay:60ms">
         <div class="border border-dark-50 rounded-md p-4 h-full bg-white">
-            <h5 class="font-semibold text-sm mb-4">{% trans 'Recruitment Details' %}</h5>
+            <div class="cp-card-head flex items-center justify-between pb-3 mb-4 border-b border-dark-50">
+                <h5 class="font-semibold text-sm flex items-center gap-2.5">
+                    <i class="fa-solid fa-file-lines" style="color: {{ theme_primary_600 }};"></i>
+                    {% trans 'Recruitment Details' %}
+                </h5>
+                <button type="button" class="cp-collapse" aria-expanded="true" aria-label="{% trans 'Collapse' %}"
+                    onclick="var body=this.closest('.cp-card-head').nextElementSibling; var shut=body.style.display!=='none'; body.style.display=shut?'none':''; this.setAttribute('aria-expanded', shut ? 'false' : 'true'); this.classList.toggle('is-shut', shut);">
+                    <i class="fa-solid fa-chevron-up"></i>
+                </button>
+            </div>
             <div class="grid grid-cols-2 gap-x-4 gap-y-4">
                 <div>
                     <p class="cp-field-label">{% trans 'Recruitment' %}</p>
@@ -104,7 +134,7 @@
                 <div>
                     <p class="cp-field-label">{% trans 'Current Stage' %}</p>
                     <p class="cp-field-value">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium" style="background: {{ theme_primary_100 }}; color: {{ theme_primary_700 }};">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium" style="background: {{ theme_primary_300 }}; color: {{ theme_primary_800 }};">
                             {{ candidate.stage_id|default:'—' }}
                         </span>
                     </p>
@@ -142,7 +172,16 @@
     {# ============ CAREER DETAILS ============ #}
     <div class="cp-reveal cp-card col-span-2 mb-4 lg:mb-0" style="transition-delay:120ms">
         <div class="border border-dark-50 rounded-md p-4 h-full bg-white">
-            <h5 class="font-semibold text-sm mb-4">{% trans 'Career Details' %}</h5>
+            <div class="cp-card-head flex items-center justify-between pb-3 mb-4 border-b border-dark-50">
+                <h5 class="font-semibold text-sm flex items-center gap-2.5">
+                    <i class="fa-solid fa-briefcase" style="color: {{ theme_primary_600 }};"></i>
+                    {% trans 'Career Details' %}
+                </h5>
+                <button type="button" class="cp-collapse" aria-expanded="true" aria-label="{% trans 'Collapse' %}"
+                    onclick="var body=this.closest('.cp-card-head').nextElementSibling; var shut=body.style.display!=='none'; body.style.display=shut?'none':''; this.setAttribute('aria-expanded', shut ? 'false' : 'true'); this.classList.toggle('is-shut', shut);">
+                    <i class="fa-solid fa-chevron-up"></i>
+                </button>
+            </div>
             <div class="block lg:grid grid-cols-2 gap-6">
                 <div class="grid grid-cols-2 gap-x-4 gap-y-4">
                     <div>
@@ -219,7 +258,16 @@
     {% if candidate.education_set.all %}
     <div class="cp-reveal cp-card col-span-2 mb-4 lg:mb-0" style="transition-delay:180ms">
         <div class="border border-dark-50 rounded-md p-4 h-full bg-white">
-            <h5 class="font-semibold text-sm mb-4">{% trans 'Education' %}</h5>
+            <div class="cp-card-head flex items-center justify-between pb-3 mb-4 border-b border-dark-50">
+                <h5 class="font-semibold text-sm flex items-center gap-2.5">
+                    <i class="fa-solid fa-graduation-cap" style="color: {{ theme_primary_600 }};"></i>
+                    {% trans 'Education' %}
+                </h5>
+                <button type="button" class="cp-collapse" aria-expanded="true" aria-label="{% trans 'Collapse' %}"
+                    onclick="var body=this.closest('.cp-card-head').nextElementSibling; var shut=body.style.display!=='none'; body.style.display=shut?'none':''; this.setAttribute('aria-expanded', shut ? 'false' : 'true'); this.classList.toggle('is-shut', shut);">
+                    <i class="fa-solid fa-chevron-up"></i>
+                </button>
+            </div>
             <div class="space-y-5">
                 {% for edu in candidate.education_set.all %}
                 <div class="cp-timeline-item">
@@ -260,7 +308,16 @@
     {% if candidate.experience_set.all %}
     <div class="cp-reveal cp-card col-span-2 mb-4 lg:mb-0" style="transition-delay:240ms">
         <div class="border border-dark-50 rounded-md p-4 h-full bg-white">
-            <h5 class="font-semibold text-sm mb-4">{% trans 'Experience' %}</h5>
+            <div class="cp-card-head flex items-center justify-between pb-3 mb-4 border-b border-dark-50">
+                <h5 class="font-semibold text-sm flex items-center gap-2.5">
+                    <i class="fa-solid fa-building" style="color: {{ theme_primary_600 }};"></i>
+                    {% trans 'Experience' %}
+                </h5>
+                <button type="button" class="cp-collapse" aria-expanded="true" aria-label="{% trans 'Collapse' %}"
+                    onclick="var body=this.closest('.cp-card-head').nextElementSibling; var shut=body.style.display!=='none'; body.style.display=shut?'none':''; this.setAttribute('aria-expanded', shut ? 'false' : 'true'); this.classList.toggle('is-shut', shut);">
+                    <i class="fa-solid fa-chevron-up"></i>
+                </button>
+            </div>
             <div class="space-y-5">
                 {% for exp in candidate.experience_set.all %}
                 <div class="cp-timeline-item{% if exp.is_current_job %} cp-timeline-current{% endif %}">
