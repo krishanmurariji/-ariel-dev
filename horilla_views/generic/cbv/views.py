@@ -139,6 +139,17 @@ class HorillaListView(ListView):
     """
     actions: list = []
 
+    centered_columns: list = []
+    """
+    Attribute names (second item of a `columns` entry) whose cells are centre aligned.
+    """
+
+    actions_menu: bool = False
+    """
+    True: show the row actions as a three-dot button whose menu opens on hover,
+    instead of one icon button per action.
+    """
+
     option_method: str = ""
     options: list = []
     row_attrs: str = """"""
@@ -268,6 +279,8 @@ class HorillaListView(ListView):
 
         context["action_method"] = self.action_method
         context["actions"] = self.actions
+        context["actions_menu"] = self.actions_menu
+        context["centered_columns"] = self.centered_columns
 
         context["option_method"] = self.option_method
         context["options"] = self.options
@@ -1715,6 +1728,11 @@ class HorillaCardView(ListView):
     """
     actions: list = []
 
+    actions_menu: bool = False
+    """
+    True: show the card actions as the three-dot hover menu used by the list view.
+    """
+
     card_attrs: str = """"""
 
     show_filter_tags: bool = True
@@ -1782,6 +1800,7 @@ class HorillaCardView(ListView):
         context["search_url"] = self.search_url
         context["card_attrs"] = self.card_attrs
         context["actions"] = self.actions
+        context["actions_menu"] = self.actions_menu
         context["details"] = self.details
         context["show_filter_tags"] = self.show_filter_tags
         context["card_status_class"] = self.card_status_class
@@ -2221,6 +2240,22 @@ class HorillaNavView(TemplateView):
     empty_inputs: list = []
     view_types: list = []
     create_attrs: str = """"""
+    create_label: str = ""
+    """
+    Text of the create button; empty keeps "Create".
+    """
+    hide_actions_button: bool = False
+    """
+    True: do not show the bulk "Actions" button in the nav bar.
+    """
+    filter_icon_only: bool = False
+    """
+    True: the Filter button shows its icon without the text.
+    """
+    show_clear_filter: bool = False
+    """
+    True: the filter pop-up gets a button that empties every filter and re-applies.
+    """
     apply_first_filter = True
 
     def __init__(self, **kwargs: Any) -> None:
@@ -2288,8 +2323,12 @@ class HorillaNavView(TemplateView):
         context["search_input_attrs"] = self.search_input_attrs
         context["group_by_fields"] = self.group_by_fields
         context["actions"] = self.actions
+        context["hide_actions_button"] = self.hide_actions_button
+        context["filter_icon_only"] = self.filter_icon_only
+        context["show_clear_filter"] = self.show_clear_filter
         context["filter_body_template"] = self.filter_body_template
         context["create_attrs"] = self.create_attrs
+        context["create_label"] = self.create_label
         context["search_in"] = self.search_in
         context["apply_first_filter"] = self.apply_first_filter
         context["filter_instance_context_name"] = self.filter_instance

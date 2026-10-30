@@ -18,6 +18,15 @@ class HorillaKanbanView(HorillaCardView):
     group_order_by: str = "sequence"
     records_per_page: int = 10
     custom_card_content_template: str = ""
+    kanban_card_template: str = ""
+    """
+    Template that replaces the whole default card body (avatar, details). The card's action menu
+    is available to it as {% include "generic/pipeline/kanban_card_actions.html" %}.
+    """
+    kanban_empty_template: str = ""
+    """
+    Template shown, centred, in a column that has no cards.
+    """
     group_actions: list = []
     show_kanban_confirmation: bool = True
     folded_groups: list = []

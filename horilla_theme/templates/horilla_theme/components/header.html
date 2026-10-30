@@ -2,7 +2,86 @@
 {% load basefilters %}
 {% show_section as show_section %}
 
-<div class="oh-main-header flex justify-between items-center bg-white py-3 px-5 border-b border-b-dark-50 fixed z-40">
+<style>
+    .oh-main-header .oh-hdr-btn {
+        width: 2.25rem;
+        height: 2.25rem;
+        padding: 0;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        line-height: 2.25rem;
+        text-align: center;
+    }
+    .oh-main-header .oh-hdr-btn > a {
+        display: block;
+        width: 100%;
+        height: 100%;
+        line-height: inherit;
+    }
+        /* Keeps the inline button from leaving a baseline gap under it; the popup sits right below. */
+    .oh-main-header .dropdown-wrapper > button {
+        vertical-align: top;
+    }
+    .oh-main-header .check {
+        height: 2.25rem;
+        border-radius: 0.5rem;
+    }
+    /*
+     * The pop-ups start just below the bar instead of overlapping its bottom
+     * edge (white on white, so the overlap looked like a cut-off top). The extra
+     * bottom padding keeps the hover area unbroken between button and pop-up.
+     */
+    .oh-main-header .dropdown-wrapper {
+        padding-bottom: 0.5625rem;
+        margin-bottom: -0.5625rem;
+    }
+    .oh-main-header .dropdown-wrapper > .dropdown-content {
+        margin-top: 0.5625rem;
+    }
+
+    /* Dark theme: crumbs that are plain text (not links), such as the company name, were left dark grey on the dark bar. */
+    body.dark .oh-main-header .breadcrumb li span {
+        color: #e5e7eb;
+    }
+
+    /* Small screens: no breadcrumbs, only the buttons; the pop-ups span the screen width */
+    @media (max-width: 767px) {
+        .oh-main-header {
+            justify-content: flex-end;
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+        }
+        .oh-main-header #breadcrumbs-container {
+            display: none;
+        }
+        .oh-main-header > div.flex {
+            gap: 0.5rem;
+        }
+        .oh-main-header .check {
+            width: 2.25rem;
+            padding: 0;
+        }
+        .oh-main-header .check .date div,
+        .oh-main-header .check .con {
+            display: none;
+        }
+        .oh-main-header .check .date i {
+            padding: 0 !important;
+        }
+        .oh-main-header .dropdown-wrapper > .dropdown-content {
+            position: fixed;
+            top: 3.5rem;
+            /* clear of the icon strip, which sits above the top bar */
+            left: calc(var(--sb-rail, 3.5rem) + 0.5rem);
+            right: 0.5rem;
+            width: auto;
+            min-width: 0;
+            max-width: none;
+            margin-top: 0;
+        }
+    }
+</style>
+<div class="oh-main-header flex justify-between items-center bg-white py-2 px-5 border-b border-b-dark-50 fixed z-40">
     <div id="breadcrumbs-container">
         {% if breadcrumbs %}
             {% include "base/navbar_components/breadcrumbs_view.html" %}
@@ -19,7 +98,7 @@
             {% endif %}
             <button
                 id="themeToggleButton"
-                class="md:block p-2 group text-primary-600 w-12 h-12 bg-primary-100 hover:bg-primary-600 rounded-full transition duration-300 flex items-center justify-center"
+                class="md:block oh-hdr-btn group text-primary-600 bg-primary-100 hover:bg-primary-600 transition duration-300 flex items-center justify-center"
             >
                 <a href="#" aria-label="Toggle theme" onclick="return false">
                     {% if request.session.theme == "dark" %}
@@ -30,7 +109,7 @@
                 </a>
             </button>
             {% if show_section %}
-                <button class="md:block p-2 group text-primary-600 w-12 h-12 bg-primary-100 hover:bg-primary-600 rounded-full transition duration-300 flex items-center justify-center">
+                <button class="md:block oh-hdr-btn group text-primary-600 bg-primary-100 hover:bg-primary-600 transition duration-300 flex items-center justify-center">
                     <a href="{% url 'settings' %}">
                         <i class="fas fa-cog transition duration-300 group-hover:text-white"></i>
                     </a>
@@ -38,14 +117,14 @@
             {% endif %}
             <div class="relative dropdown-wrapper">
                 <button
-                    class="hidden md:block p-2 group text-primary-600 w-12 h-12 bg-primary-100 hover:bg-primary-600 rounded-full transition duration-300 relative"
+                    class="oh-hdr-btn group text-primary-600 bg-primary-100 hover:bg-primary-600 transition duration-300 relative"
                     hx-get="{% url 'notifications' %}"
                     hx-target="#notificationContainer"
                     hx-trigger="load"
                 >
                     <i class="fas fa-bell transition duration-300 group-hover:text-white"></i>
                     <span
-                        class="absolute bg-[#d7391d] w-7 h-7 rounded-full text-xs text-[white] font-semibold flex items-center justify-center border-2 border-white p-1 [right:-10px] [top:-7px]"
+                        class="absolute bg-[#d7391d] min-w-[1.125rem] h-[1.125rem] rounded-full text-[10px] leading-none text-[white] font-semibold flex items-center justify-center border-2 border-white px-1 [right:-6px] [top:-6px]"
                     >
                         {% live_notify_badge %}
                     </span>
@@ -54,7 +133,7 @@
             </div>
 
             <div class="relative dropdown-wrapper">
-                <button class="hidden md:block p-2 group text-primary-600 w-12 h-12 bg-primary-100 hover:bg-primary-600 rounded-full transition duration-300">
+                <button class="oh-hdr-btn group text-primary-600 bg-primary-100 hover:bg-primary-600 transition duration-300">
                     <i class="fas fa-globe transition duration-300 group-hover:text-white"></i>
                 </button>
                 {% include "base/navbar_components/language_settings.html" %}
@@ -62,7 +141,7 @@
 
             {% if perms.base.change_company %}
                 <div class="relative dropdown-wrapper">
-                    <button class="hidden md:block p-2 group text-primary-600 w-12 h-12 bg-primary-100 hover:bg-primary-600 rounded-full transition duration-300">
+                    <button class="oh-hdr-btn group text-primary-600 bg-primary-100 hover:bg-primary-600 transition duration-300">
                         <i class="fa-solid fa-building transition duration-300 group-hover:text-white"></i>
                     </button>
                     {% include "base/navbar_components/company_selection.html" %}

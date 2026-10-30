@@ -33,6 +33,7 @@
         {% if bulk_select_option %} {% include "generic/quick_actions.html" %} {% endif %}
         {% if queryset|length %}
 
+            {% if actions_menu and actions %}{% include "generic/row_action_menu_assets.html" %}{% endif %}
             <div class="bg-white p-2 rounded-md shadow-card relative">
                 {% if show_toggle_form %}
                 <div class="oh-sticky-dropdown--header absolute right-[30px] top-[25px]" style="z-index: 13;">
@@ -174,7 +175,7 @@
                                     {% endif %}
                                     {% for cell in columns %}
                                         {% with attribute=cell.1 index=forloop.counter %}
-                                            <td class="text-sm text-left p-3 text-[#666] h-[45px] max-w-0">
+                                            <td class="text-sm {% if attribute in centered_columns %}text-center{% else %}text-left{% endif %} p-3 text-[#666] h-[45px] max-w-0">
                                                 {% if not cell.2 %}
                                                     <div class="truncate">
                                                         {{instance|cell_value:attribute|selected_format:request.user.employee_get.employee_work_info.company_id|safe_cell}}
@@ -234,7 +235,9 @@
                                         <td class="stickyright action-col-cell text-sm text-center p-3 text-[#666] h-[45px]"
                                             onclick="event.stopPropagation()"
                                         >
-                                            {% if not action_method %}
+                                            {% if not action_method and actions_menu %}
+                                                {% include "generic/row_action_menu.html" %}
+                                            {% elif not action_method %}
                                                 <div class="flex justify-center gap-1">
                                                     {% for action in actions %}
                                                         {% if action.accessibility|accessibility:instance %}

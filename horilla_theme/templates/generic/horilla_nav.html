@@ -1,5 +1,5 @@
 {% load static i18n %}
-<div class="flex flex-wrap justify-between items-center mb-3">
+<div class="flex flex-wrap justify-between items-center mb-1     ">
     <h3 class="text-lg font-semibold">{{ nav_title }}</h3>
     <div class="flex flex-wrap gap-1">
         {% if search_url %}
@@ -56,11 +56,12 @@
                                 data-type="{{type.type}}"
                                 hx-get="{% url 'active-hnv-view-type' %}?view={{type.type}}&path={{request.path}}"
                                 class="tab-btn bg-white px-4 py-2 rounded-md text-xs flex items-center gap-2 border transition duration-300 border-primary-500 nav-view-btn"
-                                title="{{type.type|title}}"
+                                  style="width: 36px; height: 36px; padding: 0; justify-content: center"
+: 34px; height: 36px; padding: 0; justify-content: center"
                                 onclick="$(this).closest('form').attr('hx-get','{{type.url}}');
                                     $(this).closest('form').find('#applyFilter').click()"
                             >
-                                <a {{type.attrs|safe}}> <ion-icon name="{{type.icon}}"></ion-icon></a>
+                                <a {{type.attrs|safe}} style="display: flex; align-items: center; justify-content: center"> <ion-icon name="{{type.icon}}" style="font-size: 1.25rem; display: block"></ion-icon></a>
                                 {% if active_view.type == type.type %}
                                     <script>
                                         $(".navFilterForm").attr('hx-get', '{{type.url|safe}}');
@@ -75,16 +76,18 @@
                 {% if filter_body_template %}
                     <div class="relative dropdown-wrapper">
                         <span
-                            class="px-5 py-2 h-full bg-[white] rounded-md text-xs flex items-center gap-2 border border-primary-500 hover:border-primary-600 transition duration-300 cursor-pointer"
+                            class="{% if filter_icon_only %}px-3 justify-center{% else %}px-5{% endif %} py-2 h-full bg-[white] rounded-md text-xs flex items-center gap-2 border border-primary-500 hover:border-primary-600 transition duration-300 cursor-pointer"
+                            {% if filter_icon_only %}aria-label="{% trans 'Filter' %}" style="width: 41px; height: 36px; padding: 0; justify-content: center"{% endif %}
                         >
                             <img
                                 src="{% static 'horilla_theme/assets/img/icons/sort.svg' %}"
                                 alt="{% trans 'Filter' %}"
-                                width="15"
-                                class="mt-[-1px]"
+                                width="{% if filter_icon_only %}20{% else %}15{% endif %}"
+                                class="{% if not filter_icon_only %}mt-[-1px]{% endif %}"
                             >
-                            {% trans "Filter" %}
+                            {% if not filter_icon_only %}{% trans "Filter" %}{% endif %}
                         </span>
+                        <span class="nav-filter-dot" aria-label="{% trans 'Filter applied' %}"></span>
 
                         <div class="dropdown-content absolute z-10 bg-white rounded-lg [box-shadow:0px_0px_20px_0px_rgb(0_0_0_/_8%)] min-w-[400px] p-3 right-0">
                             <div class="accordion-wrapper space-y-2">
@@ -125,7 +128,16 @@
                                     </div>
                                 {% endif %}
 
-                                <div class="flex justify-end">
+                                <div class="flex justify-end gap-2">
+                                    {% if show_clear_filter %}
+                                        <button
+                                            type="button"
+                                            class="px-4 py-2 bg-white text-primary-600 border border-primary-500 rounded-md text-xs flex items-center gap-2 hover:bg-primary-100 transition duration-300"
+                                            onclick="clearNavFilter(this)"
+                                        >
+                                            <i class="fa-solid fa-xmark"></i>{% trans "Clear" %}
+                                        </button>
+                                    {% endif %}
                                     <button
                                         class="px-4 py-2 bg-primary-600 text-white rounded-md text-xs flex items-center gap-2 hover:bg-primary-800 transition duration-300 filterButton"
                                         id="applyFilter"
@@ -151,7 +163,7 @@
         {% endif %}
         <input type="hidden" id="pageInput">
         <input type="hidden" id="sortInput">
-        {% if actions %}
+        {% if actions and not hide_actions_button %}
             <div class="relative dropdown-wrapper">
                 <button class="px-5 py-2 h-full bg-[white] rounded-md text-xs flex items-center gap-2 border border-primary-500 hover:border-primary-600 transition duration-300">
                     <img
@@ -190,7 +202,7 @@
                     width="13"
                     class="filter brightness-0 invert"
                 >
-                {% trans "Create" %}
+                {% if create_label %}{{ create_label }}{% else %}{% trans "Create" %}{% endif %}
             </a>
         {% endif %}
     </div>
@@ -223,5 +235,77 @@
             $(".oh-view-btn--active").removeClass("oh-view-btn--active");
             $(this).addClass("oh-view-btn--active");
         });
+
+        // Only the button of the view you are NOT in is shown (list active -> card button, and back).
+        // With no saved choice the first view type (list) is the current one.
+        if ($(".nav-view-btn").length > 1 && !$(".nav-view-btn.oh-view-btn--active").length) {
+            $(".nav-view-btn").first().addClass("oh-view-btn--active");
+        }
     });
 </script>
+<style>
+    .nav-view-btn.oh-view-btn--active { display: none !important; }
+    .nav-filter-dot {
+        display: none; position: absolute; top: -4px; right: -4px; width: 11px; height: 11px;
+        border-radius: 50%; background: #e5484d; border: 2px solid #fff; pointer-events: none;
+    }
+    .nav-filter-dot.is-on { display: block; }
+</style>
+<script>
+    // Red dot on the Filter button while a filter is applied: a field of the filter pop-up holds
+    // something other than what the page started with (some pages open with a default such as
+    // "Is Closed = No"; that is not counted). The pop-up keeps the applied values.
+    (function () {
+        function fields() {
+            return $("#filterForm .dropdown-content").find("input, select, textarea").filter(function () {
+                // unnamed inputs are the search boxes inside the select widgets, not filter fields
+                return !!this.name && ["hidden", "submit", "button", "reset"].indexOf((this.type || "").toLowerCase()) === -1;
+            });
+        }
+        function valueOf(el) {
+            var type = (el.type || "").toLowerCase();
+            if (type === "checkbox" || type === "radio") return el.checked;
+            var value = $(el).val();
+            return Array.isArray(value) ? value.join(",") : (value || "");
+        }
+        // what the page opened with
+        fields().each(function () { $(this).data("navDefault", valueOf(this)); });
+        function filterApplied() {
+            var applied = false;
+            fields().each(function () {
+                if (valueOf(this) !== $(this).data("navDefault")) applied = true;
+            });
+            return applied;
+        }
+        function refreshDot() {
+            $(".nav-filter-dot").toggleClass("is-on", filterApplied());
+        }
+        $(document).off("htmx:afterSettle.navFilterDot").on("htmx:afterSettle.navFilterDot", refreshDot);
+        $(refreshDot);
+    })();
+</script>
+
+{% if show_clear_filter %}
+<script>
+    // Puts every filter field in the pop-up back to what the page opened with (empty on most
+    // pages) and applies it.
+    function clearNavFilter(button) {
+        var form = $(button).closest("form");
+        form.find(".dropdown-content").find("input, select, textarea").each(function () {
+            var type = (this.type || "").toLowerCase();
+            if (!this.name || ["hidden", "submit", "button", "reset"].indexOf(type) !== -1) return;
+            var initial = $(this).data("navDefault");
+            if (type === "checkbox" || type === "radio") {
+                this.checked = initial === true;
+            } else if (this.multiple) {
+                $(this).val(initial ? String(initial).split(",") : []);
+            } else {
+                $(this).val(initial || "");
+            }
+            // refreshes select2 widgets without firing the handlers that auto-apply
+            $(this).trigger("change.select2");
+        });
+        form.find("#applyFilter").click();
+    }
+</script>
+{% endif %}

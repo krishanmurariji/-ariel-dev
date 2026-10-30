@@ -15,6 +15,7 @@
         hx-on:click="htmxLoadIndicator(this);"
     >
     </button>
+    {% if actions and actions_menu %}{% include "generic/row_action_menu_assets.html" %}{% endif %}
     {% if show_filter_tags %}
         {% include "generic/filter_tags.html" %}
     {% endif %}
@@ -37,11 +38,15 @@
                                             class="absolute inline-block right-0 -top-1"
                                             onclick="event.stopPropagation()"
                                         >
+                                            {% if actions and actions_menu %}
+                                                {% include "generic/row_action_menu.html" %}
+                                            {% else %}
                                             <div class="cursor-pointer dropdown-toggle w-[20px]">
                                                 <i class="fa-solid fa-ellipsis-vertical text-black ms-[10px]"></i>
                                             </div>
+                                            {% endif %}
 
-                                            {% if actions %}
+                                            {% if actions and not actions_menu %}
                                                 <div class="dropdown-menu absolute right-0 min-w-[100px] bg-white rounded-lg shadow-card py-2 hidden z-50 transition-all duration-200">
                                                     <ul class="text-xs">
                                                         {% for action in actions %}
@@ -67,11 +72,15 @@
                                             class="absolute inline-block right-0 -top-1"
                                             onclick="event.stopPropagation()"
                                         >
+                                            {% if actions and actions_menu %}
+                                                {% include "generic/row_action_menu.html" %}
+                                            {% else %}
                                             <div class="cursor-pointer dropdown-toggle w-[20px]">
                                                 <i class="fa-solid fa-ellipsis-vertical text-black ms-[10px]"></i>
                                             </div>
+                                            {% endif %}
 
-                                            {% if actions %}
+                                            {% if actions and not actions_menu %}
                                                 <div class="dropdown-menu absolute right-0 min-w-[100px] bg-white rounded-lg shadow-card py-2 hidden z-50 transition-all duration-200">
                                                     <ul class="text-xs">
                                                         {% for action in actions %}

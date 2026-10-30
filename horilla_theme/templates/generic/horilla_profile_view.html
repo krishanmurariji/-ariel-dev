@@ -19,16 +19,99 @@
             <div class="bg-white rounded-md shadow-card p-3 mb-5">
             {% endif %}
                 {% if request.resolver_match.url_name == "candidate-view" or request.resolver_match.url_name == "candidate-view-individual" %}
-                {% with theme_primary_500=theme_obj.primary_500|default:"#F7C8C1" theme_primary_600=theme_obj.primary_600|default:"#E54F38" theme_primary_700=theme_obj.primary_700|default:"#ce4732" theme_primary_800=theme_obj.primary_800|default:"#AC3B2A" theme_primary_900=theme_obj.primary_900|default:"#672419" theme_primary_100=theme_obj.primary_100|default:"#FFF5F1" %}
+                {% with theme_primary_300=theme_obj.primary_300|default:"#FCEDEB" theme_primary_500=theme_obj.primary_500|default:"#F7C8C1" theme_primary_600=theme_obj.primary_600|default:"#E54F38" theme_primary_700=theme_obj.primary_700|default:"#ce4732" theme_primary_800=theme_obj.primary_800|default:"#AC3B2A" theme_primary_900=theme_obj.primary_900|default:"#672419" theme_primary_100=theme_obj.primary_100|default:"#FFF5F1" %}
                 <style>
-                    .kk-cover {
-                        background:
-                            radial-gradient(circle at 15% 20%, {{ theme_primary_500 }}55 0%, transparent 45%),
-                            radial-gradient(circle at 88% 85%, {{ theme_primary_900 }}77 0%, transparent 55%),
-                            linear-gradient(120deg, {{ theme_primary_900 }} 0%, {{ theme_primary_800 }} 30%, {{ theme_primary_600 }} 65%, {{ theme_primary_700 }} 100%);
+                    .kk-banner {
+                        position: relative;
+                        overflow: hidden;
+                        height: 6.75rem;
+                        background: linear-gradient(180deg, {{ theme_primary_600 }} 0%, {{ theme_primary_500 }} 42%, {{ theme_primary_100 }} 78%, #ffffff 100%);
+                        background-size: cover;
+                        background-position: center;
+                    }
+                    .kk-banner .kk-wave {
+                        position: absolute;
+                        inset: 0;
+                        width: 100%;
+                        height: 100%;
+                        pointer-events: none;
+                    }
+                    /* Dark theme: the cover fades into the dark card, buttons and name stay readable. */
+                    body.dark .kk-banner {
+                        background: linear-gradient(180deg, {{ theme_primary_600 }} 0%, {{ theme_primary_800 }} 100%);
+                    }
+                    body.dark .kk-banner .kk-wave path[fill="#ffffff"] {
+                        fill: #242424;
+                    }
+                    body.dark .kk-name {
+                        color: #f9fafb;
+                    }
+                    body.dark .kk-btn {
+                        background: #333333;
+                        border-color: #4b5563;
+                        color: #f3f4f6;
+                    }
+                    body.dark .kk-btn:hover {
+                        border-color: {{ theme_primary_600 }};
+                        color: #ffffff;
+                    }
+                    body.dark .kk-btn.kk-btn-dark {
+                        background: {{ theme_primary_800 }};
+                        border-color: {{ theme_primary_800 }};
+                        color: #ffffff;
+                    }
+                    body.dark .kk-action-link {
+                        color: #e5e7eb !important;
+                    }
+                    body.dark .kk-infobar > div + div {
+                        border-left-color: #374151;
+                    }
+                    .kk-banner-veil {
+                        position: absolute;
+                        inset: 0;
+                        background: linear-gradient(90deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.6) 100%);
+                    }
+                    .kk-btn {
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 0.375rem;
+                        min-width: 2.25rem;
+                        height: 2.25rem;
+                        padding: 0 0.5rem;
+                        border: 1px solid #e5e7eb;
+                        border-radius: 0.5rem;
+                        background: #ffffff;
+                        color: #374151;
+                        font-size: 0.8125rem;
+                        cursor: pointer;
+                        transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+                    }
+                    .kk-btn:hover {
+                        color: {{ theme_primary_600 }};
+                        border-color: {{ theme_primary_600 }};
+                    }
+                    .kk-btn-dark {
+                        padding: 0 0.875rem;
+                        background: {{ theme_primary_800 }};
+                        border-color: {{ theme_primary_800 }};
+                        color: #ffffff;
+                    }
+                    .kk-btn-dark:hover {
+                        background: {{ theme_primary_900 }};
+                        border-color: {{ theme_primary_900 }};
+                        color: #ffffff;
+                    }
+                    .kk-infobar > div + div {
+                        border-left: 1px solid #e6e6e6;
+                    }
+                    @media (max-width: 767px) {
+                        .kk-infobar > div + div {
+                            border-left: 0;
+                        }
                     }
                     .kk-usertablist {
-                        border-bottom: 1px solid #E6E6E6;
+                        /* border-bottom: 1px solid #E6E6E6; (line under the tab row, switched off) */
                         gap: 4px !important;
                     }
                     .kk-usertablist li button {
@@ -39,13 +122,26 @@
                         padding: 10px 4px !important;
                         margin: 0 16px 0 0 !important;
                         font-weight: 500;
-                        border-bottom: 2px solid transparent !important;
+                        border-bottom: 3px solid transparent !important;
                     }
                     .kk-usertablist li button.active,
                     .kk-usertablist li button:hover {
                         background: transparent !important;
                         color: {{ theme_primary_600 }} !important;
-                        border-bottom: 2px solid {{ theme_primary_600 }} !important;
+                        border-bottom: 3px solid {{ theme_primary_600 }} !important;
+                    }
+                    /* Dark theme: only the selected tab has a line (the others had a dim grey one); it keeps the theme colour. */
+                    body.dark .kk-usertablist li button {
+                        border-bottom: 3px solid transparent !important;
+                    }
+                    body.dark .kk-usertablist li button.active,
+                    body.dark .kk-usertablist li button:hover {
+                        background: transparent !important;
+                        color: {{ theme_primary_600 }} !important;
+                        border-bottom: 3px solid {{ theme_primary_600 }} !important;
+                    }
+                    body.dark .kk-usertablist li button.active {
+                        font-weight: 600;
                     }
                     .kk-gear-btn:hover i {
                         color: {{ theme_primary_600 }} !important;
@@ -54,22 +150,27 @@
                         color: {{ theme_primary_600 }} !important;
                     }
                 </style>
-                <div class="kk-cover relative rounded-t-md h-40 md:h-56"
-                    {% if cover_image_url %}
-                    style="background-image:url('{{ cover_image_url }}'); background-size:cover; background-position:center;"
-                    {% endif %}
+                <div class="kk-banner rounded-t-md"
+                    {% if cover_image_url %}style="background-image:url('{{ cover_image_url }}');"{% endif %}
                 >
-                    {% if cover_image_url %}
-                    <div class="absolute inset-0 rounded-t-md" style="background:linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.35) 100%);"></div>
-                    {% endif %}
-                    <div class="absolute top-3 right-3 flex items-center gap-2">
+                    {% if cover_image_url %}<div class="kk-banner-veil"></div>{% endif %}
+                    <svg class="kk-wave" overflow="visible" viewBox="0 0 1200 160" preserveAspectRatio="none" aria-hidden="true">
+                        <!-- Three translucent bands that rise where the others fall, so they cross each other. -->
+                        <path d="M0,66 C190,34 380,112 610,92 C830,72 1010,22 1200,52 L1200,185 L0,185 Z" fill="#ffffff" fill-opacity="0.3"></path>
+                        <path d="M0,114 C230,140 410,58 650,68 C870,78 1020,122 1200,82 L1200,185 L0,185 Z" fill="#ffffff" fill-opacity="0.4"></path>
+                        <path d="M0,96 C250,70 440,140 710,120 C930,104 1070,70 1200,96 L1200,185 L0,185 Z" fill="#ffffff" fill-opacity="0.5"></path>
+                        <path d="M0,140 C300,126 520,152 800,138 C980,128 1100,140 1200,134 L1200,185 L0,185 Z" fill="#ffffff" fill-opacity="1"></path>
+                        <path d="M0,66 C190,34 380,112 610,92 C830,72 1010,22 1200,52" fill="none" stroke="#ffffff" stroke-opacity="0.45" stroke-width="1"></path>
+                        <path d="M0,114 C230,140 410,58 650,68 C870,78 1020,122 1200,82" fill="none" stroke="#ffffff" stroke-opacity="0.4" stroke-width="1"></path>
+                    </svg>
+
+                    <div class="absolute top-3 right-3 flex items-center gap-2" style="z-index: 3;">
                         <button
                             id="candidateBackButton"
                             type="button"
                             title="{% trans 'Back' %}"
-                            class="px-3 py-1 text-xs bg-white/20 backdrop-blur text-white rounded-full hover:bg-white/30 transition duration-300 flex items-center gap-2"
+                            class="kk-btn kk-btn-dark"
                             onclick="candidateProfileGoBack()"
-                            style="display: none"
                         >
                             <i class="fa-solid fa-arrow-left"></i>
                             {% trans "Back" %}
@@ -116,6 +217,8 @@
                             				sessionStorage.removeItem("candidateProfileBackUrl");
                             			} catch (e) {}
                             			window.location.href = backUrl;
+                            		} else {
+                            			window.location.href = "{% url 'candidate-view' %}";
                             		}
                             	};
 
@@ -129,15 +232,15 @@
                         {% if actions %}
                             <div class="relative inline-block" x-data="{open: false}">
                                 <button
-                                    class="kk-gear-btn p-2 group text-white w-8 h-8 text-sm bg-white/20 backdrop-blur hover:bg-white rounded-full transition duration-300 flex items-center justify-center"
+                                    class="kk-btn"
                                     title="{% trans 'Actions' %}"
                                     @click="open = !open"
                                     @click.outside="open = false"
                                 >
-                                    <i class="fas fa-cog transition duration-300"></i>
+                                    <i class="fas fa-cog"></i>
                                 </button>
                                 <div
-                                    class="absolute right-0 min-w-[100px] bg-white rounded-lg shadow-card py-2 z-50 transition-all duration-200"
+                                    class="absolute right-0 mt-1 min-w-[100px] bg-white rounded-lg shadow-card py-2 z-50 transition-all duration-200"
                                     x-show="open"
                                 >
                                     <ul class="text-xs">
@@ -158,90 +261,86 @@
                         {% endif %}
 
                         {% if instance_ids and previous_url and next_url %}
-                            <div class="flex gap-1">
-                                <button
-                                    data-action="previous"
-                                    hx-get="{{previous_url}}?instance_ids={{instance_ids}}"
-                                    {% if push_url %}hx-push-url="{{push_url_prev}}"{% endif %}
-                                    hx-target="#{{view_id|safe}}"
-                                    hx-swap="outerHTML"
-                                    title="Previous"
-                                    class="p-2 w-8 h-8 justify-center bg-white/20 backdrop-blur text-white rounded-full text-xs flex items-center gap-2 hover:bg-white/30 transition duration-300"
-                                >
-                                    <i class="fa-solid fa-angle-left"></i>
-                                </button>
-                                <button
-                                    data-action="next"
-                                    hx-get="{{next_url}}?instance_ids={{instance_ids}}"
-                                    {% if push_url %}hx-push-url="{{push_url_next}}"{% endif %}
-                                    hx-target="#{{view_id|safe}}"
-                                    hx-swap="outerHTML"
-                                    title="Next"
-                                    class="p-2 w-8 h-8 justify-center bg-white/20 backdrop-blur text-white rounded-full text-xs flex items-center gap-2 hover:bg-white/30 transition duration-300"
-                                >
-                                    <i class="fa-solid fa-angle-right"></i>
-                                </button>
-                            </div>
+                            <button
+                                data-action="previous"
+                                hx-get="{{previous_url}}?instance_ids={{instance_ids}}"
+                                {% if push_url %}hx-push-url="{{push_url_prev}}"{% endif %}
+                                hx-target="#{{view_id|safe}}"
+                                hx-swap="outerHTML"
+                                title="Previous"
+                                class="kk-btn"
+                            >
+                                <i class="fa-solid fa-angle-left"></i>
+                            </button>
+                            <button
+                                data-action="next"
+                                hx-get="{{next_url}}?instance_ids={{instance_ids}}"
+                                {% if push_url %}hx-push-url="{{push_url_next}}"{% endif %}
+                                hx-target="#{{view_id|safe}}"
+                                hx-swap="outerHTML"
+                                title="Next"
+                                class="kk-btn"
+                            >
+                                <i class="fa-solid fa-angle-right"></i>
+                            </button>
                         {% endif %}
                     </div>
+
                 </div>
 
-                <div class="px-5 pb-4">
-                    <div class="flex items-end gap-4" style="margin-top: -56px; position: relative; z-index: 1;">
+                    <div class="relative flex flex-wrap items-end gap-5 px-6 pb-4" style="z-index: 2; margin-top: -2.75rem;">
                         <img
                             src="{{ object.get_avatar }}"
                             alt=""
                             data-src="{{ object.get_avatar }}"
                             class="avatar-thumb shrink-0"
-                            style="width: 112px; height: 112px; min-width: 112px; border-radius: 9999px; object-fit: cover; object-position: center; border: 5px solid #fff; box-shadow: 0px 4px 14px rgba(0,0,0,0.15); display: block;"
+                            style="width: 96px; height: 96px; min-width: 96px; border-radius: 9999px; object-fit: cover; object-position: center; border: 4px solid #fff; box-shadow: 0px 4px 14px rgba(0,0,0,0.12); display: block;"
                         >
-                        <div class="min-w-0 pb-2">
-                            <h4 class="font-semibold text-lg truncate">{{ object }}</h4>
-                            <p class="text-xs text-[#565E6C] truncate">
+                        <div class="min-w-0">
+                            <h4 class="kk-name font-bold text-xl truncate">{{ object }}</h4>
+                            <p class="text-sm text-[#565E6C] truncate mb-2">
                                 {% if object.job_position_id %}{{ object.job_position_id }}{% else %}{% trans "Candidate" %}{% endif %}
                             </p>
+                            <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-[#565E6C]">
+                                <span class="flex items-center gap-1.5">
+                                    <i class="fa-solid fa-envelope" style="color: {{ theme_primary_600 }};"></i>
+                                    {{ object.get_email|default:"—" }}
+                                </span>
+                                <span class="flex items-center gap-1.5">
+                                    <i class="fa-solid fa-phone" style="color: {{ theme_primary_600 }};"></i>
+                                    {{ object.phone|default:"—" }}
+                                </span>
+                                <span class="flex items-center gap-1.5">
+                                    <i class="fa-solid fa-location-dot" style="color: {{ theme_primary_600 }};"></i>
+                                    {% if object.city or object.state or object.country %}{{ object.city|default:'' }}{% if object.city and object.state %}, {% endif %}{{ object.state|default:'' }}{% else %}—{% endif %}
+                                </span>
+                                <span class="flex items-center gap-1.5">
+                                    <i class="fa-solid {% if object.gender == 'male' %}fa-mars{% elif object.gender == 'female' %}fa-venus{% else %}fa-genderless{% endif %}" style="color: {{ theme_primary_600 }};"></i>
+                                    {{ object.get_gender_display|default:"—" }}
+                                </span>
+                                {% if object.stage_id %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium" style="background: {{ theme_primary_300 }}; color: {{ theme_primary_800 }};">
+                                        {{ object.stage_id }}
+                                    </span>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
-
-                    <div class="flex flex-wrap items-center gap-x-6 gap-y-2 mt-4 text-xs text-[#565E6C]">
-                        <span class="flex items-center gap-1.5">
-                            <i class="fa-solid fa-envelope" style="color: {{ theme_primary_600 }};"></i>
-                            {{ object.get_email|default:"—" }}
-                        </span>
-                        <span class="flex items-center gap-1.5">
-                            <i class="fa-solid fa-phone" style="color: {{ theme_primary_600 }};"></i>
-                            {{ object.phone|default:"—" }}
-                        </span>
-                        <span class="flex items-center gap-1.5">
-                            <i class="fa-solid fa-location-dot" style="color: {{ theme_primary_600 }};"></i>
-                            {% if object.city or object.state or object.country %}{{ object.city|default:'' }}{% if object.city and object.state %}, {% endif %}{{ object.state|default:'' }}{% else %}—{% endif %}
-                        </span>
-                        <span class="flex items-center gap-1.5">
-                            <i class="fa-solid {% if object.gender == 'male' %}fa-mars{% elif object.gender == 'female' %}fa-venus{% else %}fa-genderless{% endif %}" style="color: {{ theme_primary_600 }};"></i>
-                            {{ object.get_gender_display|default:"—" }}
-                        </span>
-                        {% if object.stage_id %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium" style="background: {{ theme_primary_100 }}; color: {{ theme_primary_700 }};">
-                            {{ object.stage_id }}
-                        </span>
-                        {% endif %}
-                    </div>
-
-                    <div class="flex flex-wrap gap-x-10 gap-y-3 mt-4 pt-4 border-t border-dark-50">
-                        <div>
+                    <div class="kk-infobar grid grid-cols-1 md:grid-cols-3 gap-y-3 px-6 py-3 border-t border-dark-50">
+                        <div class="md:pr-6">
                             <p class="text-[10px] uppercase tracking-wide text-[#8891A1] mb-0.5">{% trans "Recruitment" %}</p>
-                            <p class="text-xs font-semibold">{{ object.stage_id.recruitment_id|default:"—" }}</p>
+                            <p class="text-[13px] font-semibold">{{ object.stage_id.recruitment_id|default:"—" }}</p>
                         </div>
-                        <div>
+                        <div class="md:px-6">
                             <p class="text-[10px] uppercase tracking-wide text-[#8891A1] mb-0.5">{% trans "Department" %}</p>
-                            <p class="text-xs font-semibold">{{ object.job_position_id.department_id|default:"—" }}</p>
+                            <p class="text-[13px] font-semibold">{{ object.job_position_id.department_id|default:"—" }}</p>
                         </div>
-                        <div>
+                        <div class="md:pl-6">
                             <p class="text-[10px] uppercase tracking-wide text-[#8891A1] mb-0.5">{% trans "Applied Position" %}</p>
-                            <p class="text-xs font-semibold">{{ object.job_position_id|default:"—" }}</p>
+                            <p class="text-[13px] font-semibold">{{ object.job_position_id|default:"—" }}</p>
                         </div>
                     </div>
-                </div>
+
                 {% endwith %}
                 {% else %}
                 <div class="block lg:flex lg:items-center gap-3 mb-5 bg-[#f4f7fe] rounded-md p-3 lg:sticky top-0 z-10">

@@ -1,0 +1,39 @@
+{% load i18n generic_template_filters %}
+{% if actions or view.action_method %}
+<div
+    x-data="{ open: false }"
+    class="absolute inline-block dropdown-wrapper right-5 top-5 w-3"
+    @click.outside="open = false"
+    title="{% trans 'Actions' %}"
+    onclick="event.stopPropagation()"
+>
+    <button class="cursor-pointer dropdown-toggle w-[10px]" @click="open = !open">
+        <i class="fa-solid fa-ellipsis-vertical text-black"></i>
+    </button>
+
+    <div
+        x-show="open"
+        x-transition
+        style="cursor:pointer;"
+        class="dropdown-menu absolute right-0 bg-[#f7f7f7] rounded-lg shadow-card py-2 z-50 min-w-[170px]"
+    >
+        <ul class="text-xs">
+            {% if view.action_method %}
+                {{ instance|getattribute:view.action_method|safe }}
+            {% else %}
+                {% for action in actions %}
+                    {% if action.accessibility|accessibility:instance %}
+                        <li class="p-1">
+                            <p
+                                class="w-full text-left px-3 py-1 hover:text-primary-600 font-semibold"
+                            >
+                                <a {{action.attrs|format_attrs:instance|safe}}>{{instance|getattribute:action.action|default:action.action}}</a>
+                            </p>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        </ul>
+    </div>
+</div>
+{% endif %}
