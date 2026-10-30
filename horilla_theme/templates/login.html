@@ -113,8 +113,40 @@
                     {% else %}
                         <div class="al-row"></div>
                     {% endif %}
-                    <button type="submit" class="al-btn">{% trans "Sign in" %}</button>
+                    <button type="submit" class="al-btn" id="signInButton">{% trans "Sign in" %}</button>
                 </form>
+                <script>
+                    // Sign in stays off until both fields have something in them. Browsers fill saved
+                    // logins in without typing events, so the state is also re-read on load, on focus,
+                    // and for the first few seconds. Without JavaScript the button simply stays on.
+                    (function () {
+                        var form = document.querySelector(".al-form");
+                        var user = document.getElementById("username");
+                        var pass = document.getElementById("password");
+                        var button = document.getElementById("signInButton");
+                        if (!form || !user || !pass || !button) return;
+                        function ready() { return user.value.trim() !== "" && pass.value !== ""; }
+                        function refresh() { button.disabled = !ready(); }
+                        ["input", "change", "keyup", "focus", "blur"].forEach(function (name) {
+                            user.addEventListener(name, refresh);
+                            pass.addEventListener(name, refresh);
+                        });
+                        window.addEventListener("pageshow", refresh);
+                        document.addEventListener("visibilitychange", refresh);
+                        form.addEventListener("submit", function (event) {
+                            if (!ready()) {
+                                event.preventDefault();
+                                (user.value.trim() === "" ? user : pass).focus();
+                            }
+                        });
+                        refresh();
+                        var checks = 0;
+                        var timer = setInterval(function () {
+                            refresh();
+                            if (++checks >= 20) clearInterval(timer);
+                        }, 250);
+                    })();
+                </script>
 
                 {% if initialize_database %}
                     <div class="al-setup">

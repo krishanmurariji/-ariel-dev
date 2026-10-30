@@ -107,6 +107,9 @@
             .al-btn:hover { background: var(--al-accent-dark); }
             .al-btn:active { transform: translateY(1px); }
             .al-btn:focus-visible { outline: 3px solid color-mix(in srgb, var(--al-accent) 40%, transparent); outline-offset: 2px; }
+            .al-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+            .al-btn:disabled:hover { background: var(--al-accent); }
+            .al-btn:disabled:active { transform: none; }
 
             .al-error { margin: 0.375rem 0 0; padding: 0; list-style: none; font-size: 0.8125rem; color: #b91c1c; }
             .al-error li { margin: 0.125rem 0; }
