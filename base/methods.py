@@ -227,11 +227,38 @@ def build_safe_template_request(request):
         is_superuser=bool(getattr(user, "is_superuser", False)),
     )
 
+    scheme, host = _public_origin(request)
     return SimpleNamespace(
         method=getattr(request, "method", ""),
         path=getattr(request, "path", ""),
+        # the site's own address, for links in mails: {{ request.scheme }}://{{ request.get_host }}
+        scheme=scheme,
+        get_host=host,
         user=safe_user,
     )
+
+
+def _public_origin(request):
+    """
+    ``(scheme, host)`` of this site, for links in a mail. Taken from the request when it has them
+    (Django has already checked the host against ALLOWED_HOSTS); otherwise from the first
+    configured trusted origin, so a mail built away from a request still gets a working link.
+    """
+    from urllib.parse import urlsplit
+
+    from django.conf import settings
+
+    try:
+        host = request.get_host()
+        if host:
+            return request.scheme or "https", host
+    except Exception:  # no request, or a host header that is not allowed
+        pass
+    for origin in getattr(settings, "CSRF_TRUSTED_ORIGINS", None) or []:
+        parts = urlsplit(origin)
+        if parts.scheme in ("http", "https") and parts.netloc:
+            return parts.scheme, parts.netloc
+    return "", ""
 
 
 def users_count(self):
