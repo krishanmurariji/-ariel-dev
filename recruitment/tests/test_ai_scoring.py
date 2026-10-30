@@ -10,11 +10,14 @@ real DB, real PyMuPDF against a real generated PDF fixture.
 import re
 import threading
 import time
+from contextlib import ExitStack
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.core.cache import cache
 from django.core.files.base import ContentFile
 from django.test import Client, TestCase, TransactionTestCase
+from horilla.isolated_testcase import IsolatedTestCase
 
 from base.models import Company, Department, JobPosition
 from employee.models import Employee
@@ -24,7 +27,7 @@ from recruitment.tests.test_intake import TINY_PDF
 from recruitment import ai_scoring
 
 
-class AIScoringTestCase(TestCase):
+class AIScoringTestCase(IsolatedTestCase):
     def setUp(self):
         cache.clear()
         self.company = Company.objects.create(
@@ -253,8 +256,31 @@ class PipelineOrderingTests(AIScoringTestCase):
         self.assertEqual(ordered, [high, low, unscored])
 
 
+class _SyncThread:
+    """Stands in for threading.Thread so the signal's background work runs on the spot."""
+
+    def __init__(self, target=None, daemon=None, **kwargs):
+        self.target = target
+
+    def start(self):
+        self.target()
+
+
 class AutoScoreSignalTests(AIScoringTestCase):
+    def background_runs_now(self):
+        """
+        The signal scores in a background thread started after the commit, and that thread
+        force-closes its database connection when done and then asks the job matcher (an AI call).
+        In a test the work runs on the spot, on the test's own connection, with no AI call.
+        """
+        stack = ExitStack()
+        stack.enter_context(patch("recruitment.signals.threading", SimpleNamespace(Thread=_SyncThread)))
+        stack.enter_context(patch("django.db.close_old_connections"))
+        stack.enter_context(patch("recruitment.ai_job_match.suggest_job_match"))
+        self.addCleanup(stack.close)
+
     def test_signal_scores_new_candidate_with_resume(self):
+        self.background_runs_now()
         with patch("recruitment.ai_scoring.score_candidate") as mocked:
             with self.captureOnCommitCallbacks(execute=True):
                 candidate = self.make_candidate()
@@ -262,13 +288,17 @@ class AutoScoreSignalTests(AIScoringTestCase):
         self.assertEqual(mocked.call_args[0][0].pk, candidate.pk)
 
     def test_signal_skips_candidate_without_resume(self):
+        self.background_runs_now()
         with patch("recruitment.ai_scoring.score_candidate") as mocked:
             with self.captureOnCommitCallbacks(execute=True):
                 self.make_candidate(with_resume=False)
         mocked.assert_not_called()
 
     def test_signal_skips_on_update_not_create(self):
-        candidate = self.make_candidate()
+        self.background_runs_now()
+        with patch("recruitment.ai_scoring.score_candidate"):
+            with self.captureOnCommitCallbacks(execute=True):
+                candidate = self.make_candidate()
         with patch("recruitment.ai_scoring.score_candidate") as mocked:
             with self.captureOnCommitCallbacks(execute=True):
                 candidate.name = "Renamed"

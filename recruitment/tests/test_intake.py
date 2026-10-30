@@ -17,6 +17,7 @@ import fitz
 from django.conf import settings
 from django.core.cache import cache
 from django.test import TestCase
+from horilla.isolated_testcase import IsolatedTestCase
 from django.utils import timezone
 
 from base.models import Company, Department, JobPosition
@@ -135,7 +136,7 @@ class FakeProvider:
         return self.list_result
 
 
-class IntakeTestCase(TestCase):
+class IntakeTestCase(IsolatedTestCase):
     """Base class: sets up a company, an open recruitment, an Outlook
     mailbox, and patches recruitment.intake.get_provider with a
     FakeProvider so no test in this file touches real provider code."""
@@ -503,6 +504,15 @@ class DailyCandidateCapTests(IntakeTestCase):
 
 
 class PollGuardTests(IntakeTestCase):
+    def setUp(self):
+        super().setUp()
+        # run_guarded_poll is wrapped in with_db_cleanup, which force-closes the database
+        # connection when the job ends (right for a background job). Here the connection is the
+        # test's own, so it is left open.
+        patcher = patch("horilla.background_utils.connections")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_concurrent_poll_is_skipped(self):
         IntakePollLock.objects.filter(pk=1).update(
             locked_at=timezone.now(), locked_by="other-worker"

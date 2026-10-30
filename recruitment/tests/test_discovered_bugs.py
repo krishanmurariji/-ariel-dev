@@ -11,6 +11,7 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
+from horilla.isolated_testcase import IsolatedTestCase
 from django.urls import reverse
 
 from base.models import Company, Department, JobPosition
@@ -47,7 +48,7 @@ def _make_recruitment_manager(company, recruitment, first_name, email, phone):
     return employee
 
 
-class RecruitmentStrSideEffectTests(TestCase):
+class RecruitmentStrSideEffectTests(IsolatedTestCase):
     """
     Recruitment.__str__() used to call
     self.open_positions.add(self.job_position_id) as a side effect of
@@ -92,7 +93,7 @@ class RecruitmentStrSideEffectTests(TestCase):
         )
 
 
-class DuplicateCandidateEmailCaseSensitivityTests(TestCase):
+class DuplicateCandidateEmailCaseSensitivityTests(IsolatedTestCase):
     """
     CandidateForm.clean() blocked a duplicate application
     case-insensitively (email__iexact), but Candidate.Meta.unique_together
@@ -129,7 +130,7 @@ class DuplicateCandidateEmailCaseSensitivityTests(TestCase):
         self.assertIn("email", ctx.exception.error_dict)
 
 
-class CandidateDocumentIdorTests(TestCase):
+class CandidateDocumentIdorTests(IsolatedTestCase):
     """
     view_file/file_upload/candidate_add_notes (recruitment/views/views.py)
     are gated only by @candidate_login_required, which verifies *a*
@@ -209,7 +210,7 @@ class CandidateDocumentIdorTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
-class CandidatePortalLoginThrottlingTests(TestCase):
+class CandidatePortalLoginThrottlingTests(IsolatedTestCase):
     """
     The candidate portal authenticates with the applicant's own phone
     number (CandidateAuthenticationBackend) - low entropy, and often known
@@ -311,7 +312,7 @@ class CandidatePortalLoginThrottlingTests(TestCase):
         self.assertIn("Too many failed login attempts", response.content.decode())
 
 
-class DragDropHireFlagTests(TestCase):
+class DragDropHireFlagTests(IsolatedTestCase):
     """
     update_candidate_stage_and_sequence (recruitment/views/views.py) is the
     pipeline drag-and-drop endpoint - it moved candidates via a queryset
@@ -385,7 +386,7 @@ class DragDropHireFlagTests(TestCase):
         )
 
 
-class CandidateRatingPermissionAndValidationTests(TestCase):
+class CandidateRatingPermissionAndValidationTests(IsolatedTestCase):
     """
     create_candidate_rating/update_candidate_rating (recruitment/views/
     views.py) only had @login_required - any authenticated employee,

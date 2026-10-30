@@ -10,6 +10,7 @@ non-admin test users is "123qwe".
 
 from django.contrib.auth.models import Permission
 from django.test import Client, TestCase
+from horilla.isolated_testcase import IsolatedTestCase
 from django.urls import reverse
 
 from base.models import Company
@@ -92,7 +93,7 @@ def _make_mailbox(company, display_name, email):
     return CandidateIntakeMailbox.objects.create(azure_api=api, company_id=company)
 
 
-class IntakeAccessTestBase(TestCase):
+class IntakeAccessTestBase(IsolatedTestCase):
     def setUp(self):
         # current_company_id is a contextvar, not DB state - a previous
         # test's last request (same worker thread) can otherwise leak its
