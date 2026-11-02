@@ -648,8 +648,11 @@ def _apply_candidate_move(request, candidate, target_recruitment, target_stage) 
     on failure it has already set a messages.error() and the caller should
     just return its own HttpResponse without doing anything further.
     """
+    # Holding the "change candidate" permission (for example an HR Manager group) is enough to move a
+    # candidate into any job; without it you must manage the target job as a recruitment or stage manager.
     is_authorized = (
         request.user.is_superuser
+        or request.user.has_perm("recruitment.change_candidate")
         or is_stagemanager(request)[1].filter(recruitment_id=target_recruitment).exists()
         or is_recruitmentmanager(request, rec_id=target_recruitment.id)[0]
     )
