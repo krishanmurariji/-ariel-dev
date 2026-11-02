@@ -1557,11 +1557,29 @@ def roles_responsibility(request, token):
     )
 
 
+def _may_use_upload_page(request, candidate):
+    """
+    Who may open the documents page of an onboarding link: the candidate signed in to the
+    Candidate Portal, the candidate partway through this same onboarding in this browser
+    session (they have just set up their account), or staff allowed to change candidates.
+    Holding the link alone is not enough.
+    """
+    session = request.session
+    if session.get("candidate_id") == candidate.id:
+        return True
+    pending = session.get(PENDING_USER_SESSION_KEY)
+    if pending and pending.get("username") == candidate.email:
+        return True
+    user = request.user
+    return bool(user.is_authenticated and user.has_perm("recruitment.change_candidate"))
+
+
 def document_upload(request, token):
     """
     function used to let the candidate view requested documents and upload
     them before continuing. Advancing past this step is blocked until every
-    mandatory document has an uploaded file.
+    mandatory document has an uploaded file. The page needs a sign-in (see
+    _may_use_upload_page): anyone else is sent to the Candidate Portal login.
 
     Parameters:
     request (HttpRequest): The HTTP request object.
@@ -1575,6 +1593,8 @@ def document_upload(request, token):
     if onboarding_portal is None or onboarding_portal.used:
         return render(request, "404.html")
     candidate = onboarding_portal.candidate_id
+    if not _may_use_upload_page(request, candidate):
+        return redirect("candidate-login")
     document_requests = list(candidate.candidatedocumentrequest_set.all())
     # A CandidateDocumentRequest auto-creates a placeholder CandidateDocument
     # row (status="requested") the moment it's created - that row existing is

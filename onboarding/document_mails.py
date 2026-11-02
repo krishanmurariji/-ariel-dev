@@ -47,8 +47,12 @@ def _requirements(doc_request):
     return rows
 
 
-def notify_candidate_document_requested(candidate, doc_request, upload_link):
-    """Tell the candidate which document is wanted and where to upload it."""
+def notify_candidate_document_requested(candidate, doc_request, upload_link=None):
+    """
+    Tell the candidate which document is wanted. There is no upload link in the mail: the
+    candidate signs in to the Candidate Portal and uploads from its Documents section.
+    ``upload_link`` is accepted and ignored for older callers.
+    """
     if not candidate.email:
         return False
     if automation_sends("recruitment.models.CandidateDocumentRequest"):
@@ -58,8 +62,15 @@ def notify_candidate_document_requested(candidate, doc_request, upload_link):
         greeting(candidate.name)
         + paragraph(escape(_("We need a document from you to continue with your onboarding.")))
         + info_card(_requirements(doc_request))
-        + paragraph(escape(_("Please upload it at your earliest convenience.")))
-        + action_button(upload_link, _("Upload Document"))
+        + paragraph(
+            escape(
+                _(
+                    "Please upload it at your earliest convenience: sign in to the Candidate "
+                    "Portal with your registered email address and mobile number, then open "
+                    "the Documents section."
+                )
+            )
+        )
     )
     return send_branded_mail(
         _("Document requested: %(title)s") % {"title": doc_request.title},
@@ -78,11 +89,8 @@ def mail_newly_requested(instance, pk_set, reverse):
     side (``reverse``), the candidate (and ``pk_set`` the requests).
     """
     from base.mail_helpers import run_in_background
-    from onboarding.stepper import candidate_upload_link
-    from horilla.horilla_middlewares import _thread_locals
     from recruitment.models import Candidate, CandidateDocumentRequest
 
-    request = getattr(_thread_locals, "request", None)
     if reverse:
         pairs = [(instance, doc_request) for doc_request in CandidateDocumentRequest.objects.filter(pk__in=pk_set)]
     else:
@@ -90,9 +98,7 @@ def mail_newly_requested(instance, pk_set, reverse):
     for candidate, doc_request in pairs:
         if not candidate.email:
             continue
-        # the link needs the request, which the background thread does not have
-        link = candidate_upload_link(request, candidate)
-        run_in_background(notify_candidate_document_requested, candidate, doc_request, link)
+        run_in_background(notify_candidate_document_requested, candidate, doc_request)
 
 
 def notify_candidate_document_approved(document):

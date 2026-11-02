@@ -868,8 +868,7 @@ def send_document_reminder(request, pk, doc_id):
             {"error": str(_("This candidate has no email address on file."))},
             status=400,
         )
-    portal_url = candidate_upload_link(request, candidate)
-    notify_candidate_document_reminder(candidate, document, portal_url)
+    notify_candidate_document_reminder(candidate, document)
     return JsonResponse({"success": True})
 
 

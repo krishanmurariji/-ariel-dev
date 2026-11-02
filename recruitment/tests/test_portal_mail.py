@@ -8,13 +8,14 @@ from unittest import mock
 
 from django.core import mail
 from django.test import TestCase
+from horilla.isolated_testcase import IsolatedTestCase
 
 from base.models import Company, Department, JobPosition
 from recruitment import portal_mail
 from recruitment.models import Candidate, Recruitment, RecruitmentGeneralSetting
 
 
-class PortalMailTests(TestCase):
+class PortalMailTests(IsolatedTestCase):
     def setUp(self):
         # the mail is sent from a background thread in real use; run it inline so it can be checked
         patcher = mock.patch(

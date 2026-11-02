@@ -53,10 +53,7 @@ DOCUMENT_REMINDER_CONTENT = """<p style="margin:0 0 16px;font-size:15px;color:#2
   <p style="margin:0 0 8px;font-size:15px;color:#2d2d2d;"><strong>%(title)s</strong>%(mandatory_badge)s</p>
   <p style="margin:0;font-size:13px;color:#555555;">Accepted format: %(format)s%(max_size)s</p>
 </div>
-<p style="margin:0 0 24px;font-size:14px;color:#444444;line-height:1.7;">Please upload it at your earliest convenience using the button below.</p>
-<div style="text-align:center;margin:0 0 24px;">
-  <a href="%(portal_url)s" style="display:inline-block;padding:12px 28px;background:#0f6e5c;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:6px;">Upload Document</a>
-</div>
+<p style="margin:0 0 24px;font-size:14px;color:#444444;line-height:1.7;">Please upload it at your earliest convenience: sign in to the Candidate Portal with your registered email address and mobile number, then open the Documents section.</p>
 <p style="margin:0;font-size:13px;color:#888888;">If you've already sent this across or have any trouble uploading it, please reach out to us and we'll be happy to help.</p>"""
 
 
@@ -141,11 +138,13 @@ def notify_onboarding_buddy_assigned(candidate, employee):
     )
 
 
-def notify_candidate_document_reminder(candidate, document, portal_url):
+def notify_candidate_document_reminder(candidate, document, portal_url=None):
     """
     Emails the candidate a reminder to upload one specific document that's
-    still pending (requested but no file submitted yet), with a direct
-    link back into their onboarding portal.
+    still pending (requested but no file submitted yet). The mail carries no link: the
+    candidate signs in to the Candidate Portal (email and mobile number) and uploads
+    from its Documents section, so nobody gets onto an upload page just by holding a
+    mailed link. ``portal_url`` is accepted and ignored for older callers.
     """
     if not candidate.email:
         return
@@ -170,7 +169,6 @@ def notify_candidate_document_reminder(candidate, document, portal_url):
             "mandatory_badge": mandatory_badge,
             "format": escape(request_obj.get_format_display() if request_obj else "Any"),
             "max_size": escape(max_size),
-            "portal_url": portal_url,
         },
         to_email=candidate.email,
         company=_candidate_company(candidate),

@@ -28,7 +28,7 @@ def inline(func, *args, **kwargs):
 
 
 @override_settings(STORAGES=PLAIN_STATIC)
-class CandidateDocumentMailTests(AccessTestCase):
+class DocumentMailSetup(AccessTestCase):
     def setUp(self):
         super().setUp()
         company = Company.objects.create(company="Test Co", address="x", country="x", state="x", city="x", zip="0")
@@ -54,17 +54,21 @@ class CandidateDocumentMailTests(AccessTestCase):
             )
         )
 
+
+@override_settings(STORAGES=PLAIN_STATIC)
+class CandidateDocumentMailTests(DocumentMailSetup):
     # ---- the mails themselves
-    def test_the_candidate_is_told_what_is_wanted_and_where_to_upload(self):
-        document_mails.notify_candidate_document_requested(
-            self.candidate, self.request_obj, "https://hr.test/onboarding/document-upload/abc/"
-        )
+    def test_the_candidate_is_told_what_is_wanted_and_to_sign_in_to_the_portal(self):
+        document_mails.notify_candidate_document_requested(self.candidate, self.request_obj)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["jane@example.com"])
         self.assertIn("Passport", mail.outbox[0].subject)
         html = mail.outbox[0].alternatives[0][0]
-        for text in ("Passport", "PDF", "5 MB", "First page", "https://hr.test/onboarding/document-upload/abc/", "Required"):
+        for text in ("Passport", "PDF", "5 MB", "First page", "Required", "Candidate Portal", "Documents section"):
             self.assertIn(text, html)
+        # no button and no link into an upload page
+        self.assertNotIn("Upload Document", html)
+        self.assertNotIn("document-upload", html)
 
     def test_an_accepted_document_is_confirmed_to_the_candidate(self):
         document_mails.notify_candidate_document_approved(self.document)
@@ -92,7 +96,7 @@ class CandidateDocumentMailTests(AccessTestCase):
     def test_what_staff_typed_cannot_inject_html_into_the_mail(self):
         self.request_obj.title = "<script>alert(1)</script>"
         self.request_obj.save()
-        document_mails.notify_candidate_document_requested(self.candidate, self.request_obj, "https://hr.test/u/")
+        document_mails.notify_candidate_document_requested(self.candidate, self.request_obj)
         self.assertNotIn("<script>alert(1)</script>", mail.outbox[0].alternatives[0][0])
 
     # ---- the places that send them
@@ -108,7 +112,7 @@ class CandidateDocumentMailTests(AccessTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Visa", mail.outbox[0].subject)
-        self.assertIn("/onboarding/document-upload/", mail.outbox[0].alternatives[0][0])
+        self.assertNotIn("/onboarding/document-upload/", mail.outbox[0].alternatives[0][0])
 
     def test_asking_for_the_same_document_twice_mails_once(self):
         self.client.force_login(self.hr_user)
@@ -133,7 +137,7 @@ class CandidateDocumentMailTests(AccessTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual([m.to for m in mail.outbox], [["jane@example.com"]])
         self.assertIn("Degree", mail.outbox[0].subject)
-        self.assertIn("/onboarding/document-upload/", mail.outbox[0].alternatives[0][0])
+        self.assertNotIn("/onboarding/document-upload/", mail.outbox[0].alternatives[0][0])
 
     def test_adding_the_same_candidate_again_does_not_mail_again(self):
         with mock.patch("base.mail_helpers.run_in_background", side_effect=inline), \
@@ -141,17 +145,20 @@ class CandidateDocumentMailTests(AccessTestCase):
             self.request_obj.candidate_id.add(self.candidate)  # already on it
         self.assertEqual(len(mail.outbox), 0)
 
-    def test_a_request_made_without_a_web_request_still_mails_with_a_link(self):
-        # e.g. from the API or a script: no request to take the address from
+    def test_a_request_made_without_a_web_request_still_mails(self):
+        # e.g. from the API or a script: no request to take an address from
         second = CandidateDocumentRequest.objects.create(title="Photo", format="any", created_by=self.hr_user)
         with mock.patch("base.mail_helpers.run_in_background", side_effect=inline), \
                 self.captureOnCommitCallbacks(execute=True):
             second.candidate_id.add(self.candidate)
         self.assertEqual(len(mail.outbox), 1)
-        self.assertIn("/onboarding/document-upload/", mail.outbox[0].alternatives[0][0])
+        self.assertNotIn("/onboarding/document-upload/", mail.outbox[0].alternatives[0][0])
 
     def test_the_candidate_uploading_through_their_link_mails_the_request_creator(self):
         OnboardingPortal.objects.create(candidate_id=self.candidate, token="tok123", used=False)
+        session = self.client.session
+        session["candidate_id"] = self.candidate.pk  # signed in to the Candidate Portal
+        session.save()
         with mock.patch("base.mail_helpers.run_in_background", side_effect=inline):
             self.client.post(
                 reverse("document-upload", kwargs={"token": "tok123"}),
@@ -159,3 +166,105 @@ class CandidateDocumentMailTests(AccessTestCase):
             )
         recipients = [m.to for m in mail.outbox]
         self.assertIn([self.hr.get_mail()], recipients)
+
+
+@override_settings(STORAGES=PLAIN_STATIC)
+class UploadPageNeedsASignIn(DocumentMailSetup):
+    """The documents page of an onboarding link is not open to whoever holds the link."""
+
+    TOKEN = "tok-signin"
+
+    def setUp(self):
+        super().setUp()
+        OnboardingPortal.objects.create(candidate_id=self.candidate, token=self.TOKEN, used=False)
+        self.url = reverse("document-upload", kwargs={"token": self.TOKEN})
+        self.file = {f"doc_request_{self.request_obj.pk}": SimpleUploadedFile("p.pdf", b"%PDF-1.4 x")}
+
+    def uploaded(self):
+        return bool(CandidateDocument.objects.filter(candidate_id=self.candidate).exclude(document="").exists())
+
+    def sign_in_as_candidate(self, candidate):
+        session = self.client.session
+        session["candidate_id"] = candidate.pk
+        session.save()
+
+    def test_someone_with_only_the_link_is_sent_to_the_candidate_portal_login(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("candidate-login"))
+
+    def test_someone_with_only_the_link_cannot_upload(self):
+        response = self.client.post(self.url, self.file)
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(self.uploaded())
+
+    def test_the_candidate_signed_in_to_the_portal_can_open_it_and_upload(self):
+        self.sign_in_as_candidate(self.candidate)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+        with mock.patch("base.mail_helpers.run_in_background", side_effect=inline):
+            self.client.post(self.url, self.file)
+        self.assertTrue(self.uploaded())
+
+    def test_a_different_candidate_signed_in_cannot_use_this_link(self):
+        other = Candidate.objects.create(
+            name="Other", email="other@example.com", recruitment_id=self.candidate.recruitment_id,
+            job_position_id=self.candidate.job_position_id,
+        )
+        self.sign_in_as_candidate(other)
+        self.assertEqual(self.client.get(self.url).status_code, 302)
+        self.client.post(self.url, self.file)
+        self.assertFalse(self.uploaded())
+
+    def test_the_candidate_partway_through_this_onboarding_session_can_continue(self):
+        session = self.client.session
+        session["onboarding_pending_user"] = {"username": self.candidate.email, "password": "x"}
+        session.save()
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_someone_elses_pending_onboarding_session_does_not_count(self):
+        session = self.client.session
+        session["onboarding_pending_user"] = {"username": "someone-else@example.com", "password": "x"}
+        session.save()
+        self.assertEqual(self.client.get(self.url).status_code, 302)
+
+    def test_staff_who_may_change_candidates_can_open_it(self):
+        self.client.force_login(self.hr_user)  # a superuser in this test class
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_a_signed_in_employee_without_that_permission_cannot(self):
+        self.client.force_login(self.stranger_user)
+        self.assertEqual(self.client.get(self.url).status_code, 302)
+
+    def test_a_wrong_token_is_still_not_found(self):
+        response = self.client.get(reverse("document-upload", kwargs={"token": "nope"}))
+        self.assertEqual(response.status_code, 200)  # the 404 page is rendered, not the upload page
+        self.assertNotContains(response, "doc_request_")
+
+
+@override_settings(STORAGES=PLAIN_STATIC)
+class ReminderMail(DocumentMailSetup):
+    def reminder(self):
+        document = CandidateDocument.objects.filter(candidate_id=self.candidate).first()
+        self.client.force_login(self.hr_user)
+        response = self.client.post(
+            reverse("onboarding-stepper-document-remind", kwargs={"pk": self.candidate.pk, "doc_id": document.pk})
+        )
+        return response, document
+
+    def test_the_reminder_has_no_button_and_no_link(self):
+        mail.outbox.clear()
+        response, _document = self.reminder()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        html = mail.outbox[0].alternatives[0][0]
+        self.assertIn("Passport", html)
+        self.assertIn("Candidate Portal", html)
+        self.assertNotIn("Upload Document", html)
+        self.assertNotIn("document-upload", html)
+        self.assertNotIn("onboarding/", html)
+
+    def test_sending_a_reminder_does_not_create_or_reset_an_upload_link(self):
+        OnboardingPortal.objects.create(candidate_id=self.candidate, token="keep-me", used=True)
+        self.reminder()
+        portal = OnboardingPortal.objects.get(candidate_id=self.candidate)
+        self.assertEqual((portal.token, portal.used), ("keep-me", True))
