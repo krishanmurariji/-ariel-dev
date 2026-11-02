@@ -36,7 +36,7 @@ view alone.
 """
 
 from django.db.models import Count, Q
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.urls import reverse, reverse_lazy
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
@@ -71,6 +71,10 @@ class CandidateChecklistTaskKanbanView(HorillaKanbanView):
     filter_class = CandidateChecklistTaskFilter
     pre_move_check_url = reverse_lazy("onboarding-checklist-task-kanban-move")
 
+    @property
+    def group_count_url(self):
+        return reverse("my-checklist-tasks-kanban-count", kwargs={"pk": self.kwargs["pk"]})
+
     details = {
         "title": "{title}",
         "Phase": "{get_phase_display}",
@@ -95,6 +99,23 @@ class CandidateChecklistTaskKanbanView(HorillaKanbanView):
             queryset = queryset.filter(candidate_id=candidate_pk)
         self.queryset = queryset
         return queryset
+
+
+@method_decorator(login_required, name="dispatch")
+class ChecklistTaskGroupCount(View):
+    """
+    How many cards a column of one candidate's My Tasks board holds, worked out exactly the way the board
+    itself is (the user's visibility, this candidate, the board's filters), so a column's heading always
+    matches the cards under it.
+    """
+
+    def get(self, request, *args, **kwargs):
+        queryset = visible_tasks_queryset(request).filter(candidate_id=kwargs.get("pk"))
+        queryset = CandidateChecklistTaskFilter(
+            data=request.GET, queryset=queryset, request=request
+        ).qs
+        status = request.GET.get("group_id", "")
+        return HttpResponse(str(queryset.filter(status=status).count()))
 
 
 @method_decorator(login_required, name="dispatch")

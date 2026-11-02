@@ -1,10 +1,6 @@
 {% load i18n %}
 <div class="oh-dropdown__filter-body">
   <div class="oh-input-group">
-    <label class="oh-label" for="{{ f.search.id_for_label }}">{% trans "Search" %}</label>
-    {{ f.search }}
-  </div>
-  <div class="oh-input-group">
     <label class="oh-label" for="{{ f.candidate.id_for_label }}">{{ f.candidate.label }}</label>
     {{ f.candidate }}
   </div>

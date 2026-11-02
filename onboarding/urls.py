@@ -463,6 +463,11 @@ urlpatterns = [
         name="my-checklist-tasks-kanban",
     ),
     path(
+        "my-checklist-tasks/board/candidate/<int:pk>/count/",
+        cbv_checklist_tasks.ChecklistTaskGroupCount.as_view(),
+        name="my-checklist-tasks-kanban-count",
+    ),
+    path(
         "my-checklist-tasks/board/list/",
         cbv_checklist_tasks.CandidateChecklistTaskListView.as_view(),
         name="my-checklist-tasks-list",

@@ -17,6 +17,20 @@
     >
       <input type="hidden" name="view" value="{{ initial_view }}">
 
+      <div class="relative">
+        <input
+          type="text"
+          id="myTasksSearch"
+          name="search"
+          value="{{ filter_form.search.value|default_if_none:'' }}"
+          class="text-color-600 ps-8 p-1.5 pb-2 placeholder:text-xs w-full border border-dark-50 rounded-md focus-visible:outline-0 placeholder:text-dark-100 text-sm [transition:.3s] focus:border-primary-600"
+          aria-label="{% trans 'Search Input' %}"
+          placeholder="{% trans 'Search' %}"
+          autocomplete="off"
+        >
+        <i class="fas fa-search absolute left-3 top-[1px] bottom-0 m-auto flex items-center opacity-50 text-xs"></i>
+      </div>
+
       <ul class="oh-view-types" style="margin-bottom: 0;">
         <li class="oh-view-type">
           <a
@@ -59,6 +73,18 @@
     <div class="bg-white rounded-md shadow-card p-12 text-xs text-[#9AA1AC] text-center">{% trans "Loading tasks..." %}</div>
   </div>
 </div>
+
+<script>
+  // typing in the search box filters the board after a short pause, like the search box on the other screens
+  (function () {
+    var timer;
+    $(document).on("keyup", "#myTasksSearch", function () {
+      var form = this.form;
+      clearTimeout(timer);
+      timer = setTimeout(function () { form.requestSubmit(); }, 500);
+    });
+  })();
+</script>
 
 <style>
   .oh-view-types { display: flex; list-style: none; margin: 0; padding: 0; gap: 4px; }

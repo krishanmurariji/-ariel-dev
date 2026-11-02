@@ -7,6 +7,7 @@ assignee acts on the CandidateChecklistTask rows created by the Start
 Onboarding stepper.
 """
 
+from django.urls import reverse
 from django.contrib import messages
 from django.db import transaction
 from django.http import HttpResponse
@@ -228,11 +229,18 @@ def my_checklist_tasks_board(request):
     )
 
     if request.GET.get("view") == "list":
-        return CandidateChecklistTaskListView.as_view()(request)
+        response = CandidateChecklistTaskListView.as_view()(request)
+    elif not visible_candidates_queryset(request).exists():
+        response = render(request, "onboarding/task_templates/_no_candidates.html")
+    else:
+        response = MyTasksCandidateTabsView.as_view()(request)
 
-    if not visible_candidates_queryset(request).exists():
-        return render(request, "onboarding/task_templates/_no_candidates.html")
-    return MyTasksCandidateTabsView.as_view()(request)
+    # The form pushes the address it fetched into the browser's address bar; that is this fragment, so
+    # a refresh would show the bare board. Push the page's own address (same filters) instead.
+    if request.headers.get("HX-Request"):
+        query = request.GET.urlencode()
+        response["HX-Push-Url"] = reverse("my-checklist-tasks") + (f"?{query}" if query else "")
+    return response
 
 
 @login_required

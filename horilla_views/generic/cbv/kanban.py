@@ -28,6 +28,12 @@ class HorillaKanbanView(HorillaCardView):
     Template shown, centred, in a column that has no cards.
     """
     group_actions: list = []
+    group_count_url: str = ""
+    """
+    Address that answers "how many cards are in this column" for exactly what this board shows
+    (``?group_id=`` plus the board's own filters). Empty uses the generic count, which counts every
+    row of the model with that group value.
+    """
     show_kanban_confirmation: bool = True
     folded_groups: list = []
     action_method: str = """"""
@@ -47,6 +53,7 @@ class HorillaKanbanView(HorillaCardView):
         context["app_label"] = app_label
         context["model_name"] = model_name
         context["tab_id"] = self.kwargs.get("pk", None)
+        context["group_count_url"] = str(self.group_count_url or "")
 
         grouped_items = {}
         paginated_groups = {}

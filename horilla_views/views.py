@@ -716,8 +716,13 @@ def update_kanban_sequence(request):
     except Exception:
         return JsonResponse({"error": "Invalid model path."}, status=400)
 
-    if not get_nested_field(model, order_by):
+    order_field = get_nested_field(model, order_by)
+    if not order_field:
         return JsonResponse({"info": f"Model does not have a {order_by} field."})
+    if getattr(order_field, "primary_key", False):
+        # A position cannot be stored in the primary key: writing it would save every card over
+        # whichever row already holds that number (or add a row), so nothing is stored.
+        return JsonResponse({"info": f"{order_by} is the primary key; no order is stored."})
 
     filters = {}
     if group_key and group_id:
@@ -808,6 +813,11 @@ def update_kanban_item_group(request):
             # Not a ForeignKey → probably a CharField (choices) or something similar
             group_instance = group_id
 
+        # A board that sorts by the primary key (e.g. "id") has no field to keep a position in;
+        # writing one there would overwrite other rows, so only the new group is stored.
+        order_field = get_nested_field(model, order_by)
+        store_order = not (order_field is None or getattr(order_field, "primary_key", False))
+
         # Fetch all objects in order_list
         objects = list(model.objects.filter(id__in=order_list))
         obj_map = {str(obj.id): obj for obj in objects}
@@ -819,7 +829,8 @@ def update_kanban_item_group(request):
             if not obj:
                 continue
 
-            set_nested_attr(obj, order_by, index)
+            if store_order:
+                set_nested_attr(obj, order_by, index)
 
             # If group_key is nested, set it properly
             if "__" in group_key:

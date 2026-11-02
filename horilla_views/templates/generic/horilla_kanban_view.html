@@ -126,7 +126,11 @@
             <button
                 hidden
                 class="reload-badge"
+                {% if group_count_url %}
+                hx-get="{{ group_count_url }}?{{ request.GET.urlencode }}&group_id={{ key|urlencode }}"
+                {% else %}
                 hx-get="{% url 'get-kanban-card-count' %}?model={{app_label}}.{{model_name}}&group_key={{view.group_key}}&group_id={{key}}"
+                {% endif %}
                 hx-target="#groupCount{{key}}"
                 hx-swap="innerHTML"
             >
@@ -153,7 +157,7 @@
                                     data-rec-stage-badge="{{rec.id}}"
                                     id="groupCount{{key}}"
                                 >
-                                    {{group.page_obj.object_list.count}}
+                                    {{group.page_obj.paginator.count}}
                                 </span>
                                 {{group.label}}
                             </h5>
@@ -246,12 +250,15 @@
 	});
 
     var tabId = $("#{{view_id}}").closest(".oh-tabs__content:visible").attr("id");
+    {% if not group_count_url %}
+    // the tab badge shows the number of columns here; a board with its own column counts keeps the server's task total
     var badge = $(`#badge-${tabId}`);
     var count = "{{grouped_items.items|length}}";
     var label = badge.attr("data-badge-label") || "";
     var title = count + " " + label;
     badge.html(count);
     badge.attr("title", title);
+    {% endif %}
 
 	// Stretch the columns down to the bottom of the screen (the CSS height is only the fallback).
 	(function () {
