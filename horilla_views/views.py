@@ -44,6 +44,12 @@ from horilla_views.cbv_methods import (
     set_nested_attr,
 )
 from horilla_views.forms import SavedFilterForm
+from horilla_views.kanban_access import (
+    board_for,
+    board_model,
+    choice_ok,
+    usable_order_field,
+)
 from horilla_views.generic.cbv.views import HorillaFormView, HorillaListView
 from horilla_views.templatetags.generic_template_filters import getattribute
 
@@ -686,11 +692,41 @@ class HorillaDeleteConfirmationView(View):
         return context
 
 
+def _kanban_refusal(message, status=400):
+    return JsonResponse({"error": message}, status=status)
+
+
+def _kanban_ids(raw):
+    """A browser-supplied list of ids -> list of ints, or None if it is not one."""
+    try:
+        ids = json.loads(raw or "[]")
+        if not isinstance(ids, list):
+            return None
+        return [int(i) for i in ids]
+    except (ValueError, TypeError):
+        return None
+
+
+def _kanban_cards(request, board, model, ids):
+    """
+    The cards asked about, or a refusal. Every card must be one the user may move;
+    a single card they may not move refuses the whole request.
+    """
+    cards = list(model.objects.filter(id__in=ids))
+    for card in cards:
+        if not board.can_move(request.user, card):
+            return None, _kanban_refusal("You do not have permission to do this.", 403)
+    return cards, None
+
+
 @post_only
 @func_login_required
 def update_kanban_sequence(request):
     """
-    generic method to update the 'sequence' in kanban view.
+    Save the order of the cards in one column of a kanban board.
+
+    Only the boards listed in horilla_views.kanban_access.BOARDS can use this, only
+    by their own grouping field, and only for people who may move those cards.
 
     GET params:
     - model: 'app_label.ModelName'
@@ -699,56 +735,44 @@ def update_kanban_sequence(request):
     - groupId: optional value of the grouping field
     """
 
-    model_path = request.GET.get("model", "")
-    order = request.GET.get("order", "[]")
+    board = board_for(request.GET.get("model"))
+    order_by = request.GET.get("orderBy")
     group_key = request.GET.get("groupKey")
     group_id = request.GET.get("groupId")
-    order_by = request.GET.get("orderBy")
-    order_list = json.loads(order)
+    order_list = _kanban_ids(request.GET.get("order"))
 
-    if not model_path:
-        return JsonResponse({"error": "Missing 'model'."}, status=400)
+    if board is None:
+        return _kanban_refusal("Invalid model path.")
     if not order_list:
-        return JsonResponse({"error": "Missing 'order'."}, status=400)
-    try:
-        app_label, model_name = model_path.split(".")
-        model = apps.get_model(app_label, model_name)
-    except Exception:
-        return JsonResponse({"error": "Invalid model path."}, status=400)
+        return _kanban_refusal("Missing 'order'.")
+    model = board_model(board)
 
-    order_field = get_nested_field(model, order_by)
-    if not order_field:
+    if not usable_order_field(model, order_by):
         return JsonResponse({"info": f"Model does not have a {order_by} field."})
-    if getattr(order_field, "primary_key", False):
-        # A position cannot be stored in the primary key: writing it would save every card over
-        # whichever row already holds that number (or add a row), so nothing is stored.
-        return JsonResponse({"info": f"{order_by} is the primary key; no order is stored."})
 
     filters = {}
     if group_key and group_id:
-        if not get_nested_field(model, group_key):
-            return JsonResponse(
-                {"error": f"Model does not have field '{group_key}'."}, status=400
-            )
-
+        if group_key not in board.group_keys:
+            return _kanban_refusal(f"Model does not have field '{group_key}'.")
         field = get_nested_field(model, group_key)
         if field.is_relation:
-            try:
-                group_instance = field.related_model.objects.get(pk=group_id)
-            except field.related_model.DoesNotExist:
-                return JsonResponse(
-                    {
-                        "error": f"{field.related_model.__name__} with ID {group_id} not found."
-                    },
-                    status=404,
+            group_instance = field.related_model.objects.filter(pk=group_id).first()
+            if group_instance is None:
+                return _kanban_refusal(
+                    f"{field.related_model.__name__} with ID {group_id} not found.", 404
                 )
             filters[group_key] = group_instance
         else:
             filters[group_key] = group_id
 
-    objs = list(model.objects.filter(id__in=order_list, **filters))
-    obj_by_id = {str(obj.id): obj for obj in objs}
+    cards, refusal = _kanban_cards(
+        request, board, model, order_list
+    )
+    if refusal:
+        return refusal
+    wanted = {str(card.id) for card in model.objects.filter(id__in=order_list, **filters)}
 
+    obj_by_id = {str(card.id): card for card in cards if str(card.id) in wanted}
     updated_objs = []
     for index, obj_id in enumerate(order_list):
         obj = obj_by_id.get(str(obj_id))
@@ -766,61 +790,65 @@ def update_kanban_sequence(request):
 @func_login_required
 def update_kanban_item_group(request):
     """
-    Generic method to update sequence and group kanban objects.
+    Move a card to another column of a kanban board (and save the card order).
+
+    Only the boards listed in horilla_views.kanban_access.BOARDS can use this, only
+    by their own grouping field, only into a column that belongs to the same
+    parent as the card, and only for people who may move that card.
 
     GET parameters:
     - model: 'app_label.ModelName'
-    - groupKey: foreign key field on the model (can be nested: 'stage__stage_id')
+    - groupKey: the field the board groups by (can be nested: 'stage__stage_id')
     - groupId: ID of the new group to assign
     - objectId: ID of the object being moved
     - order: ordered list of IDs to update sequence
     """
 
-    model_path = request.GET.get("model")
+    board = board_for(request.GET.get("model"))
     group_key = request.GET.get("groupKey")
     group_id = request.GET.get("groupId")
     object_id = request.GET.get("objectId")
-    order = request.GET.get("order", "[]")
     order_by = request.GET.get("orderBy")
+    order_list = _kanban_ids(request.GET.get("order"))
+
+    if not all([board, group_key, group_id, object_id, order_list, order_by]):
+        return _kanban_refusal("Missing required parameters")
+    if group_key not in board.group_keys:
+        return _kanban_refusal(f"Invalid group key: {group_key}")
+
     try:
-        order_list = json.loads(order)
-    except json.JSONDecodeError:
-        order_list = []
-
-    if not all([model_path, group_key, group_id, object_id, order_list, order_by]):
-        return JsonResponse({"error": "Missing required parameters"}, status=400)
-
-    try:
-        model = apps.get_model(*model_path.split("."))
-
-        # Get the group object from group_key
+        model = board_model(board)
         group_field = get_nested_field(model, group_key)
         if not group_field:
-            return JsonResponse(
-                {"error": f"Invalid group key: {group_key}"}, status=400
-            )
+            return _kanban_refusal(f"Invalid group key: {group_key}")
 
-        if hasattr(group_field, "related_model") and group_field.related_model:
+        if getattr(group_field, "related_model", None):
             group_model = group_field.related_model
-            try:
-                group_instance = group_model.objects.get(id=group_id)
-            except group_model.DoesNotExist:
-                return JsonResponse(
-                    {"error": f"{group_model.__name__} with ID {group_id} not found."},
-                    status=404,
+            group_instance = group_model.objects.filter(id=group_id).first()
+            if group_instance is None:
+                return _kanban_refusal(
+                    f"{group_model.__name__} with ID {group_id} not found.", 404
                 )
         else:
-            # Not a ForeignKey → probably a CharField (choices) or something similar
+            # a column made of choices (e.g. a status): only a real choice will do
+            if not choice_ok(model, group_key, group_id):
+                return _kanban_refusal(f"Invalid value for {group_key}.")
             group_instance = group_id
 
-        # A board that sorts by the primary key (e.g. "id") has no field to keep a position in;
-        # writing one there would overwrite other rows, so only the new group is stored.
-        order_field = get_nested_field(model, order_by)
-        store_order = not (order_field is None or getattr(order_field, "primary_key", False))
+        # the card being moved must be among the cards in the new order
+        if int(object_id) not in order_list:
+            return _kanban_refusal("Missing required parameters")
 
-        # Fetch all objects in order_list
-        objects = list(model.objects.filter(id__in=order_list))
-        obj_map = {str(obj.id): obj for obj in objects}
+        cards, refusal = _kanban_cards(request, board, model, order_list)
+        if refusal:
+            return refusal
+        obj_map = {str(card.id): card for card in cards}
+        if getattr(group_field, "related_model", None):
+            for card in cards:
+                if not board.column_ok(card, group_instance):
+                    return _kanban_refusal("That column belongs to something else.", 403)
+
+        write_order = usable_order_field(model, order_by)
         updated = []
         fields = set()
 
@@ -829,7 +857,7 @@ def update_kanban_item_group(request):
             if not obj:
                 continue
 
-            if store_order:
+            if write_order:
                 set_nested_attr(obj, order_by, index)
 
             # If group_key is nested, set it properly
@@ -848,46 +876,45 @@ def update_kanban_item_group(request):
 
         return JsonResponse({"status": "success", "updated": len(updated)})
 
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+    except Exception:
+        return _kanban_refusal("Could not update the board.", 500)
 
 
 @post_only
 @func_login_required
 def update_kanban_group_sequence(request):
     """
-    Generic method to update the sequence of kanban groups.
-    """
-    model_path = request.GET.get("model")
-    group_key = request.GET.get("group_key")
-    sequence_raw = request.GET.get("sequence", "")
-    order_by = request.GET.get("orderBy")
+    Save the order of the columns of a kanban board.
 
-    if not model_path:
+    Needs the permission to manage that board's columns, e.g. recruitment stages.
+    """
+    board = board_for(request.GET.get("model"))
+    group_key = request.GET.get("group_key")
+    order_by = request.GET.get("orderBy")
+    sequence = _kanban_ids(request.GET.get("sequence"))
+
+    if board is None:
         return HorillaRedirect(
             request,
             message=_("No matching query found."),
         )
+    if not board.can_arrange(request.user):
+        return _kanban_refusal("You do not have permission to do this.", 403)
+    if group_key not in board.group_keys or order_by != "sequence" or sequence is None:
+        return _kanban_refusal("Invalid request.")
 
-    try:
-        sequence = json.loads(sequence_raw)
-    except json.JSONDecodeError:
-        sequence = []
+    group_field = get_nested_field(board_model(board), group_key)
+    group_model = getattr(group_field, "related_model", None)
+    if group_model is None:
+        return _kanban_refusal("This board's columns cannot be reordered.")
 
-    model = apps.get_model(*model_path.split("."))
-    group_field = get_nested_field(model, group_key)
-
-    group_model = group_field.related_model
-
-    to_update = []
-    for index, group_id in enumerate(sequence):
-        instance = group_model(
-            pk=group_id,
-            sequence=index,
-        )
-        to_update.append(instance)
-
-    group_model.objects.bulk_update(to_update, fields=[order_by])
+    known = set(group_model.objects.filter(pk__in=sequence).values_list("pk", flat=True))
+    to_update = [
+        group_model(pk=group_id, sequence=index)
+        for index, group_id in enumerate(sequence)
+        if group_id in known
+    ]
+    group_model.objects.bulk_update(to_update, fields=["sequence"])
 
     return JsonResponse(
         {"status": "success", "message": "Group sequence updated successfully."}
@@ -897,20 +924,26 @@ def update_kanban_group_sequence(request):
 @func_login_required
 def get_kanban_card_count(request):
     """
-    Generic method to get the count of kanban cards in each group.
+    Count the cards in one column of a kanban board.
     """
-    model_path = request.GET.get("model")
+    board = board_for(request.GET.get("model"))
     group_id = request.GET.get("group_id")
     group_key = request.GET.get("group_key")
 
-    if not model_path:
+    if board is None:
         return HorillaRedirect(
             request,
             message=_("No matching query found."),
         )
+    if group_key not in board.group_keys:
+        return _kanban_refusal("Invalid request.")
+    if not board.can_open(request.user):
+        return _kanban_refusal("You do not have permission to do this.", 403)
 
-    model = apps.get_model(*model_path.split("."))
-    count = model.objects.filter(**{group_key: group_id}).count()
+    try:
+        count = board_model(board).objects.filter(**{group_key: group_id}).count()
+    except (ValueError, TypeError):
+        return _kanban_refusal("Invalid request.")
 
     return HttpResponse(f"{count}")
 
