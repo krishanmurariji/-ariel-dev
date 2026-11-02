@@ -39,33 +39,40 @@
                     <div class="oh-input-group">
                         <label class="oh-label">{% trans "Course/Degree" %}</label>
                         {{ edu_form.degree }}
+                        {% include "onboarding/_field_error.html" with field=edu_form.degree %}
                     </div>
                     <div class="oh-input-group">
                         <label class="oh-label">{% trans "University/College" %}</label>
                         {{ edu_form.university }}
+                        {% include "onboarding/_field_error.html" with field=edu_form.university %}
                     </div>
                     <div class="oh-input-group">
                         <label class="oh-label">{% trans "Branch/Specialization" %}</label>
                         {{ edu_form.specialization }}
+                        {% include "onboarding/_field_error.html" with field=edu_form.specialization %}
                     </div>
                     <div class="oh-input-group">
                         <label class="oh-label">{% trans "CGPA/Percentage" %}</label>
                         {{ edu_form.percentage_cgpa }}
+                        {% include "onboarding/_field_error.html" with field=edu_form.percentage_cgpa %}
                     </div>
                     <div class="oh-input-group">
                         <label class="oh-label">{% trans "Start of Course" %}</label>
                         {{ edu_form.start_date }}
+                        {% include "onboarding/_field_error.html" with field=edu_form.start_date %}
                     </div>
                     <div class="oh-input-group">
                         <label class="oh-label">{% trans "End of Course" %}</label>
                         {{ edu_form.end_date }}
+                        {% include "onboarding/_field_error.html" with field=edu_form.end_date %}
                     </div>
                     <div class="oh-swz__field--full oh-input-group">
                         <label class="oh-label">{% trans "Location" %}</label>
                         {{ edu_form.location }}
+                        {% include "onboarding/_field_error.html" with field=edu_form.location %}
                     </div>
                 </div>
-                {{ edu_form.errors }}
+                {% include "onboarding/_row_errors.html" with form=edu_form %}
             </div>
             {% endfor %}
         </div>

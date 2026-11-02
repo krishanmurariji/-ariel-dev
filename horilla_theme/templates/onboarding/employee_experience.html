@@ -39,25 +39,30 @@
                     <div class="oh-input-group">
                         <label class="oh-label">{% trans "Company Name" %}</label>
                         {{ exp_form.company_name }}
+                        {% include "onboarding/_field_error.html" with field=exp_form.company_name %}
                     </div>
                     <div class="oh-input-group">
                         <label class="oh-label">{% trans "Job Title" %}</label>
                         {{ exp_form.designation }}
+                        {% include "onboarding/_field_error.html" with field=exp_form.designation %}
                     </div>
                     <div class="oh-input-group">
                         <label class="oh-label">{% trans "Date of Joining" %}</label>
                         {{ exp_form.start_date }}
+                        {% include "onboarding/_field_error.html" with field=exp_form.start_date %}
                     </div>
                     <div class="oh-input-group">
                         <label class="oh-label">{% trans "Date of Relieving" %}</label>
                         {{ exp_form.end_date }}
+                        {% include "onboarding/_field_error.html" with field=exp_form.end_date %}
                     </div>
                     <div class="oh-swz__field--full oh-input-group">
                         <label class="oh-label">{% trans "Location" %}</label>
                         {{ exp_form.location }}
+                        {% include "onboarding/_field_error.html" with field=exp_form.location %}
                     </div>
                 </div>
-                {{ exp_form.errors }}
+                {% include "onboarding/_row_errors.html" with form=exp_form %}
             </div>
             {% endfor %}
         </div>

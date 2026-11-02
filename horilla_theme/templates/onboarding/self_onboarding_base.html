@@ -155,6 +155,10 @@
             gap: 1.1rem 1.5rem;
         }
         .oh-swz__field--full { grid-column: 1 / -1; }
+        .oh-swz__error { display: flex; flex-direction: column; gap: 2px; margin: -4px 0 10px; font-size: 12px; line-height: 1.4; color: #b42318; }
+        .oh-swz__error::before { content: none; }
+        .oh-swz__error--row { margin: 0 0 12px; padding: 8px 12px; background: #fef3f2; border: 1px solid #fecdca; border-radius: 6px; }
+        .oh-input-group:has(.oh-swz__error) .oh-input { border-color: #f04438; }
 
         /* Fixed footer bar - same position/height on every step regardless
            of how much content sits above it, instead of the button sitting

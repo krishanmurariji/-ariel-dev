@@ -125,17 +125,20 @@
                     <div class="oh-input-group">
                         <label class="oh-label">{% trans "Name" %}</label>
                         {{ contact_form.name }}
+                        {% include "onboarding/_field_error.html" with field=contact_form.name %}
                     </div>
                     <div class="oh-input-group">
                         <label class="oh-label">{% trans "Phone" %}</label>
                         {{ contact_form.phone }}
+                        {% include "onboarding/_field_error.html" with field=contact_form.phone %}
                     </div>
                     <div class="oh-swz__field--full oh-input-group">
                         <label class="oh-label">{% trans "Relation" %}</label>
                         {{ contact_form.relation }}
+                        {% include "onboarding/_field_error.html" with field=contact_form.relation %}
                     </div>
                 </div>
-                {{ contact_form.errors }}
+                {% include "onboarding/_row_errors.html" with form=contact_form %}
             </div>
             {% endfor %}
         </div>
