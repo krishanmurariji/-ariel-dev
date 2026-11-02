@@ -81,6 +81,12 @@ class ExitSettingsInPageTests(IsolatedTestCase):
         self.assertTrue(events["exitSettingsNotice"]["close"])
         self.assertIn("exitSettingsChanged", events)
 
+    def test_the_task_group_window_keeps_the_page_loader_off_its_own_form(self):
+        # The page's loader empties the window's target as a request starts, which detaches the form
+        # and drops the close/refresh events the answer sends. The form keeps that handler off itself.
+        response = self.client.get(reverse("exit-task-group-new"), **HX)
+        self.assertContains(response, 'hx-on::before-request="event.stopPropagation()"')
+
     # -- exit reasons -----------------------------------------------------------
 
     def test_the_reason_window_opens_for_adding_and_renaming(self):

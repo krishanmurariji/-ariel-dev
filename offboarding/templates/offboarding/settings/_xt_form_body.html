@@ -18,7 +18,7 @@
     .xg-scroll { max-height: 62vh; overflow-y: auto; padding: 2px 6px 2px 2px; }
 </style>
 
-<form id="xgForm" {% if modal %}hx-post="{{ request.path }}" hx-target="#xsModalBody" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']"{% else %}method="post"{% endif %}>
+<form id="xgForm" {% if modal %}hx-post="{{ request.path }}" hx-target="#xsModalBody" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']" hx-on::before-request="event.stopPropagation()"{% else %}method="post"{% endif %}>
     {% csrf_token %}
     <div class="{% if modal %}xg-scroll{% endif %}">
         {% if form.non_field_errors %}<div class="xg-box"><div class="xg-pad xg-err" style="margin:0;">{{ form.non_field_errors|join:" " }}</div></div>{% endif %}
