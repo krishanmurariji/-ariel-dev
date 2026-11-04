@@ -1,0 +1,30 @@
+# Render blueprint - lives ONLY on the `render` branch of krishanmurariji/-ariel-dev.
+# Never merge this branch into master and never push it to the abhatia (production) remote.
+services:
+  - type: web
+    name: arielhr
+    runtime: python
+    plan: free
+    branch: render
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate --noinput
+    # ASGI entrypoint: docker/gunicorn.conf.py forces the uvicorn worker, so a WSGI
+    # entrypoint (horilla.wsgi) fails every request with "missing start_response".
+    startCommand: gunicorn horilla.asgi:application --config docker/gunicorn.conf.py
+    healthCheckPath: /login/
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: GUNICORN_WORKERS
+        value: "1"
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: arielhr.onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://arielhr.onrender.com
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_INIT_PASSWORD
+        sync: false
