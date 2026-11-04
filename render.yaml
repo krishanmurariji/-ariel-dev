@@ -28,3 +28,21 @@ services:
         sync: false
       - key: DB_INIT_PASSWORD
         sync: false
+      - key: TIME_ZONE
+        value: Asia/Kolkata
+      # Uploaded files: Render's free web service has no persistent disk, so use
+      # S3-compatible storage (Backblaze B2) or uploads vanish on every restart.
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_STORAGE_BUCKET_NAME
+        sync: false
+      - key: AWS_S3_ENDPOINT_URL
+        sync: false
+      - key: MEDIA_URL
+        value: /media
+      - key: MEDIA_ROOT
+        value: media
+      - key: NAMESPACE
+        value: arielhr
