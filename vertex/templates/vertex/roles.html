@@ -1,0 +1,64 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+<div class="px-4 py-4">
+  <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
+    <div>
+      <h1 class="text-xl font-bold">{% trans "Vertex Roles" %}</h1>
+      <p class="text-sm text-dark-400 mt-1">{% trans "Assign each employee a portal role. The role decides what they can do in every Vertex section." %}</p>
+    </div>
+    <form method="get" class="flex gap-2">
+      <input type="text" name="search" value="{{ search }}" placeholder="{% trans 'Search name or badge' %}" class="oh-input" />
+      <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Search" %}</button>
+    </form>
+  </div>
+
+  {% if messages %}
+    <div class="oh-alert-container">
+      {% for message in messages %}
+        <div class="oh-alert oh-alert--animated {{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="bg-white rounded-md shadow-card border border-[#ebebeb]">
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="text-left text-dark-400 uppercase text-[10px] tracking-wide border-b border-[#ebebeb]">
+            <th class="px-5 py-2">{% trans "Employee" %}</th>
+            <th class="px-2 py-2">{% trans "Badge" %}</th>
+            <th class="px-2 py-2">{% trans "Department" %}</th>
+            <th class="px-2 py-2">{% trans "Portal role" %}</th>
+            <th class="px-2 py-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr class="border-b border-[#f3f3f3]">
+            <td class="px-5 py-2">{{ row.employee.get_full_name }}</td>
+            <td class="px-2 py-2">{{ row.employee.badge_id|default:"-" }}</td>
+            <td class="px-2 py-2">{{ row.employee.employee_work_info.department_id|default:"-" }}</td>
+            <td class="px-2 py-2">
+              <select name="portal_role" form="role-form-{{ row.employee.pk }}" class="oh-select">
+                {% for value, label in roles %}
+                  <option value="{{ value }}" {% if value == row.role %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td class="px-2 py-2">
+              <form id="role-form-{{ row.employee.pk }}" method="post" action="{% url 'vertex-role-update' row.employee.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Save" %}</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="px-5 py-6 text-center text-dark-400">{% trans "No employees found." %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock content %}
