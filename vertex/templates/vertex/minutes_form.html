@@ -1,0 +1,21 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+<div class="px-4 py-4 max-w-3xl">
+  <h1 class="text-xl font-bold mb-4">{{ title }}</h1>
+  <form method="post" class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5 grid gap-4">
+    {% csrf_token %}
+    {% for field in form %}
+      <div>
+        <label for="{{ field.id_for_label }}" class="block text-xs font-semibold mb-1">{{ field.label }}</label>
+        {{ field }}
+        {% for error in field.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+      </div>
+    {% endfor %}
+    <div class="flex gap-2">
+      <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Save" %}</button>
+      <a href="{% if minute %}{% url 'vertex-minute' minute.pk %}{% else %}{% url 'vertex-minutes' %}{% endif %}" class="oh-btn oh-btn--light">{% trans "Cancel" %}</a>
+    </div>
+  </form>
+</div>
+{% endblock content %}

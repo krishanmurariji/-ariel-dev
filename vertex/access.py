@@ -92,3 +92,52 @@ def can_open_document(user, document):
         is_business_only(user, document.project)
         and document.visibility == Visibility.INTERNAL
     )
+
+
+# ---------------------------------------------------------------------------
+# Reviews (ArielVertex ReviewsController)
+# ---------------------------------------------------------------------------
+
+
+def sees_all_reviews(user):
+    """Requesters and holders of the see-all switch see every review request."""
+    return user.has_perm("vertex.view_allreviewrequests") or user.has_perm(
+        "vertex.add_reviewrequest"
+    )
+
+
+def visible_reviews(user):
+    from vertex.models import ReviewRequest
+
+    if not user.has_perm("vertex.view_reviewrequest"):
+        return ReviewRequest.objects.none()
+    reviews = ReviewRequest.objects.select_related(
+        "project", "subject", "requested_by", "assigned_to"
+    )
+    if sees_all_reviews(user):
+        return reviews
+    employee = employee_of(user)
+    if employee is None:
+        return reviews.none()
+    return reviews.filter(
+        Q(assigned_to=employee) | Q(subject=employee) | Q(requested_by=employee)
+    )
+
+
+def can_schedule_review(user, review):
+    return user.has_perm("vertex.change_reviewrequest") and can_manage(user, review.project)
+
+
+def can_submit_review(user, review):
+    """Only the assigned reviewer, or someone who sees every review, may submit the outcome."""
+    perm = (
+        "vertex.add_codereview"
+        if review.review_type == "code_review"
+        else "vertex.add_projectreview"
+    )
+    if not user.has_perm(perm):
+        return False
+    employee = employee_of(user)
+    return (
+        employee is not None and review.assigned_to_id == employee.pk
+    ) or user.has_perm("vertex.view_allreviewrequests")

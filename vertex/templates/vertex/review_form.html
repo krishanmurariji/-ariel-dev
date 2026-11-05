@@ -1,0 +1,22 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+<div class="px-4 py-4 max-w-3xl">
+  <h1 class="text-xl font-bold mb-1">{% trans "Request / schedule review" %}</h1>
+  <p class="text-sm text-dark-400 mb-4">{% trans "Pick one or more employees. Fill in the meeting time to schedule them straight away; leave it empty to keep the requests open." %}</p>
+  <form method="post" class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5 grid gap-4 md:grid-cols-2">
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="{% if field.name == 'subjects' or field.name == 'notes' %}md:col-span-2{% endif %}">
+        <label for="{{ field.id_for_label }}" class="block text-xs font-semibold mb-1">{{ field.label }}</label>
+        {{ field }}
+        {% for error in field.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+      </div>
+    {% endfor %}
+    <div class="md:col-span-2 flex gap-2">
+      <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Create" %}</button>
+      <a href="{% url 'vertex-reviews' %}" class="oh-btn oh-btn--light">{% trans "Cancel" %}</a>
+    </div>
+  </form>
+</div>
+{% endblock content %}

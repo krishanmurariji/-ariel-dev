@@ -19,6 +19,7 @@ Superusers (admin) always pass every permission check, as in the rest of Ariel H
 
 import os
 
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -257,3 +258,198 @@ class ProjectCall(models.Model):
         verbose_name = _("Project call")
         verbose_name_plural = _("Project calls")
         ordering = ["-scheduled_at"]
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: reviews and meeting minutes (ArielVertex ReviewRequest, ReviewMeeting,
+# ProjectReview, CodeReview, MeetingMinute)
+#
+# * view_reviewrequest          see the Reviews page (own reviews: subject, reviewer or requester)
+# * view_allreviewrequests      see every review request    (proxy "Review request (all)")
+# * add_reviewrequest           request / schedule reviews  (also sees all requests, as in Vertex)
+# * change_reviewrequest        schedule a request (and be PM/PC of its project)
+# * add_projectreview / add_codereview   submit the outcome (assigned reviewer, or see-all)
+# * view/add/change/delete_meetingminute minutes; only the person who captured them can touch them
+# ---------------------------------------------------------------------------
+
+
+class ReviewType(models.TextChoices):
+    PROJECT_REVIEW = "project_review", _("Project review")
+    CODE_REVIEW = "code_review", _("Code review")
+    GENERAL_FEEDBACK = "general_feedback", _("General feedback")
+
+
+class ReviewRequestStatus(models.TextChoices):
+    OPEN = "open", _("Open")
+    SCHEDULED = "scheduled", _("Scheduled")
+    IN_PROGRESS = "in_progress", _("In progress")
+    COMPLETED = "completed", _("Completed")
+    CANCELLED = "cancelled", _("Cancelled")
+
+
+class MeetingResponse(models.TextChoices):
+    NO_RESPONSE = "no_response", _("No response")
+    ACCEPTED = "accepted", _("Accepted")
+    DECLINED = "declined", _("Declined")
+    TENTATIVE = "tentative", _("Tentative")
+
+
+class ReviewRequest(models.Model):
+    """HR / management request for a project, code or general review of one employee."""
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="review_requests")
+    subject = models.ForeignKey(
+        "employee.Employee", on_delete=models.CASCADE, related_name="vertex_reviews_about"
+    )
+    requested_by = models.ForeignKey(
+        "employee.Employee", null=True, on_delete=models.SET_NULL, related_name="vertex_reviews_requested"
+    )
+    assigned_to = models.ForeignKey(
+        "employee.Employee", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="vertex_reviews_assigned",
+    )
+    review_type = models.CharField(
+        max_length=20, choices=ReviewType.choices, default=ReviewType.PROJECT_REVIEW
+    )
+    status = models.CharField(
+        max_length=15, choices=ReviewRequestStatus.choices, default=ReviewRequestStatus.OPEN
+    )
+    notes = models.TextField(blank=True, default="")
+    due_date = models.DateField(null=True, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Review request")
+        verbose_name_plural = _("Review requests")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.get_review_type_display()} of {self.subject} ({self.project.code})"
+
+    def get_absolute_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-review", args=[self.pk])
+
+
+class AllReviewRequests(ReviewRequest):
+    """Permission switch only: ``view_allreviewrequests`` shows every review request."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Review request (all)")
+        verbose_name_plural = _("Review requests (all)")
+
+
+class ReviewMeeting(models.Model):
+    """The scheduled review meeting. The meeting link is entered by hand (no Outlook/Teams yet)."""
+
+    review_request = models.OneToOneField(
+        ReviewRequest, on_delete=models.CASCADE, related_name="meeting"
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    scheduled_at = models.DateTimeField()
+    duration_minutes = models.PositiveSmallIntegerField(default=30)
+    attendees = models.CharField(max_length=1000, blank=True, default="")
+    meeting_url = models.URLField(blank=True, default="")
+    response_status = models.CharField(
+        max_length=15, choices=MeetingResponse.choices, default=MeetingResponse.NO_RESPONSE
+    )
+    responded_at = models.DateTimeField(null=True, blank=True)
+    scheduled_by = models.ForeignKey(
+        "employee.Employee", null=True, on_delete=models.SET_NULL, related_name="+"
+    )
+
+    class Meta:
+        verbose_name = _("Review meeting")
+        verbose_name_plural = _("Review meetings")
+
+
+_RATING = [MinValueValidator(1), MaxValueValidator(5)]
+
+
+class ProjectReview(models.Model):
+    """Project contribution review submitted by the assigned reviewer (PM / PC)."""
+
+    review_request = models.OneToOneField(
+        ReviewRequest, on_delete=models.CASCADE, related_name="project_review"
+    )
+    reviewer = models.ForeignKey(
+        "employee.Employee", null=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    delivery_rating = models.PositiveSmallIntegerField(validators=_RATING)
+    ownership_rating = models.PositiveSmallIntegerField(validators=_RATING)
+    collaboration_rating = models.PositiveSmallIntegerField(validators=_RATING)
+    strengths = models.TextField(blank=True, default="")
+    observations = models.TextField(blank=True, default="")
+    action_items = models.TextField(blank=True, default="")
+    submitted_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Project review")
+        verbose_name_plural = _("Project reviews")
+
+
+class CodeReview(models.Model):
+    """Technical review outcome captured by a Technical Lead."""
+
+    review_request = models.OneToOneField(
+        ReviewRequest, on_delete=models.CASCADE, related_name="code_review"
+    )
+    reviewer = models.ForeignKey(
+        "employee.Employee", null=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    code_quality_rating = models.PositiveSmallIntegerField(validators=_RATING)
+    architecture_rating = models.PositiveSmallIntegerField(validators=_RATING)
+    testing_rating = models.PositiveSmallIntegerField(validators=_RATING)
+    strengths = models.TextField(blank=True, default="")
+    observations = models.TextField(blank=True, default="")
+    blockers = models.TextField(blank=True, default="")
+    action_items = models.TextField(blank=True, default="")
+    submitted_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Code review")
+        verbose_name_plural = _("Code reviews")
+
+
+class MinuteStatus(models.TextChoices):
+    DRAFT = "draft", _("Draft")
+    PREVIEW = "preview", _("Preview")
+    APPROVED = "approved", _("Approved")
+    SENT = "sent", _("Sent")
+
+
+class MeetingMinute(models.Model):
+    """
+    Notes captured -> minutes generated -> previewed -> approved -> sent to attendees.
+    Editing approved or sent minutes sends them back to Preview so they are approved again.
+    """
+
+    title = models.CharField(max_length=200)
+    meeting_date = models.DateTimeField()
+    location = models.CharField(max_length=200, blank=True, default="")
+    attendees = models.TextField(blank=True, default="", help_text=_("Emails, comma or line separated"))
+    raw_notes = models.TextField(blank=True, default="")
+    minutes_text = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=10, choices=MinuteStatus.choices, default=MinuteStatus.DRAFT)
+    created_by = models.ForeignKey(
+        "employee.Employee", on_delete=models.CASCADE, related_name="vertex_minutes"
+    )
+    approved_by = models.ForeignKey(
+        "employee.Employee", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    sent_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Meeting minute")
+        verbose_name_plural = _("Meeting minutes")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.title

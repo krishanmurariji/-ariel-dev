@@ -1,0 +1,68 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+<div class="px-4 py-4">
+  <a href="{% url 'vertex-reviews' %}" class="text-xs text-dark-400 hover:underline">&larr; {% trans "Reviews" %}</a>
+  <h1 class="text-xl font-bold mt-1">{{ review.get_review_type_display }}: {{ review.subject.get_full_name }}</h1>
+  <p class="text-xs text-dark-400 mb-4">{{ review.project }} &middot; {{ review.get_status_display }}
+    {% if review.assigned_to %}&middot; {% trans "Reviewer" %}: {{ review.assigned_to.get_full_name }}{% endif %}
+    {% if review.due_date %}&middot; {% trans "Due" %}: {{ review.due_date }}{% endif %}</p>
+
+  {% if messages %}
+    <div class="oh-alert-container">{% for message in messages %}<div class="oh-alert oh-alert--animated {{ message.tags }}">{{ message }}</div>{% endfor %}</div>
+  {% endif %}
+
+  {% if review.notes %}<div class="bg-white rounded-md border border-[#ebebeb] p-4 mb-4 text-sm"><b>{% trans "Notes" %}:</b> {{ review.notes|linebreaksbr }}</div>{% endif %}
+
+  <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5 mb-4 text-sm">
+    <h2 class="font-semibold mb-2">{% trans "Meeting" %}</h2>
+    {% if meeting %}
+      <p>{{ meeting.title }} &middot; {{ meeting.scheduled_at }} &middot; {{ meeting.duration_minutes }} {% trans "min" %}
+        {% if meeting.meeting_url %}&middot; <a href="{{ meeting.meeting_url }}" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">{% trans "Join" %}</a>{% endif %}</p>
+      <p class="text-xs text-dark-400 mt-1">{% trans "Attendees" %}: {{ meeting.attendees|default:"-" }}</p>
+      <p class="text-xs mt-1">{% trans "Response of the reviewed person" %}: <b>{{ meeting.get_response_status_display }}</b></p>
+      {% if can_respond %}
+        <form method="post" action="{% url 'vertex-review-respond' review.pk %}" class="flex gap-2 mt-3">
+          {% csrf_token %}
+          {% for value, label in responses %}{% if value != "no_response" %}<button type="submit" name="response" value="{{ value }}" class="oh-btn oh-btn--light">{{ label }}</button>{% endif %}{% endfor %}
+        </form>
+      {% endif %}
+    {% else %}
+      <p class="text-dark-400">{% trans "Not scheduled yet." %}</p>
+    {% endif %}
+    {% if can_schedule %}
+      <form method="post" action="{% url 'vertex-review-schedule' review.pk %}" class="grid md:grid-cols-3 gap-2 items-end border-t border-[#ebebeb] mt-4 pt-4">
+        {% csrf_token %}
+        {% for field in schedule_form %}<div><label class="block text-xs font-semibold mb-1">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+        <button type="submit" class="oh-btn oh-btn--secondary">{% if meeting %}{% trans "Reschedule" %}{% else %}{% trans "Schedule" %}{% endif %}</button>
+      </form>
+    {% endif %}
+  </div>
+
+  <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5 text-sm">
+    <h2 class="font-semibold mb-2">{% trans "Outcome" %}</h2>
+    {% if submitted %}
+      <ul class="mb-3">
+        {% if is_code %}
+          <li>{% trans "Code quality" %}: {{ submitted.code_quality_rating }}/5</li><li>{% trans "Architecture" %}: {{ submitted.architecture_rating }}/5</li><li>{% trans "Testing" %}: {{ submitted.testing_rating }}/5</li>
+        {% else %}
+          <li>{% trans "Delivery" %}: {{ submitted.delivery_rating }}/5</li><li>{% trans "Ownership" %}: {{ submitted.ownership_rating }}/5</li><li>{% trans "Collaboration" %}: {{ submitted.collaboration_rating }}/5</li>
+        {% endif %}
+      </ul>
+      <p><b>{% trans "Strengths" %}:</b> {{ submitted.strengths|default:"-"|linebreaksbr }}</p>
+      <p><b>{% trans "Observations" %}:</b> {{ submitted.observations|default:"-"|linebreaksbr }}</p>
+      {% if is_code %}<p><b>{% trans "Blockers" %}:</b> {{ submitted.blockers|default:"-"|linebreaksbr }}</p>{% endif %}
+      <p><b>{% trans "Action items" %}:</b> {{ submitted.action_items|default:"-"|linebreaksbr }}</p>
+    {% elif not can_submit %}
+      <p class="text-dark-400">{% trans "No outcome has been submitted yet." %}</p>
+    {% endif %}
+    {% if can_submit %}
+      <form method="post" action="{% url 'vertex-review-submit' review.pk %}" class="grid md:grid-cols-3 gap-2 items-end border-t border-[#ebebeb] mt-3 pt-4">
+        {% csrf_token %}
+        {% for field in submit_form %}<div><label class="block text-xs font-semibold mb-1">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+        <button type="submit" class="oh-btn oh-btn--secondary">{% if submitted %}{% trans "Update outcome" %}{% else %}{% trans "Submit outcome" %}{% endif %}</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock content %}
