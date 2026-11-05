@@ -1,0 +1,94 @@
+"""
+vertex/access.py
+
+Who may see or manage which Vertex project. Permissions are ordinary Ariel HR
+(Django) permissions, so groups, users and the admin work as everywhere else. A
+superuser (Admin) always passes.
+
+Rules, ported from ArielVertex ProjectAccessService:
+
+* see the Projects pages      -> vertex.view_project
+* see EVERY project           -> vertex.view_allprojects (else only projects the user is on)
+* manage a project            -> vertex.change_allprojects, or vertex.change_project AND
+                                 being project manager / coordinator on that project
+* business people on a project never see Internal documents
+"""
+
+from django.db.models import Q
+
+from vertex.models import Project, ProjectMember, ProjectRole, Visibility
+
+MANAGER_ROLES = (ProjectRole.PROJECT_MANAGER, ProjectRole.PROJECT_COORDINATOR)
+
+
+def employee_of(user):
+    return getattr(user, "employee_get", None)
+
+
+def sees_all_projects(user):
+    return user.has_perm("vertex.view_allprojects")
+
+
+def membership(user, project):
+    employee = employee_of(user)
+    if employee is None:
+        return None
+    return ProjectMember.objects.filter(
+        project=project, employee=employee, is_active=True
+    ).first()
+
+
+def visible_projects(user):
+    """Projects the user may open."""
+    if not user.has_perm("vertex.view_project"):
+        return Project.objects.none()
+    if sees_all_projects(user):
+        return Project.objects.all()
+    employee = employee_of(user)
+    if employee is None:
+        return Project.objects.none()
+    return Project.objects.filter(
+        Q(members__employee=employee, members__is_active=True)
+    ).distinct()
+
+
+def can_view(user, project):
+    return visible_projects(user).filter(pk=project.pk).exists()
+
+
+def my_role(user, project):
+    member = membership(user, project)
+    return member.role_on_project if member else None
+
+
+def can_manage(user, project):
+    if user.has_perm("vertex.change_allprojects"):
+        return True
+    if not user.has_perm("vertex.change_project"):
+        return False
+    return my_role(user, project) in MANAGER_ROLES
+
+
+def is_business_only(user, project):
+    """A business person on the project (without see-all) is kept away from internal items."""
+    return (
+        my_role(user, project) == ProjectRole.BUSINESS_PERSON
+        and not sees_all_projects(user)
+    )
+
+
+def visible_documents(user, project):
+    documents = project.documents.select_related("uploaded_by")
+    if is_business_only(user, project):
+        documents = documents.exclude(visibility=Visibility.INTERNAL)
+    return documents
+
+
+def can_open_document(user, document):
+    """Rule for /media/: the file of a document opens only for people who can see it."""
+    if not can_view(user, document.project):
+        return False
+    return not (
+        is_business_only(user, document.project)
+        and document.visibility == Visibility.INTERNAL
+    )

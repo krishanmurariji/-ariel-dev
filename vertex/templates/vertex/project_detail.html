@@ -1,0 +1,137 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+<div class="px-4 py-4">
+  <div class="flex items-start justify-between flex-wrap gap-3 mb-4">
+    <div>
+      <a href="{% url 'vertex-projects' %}" class="text-xs text-dark-400 hover:underline">&larr; {% trans "Projects" %}</a>
+      <h1 class="text-xl font-bold mt-1">{{ project.name }} <span class="text-sm font-normal text-dark-400">{{ project.code }}</span></h1>
+      <p class="text-xs text-dark-400 mt-1">
+        {{ project.get_status_display }} &middot; {% trans "Health" %}: {{ project.get_health_display }} &middot; {% trans "Priority" %}: {{ project.get_priority_display }}
+        {% if my_role %}&middot; {% trans "Your role" %}: {{ my_role }}{% endif %}
+      </p>
+    </div>
+    {% if can_manage %}
+      <a href="{% url 'vertex-project-edit' project.pk %}" class="oh-btn oh-btn--secondary">{% trans "Edit" %}</a>
+    {% endif %}
+  </div>
+
+  {% if messages %}
+    <div class="oh-alert-container">
+      {% for message in messages %}<div class="oh-alert oh-alert--animated {{ message.tags }}">{{ message }}</div>{% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="flex gap-1 border-b border-[#ebebeb] mb-4 text-sm">
+    {% for t in tabs %}
+      <a href="?tab={{ t }}" class="px-3 py-2 {% if t == tab %}border-b-2 border-primary font-semibold{% else %}text-dark-400{% endif %}">
+        {% if t == "overview" %}{% trans "Overview" %}{% elif t == "team" %}{% trans "Team" %}{% elif t == "documents" %}{% trans "Documents" %}{% elif t == "calls" %}{% trans "Calls" %}{% else %}{% trans "Comments" %}{% endif %}
+      </a>
+    {% endfor %}
+  </div>
+
+  <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5 text-sm">
+
+  {% if tab == "overview" %}
+    <dl class="grid md:grid-cols-2 gap-3">
+      <div><dt class="text-xs text-dark-400">{% trans "Client" %}</dt><dd>{{ project.client_name|default:"-" }}</dd></div>
+      <div><dt class="text-xs text-dark-400">{% trans "Business owner" %}</dt><dd>{{ project.business_owner|default:"-" }}</dd></div>
+      <div><dt class="text-xs text-dark-400">{% trans "Start date" %}</dt><dd>{{ project.start_date }}</dd></div>
+      <div><dt class="text-xs text-dark-400">{% trans "Expected end date" %}</dt><dd>{{ project.expected_end_date|default:"-" }}</dd></div>
+      <div class="md:col-span-2"><dt class="text-xs text-dark-400">{% trans "Description" %}</dt><dd>{{ project.description|default:"-"|linebreaksbr }}</dd></div>
+      <div><dt class="text-xs text-dark-400">{% trans "Tags" %}</dt><dd>{% for tag in project.tag_list %}<span class="oh-badge">{{ tag }}</span> {% empty %}-{% endfor %}</dd></div>
+      <div class="md:col-span-2"><dt class="text-xs text-dark-400">{% trans "Notes" %}</dt><dd>{{ project.notes|default:"-"|linebreaksbr }}</dd></div>
+    </dl>
+
+  {% elif tab == "team" %}
+    <table class="w-full text-xs mb-4">
+      <thead><tr class="text-left text-dark-400 uppercase text-[10px]"><th class="py-2">{% trans "Employee" %}</th><th>{% trans "Role" %}</th><th>{% trans "Allocation" %}</th><th>{% trans "Since" %}</th><th></th></tr></thead>
+      <tbody>
+      {% for m in members %}
+        <tr class="border-t border-[#f3f3f3]">
+          <td class="py-2">{{ m.employee.get_full_name }}</td>
+          <td>{{ m.get_role_on_project_display }}</td>
+          <td>{{ m.allocation_pct }}%</td>
+          <td>{{ m.start_date }}</td>
+          <td>{% if can_remove_member %}
+            <form method="post" action="{% url 'vertex-member-remove' project.pk m.pk %}">{% csrf_token %}<button class="oh-btn oh-btn--light" type="submit">{% trans "Remove" %}</button></form>
+          {% endif %}</td>
+        </tr>
+      {% empty %}<tr><td colspan="5" class="py-4 text-center text-dark-400">{% trans "No team members yet." %}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    {% if can_add_member %}
+      <form method="post" action="{% url 'vertex-member-add' project.pk %}" class="grid md:grid-cols-5 gap-2 items-end border-t border-[#ebebeb] pt-4">
+        {% csrf_token %}
+        {% for field in member_form %}<div><label class="block text-xs font-semibold mb-1">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+        <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Add member" %}</button>
+      </form>
+    {% endif %}
+
+  {% elif tab == "documents" %}
+    <table class="w-full text-xs mb-4">
+      <thead><tr class="text-left text-dark-400 uppercase text-[10px]"><th class="py-2">{% trans "Title" %}</th><th>{% trans "Category" %}</th><th>{% trans "Visibility" %}</th><th>{% trans "Uploaded by" %}</th><th></th></tr></thead>
+      <tbody>
+      {% for d in documents %}
+        <tr class="border-t border-[#f3f3f3]">
+          <td class="py-2">
+            {% if d.is_video_link %}<a href="{{ d.video_url }}" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">{{ d.title }}</a>
+            {% else %}<a href="{% url 'vertex-document-download' project.pk d.pk %}" class="text-primary hover:underline">{{ d.title }}</a>{% endif %}
+          </td>
+          <td>{{ d.get_category_display }}</td>
+          <td>{{ d.get_visibility_display }}</td>
+          <td>{{ d.uploaded_by.get_full_name|default:"-" }}</td>
+          <td>{% if can_delete_document %}
+            <form method="post" action="{% url 'vertex-document-delete' project.pk d.pk %}">{% csrf_token %}<button class="oh-btn oh-btn--light" type="submit">{% trans "Delete" %}</button></form>
+          {% endif %}</td>
+        </tr>
+      {% empty %}<tr><td colspan="5" class="py-4 text-center text-dark-400">{% trans "No documents yet." %}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    {% if can_add_document %}
+      <form method="post" enctype="multipart/form-data" action="{% url 'vertex-document-add' project.pk %}" class="grid md:grid-cols-3 gap-2 items-end border-t border-[#ebebeb] pt-4">
+        {% csrf_token %}
+        {% for field in document_form %}<div><label class="block text-xs font-semibold mb-1">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+        <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Add document" %}</button>
+      </form>
+    {% endif %}
+
+  {% elif tab == "calls" %}
+    <table class="w-full text-xs mb-4">
+      <thead><tr class="text-left text-dark-400 uppercase text-[10px]"><th class="py-2">{% trans "Title" %}</th><th>{% trans "Type" %}</th><th>{% trans "When" %}</th><th>{% trans "Minutes" %}</th><th>{% trans "Link" %}</th></tr></thead>
+      <tbody>
+      {% for c in calls %}
+        <tr class="border-t border-[#f3f3f3]">
+          <td class="py-2">{{ c.title }}</td><td>{{ c.get_call_type_display }}</td><td>{{ c.scheduled_at }}</td><td>{{ c.duration_minutes }}</td>
+          <td>{% if c.meeting_url %}<a href="{{ c.meeting_url }}" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">{% trans "Join" %}</a>{% else %}-{% endif %}</td>
+        </tr>
+      {% empty %}<tr><td colspan="5" class="py-4 text-center text-dark-400">{% trans "No calls yet." %}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    {% if can_add_call %}
+      <form method="post" action="{% url 'vertex-call-add' project.pk %}" class="grid md:grid-cols-3 gap-2 items-end border-t border-[#ebebeb] pt-4">
+        {% csrf_token %}
+        {% for field in call_form %}<div><label class="block text-xs font-semibold mb-1">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+        <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Schedule call" %}</button>
+      </form>
+    {% endif %}
+
+  {% else %}
+    <div class="grid gap-3 mb-4">
+      {% for c in comments %}
+        <div class="border border-[#f3f3f3] rounded p-3">
+          <p class="text-xs text-dark-400 mb-1">{{ c.author.get_full_name|default:"-" }} &middot; {{ c.created_at }}</p>
+          <p>{{ c.message|linebreaksbr }}</p>
+        </div>
+      {% empty %}<p class="text-center text-dark-400">{% trans "No comments yet." %}</p>{% endfor %}
+    </div>
+    <form method="post" action="{% url 'vertex-comment-add' project.pk %}" class="grid gap-2 border-t border-[#ebebeb] pt-4">
+      {% csrf_token %}
+      {{ comment_form.message }}
+      <div><button type="submit" class="oh-btn oh-btn--secondary">{% trans "Post comment" %}</button></div>
+    </form>
+  {% endif %}
+
+  </div>
+</div>
+{% endblock content %}

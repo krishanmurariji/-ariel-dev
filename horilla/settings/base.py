@@ -602,6 +602,7 @@ SIDEBARS = [
     "leave",
     "payroll",
     "payroll_pro",
+    "vertex",
     "recruitment",
     "onboarding",
     "offboarding",
