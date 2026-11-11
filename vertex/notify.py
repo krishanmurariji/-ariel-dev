@@ -49,3 +49,25 @@ def send_plain_email(emails, subject, body):
         except Exception:
             logger.exception("Vertex mail to %s failed", email)
     return sent
+
+
+def employees_with_perm(perm):
+    """Active employees who hold a permission, directly, through a group, or as admin."""
+    from django.contrib.auth import get_user_model
+    from django.contrib.auth.models import Permission
+    from django.db.models import Q
+
+    from employee.models import Employee
+
+    app_label, codename = perm.split(".", 1)
+    permission = Permission.objects.filter(
+        content_type__app_label=app_label, codename=codename
+    ).first()
+    if permission is None:
+        return Employee.objects.none()
+    users = get_user_model().objects.filter(
+        Q(is_superuser=True)
+        | Q(groups__permissions=permission)
+        | Q(user_permissions=permission)
+    ).distinct()
+    return Employee.objects.filter(employee_user_id__in=users, is_active=True)

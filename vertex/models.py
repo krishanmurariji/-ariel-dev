@@ -569,3 +569,119 @@ class AllStatusUpdates(StatusUpdate):
         proxy = True
         verbose_name = _("Status update (all)")
         verbose_name_plural = _("Status updates (all)")
+
+
+# ---------------------------------------------------------------------------
+# Resources (ArielVertex ResourcesController + ResourceRequestsController)
+#
+# * view_resourcerequest        see the Hiring Requests page (own requests)
+# * view_allresourcerequests    see every request     (proxy "Resource request (all)")
+# * add_resourcerequest         raise a request for a project the person can see
+# * change_resourcerequest      move a request through its status flow (HR); also sees all
+# * view_resourcevisibility     the Resource Visibility page (allocation of every person)
+# ---------------------------------------------------------------------------
+
+
+class ResourceRequestStatus(models.TextChoices):
+    OPEN = "open", _("Open")
+    UNDER_REVIEW = "under_review", _("Under review")
+    NEED_MORE_INFORMATION = "need_more_information", _("Need more information")
+    APPROVED = "approved", _("Approved")
+    IN_HIRING_PROCESS = "in_hiring_process", _("In hiring process")
+    CANDIDATE_SHARED = "candidate_shared", _("Candidate shared")
+    FULFILLED = "fulfilled", _("Fulfilled")
+    REJECTED = "rejected", _("Rejected")
+    CLOSED = "closed", _("Closed")
+
+
+class ResourceRequest(models.Model):
+    """Hiring / resource request raised by a project manager or coordinator."""
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="resource_requests")
+    requested_by = models.ForeignKey(
+        "employee.Employee", null=True, on_delete=models.SET_NULL, related_name="vertex_resource_requests"
+    )
+    role_title = models.CharField(max_length=200, verbose_name=_("Role title"))
+    skills = models.CharField(max_length=500, blank=True, default="", help_text=_("Comma separated"))
+    reason = models.TextField(blank=True, default="")
+    priority = models.IntegerField(choices=Priority.choices, default=Priority.MEDIUM)
+    count = models.PositiveSmallIntegerField(
+        default=1, validators=[MinValueValidator(1), MaxValueValidator(100)], verbose_name=_("Count")
+    )
+    expected_start_date = models.DateField(null=True, blank=True, verbose_name=_("Expected start"))
+    status = models.CharField(
+        max_length=25, choices=ResourceRequestStatus.choices, default=ResourceRequestStatus.OPEN
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Resource request")
+        verbose_name_plural = _("Resource requests")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.role_title} x{self.count} ({self.project.code})"
+
+    def get_absolute_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-resource-request", args=[self.pk])
+
+    def redirect(self):
+        return f"onclick=\"window.location.href='{self.get_absolute_url()}'\""
+
+    def get_project_code(self):
+        return self.project.code
+
+    def get_requested_by_name(self):
+        return self.requested_by.get_full_name() if self.requested_by else "-"
+
+    def get_status_html(self):
+        from django.utils.html import format_html
+
+        colour = {
+            "open": "#3b82f6", "under_review": "#8b5cf6", "need_more_information": "#f59e0b",
+            "approved": "#16a34a", "in_hiring_process": "#0ea5e9", "candidate_shared": "#14b8a6",
+            "fulfilled": "#15803d", "rejected": "#dc2626", "closed": "#6b7280",
+        }.get(self.status, "#6b7280")
+        return format_html(
+            '<span style="display:inline-flex;align-items:center;gap:6px">'
+            '<span style="width:9px;height:9px;border-radius:50%;background:{}"></span>{}</span>',
+            colour,
+            self.get_status_display(),
+        )
+
+
+class AllResourceRequests(ResourceRequest):
+    """Permission switch only: ``view_allresourcerequests`` shows every request."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Resource request (all)")
+        verbose_name_plural = _("Resource requests (all)")
+
+
+class ResourceRequestComment(models.Model):
+    resource_request = models.ForeignKey(
+        ResourceRequest, on_delete=models.CASCADE, related_name="comments"
+    )
+    author = models.ForeignKey(
+        "employee.Employee", null=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Resource request comment")
+        verbose_name_plural = _("Resource request comments")
+        ordering = ["created_at"]
+
+
+class ResourceVisibility(ProjectMember):
+    """Permission switch only: ``view_resourcevisibility`` opens the Resource Visibility page."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Resource visibility")
+        verbose_name_plural = _("Resource visibility")

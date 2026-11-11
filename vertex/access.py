@@ -206,3 +206,90 @@ def consolidated_summary(project, days=7):
         "expected": len(expected),
         "missing": [m.employee.get_full_name() for m in expected if m.employee_id not in reporting_ids],
     }
+
+
+# ---------------------------------------------------------------------------
+# Resources (ArielVertex ResourcesController + ResourceRequestsController)
+# ---------------------------------------------------------------------------
+
+AVAILABILITY_ORDER = ("Free", "Partially Available", "Fully Allocated", "Overloaded")
+
+
+def availability_for(total):
+    """Allocation bucket, ported from ArielVertex: 0 free, under 60 partial, up to 100 full, above overloaded."""
+    if total <= 0:
+        return "Free"
+    if total < 60:
+        return "Partially Available"
+    if total <= 100:
+        return "Fully Allocated"
+    return "Overloaded"
+
+
+def occupancy(search=""):
+    """
+    Allocation of every active employee across projects.
+
+    ArielVertex only lists people who already have a membership, so its Free bucket is always
+    empty. Here every active employee is listed and a person with no allocation is Free.
+    Allocations of members who have left the project (end date passed) are not counted.
+    """
+    from django.utils import timezone
+
+    from employee.models import Employee
+
+    today = timezone.localdate()
+    memberships = ProjectMember.objects.filter(is_active=True).filter(
+        Q(end_date__isnull=True) | Q(end_date__gte=today)
+    ).select_related("project")
+    lines = {}
+    for member in memberships:
+        lines.setdefault(member.employee_id, []).append(member)
+
+    employees = Employee.objects.filter(is_active=True).order_by(
+        "employee_first_name", "employee_last_name"
+    )
+    if search:
+        employees = employees.filter(
+            Q(employee_first_name__icontains=search)
+            | Q(employee_last_name__icontains=search)
+            | Q(badge_id__icontains=search)
+        )
+    rows = []
+    for employee in employees:
+        own = lines.get(employee.pk, [])
+        total = sum(m.allocation_pct for m in own)
+        rows.append(
+            {
+                "employee": employee,
+                "projects": own,
+                "total": total,
+                "availability": availability_for(total),
+            }
+        )
+    rows.sort(key=lambda r: -r["total"])
+    buckets = [
+        {"name": name, "count": sum(1 for r in rows if r["availability"] == name)}
+        for name in AVAILABILITY_ORDER
+    ]
+    return rows, buckets
+
+
+def sees_all_resource_requests(user):
+    return user.has_perm("vertex.view_allresourcerequests") or user.has_perm(
+        "vertex.change_resourcerequest"
+    )
+
+
+def visible_resource_requests(user):
+    from vertex.models import ResourceRequest
+
+    if not user.has_perm("vertex.view_resourcerequest"):
+        return ResourceRequest.objects.none()
+    requests = ResourceRequest.objects.select_related("project", "requested_by")
+    if sees_all_resource_requests(user):
+        return requests
+    employee = employee_of(user)
+    if employee is None:
+        return requests.none()
+    return requests.filter(requested_by=employee)

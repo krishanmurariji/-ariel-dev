@@ -65,6 +65,7 @@ def project_detail(request, pk):
         "can_submit_status": user.has_perm("vertex.add_statusupdate")
         and access.assignable_projects(user).filter(pk=project.pk).exists(),
         "can_request_review": user.has_perm("vertex.add_reviewrequest"),
+        "can_request_resource": user.has_perm("vertex.add_resourcerequest"),
         "comment_form": CommentForm(),
         "counts": {"team": len(members)},
     }

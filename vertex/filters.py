@@ -8,7 +8,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from horilla.filters import HorillaFilterSet
-from vertex.models import Project, StatusUpdate
+from vertex.models import Project, ResourceRequest, StatusUpdate
 
 
 class VertexProjectFilter(HorillaFilterSet):
@@ -64,6 +64,22 @@ class StatusUpdateFilter(HorillaFilterSet):
         return queryset.filter(
             Q(work_completed__icontains=value)
             | Q(blockers__icontains=value)
+            | Q(project__name__icontains=value)
+            | Q(project__code__icontains=value)
+        )
+
+
+class ResourceRequestFilter(HorillaFilterSet):
+    search = django_filters.CharFilter(method="filter_search")
+
+    class Meta:
+        model = ResourceRequest
+        fields = ["project", "status", "priority"]
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(role_title__icontains=value)
+            | Q(skills__icontains=value)
             | Q(project__name__icontains=value)
             | Q(project__code__icontains=value)
         )

@@ -109,11 +109,18 @@
     {% elif tab == "team" %}
       <div class="vx-toolbar">
         <span class="vx-muted">{{ members|length }} {% trans "people on this project" %}</span>
-        {% if can_add_member %}
-          <button type="button" class="oh-btn oh-btn--secondary" hx-get="{% url 'vertex-member-add' project.pk %}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal">
-            <ion-icon name="person-add-outline" class="me-1"></ion-icon>{% trans "Add member" %}
-          </button>
-        {% endif %}
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          {% if can_request_resource %}
+            <button type="button" class="oh-btn oh-btn--light" hx-get="{% url 'vertex-hiring-new' %}?project={{ project.pk }}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal">
+              <ion-icon name="people-outline" class="me-1"></ion-icon>{% trans "Request resource" %}
+            </button>
+          {% endif %}
+          {% if can_add_member %}
+            <button type="button" class="oh-btn oh-btn--secondary" hx-get="{% url 'vertex-member-add' project.pk %}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal">
+              <ion-icon name="person-add-outline" class="me-1"></ion-icon>{% trans "Add member" %}
+            </button>
+          {% endif %}
+        </div>
       </div>
       <div class="vx-grid">
         {% for m in members %}

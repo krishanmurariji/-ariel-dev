@@ -23,6 +23,16 @@ SUBMENUS = [
         "accessibility": "vertex.sidebar.status_accessibility",
     },
     {
+        "menu": _("Hiring Requests"),
+        "redirect": reverse("vertex-hiring"),
+        "accessibility": "vertex.sidebar.hiring_accessibility",
+    },
+    {
+        "menu": _("Resource Visibility"),
+        "redirect": reverse("vertex-resources"),
+        "accessibility": "vertex.sidebar.resources_accessibility",
+    },
+    {
         "menu": _("Reviews"),
         "redirect": reverse("vertex-reviews"),
         "accessibility": "vertex.sidebar.reviews_accessibility",
@@ -49,3 +59,11 @@ def minutes_accessibility(request, submenu, user_perms, *args, **kwargs):
 
 def status_accessibility(request, submenu, user_perms, *args, **kwargs):
     return request.user.has_perm("vertex.view_statusupdate")
+
+
+def hiring_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("vertex.view_resourcerequest")
+
+
+def resources_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("vertex.view_resourcevisibility")

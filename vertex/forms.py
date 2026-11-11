@@ -16,6 +16,9 @@ from vertex.models import (
     ProjectComment,
     ProjectDocument,
     ProjectMember,
+    ResourceRequest,
+    ResourceRequestComment,
+    ResourceRequestStatus,
     StatusUpdate,
 )
 
@@ -178,3 +181,65 @@ class StatusUpdateForm(ModelForm):
         if not value:
             raise forms.ValidationError(_("Describe the work completed."))
         return value
+
+
+class ResourceRequestForm(ModelForm):
+    """Raise a hiring / resource request for a project the person can open."""
+
+    cols = {"reason": 12, "skills": 12}
+
+    class Meta:
+        model = ResourceRequest
+        fields = [
+            "project", "role_title", "count", "priority", "skills",
+            "expected_start_date", "reason",
+        ]
+        widgets = {
+            "expected_start_date": _DATE,
+            "reason": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        from horilla.horilla_middlewares import _thread_locals
+        from vertex import access
+
+        super().__init__(*args, **kwargs)
+        request = getattr(_thread_locals, "request", None)
+        user = getattr(request, "user", None)
+        self.fields["project"].queryset = (
+            access.visible_projects(user).order_by("name")
+            if user is not None
+            else Project.objects.none()
+        )
+
+    def clean_role_title(self):
+        value = self.cleaned_data["role_title"].strip()
+        if not value:
+            raise forms.ValidationError(_("Enter the role title."))
+        return value
+
+    def clean_expected_start_date(self):
+        value = self.cleaned_data["expected_start_date"]
+        if value and value < timezone.localdate():
+            raise forms.ValidationError(_("The expected start cannot be in the past."))
+        return value
+
+
+class ResourceStatusForm(forms.Form):
+    status = forms.ChoiceField(choices=ResourceRequestStatus.choices, label=_("Status"))
+    comment = forms.CharField(
+        required=False, widget=forms.Textarea(attrs={"rows": 2}), label=_("Comment")
+    )
+
+
+class ResourceCommentForm(ModelForm):
+    class Meta:
+        model = ResourceRequestComment
+        fields = ["message"]
+        widgets = {"message": forms.Textarea(attrs={"rows": 2})}
+
+    def clean_message(self):
+        message = self.cleaned_data["message"].strip()
+        if not message:
+            raise forms.ValidationError(_("Comment cannot be empty."))
+        return message

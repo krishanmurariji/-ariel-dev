@@ -25,12 +25,17 @@ from horilla_views.generic.cbv.views import (
     TemplateView,
 )
 from vertex import access
-from vertex.filters import StatusUpdateFilter, VertexProjectFilter
+from vertex.filters import (
+    ResourceRequestFilter,
+    StatusUpdateFilter,
+    VertexProjectFilter,
+)
 from vertex.forms import (
     CallForm,
     DocumentForm,
     MemberForm,
     ProjectForm,
+    ResourceRequestForm,
     StatusUpdateForm,
 )
 from vertex.models import (
@@ -39,9 +44,10 @@ from vertex.models import (
     ProjectDocument,
     ProjectMember,
     ProjectRole,
+    ResourceRequest,
     StatusUpdate,
 )
-from vertex.notify import notify_employees
+from vertex.notify import employees_with_perm, notify_employees
 
 
 def _status_filter_js(value):
@@ -479,6 +485,125 @@ class StatusUpdateFormView(HorillaFormView):
         update.employee = access.employee_of(self.request.user)
         update.save()
         messages.success(self.request, _("Status update submitted."))
+        if "/vertex/projects/" in self.request.META.get("HTTP_REFERER", ""):
+            return self.HttpResponse(RELOAD_PAGE)
+        return self.HttpResponse()
+
+
+# ---------------------------------------------------------------------------
+# Hiring requests page: list of resource requests, modal to raise a new one
+# ---------------------------------------------------------------------------
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(permission_required("vertex.view_resourcerequest"), name="dispatch")
+class ResourceRequestsView(TemplateView):
+    template_name = "vertex/cbv/hiring.html"
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(permission_required("vertex.view_resourcerequest"), name="dispatch")
+class ResourceRequestsNavView(HorillaNavView):
+    filter_form_context_name = "form"
+    filter_instance = ResourceRequestFilter()
+    search_swap_target = "#listContainer"
+    group_by_fields = ["project", "status", "priority"]
+    filter_body_template = "vertex/cbv/resource_filter.html"
+    hide_actions_button = True
+    create_label = _("Raise request")
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.search_url = reverse("vertex-hiring-list")
+        if self.request.user.has_perm("vertex.add_resourcerequest"):
+            self.create_attrs = f"""
+                onclick = "event.stopPropagation();"
+                data-toggle="oh-modal-toggle"
+                data-target="#genericModal"
+                hx-target="#genericModalBody"
+                hx-get="{reverse('vertex-hiring-new')}"
+            """
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(permission_required("vertex.view_resourcerequest"), name="dispatch")
+class ResourceRequestsList(HorillaListView):
+    model = ResourceRequest
+    filter_class = ResourceRequestFilter
+    bulk_select_option = False
+    quick_export = False
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset.filter(
+            pk__in=access.visible_resource_requests(self.request.user).values("pk")
+        ).select_related("project", "requested_by")
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.search_url = reverse("vertex-hiring-list")
+
+    @cached_property
+    def columns(self):
+        get_field = self.model()._meta.get_field
+        return [
+            (get_field("role_title").verbose_name, "role_title"),
+            (_("Project"), "get_project_code"),
+            (get_field("count").verbose_name, "count"),
+            (get_field("priority").verbose_name, "get_priority_display"),
+            (_("Status"), "get_status_html"),
+            (_("Requested by"), "get_requested_by_name"),
+            (get_field("expected_start_date").verbose_name, "expected_start_date"),
+            (_("Raised on"), "created_at"),
+        ]
+
+    @cached_property
+    def sortby_mapping(self):
+        get_field = self.model()._meta.get_field
+        return [
+            (get_field("role_title").verbose_name, "role_title"),
+            (get_field("priority").verbose_name, "priority"),
+            (_("Raised on"), "created_at"),
+        ]
+
+    row_status_class = "status-{status}"
+    row_attrs = """ {redirect} """
+
+
+@method_decorator(login_required, name="dispatch")
+class ResourceRequestFormView(HorillaFormView):
+    model = ResourceRequest
+    form_class = ResourceRequestForm
+    new_display_title = _("Raise resource request")
+
+    def dispatch(self, request, *args, **kwargs):
+        if (
+            not request.user.has_perm("vertex.add_resourcerequest")
+            or access.employee_of(request.user) is None
+        ):
+            return handle_no_permission(request)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        project = self.request.GET.get("project")
+        if project and not form.is_bound and not form.initial.get("project"):
+            form.initial["project"] = project
+        return form
+
+    def form_valid(self, form):
+        resource_request = form.save(commit=False)
+        me = access.employee_of(self.request.user)
+        resource_request.requested_by = me
+        resource_request.save()
+        notify_employees(
+            me,
+            employees_with_perm("vertex.change_resourcerequest"),
+            str(_("New resource request: %(role)s (x%(count)d)."))
+            % {"role": resource_request.role_title, "count": resource_request.count},
+            resource_request.get_absolute_url(),
+        )
+        messages.success(self.request, _("Resource request raised."))
         if "/vertex/projects/" in self.request.META.get("HTTP_REFERER", ""):
             return self.HttpResponse(RELOAD_PAGE)
         return self.HttpResponse()

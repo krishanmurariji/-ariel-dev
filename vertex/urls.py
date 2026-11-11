@@ -5,7 +5,7 @@ vertex/urls.py
 from django.urls import path
 from django.views.generic import RedirectView
 
-from vertex import cbv, views, views_minutes, views_reviews
+from vertex import cbv, views, views_minutes, views_resources, views_reviews
 
 urlpatterns = [
     path("", RedirectView.as_view(pattern_name="vertex-projects"), name="vertex-home"),
@@ -40,6 +40,15 @@ urlpatterns = [
     path("status-updates/nav/", cbv.StatusUpdatesNavView.as_view(), name="vertex-status-nav"),
     path("status-updates/list/", cbv.StatusUpdatesList.as_view(), name="vertex-status-list"),
     path("status-updates/new/", cbv.StatusUpdateFormView.as_view(), name="vertex-status-new"),
+    # resources: hiring requests and resource visibility
+    path("hiring/", cbv.ResourceRequestsView.as_view(), name="vertex-hiring"),
+    path("hiring/nav/", cbv.ResourceRequestsNavView.as_view(), name="vertex-hiring-nav"),
+    path("hiring/list/", cbv.ResourceRequestsList.as_view(), name="vertex-hiring-list"),
+    path("hiring/new/", cbv.ResourceRequestFormView.as_view(), name="vertex-hiring-new"),
+    path("hiring/<int:pk>/", views_resources.resource_request_detail, name="vertex-resource-request"),
+    path("hiring/<int:pk>/status/", views_resources.resource_request_status, name="vertex-resource-request-status"),
+    path("hiring/<int:pk>/comment/", views_resources.resource_request_comment, name="vertex-resource-request-comment"),
+    path("resources/", views_resources.resource_visibility, name="vertex-resources"),
     # reviews
     path("reviews/", views_reviews.review_list, name="vertex-reviews"),
     path("reviews/new/", views_reviews.review_create, name="vertex-review-new"),

@@ -1,0 +1,58 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+<style>
+  .rv-bucket { background:#fff; border:1px solid #ebebeb; border-radius:10px; padding:.9rem 1rem; }
+  .rv-bucket b { font-size:1.6rem; display:block; margin-top:.15rem; }
+  .rv-label { color:#9ca3af; font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+  .rv-card { display:flex; flex-wrap:wrap; gap:1rem; align-items:center; background:#fff; border:1px solid #ebebeb; border-radius:10px; padding:.85rem 1rem; margin-bottom:.6rem; }
+  .rv-card img { width:42px; height:42px; border-radius:50%; object-fit:cover; }
+  .rv-chip { display:inline-block; padding:.12rem .55rem; border-radius:999px; font-size:.72rem; font-weight:600; background:#eef2ff; color:#3730a3; margin:.15rem .25rem 0 0; }
+  .rv-meter { height:8px; border-radius:999px; background:#f3f4f6; overflow:hidden; }
+  .rv-meter > span { display:block; height:100%; border-radius:999px; }
+  .rv-tag { padding:.15rem .6rem; border-radius:999px; font-size:.72rem; font-weight:700; color:#fff; }
+  .rv-Free { background:#0ea5e9; } .rv-Partially { background:#8b5cf6; } .rv-Fully { background:#16a34a; } .rv-Overloaded { background:#dc2626; }
+</style>
+<div class="oh-wrapper">
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
+    <div>
+      <h1 class="oh-main__titlebar-title" style="margin:0">{% trans "Resource Visibility" %}</h1>
+      <p style="color:#6b7280;margin:.2rem 0 0">{% trans "Allocation across projects: free, partial, allocated, overloaded." %}</p>
+    </div>
+    <form method="get" style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <input type="text" name="search" value="{{ search }}" placeholder="{% trans 'Search name or badge' %}" class="oh-input">
+      <select name="availability" class="oh-select">
+        <option value="">{% trans "All availability" %}</option>
+        {% for a in availabilities %}<option value="{{ a }}" {% if a == availability %}selected{% endif %}>{{ a }}</option>{% endfor %}
+      </select>
+      <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Filter" %}</button>
+    </form>
+  </div>
+
+  <div class="row" style="margin-bottom:1rem">
+    {% for b in buckets %}
+      <div class="col-6 col-lg-3" style="margin-bottom:.6rem"><div class="rv-bucket"><span class="rv-label">{{ b.name }}</span><b>{{ b.count }}</b></div></div>
+    {% endfor %}
+  </div>
+
+  {% for r in rows %}
+    <div class="rv-card">
+      <img src="{{ r.employee.get_avatar }}" alt="">
+      <div style="flex:1;min-width:220px">
+        <div style="font-weight:600">{{ r.employee.get_full_name }}</div>
+        <div style="color:#6b7280;font-size:.78rem">{{ r.employee.get_job_position|default:"" }}</div>
+        <div>
+          {% for m in r.projects %}<a class="rv-chip" style="text-decoration:none" href="{{ m.project.get_absolute_url }}">{{ m.project.name }} &middot; {{ m.allocation_pct }}%</a>{% empty %}<span style="color:#9ca3af;font-size:.78rem">{% trans "No active allocation" %}</span>{% endfor %}
+        </div>
+      </div>
+      <div style="width:170px">
+        <div style="display:flex;justify-content:space-between;font-size:.75rem"><span style="color:#6b7280">{% trans "Load" %}</span><b>{{ r.total }}%</b></div>
+        <div class="rv-meter"><span style="width:{% if r.total > 100 %}100{% else %}{{ r.total }}{% endif %}%;background:{% if r.availability == 'Overloaded' %}#dc2626{% elif r.availability == 'Fully Allocated' %}#16a34a{% elif r.availability == 'Partially Available' %}#8b5cf6{% else %}#0ea5e9{% endif %}"></span></div>
+      </div>
+      <span class="rv-tag {% if r.availability == 'Free' %}rv-Free{% elif r.availability == 'Partially Available' %}rv-Partially{% elif r.availability == 'Fully Allocated' %}rv-Fully{% else %}rv-Overloaded{% endif %}">{{ r.availability }}</span>
+    </div>
+  {% empty %}
+    <p style="color:#6b7280;text-align:center;padding:2rem">{% trans "No people to show." %}</p>
+  {% endfor %}
+</div>
+{% endblock content %}
