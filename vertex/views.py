@@ -31,6 +31,21 @@ def _project_or_404(request, pk):
     return project
 
 
+def _timeline(project):
+    """How far through its planned dates the project is (None without a target date)."""
+    start, end = project.start_date, project.expected_end_date
+    if not start or not end or end <= start:
+        return None
+    today = timezone.localdate()
+    total = (end - start).days
+    done = min(max((today - start).days, 0), total)
+    return {
+        "percent": round(done * 100 / total),
+        "days_left": (end - today).days,
+        "overdue": today > end and project.status not in ("completed", "cancelled"),
+    }
+
+
 def _back(project, tab):
     return redirect(f"{project.get_absolute_url()}?tab={tab}")
 
@@ -67,10 +82,27 @@ def project_detail(request, pk):
         "can_request_review": user.has_perm("vertex.add_reviewrequest"),
         "can_request_resource": user.has_perm("vertex.add_resourcerequest"),
         "comment_form": CommentForm(),
-        "counts": {"team": len(members)},
+        "counts": {
+            "team": len(members),
+            "documents": access.visible_documents(user, project).count(),
+            "calls": project.calls.count(),
+            "status": access.visible_status_updates(user, project).count(),
+            "reviews": access.visible_reviews(user).filter(project=project).count(),
+            "comments": project.comments.count(),
+        },
+        "timeline": _timeline(project),
     }
     # only the tab that is open is loaded
-    if tab == "documents":
+    if tab == "overview":
+        context["next_call"] = (
+            project.calls.filter(scheduled_at__gte=timezone.now()).order_by("scheduled_at").first()
+        )
+        context["latest_update"] = (
+            access.visible_status_updates(user, project).select_related("employee").first()
+        )
+        context["business_view"] = access.business_view(user, project)
+        context["team_preview"] = members[:6]
+    elif tab == "documents":
         context["documents"] = access.visible_documents(user, project)
     elif tab == "calls":
         context["calls"] = project.calls.all()

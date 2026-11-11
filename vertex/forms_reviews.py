@@ -5,13 +5,14 @@ vertex/forms_reviews.py - review and minutes forms.
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
+from base.forms import ModelForm
 from employee.models import Employee
 from vertex.models import (
     CodeReview,
     MeetingMinute,
     Project,
     ProjectReview,
-    ReviewType,
+    ReviewRequest,
 )
 
 _DATE = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
@@ -24,34 +25,48 @@ def _people():
     )
 
 
-class ReviewRequestForm(forms.Form):
+class ReviewRequestForm(ModelForm):
+    vm_icon = "checkmark-done-outline"
+    vm_hint = "Pick one or more people. Add a meeting time to schedule them straight away."
+    vm_add_another = False
+    vm_sections = {"title": "Schedule a meeting (optional)"}
     """
     Request a review for one or many employees. When a meeting time is given the reviews
     are created already scheduled (ArielVertex ScheduleGroup), otherwise they stay Open.
+    The form is never saved directly: the view creates one request per selected employee.
     """
 
-    project = forms.ModelChoiceField(queryset=Project.objects.none(), label=_("Project"))
+    cols = {"project": 6, "review_type": 6, "subjects": 12, "assigned_to": 6, "due_date": 6, "notes": 12, "extra_attendees": 12}
+
     subjects = forms.ModelMultipleChoiceField(
         queryset=Employee.objects.none(), label=_("Employees to review")
     )
-    review_type = forms.ChoiceField(choices=ReviewType.choices, label=_("Review type"))
-    assigned_to = forms.ModelChoiceField(
-        queryset=Employee.objects.none(), required=False, label=_("Reviewer")
-    )
-    notes = forms.CharField(widget=forms.Textarea(attrs={"rows": 2}), required=False, label=_("Notes"))
-    due_date = forms.DateField(widget=_DATE, required=False, label=_("Due date"))
     # optional meeting
     title = forms.CharField(max_length=200, required=False, label=_("Meeting title"))
     scheduled_at = forms.DateTimeField(widget=_DATETIME, required=False, label=_("Meeting time"))
-    duration_minutes = forms.IntegerField(min_value=5, max_value=480, initial=30, required=False, label=_("Minutes"))
+    duration_minutes = forms.IntegerField(
+        min_value=5, max_value=480, initial=30, required=False, label=_("Minutes")
+    )
     meeting_url = forms.URLField(required=False, label=_("Meeting link"))
     extra_attendees = forms.CharField(required=False, label=_("Extra attendee emails"))
+
+    class Meta:
+        model = ReviewRequest
+        fields = ["project", "review_type", "assigned_to", "due_date", "notes"]
+        labels = {"assigned_to": _("Reviewer")}
+        widgets = {"due_date": _DATE, "notes": forms.Textarea(attrs={"rows": 2})}
+
+    field_order = [
+        "project", "review_type", "subjects", "assigned_to", "due_date", "notes",
+        "title", "scheduled_at", "duration_minutes", "meeting_url", "extra_attendees",
+    ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["project"].queryset = Project.objects.order_by("name")
         self.fields["subjects"].queryset = _people()
         self.fields["assigned_to"].queryset = _people()
+        self.fields["assigned_to"].required = False
 
     def clean(self):
         data = super().clean()
@@ -99,15 +114,20 @@ class CodeReviewForm(forms.ModelForm):
         }
 
 
-class MinutesForm(forms.ModelForm):
+class MinutesForm(ModelForm):
+    vm_icon = "document-text-outline"
+    vm_hint = "Capture the notes now; generate the minutes on the next page."
+    vm_add_another = False
+    cols = {"title": 6, "meeting_date": 6, "location": 12, "attendees": 12, "raw_notes": 12, "minutes_text": 12}
+
     class Meta:
         model = MeetingMinute
         fields = ["title", "meeting_date", "location", "attendees", "raw_notes", "minutes_text"]
         widgets = {
             "meeting_date": _DATETIME,
             "attendees": forms.Textarea(attrs={"rows": 2}),
-            "raw_notes": forms.Textarea(attrs={"rows": 8}),
-            "minutes_text": forms.Textarea(attrs={"rows": 14}),
+            "raw_notes": forms.Textarea(attrs={"rows": 8, "style": "min-height:190px"}),
+            "minutes_text": forms.Textarea(attrs={"rows": 14, "style": "min-height:280px"}),
         }
 
     def __init__(self, *args, **kwargs):

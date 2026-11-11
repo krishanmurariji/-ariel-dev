@@ -137,6 +137,11 @@ class Project(models.Model):
     def get_avatar(self):
         return f"https://ui-avatars.com/api/?name={self.code}&background=random&bold=true"
 
+    def get_initials(self):
+        words = [w for w in self.name.replace("-", " ").split() if w[:1].isalnum()]
+        letters = "".join(w[0] for w in words[:2]) or self.code[:2]
+        return letters.upper()
+
     def get_member_count(self):
         return sum(1 for m in self.members.all() if m.is_active)
 
@@ -318,6 +323,15 @@ class ReviewType(models.TextChoices):
     GENERAL_FEEDBACK = "general_feedback", _("General feedback")
 
 
+def _when(value):
+    """Readable local date and time for list columns, '-' when empty."""
+    from django.utils import timezone
+
+    if not value:
+        return "-"
+    return timezone.localtime(value).strftime("%d %b %Y, %H:%M")
+
+
 class ReviewRequestStatus(models.TextChoices):
     OPEN = "open", _("Open")
     SCHEDULED = "scheduled", _("Scheduled")
@@ -370,6 +384,39 @@ class ReviewRequest(models.Model):
         from django.urls import reverse
 
         return reverse("vertex-review", args=[self.pk])
+
+    def redirect(self):
+        return f"onclick=\"window.location.href='{self.get_absolute_url()}'\""
+
+    def get_project_url(self):
+        return self.project.get_absolute_url()
+
+    def get_project_code(self):
+        return self.project.code
+
+    def get_subject_name(self):
+        return self.subject.get_full_name()
+
+    def get_reviewer_name(self):
+        return self.assigned_to.get_full_name() if self.assigned_to else "-"
+
+    def get_meeting_time(self):
+        meeting = getattr(self, "meeting", None)
+        return _when(meeting.scheduled_at) if meeting else "-"
+
+    def get_status_html(self):
+        from django.utils.html import format_html
+
+        colour = {
+            "open": "#3b82f6", "scheduled": "#8b5cf6", "in_progress": "#f59e0b",
+            "completed": "#16a34a", "cancelled": "#6b7280",
+        }.get(self.status, "#6b7280")
+        return format_html(
+            '<span style="display:inline-flex;align-items:center;gap:6px">'
+            '<span style="width:9px;height:9px;border-radius:50%;background:{}"></span>{}</span>',
+            colour,
+            self.get_status_display(),
+        )
 
 
 class AllReviewRequests(ReviewRequest):
@@ -493,6 +540,43 @@ class MeetingMinute(models.Model):
     def __str__(self):
         return self.title
 
+    def get_absolute_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-minute", args=[self.pk])
+
+    def redirect(self):
+        return f"onclick=\"window.location.href='{self.get_absolute_url()}'\""
+
+    def get_update_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-minute-edit", args=[self.pk])
+
+    def get_delete_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-minute-delete", args=[self.pk])
+
+    def get_meeting_when(self):
+        return _when(self.meeting_date)
+
+    def get_sent_display(self):
+        return f"{_when(self.sent_at)} ({self.sent_count}x)" if self.sent_at else "-"
+
+    def get_status_html(self):
+        from django.utils.html import format_html
+
+        colour = {
+            "draft": "#6b7280", "preview": "#8b5cf6", "approved": "#16a34a", "sent": "#0ea5e9",
+        }.get(self.status, "#6b7280")
+        return format_html(
+            '<span style="display:inline-flex;align-items:center;gap:6px">'
+            '<span style="width:9px;height:9px;border-radius:50%;background:{}"></span>{}</span>',
+            colour,
+            self.get_status_display(),
+        )
+
 
 # ---------------------------------------------------------------------------
 # Status updates (ArielVertex StatusUpdate): a developer daily / weekly update on a project
@@ -560,6 +644,9 @@ class StatusUpdate(models.Model):
 
     def get_project_code(self):
         return self.project.code
+
+    def get_project_url(self):
+        return self.project.get_absolute_url()
 
 
 class AllStatusUpdates(StatusUpdate):
@@ -631,11 +718,17 @@ class ResourceRequest(models.Model):
     def redirect(self):
         return f"onclick=\"window.location.href='{self.get_absolute_url()}'\""
 
+    def get_project_url(self):
+        return self.project.get_absolute_url()
+
     def get_project_code(self):
         return self.project.code
 
     def get_requested_by_name(self):
         return self.requested_by.get_full_name() if self.requested_by else "-"
+
+    def get_raised_on(self):
+        return _when(self.created_at)
 
     def get_status_html(self):
         from django.utils.html import format_html

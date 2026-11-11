@@ -18,7 +18,6 @@ from vertex import access
 from vertex.forms_reviews import (
     CodeReviewForm,
     ProjectReviewForm,
-    ReviewRequestForm,
     ScheduleForm,
 )
 from vertex.minutes import split_emails
@@ -27,7 +26,6 @@ from vertex.models import (
     MeetingResponse,
     ProjectReview,
     ReviewMeeting,
-    ReviewRequest,
     ReviewRequestStatus,
 )
 from vertex.notify import notify_employees
@@ -43,72 +41,6 @@ def _review_or_404(request, pk):
 def _attendees(subjects, assignee, me, extra):
     emails = [p.email for p in [*subjects, assignee, me] if p is not None and p.email]
     return ", ".join(dict.fromkeys(e.lower() for e in [*emails, *split_emails(extra)]))
-
-
-@login_required
-@permission_required("vertex.view_reviewrequest")
-def review_list(request):
-    reviews = access.visible_reviews(request.user)
-    status = request.GET.get("status", "")
-    if status in ReviewRequestStatus.values:
-        reviews = reviews.filter(status=status)
-    return render(
-        request,
-        "vertex/review_list.html",
-        {
-            "reviews": reviews.select_related("meeting")[:200],
-            "status": status,
-            "statuses": ReviewRequestStatus.choices,
-            "can_request": request.user.has_perm("vertex.add_reviewrequest"),
-        },
-    )
-
-
-@login_required
-@permission_required("vertex.add_reviewrequest")
-def review_create(request):
-    form = ReviewRequestForm(request.POST or None, initial={"project": request.GET.get("project")})
-    if request.method == "POST" and form.is_valid():
-        data = form.cleaned_data
-        me = access.employee_of(request.user)
-        subjects = list(data["subjects"])
-        assignee = data["assigned_to"]
-        scheduled_at = data["scheduled_at"]
-        attendees = _attendees(subjects, assignee, me, data["extra_attendees"])
-        for subject in subjects:
-            review = ReviewRequest.objects.create(
-                project=data["project"],
-                subject=subject,
-                requested_by=me,
-                assigned_to=assignee,
-                review_type=data["review_type"],
-                notes=data["notes"],
-                due_date=data["due_date"],
-                status=(
-                    ReviewRequestStatus.SCHEDULED if scheduled_at else ReviewRequestStatus.OPEN
-                ),
-            )
-            if scheduled_at:
-                ReviewMeeting.objects.create(
-                    review_request=review,
-                    title=data["title"],
-                    scheduled_at=scheduled_at,
-                    duration_minutes=data["duration_minutes"] or 30,
-                    attendees=attendees,
-                    meeting_url=data["meeting_url"],
-                    scheduled_by=me,
-                )
-        verb = (
-            _("A review has been scheduled for you.")
-            if scheduled_at
-            else _("A review has been requested for you.")
-        )
-        notify_employees(me, subjects, str(verb), "/vertex/reviews/")
-        if assignee:
-            notify_employees(me, [assignee], str(_("You have been asked to run a review.")), "/vertex/reviews/")
-        messages.success(request, _("%(n)d review(s) created.") % {"n": len(subjects)})
-        return redirect("vertex-reviews")
-    return render(request, "vertex/review_form.html", {"form": form})
 
 
 @login_required

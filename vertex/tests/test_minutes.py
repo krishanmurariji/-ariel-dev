@@ -15,7 +15,7 @@ from notifications.models import Notification
 
 from vertex.minutes import generate_minutes, polish, split_emails
 from vertex.models import MeetingMinute, MinuteStatus
-from vertex.tests.test_projects import VertexTestBase, grant, make_employee
+from vertex.tests.test_projects import HX, VertexTestBase, grant, make_employee
 
 
 class GeneratorTests(SimpleTestCase):
@@ -74,7 +74,7 @@ class MinutesWorkflowTests(VertexTestBase):
             "raw_notes": self.NOTES,
         }
         data.update(extra)
-        self.client_owner.post(reverse("vertex-minute-new"), data)
+        self.client_owner.post(reverse("vertex-minute-new"), data, **HX)
         return MeetingMinute.objects.order_by("-pk").first()
 
     def act(self, name, minute):
@@ -83,7 +83,11 @@ class MinutesWorkflowTests(VertexTestBase):
     def test_no_group_means_no_access(self):
         client = self.login(self.other)
         self.assertNotEqual(client.get(reverse("vertex-minutes")).status_code, 200)
-        client.post(reverse("vertex-minute-new"), {"title": "x", "meeting_date": "2026-11-05T10:30", "raw_notes": "n"})
+        client.post(
+            reverse("vertex-minute-new"),
+            {"title": "x", "meeting_date": "2026-11-05T10:30", "raw_notes": "n"},
+            **HX,
+        )
         self.assertFalse(MeetingMinute.objects.exists())
 
     def test_creating_normalises_attendees_and_starts_as_draft(self):
@@ -171,6 +175,7 @@ class MinutesWorkflowTests(VertexTestBase):
                 "title": minute.title, "meeting_date": "2026-11-05T10:30", "attendees": minute.attendees,
                 "raw_notes": minute.raw_notes, "minutes_text": minute.minutes_text + "\n- Corrected.",
             },
+            **HX,
         )
         minute.refresh_from_db()
         self.assertEqual(minute.status, MinuteStatus.PREVIEW)
@@ -198,7 +203,13 @@ class MinutesWorkflowTests(VertexTestBase):
         self.assertEqual(client.get(reverse("vertex-minute", args=[minute.pk])).status_code, 404)
         for name in ("generate", "approve", "send", "delete"):
             self.assertEqual(client.post(reverse(f"vertex-minute-{name}", args=[minute.pk])).status_code, 404, name)
-        self.assertNotContains(client.get(reverse("vertex-minutes")), "Weekly sync")
+        self.assertNotContains(client.get(reverse("vertex-minutes-list"), **HX), "Weekly sync")
+        self.assertContains(self.client_owner.get(reverse("vertex-minutes-list"), **HX), "Weekly sync")
+        # nor can they open or save the owner's minutes through the edit modal
+        edit = reverse("vertex-minute-edit", args=[minute.pk])
+        self.assertNotContains(client.get(edit, **HX), "raw_notes")
+        client.post(edit, {"title": "Hijacked", "meeting_date": "2026-11-05T10:30", "raw_notes": "x"}, **HX)
+        self.assertEqual(MeetingMinute.objects.get(pk=minute.pk).title, "Weekly sync")
         self.assertTrue(MeetingMinute.objects.filter(pk=minute.pk).exists())
 
     def test_admin_is_not_the_owner_either(self):

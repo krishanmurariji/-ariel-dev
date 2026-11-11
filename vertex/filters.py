@@ -8,7 +8,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from horilla.filters import HorillaFilterSet
-from vertex.models import Project, ResourceRequest, StatusUpdate
+from vertex.models import MeetingMinute, Project, ResourceRequest, ReviewRequest, StatusUpdate
 
 
 class VertexProjectFilter(HorillaFilterSet):
@@ -82,4 +82,64 @@ class ResourceRequestFilter(HorillaFilterSet):
             | Q(skills__icontains=value)
             | Q(project__name__icontains=value)
             | Q(project__code__icontains=value)
+        )
+
+
+class ReviewRequestFilter(HorillaFilterSet):
+    search = django_filters.CharFilter(method="filter_search")
+
+    class Meta:
+        model = ReviewRequest
+        fields = ["project", "status", "review_type"]
+
+    due_from = django_filters.DateFilter(
+        field_name="due_date",
+        lookup_expr="gte",
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label=_("Due From"),
+    )
+    due_till = django_filters.DateFilter(
+        field_name="due_date",
+        lookup_expr="lte",
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label=_("Due Till"),
+    )
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(subject__employee_first_name__icontains=value)
+            | Q(subject__employee_last_name__icontains=value)
+            | Q(assigned_to__employee_first_name__icontains=value)
+            | Q(assigned_to__employee_last_name__icontains=value)
+            | Q(project__name__icontains=value)
+            | Q(project__code__icontains=value)
+            | Q(notes__icontains=value)
+        )
+
+
+class MeetingMinuteFilter(HorillaFilterSet):
+    search = django_filters.CharFilter(method="filter_search")
+
+    class Meta:
+        model = MeetingMinute
+        fields = ["status"]
+
+    date_from = django_filters.DateFilter(
+        field_name="meeting_date",
+        lookup_expr="date__gte",
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label=_("From"),
+    )
+    date_to = django_filters.DateFilter(
+        field_name="meeting_date",
+        lookup_expr="date__lte",
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label=_("To"),
+    )
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(title__icontains=value)
+            | Q(location__icontains=value)
+            | Q(attendees__icontains=value)
         )

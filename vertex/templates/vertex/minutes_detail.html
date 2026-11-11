@@ -1,49 +1,65 @@
 {% extends "index.html" %}
 {% load i18n %}
 {% block content %}
-<div class="px-4 py-4 max-w-4xl">
-  <a href="{% url 'vertex-minutes' %}" class="text-xs text-dark-400 hover:underline">&larr; {% trans "Meeting Minutes" %}</a>
-  <h1 class="text-xl font-bold mt-1">{{ minute.title }}</h1>
-  <p class="text-xs text-dark-400 mb-4">{{ minute.meeting_date }}{% if minute.location %} &middot; {{ minute.location }}{% endif %} &middot; <b>{{ minute.get_status_display }}</b>
-    {% if minute.approved_at %}&middot; {% trans "Approved" %} {{ minute.approved_at }}{% endif %}
-    {% if minute.sent_at %}&middot; {% trans "Sent" %} {{ minute.sent_at }} ({{ minute.sent_count }}x){% endif %}</p>
+{% include "vertex/_vx.html" %}
+<div class="oh-wrapper">
+<div class="vx-page" style="max-width:920px">
+  <a href="{% url 'vertex-minutes' %}" class="vx-back"><ion-icon name="arrow-back-outline"></ion-icon>{% trans "Meeting Minutes" %}</a>
 
   {% if messages %}
     <div class="oh-alert-container">{% for message in messages %}<div class="oh-alert oh-alert--animated {{ message.tags }}">{{ message }}</div>{% endfor %}</div>
   {% endif %}
 
-  {% if can_change %}
-  <div class="flex flex-wrap gap-2 mb-4">
-    <a href="{% url 'vertex-minute-edit' minute.pk %}" class="oh-btn oh-btn--light">{% trans "Edit notes / minutes" %}</a>
-    {% if minute.status != "sent" %}
-      <form method="post" action="{% url 'vertex-minute-generate' minute.pk %}">{% csrf_token %}<button class="oh-btn oh-btn--secondary" type="submit">{% if minute.minutes_text %}{% trans "Regenerate from notes" %}{% else %}{% trans "Generate minutes" %}{% endif %}</button></form>
-    {% endif %}
-    {% if minute.status == "preview" %}
-      <form method="post" action="{% url 'vertex-minute-approve' minute.pk %}">{% csrf_token %}<button class="oh-btn oh-btn--secondary" type="submit">{% trans "Approve" %}</button></form>
-    {% endif %}
-    {% if minute.status == "approved" or minute.status == "sent" %}
-      <form method="post" action="{% url 'vertex-minute-send' minute.pk %}" onsubmit="return confirm('{% trans "Send these minutes to all attendees?"|escapejs %}');">{% csrf_token %}<button class="oh-btn oh-btn--secondary" type="submit">{% if minute.status == "sent" %}{% trans "Re-send" %}{% else %}{% trans "Send to attendees" %}{% endif %}</button></form>
-    {% endif %}
-    {% if can_delete %}
-      <form method="post" action="{% url 'vertex-minute-delete' minute.pk %}" onsubmit="return confirm('{% trans "Delete these minutes?"|escapejs %}');">{% csrf_token %}<button class="oh-btn oh-btn--light" type="submit">{% trans "Delete" %}</button></form>
-    {% endif %}
-  </div>
-  {% endif %}
+  <div class="vx-stack">
+    <div class="vx-card vx-card--pad">
+      <div class="vx-ident">
+        <div class="vx-icon" style="width:52px;height:52px;border-radius:14px;font-size:1.5rem"><ion-icon name="document-text-outline"></ion-icon></div>
+        <div style="min-width:0">
+          <h1 class="vx-title">{{ minute.title }}</h1>
+          <div class="vx-meta">{{ minute.meeting_date|date:"j M Y, H:i" }}{% if minute.location %} &middot; {{ minute.location }}{% endif %}</div>
+        </div>
+      </div>
+      <div class="vx-chips">
+        <span class="vx-chip">{{ minute.get_status_html }}</span>
+        {% if minute.approved_at %}<span class="vx-chip">{% trans "Approved" %} {{ minute.approved_at|date:"j M Y H:i" }}</span>{% endif %}
+        {% if minute.sent_at %}<span class="vx-chip">{% trans "Sent" %} {{ minute.sent_at|date:"j M Y H:i" }} ({{ minute.sent_count }}x)</span>{% endif %}
+      </div>
 
-  <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5 mb-4 text-sm">
-    <h2 class="font-semibold mb-2">{% trans "Attendees" %}</h2>
-    <p>{% for email in attendee_list %}<span class="oh-badge">{{ email }}</span> {% empty %}-{% endfor %}</p>
-  </div>
+      {% if can_change %}
+      <div class="vx-btnrow">
+        <button type="button" class="oh-btn oh-btn--light" hx-get="{% url 'vertex-minute-edit' minute.pk %}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal"><ion-icon name="create-outline" class="me-1"></ion-icon>{% trans "Edit notes / minutes" %}</button>
+        {% if minute.status != "sent" %}
+          <form method="post" action="{% url 'vertex-minute-generate' minute.pk %}">{% csrf_token %}<button class="oh-btn oh-btn--secondary" type="submit"><ion-icon name="sparkles-outline" class="me-1"></ion-icon>{% if minute.minutes_text %}{% trans "Regenerate from notes" %}{% else %}{% trans "Generate minutes" %}{% endif %}</button></form>
+        {% endif %}
+        {% if minute.status == "preview" %}
+          <form method="post" action="{% url 'vertex-minute-approve' minute.pk %}">{% csrf_token %}<button class="oh-btn oh-btn--secondary" type="submit"><ion-icon name="checkmark-outline" class="me-1"></ion-icon>{% trans "Approve" %}</button></form>
+        {% endif %}
+        {% if minute.status == "approved" or minute.status == "sent" %}
+          <form method="post" action="{% url 'vertex-minute-send' minute.pk %}" onsubmit="return confirm('{% trans "Send these minutes to all attendees?"|escapejs %}');">{% csrf_token %}<button class="oh-btn oh-btn--secondary" type="submit"><ion-icon name="paper-plane-outline" class="me-1"></ion-icon>{% if minute.status == "sent" %}{% trans "Re-send" %}{% else %}{% trans "Send to attendees" %}{% endif %}</button></form>
+        {% endif %}
+        {% if can_delete %}
+          <form method="post" action="{% url 'vertex-minute-delete' minute.pk %}" onsubmit="return confirm('{% trans "Delete these minutes?"|escapejs %}');">{% csrf_token %}<button class="oh-btn oh-btn--light" type="submit"><ion-icon name="trash-outline" class="me-1"></ion-icon>{% trans "Delete" %}</button></form>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
 
-  <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5 mb-4 text-sm">
-    <h2 class="font-semibold mb-2">{% trans "Minutes (preview)" %}</h2>
-    {% if minute.minutes_text %}<pre class="whitespace-pre-wrap font-sans">{{ minute.minutes_text }}</pre>
-    {% else %}<p class="text-dark-400">{% trans "Not generated yet." %}</p>{% endif %}
-  </div>
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Attendees" %}</h2>
+      <div class="vx-chips" style="margin-top:0">{% for email in attendee_list %}<span class="vx-chip vx-chip--brand">{{ email }}</span>{% empty %}<span class="vx-muted">-</span>{% endfor %}</div>
+    </div>
 
-  <div class="bg-white rounded-md shadow-card border border-[#ebebeb] p-5 text-sm">
-    <h2 class="font-semibold mb-2">{% trans "Raw notes" %}</h2>
-    <pre class="whitespace-pre-wrap font-sans text-dark-400">{{ minute.raw_notes }}</pre>
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Minutes (preview)" %}</h2>
+      {% if minute.minutes_text %}<pre class="vx-text">{{ minute.minutes_text }}</pre>
+      {% else %}<div class="vx-empty"><ion-icon name="sparkles-outline"></ion-icon>{% trans "Not generated yet. Use “Generate minutes” above." %}</div>{% endif %}
+    </div>
+
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Raw notes" %}</h2>
+      <pre class="vx-text" style="color:var(--vx-muted)">{{ minute.raw_notes }}</pre>
+    </div>
   </div>
+</div>
 </div>
 {% endblock content %}

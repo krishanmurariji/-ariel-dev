@@ -33,6 +33,8 @@ _DATETIME = forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-
 
 
 class ProjectForm(ModelForm):
+    vm_icon = "folder-open-outline"
+    vm_hint = "Code, dates and ownership of the project."
     cols = {"description": 12, "notes": 12}
 
     class Meta:
@@ -66,10 +68,14 @@ class ProjectForm(ModelForm):
 
 
 class MemberForm(ModelForm):
+    vm_icon = "person-add-outline"
+    vm_hint = "Add someone to this project and set their allocation."
+
     class Meta:
         model = ProjectMember
         fields = ["employee", "role_on_project", "allocation_pct", "start_date", "end_date"]
         widgets = {"start_date": _DATE, "end_date": _DATE}
+        labels = {"allocation_pct": _("Allocation (%)"), "role_on_project": _("Role on project")}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -85,10 +91,16 @@ class MemberForm(ModelForm):
 
 
 class DocumentForm(ModelForm):
+    vm_icon = "document-text-outline"
+    vm_hint = "Upload a file (up to 30 MB) or link a recording."
+
     class Meta:
         model = ProjectDocument
         fields = ["title", "description", "category", "visibility", "is_video_link", "video_url", "file"]
         widgets = {"description": forms.Textarea(attrs={"rows": 2})}
+        labels = {"is_video_link": _("This is a video link"), "video_url": _("Video URL"), "file": _("File")}
+
+    cols = {"title": 12, "description": 12, "file": 12, "video_url": 12}
 
     def clean(self):
         data = super().clean()
@@ -122,6 +134,9 @@ class CommentForm(ModelForm):
 
 
 class CallForm(ModelForm):
+    vm_icon = "calendar-outline"
+    vm_hint = "Schedule a customer or internal call."
+
     class Meta:
         model = ProjectCall
         fields = [
@@ -129,15 +144,22 @@ class CallForm(ModelForm):
             "attendees", "meeting_url",
         ]
         widgets = {"scheduled_at": _DATETIME, "agenda": forms.Textarea(attrs={"rows": 2})}
+        labels = {"duration_minutes": _("Duration (min)"), "meeting_url": _("Meeting link"), "scheduled_at": _("Date and time")}
+
+    cols = {"title": 12, "agenda": 12, "call_type": 4, "scheduled_at": 4, "duration_minutes": 4, "attendees": 12, "meeting_url": 12}
 
 
 class StatusUpdateForm(ModelForm):
     """Submit a status update; only for projects the person is an active member of."""
+    vm_icon = "pulse-outline"
+    vm_hint = "Today's progress on a project you are assigned to."
 
     cols = {
-        "work_completed": 12, "next_planned_work": 12, "blockers": 12,
-        "dependencies": 12, "client_shareable_summary": 12, "internal_note": 12,
+        "project": 6, "update_date": 6, "hours_spent": 6, "status": 6, "work_completed": 12,
+        "next_planned_work": 6, "blockers": 6, "dependencies": 12,
+        "client_shareable_summary": 6, "internal_note": 6,
     }
+    vm_sections = {"work_completed": "Progress", "client_shareable_summary": "Visibility"}
 
     class Meta:
         model = StatusUpdate
@@ -185,15 +207,18 @@ class StatusUpdateForm(ModelForm):
 
 class ResourceRequestForm(ModelForm):
     """Raise a hiring / resource request for a project the person can open."""
+    vm_icon = "people-outline"
+    vm_hint = "Ask HR for more people on a project."
 
-    cols = {"reason": 12, "skills": 12}
+    cols = {"project": 6, "role_title": 6, "count": 4, "priority": 4, "expected_start_date": 4, "skills": 12, "reason": 12}
 
     class Meta:
         model = ResourceRequest
         fields = [
-            "project", "role_title", "count", "priority", "skills",
-            "expected_start_date", "reason",
+            "project", "role_title", "count", "priority", "expected_start_date",
+            "skills", "reason",
         ]
+        labels = {"role_title": _("Role"), "count": _("People needed"), "expected_start_date": _("Expected start")}
         widgets = {
             "expected_start_date": _DATE,
             "reason": forms.Textarea(attrs={"rows": 3}),

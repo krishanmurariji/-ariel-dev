@@ -16,7 +16,6 @@ from employee.models import Employee
 from horilla.decorators import login_required, permission_required
 from horilla.post_only import post_only
 from vertex import access
-from vertex.forms_reviews import MinutesForm
 from vertex.minutes import generate_minutes, split_emails
 from vertex.models import MeetingMinute, MinuteStatus
 from vertex.notify import notify_employees, send_plain_email
@@ -28,49 +27,6 @@ def _owned_or_404(request, pk):
     if minute is None:
         raise Http404
     return minute
-
-
-def _normalised(minute):
-    minute.attendees = ", ".join(split_emails(minute.attendees))
-
-
-@login_required
-@permission_required("vertex.view_meetingminute")
-def minutes_list(request):
-    employee = access.employee_of(request.user)
-    minutes = MeetingMinute.objects.filter(created_by=employee) if employee else MeetingMinute.objects.none()
-    status = request.GET.get("status", "")
-    if status in MinuteStatus.values:
-        minutes = minutes.filter(status=status)
-    return render(
-        request,
-        "vertex/minutes_list.html",
-        {
-            "minutes": minutes,
-            "status": status,
-            "statuses": MinuteStatus.choices,
-            "can_add": request.user.has_perm("vertex.add_meetingminute"),
-        },
-    )
-
-
-@login_required
-@permission_required("vertex.add_meetingminute")
-def minutes_create(request):
-    employee = access.employee_of(request.user)
-    if employee is None:
-        raise Http404
-    form = MinutesForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        minute = form.save(commit=False)
-        minute.created_by = employee
-        _normalised(minute)
-        minute.save()
-        messages.success(request, _("Notes saved. Generate the minutes to preview them."))
-        return redirect("vertex-minute", pk=minute.pk)
-    return render(
-        request, "vertex/minutes_form.html", {"form": form, "title": _("New meeting minutes")}
-    )
 
 
 @login_required
@@ -87,27 +43,6 @@ def minutes_detail(request, pk):
             "can_change": user.has_perm("vertex.change_meetingminute"),
             "can_delete": user.has_perm("vertex.delete_meetingminute"),
         },
-    )
-
-
-@login_required
-@permission_required("vertex.change_meetingminute")
-def minutes_edit(request, pk):
-    minute = _owned_or_404(request, pk)
-    form = MinutesForm(request.POST or None, instance=minute)
-    if request.method == "POST" and form.is_valid():
-        minute = form.save(commit=False)
-        _normalised(minute)
-        # editing approved or sent minutes sends them back to Preview to be approved again
-        if minute.status in (MinuteStatus.APPROVED, MinuteStatus.SENT) and minute.minutes_text.strip():
-            minute.status = MinuteStatus.PREVIEW
-            minute.approved_by = None
-            minute.approved_at = None
-        minute.save()
-        messages.success(request, _("Changes saved."))
-        return redirect("vertex-minute", pk=minute.pk)
-    return render(
-        request, "vertex/minutes_form.html", {"form": form, "title": _("Edit meeting minutes"), "minute": minute}
     )
 
 

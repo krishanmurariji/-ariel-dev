@@ -26,7 +26,9 @@ from horilla_views.generic.cbv.views import (
 )
 from vertex import access
 from vertex.filters import (
+    MeetingMinuteFilter,
     ResourceRequestFilter,
+    ReviewRequestFilter,
     StatusUpdateFilter,
     VertexProjectFilter,
 )
@@ -38,16 +40,42 @@ from vertex.forms import (
     ResourceRequestForm,
     StatusUpdateForm,
 )
+from vertex.forms_reviews import MinutesForm, ReviewRequestForm
 from vertex.models import (
+    MeetingMinute,
+    MinuteStatus,
     Project,
     ProjectCall,
     ProjectDocument,
     ProjectMember,
     ProjectRole,
     ResourceRequest,
+    ReviewMeeting,
+    ReviewRequest,
+    ReviewRequestStatus,
     StatusUpdate,
 )
 from vertex.notify import employees_with_perm, notify_employees
+
+
+def vertex_structured(self):
+    """Render a Vertex modal form with vertex/modal_form.html (see VertexModal)."""
+    from django.template.loader import render_to_string
+
+    from horilla.horilla_middlewares import _thread_locals
+
+    request = getattr(_thread_locals, "request", None)
+    # request= runs the context processors, so the modal picks up the company theme colours
+    return render_to_string("vertex/modal_form.html", {"form": self}, request=request)
+
+
+class VertexModal:
+    """Mixin for Vertex modal form views: swaps the form body for the Vertex modal design."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if self.form_class:
+            self.form_class.structured = vertex_structured
 
 
 def _status_filter_js(value):
@@ -141,9 +169,9 @@ class ProjectsList(HorillaListView):
             (get_field("code").verbose_name, "code"),
             (get_field("name").verbose_name, "name"),
             (_("Client"), "client_name"),
-            (get_field("status").verbose_name, "get_status_display"),
+            (_("Status"), "get_status_display"),
             (_("Health"), "get_health_html"),
-            (get_field("priority").verbose_name, "get_priority_display"),
+            (_("Priority"), "get_priority_display"),
             (_("Team"), "get_member_count"),
             (get_field("start_date").verbose_name, "start_date"),
             (get_field("expected_end_date").verbose_name, "expected_end_date"),
@@ -155,13 +183,32 @@ class ProjectsList(HorillaListView):
         return [
             (get_field("code").verbose_name, "code"),
             (get_field("name").verbose_name, "name"),
-            (get_field("priority").verbose_name, "priority"),
+            (_("Priority"), "priority"),
             (get_field("start_date").verbose_name, "start_date"),
         ]
 
     row_status_indications = STATUS_INDICATIONS
     row_status_class = "status-{status}"
     row_attrs = """ {redirect} """
+    actions_menu = True
+    actions = [
+        {
+            "action": _("Open"),
+            "icon": "open-outline",
+            "attrs": """onclick="event.preventDefault();window.location.href='{get_absolute_url}'" """,
+        },
+        {
+            "action": _("Edit"),
+            "icon": "create-outline",
+            "accessibility": "vertex.cbv.can_edit_project",
+            "attrs": """
+                hx-get='{get_update_url}'
+                hx-target='#genericModalBody'
+                data-toggle="oh-modal-toggle"
+                data-target="#genericModal"
+            """,
+        },
+    ]
 
 
 @method_decorator(login_required, name="dispatch")
@@ -194,7 +241,7 @@ class ProjectsCard(HorillaCardView):
         self.actions = [
             {
                 "action": _("Open"),
-                "attrs": """onclick="window.location.href='{get_absolute_url}'" class="oh-dropdown__link" """,
+                "attrs": """onclick="event.preventDefault();window.location.href='{get_absolute_url}'" class="oh-dropdown__link" """,
             },
             {
                 "action": _("Edit"),
@@ -217,8 +264,16 @@ def can_edit_project(request, instance, *args, **kwargs):
     return access.can_manage(request.user, instance)
 
 
+def can_change_minutes(request, instance, *args, **kwargs):
+    return request.user.has_perm("vertex.change_meetingminute")
+
+
+def can_delete_minutes(request, instance, *args, **kwargs):
+    return request.user.has_perm("vertex.delete_meetingminute")
+
+
 @method_decorator(login_required, name="dispatch")
-class ProjectFormView(HorillaFormView):
+class ProjectFormView(VertexModal, HorillaFormView):
     """Modal form: create a project (add_project) or edit one the user manages."""
 
     model = Project
@@ -273,7 +328,7 @@ RELOAD_PAGE = "<script>window.location.reload()</script>"
 
 
 @method_decorator(login_required, name="dispatch")
-class _ProjectChildFormView(HorillaFormView):
+class _ProjectChildFormView(VertexModal, HorillaFormView):
     """
     Base of the workspace modals. The project comes from the URL (``project_id``); the user
     must see the project, hold ``required_perm`` and, when ``need_manage``, manage it (PM / PC).
@@ -447,7 +502,7 @@ class StatusUpdatesList(HorillaListView):
             (_("Status"), "get_status_html"),
             (get_field("hours_spent").verbose_name, "hours_spent"),
             (get_field("work_completed").verbose_name, "work_completed"),
-            (get_field("blockers").verbose_name, "blockers"),
+            (_("Blockers"), "blockers"),
         ]
 
     @cached_property
@@ -457,10 +512,18 @@ class StatusUpdatesList(HorillaListView):
 
     row_status_indications = _status_indications()
     row_status_class = "status-{status}"
+    actions_menu = True
+    actions = [
+        {
+            "action": _("Open project"),
+            "icon": "open-outline",
+            "attrs": """onclick="event.preventDefault();window.location.href='{get_project_url}?tab=status'" """,
+        },
+    ]
 
 
 @method_decorator(login_required, name="dispatch")
-class StatusUpdateFormView(HorillaFormView):
+class StatusUpdateFormView(VertexModal, HorillaFormView):
     model = StatusUpdate
     form_class = StatusUpdateForm
     new_display_title = _("New status update")
@@ -547,31 +610,44 @@ class ResourceRequestsList(HorillaListView):
     def columns(self):
         get_field = self.model()._meta.get_field
         return [
-            (get_field("role_title").verbose_name, "role_title"),
+            (_("Role"), "role_title"),
             (_("Project"), "get_project_code"),
-            (get_field("count").verbose_name, "count"),
-            (get_field("priority").verbose_name, "get_priority_display"),
+            (_("Count"), "count"),
+            (_("Priority"), "get_priority_display"),
             (_("Status"), "get_status_html"),
             (_("Requested by"), "get_requested_by_name"),
-            (get_field("expected_start_date").verbose_name, "expected_start_date"),
-            (_("Raised on"), "created_at"),
+            (_("Expected start"), "expected_start_date"),
+            (_("Raised on"), "get_raised_on"),
         ]
 
     @cached_property
     def sortby_mapping(self):
         get_field = self.model()._meta.get_field
         return [
-            (get_field("role_title").verbose_name, "role_title"),
-            (get_field("priority").verbose_name, "priority"),
+            (_("Role"), "role_title"),
+            (_("Priority"), "priority"),
             (_("Raised on"), "created_at"),
         ]
 
     row_status_class = "status-{status}"
     row_attrs = """ {redirect} """
+    actions_menu = True
+    actions = [
+        {
+            "action": _("Open"),
+            "icon": "open-outline",
+            "attrs": """onclick="event.preventDefault();window.location.href='{get_absolute_url}'" """,
+        },
+        {
+            "action": _("Open project"),
+            "icon": "folder-open-outline",
+            "attrs": """onclick="event.preventDefault();window.location.href='{get_project_url}'" """,
+        },
+    ]
 
 
 @method_decorator(login_required, name="dispatch")
-class ResourceRequestFormView(HorillaFormView):
+class ResourceRequestFormView(VertexModal, HorillaFormView):
     model = ResourceRequest
     form_class = ResourceRequestForm
     new_display_title = _("Raise resource request")
@@ -607,3 +683,348 @@ class ResourceRequestFormView(HorillaFormView):
         if "/vertex/projects/" in self.request.META.get("HTTP_REFERER", ""):
             return self.HttpResponse(RELOAD_PAGE)
         return self.HttpResponse()
+
+
+# ---------------------------------------------------------------------------
+# Reviews page: list of review requests, modal to request / schedule reviews
+# ---------------------------------------------------------------------------
+
+
+def _filter_indications(field, items):
+    def js(value):
+        return f"""
+            onclick="
+                $('#applyFilter').closest('form').find('[name={field}]').val('{value}');
+                $('#applyFilter').click();
+            "
+        """
+
+    return [(f"{value}--dot", label, js(value)) for value, label in items]
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(permission_required("vertex.view_reviewrequest"), name="dispatch")
+class ReviewsView(TemplateView):
+    template_name = "vertex/cbv/reviews.html"
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(permission_required("vertex.view_reviewrequest"), name="dispatch")
+class ReviewsNavView(HorillaNavView):
+    filter_form_context_name = "form"
+    filter_instance = ReviewRequestFilter()
+    search_swap_target = "#listContainer"
+    group_by_fields = ["project", "status", "review_type"]
+    filter_body_template = "vertex/cbv/review_filter.html"
+    hide_actions_button = True
+    create_label = _("Request review")
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.search_url = reverse("vertex-review-list")
+        if self.request.user.has_perm("vertex.add_reviewrequest"):
+            self.create_attrs = f"""
+                onclick = "event.stopPropagation();"
+                data-toggle="oh-modal-toggle"
+                data-target="#genericModal"
+                hx-target="#genericModalBody"
+                hx-get="{reverse('vertex-review-new')}"
+            """
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(permission_required("vertex.view_reviewrequest"), name="dispatch")
+class ReviewsList(HorillaListView):
+    model = ReviewRequest
+    filter_class = ReviewRequestFilter
+    bulk_select_option = False
+    quick_export = False
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset.filter(
+            pk__in=access.visible_reviews(self.request.user).values("pk")
+        ).select_related("project", "subject", "assigned_to", "meeting")
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.search_url = reverse("vertex-review-list")
+
+    @cached_property
+    def columns(self):
+        get_field = self.model()._meta.get_field
+        return [
+            (_("Employee"), "get_subject_name"),
+            (_("Project"), "get_project_code"),
+            (_("Type"), "get_review_type_display"),
+            (_("Reviewer"), "get_reviewer_name"),
+            (_("Status"), "get_status_html"),
+            (_("Meeting"), "get_meeting_time"),
+            (_("Due"), "due_date"),
+        ]
+
+    @cached_property
+    def sortby_mapping(self):
+        get_field = self.model()._meta.get_field
+        return [
+            (_("Type"), "review_type"),
+            (_("Due"), "due_date"),
+            (_("Requested on"), "created_at"),
+        ]
+
+    row_status_indications = _filter_indications("status", ReviewRequestStatus.choices)
+    row_status_class = "status-{status}"
+    row_attrs = """ {redirect} """
+    actions_menu = True
+    actions = [
+        {
+            "action": _("Open"),
+            "icon": "open-outline",
+            "attrs": """onclick="event.preventDefault();window.location.href='{get_absolute_url}'" """,
+        },
+        {
+            "action": _("Open project"),
+            "icon": "folder-open-outline",
+            "attrs": """onclick="event.preventDefault();window.location.href='{get_project_url}?tab=reviews'" """,
+        },
+    ]
+
+
+@method_decorator(login_required, name="dispatch")
+class ReviewRequestFormView(VertexModal, HorillaFormView):
+    """Modal: request (or immediately schedule) a review for one or many employees."""
+
+    model = ReviewRequest
+    form_class = ReviewRequestForm
+    new_display_title = _("Request / schedule review")
+
+    def dispatch(self, request, *args, **kwargs):
+        if (
+            not request.user.has_perm("vertex.add_reviewrequest")
+            or access.employee_of(request.user) is None
+        ):
+            return handle_no_permission(request)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return None  # always a new request
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        project = self.request.GET.get("project")
+        if project and not form.is_bound and not form.initial.get("project"):
+            form.initial["project"] = project
+        return form
+
+    def form_valid(self, form):
+        from vertex.views_reviews import _attendees
+
+        data = form.cleaned_data
+        me = access.employee_of(self.request.user)
+        subjects = list(data["subjects"])
+        assignee = data["assigned_to"]
+        scheduled_at = data["scheduled_at"]
+        attendees = _attendees(subjects, assignee, me, data["extra_attendees"])
+        for subject in subjects:
+            review = ReviewRequest.objects.create(
+                project=data["project"],
+                subject=subject,
+                requested_by=me,
+                assigned_to=assignee,
+                review_type=data["review_type"],
+                notes=data["notes"],
+                due_date=data["due_date"],
+                status=(
+                    ReviewRequestStatus.SCHEDULED if scheduled_at else ReviewRequestStatus.OPEN
+                ),
+            )
+            if scheduled_at:
+                ReviewMeeting.objects.create(
+                    review_request=review,
+                    title=data["title"],
+                    scheduled_at=scheduled_at,
+                    duration_minutes=data["duration_minutes"] or 30,
+                    attendees=attendees,
+                    meeting_url=data["meeting_url"],
+                    scheduled_by=me,
+                )
+        verb = (
+            _("A review has been scheduled for you.")
+            if scheduled_at
+            else _("A review has been requested for you.")
+        )
+        notify_employees(me, subjects, str(verb), reverse("vertex-reviews"))
+        if assignee:
+            notify_employees(
+                me, [assignee], str(_("You have been asked to run a review.")), reverse("vertex-reviews")
+            )
+        messages.success(self.request, _("%(n)d review(s) created.") % {"n": len(subjects)})
+        return self.HttpResponse()
+
+
+# ---------------------------------------------------------------------------
+# Meeting minutes page: only the minutes the signed-in person captured
+# ---------------------------------------------------------------------------
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(permission_required("vertex.view_meetingminute"), name="dispatch")
+class MinutesView(TemplateView):
+    template_name = "vertex/cbv/minutes.html"
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(permission_required("vertex.view_meetingminute"), name="dispatch")
+class MinutesNavView(HorillaNavView):
+    filter_form_context_name = "form"
+    filter_instance = MeetingMinuteFilter()
+    search_swap_target = "#listContainer"
+    group_by_fields = ["status"]
+    filter_body_template = "vertex/cbv/minutes_filter.html"
+    hide_actions_button = True
+    create_label = _("New minutes")
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.search_url = reverse("vertex-minutes-list")
+        if self.request.user.has_perm("vertex.add_meetingminute"):
+            self.create_attrs = f"""
+                onclick = "event.stopPropagation();"
+                data-toggle="oh-modal-toggle"
+                data-target="#genericModal"
+                hx-target="#genericModalBody"
+                hx-get="{reverse('vertex-minute-new')}"
+            """
+
+
+@method_decorator(login_required, name="dispatch")
+@method_decorator(permission_required("vertex.view_meetingminute"), name="dispatch")
+class MinutesList(HorillaListView):
+    model = MeetingMinute
+    filter_class = MeetingMinuteFilter
+    bulk_select_option = False
+    quick_export = False
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        employee = access.employee_of(self.request.user)
+        if employee is None:
+            return queryset.none()
+        return queryset.filter(created_by=employee)
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.search_url = reverse("vertex-minutes-list")
+
+    @cached_property
+    def columns(self):
+        get_field = self.model()._meta.get_field
+        return [
+            (_("Title"), "title"),
+            (_("Meeting date"), "get_meeting_when"),
+            (_("Location"), "location"),
+            (_("Status"), "get_status_html"),
+            (_("Sent"), "get_sent_display"),
+        ]
+
+    @cached_property
+    def sortby_mapping(self):
+        get_field = self.model()._meta.get_field
+        return [
+            (_("Title"), "title"),
+            (_("Meeting date"), "meeting_date"),
+        ]
+
+    row_status_indications = _filter_indications("status", MinuteStatus.choices)
+    row_status_class = "status-{status}"
+    row_attrs = """ {redirect} """
+    actions_menu = True
+    actions = [
+        {
+            "action": _("Open"),
+            "icon": "open-outline",
+            "attrs": """onclick="event.preventDefault();window.location.href='{get_absolute_url}'" """,
+        },
+        {
+            "action": _("Edit"),
+            "icon": "create-outline",
+            "accessibility": "vertex.cbv.can_change_minutes",
+            "attrs": """
+                hx-get='{get_update_url}'
+                hx-target='#genericModalBody'
+                data-toggle="oh-modal-toggle"
+                data-target="#genericModal"
+            """,
+        },
+        {
+            "action": _("Delete"),
+            "icon": "trash-outline",
+            "accessibility": "vertex.cbv.can_delete_minutes",
+            "attrs": """
+                hx-post='{get_delete_url}'
+                hx-confirm='Delete these minutes? This cannot be undone.'
+                hx-swap='none'
+                hx-on::after-request='window.location.reload()'
+            """,
+        },
+    ]
+
+
+@method_decorator(login_required, name="dispatch")
+class MinutesFormView(VertexModal, HorillaFormView):
+    """Modal: capture new minutes, or correct ones the signed-in person captured."""
+
+    model = MeetingMinute
+    form_class = MinutesForm
+    new_display_title = _("New meeting minutes")
+
+    def dispatch(self, request, *args, **kwargs):
+        employee = access.employee_of(request.user)
+        pk = kwargs.get("pk")
+        if employee is None:
+            return handle_no_permission(request)
+        if pk:
+            allowed = (
+                request.user.has_perm("vertex.change_meetingminute")
+                and MeetingMinute.objects.filter(pk=pk, created_by=employee).exists()
+            )
+        else:
+            allowed = request.user.has_perm("vertex.add_meetingminute")
+        if not allowed:
+            return handle_no_permission(request)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.form.instance.pk:
+            self.form_class.verbose_name = _("Edit meeting minutes")
+        return context
+
+    def form_valid(self, form):
+        from vertex.minutes import split_emails
+
+        creating = form.instance.pk is None
+        minute = form.save(commit=False)
+        if creating:
+            minute.created_by = access.employee_of(self.request.user)
+        minute.attendees = ", ".join(split_emails(minute.attendees))
+        # editing approved or sent minutes sends them back to Preview to be approved again
+        if (
+            not creating
+            and minute.status in (MinuteStatus.APPROVED, MinuteStatus.SENT)
+            and minute.minutes_text.strip()
+        ):
+            minute.status = MinuteStatus.PREVIEW
+            minute.approved_by = None
+            minute.approved_at = None
+        minute.save()
+        if creating:
+            messages.success(
+                self.request, _("Notes saved. Generate the minutes to preview them.")
+            )
+            # straight to the minutes page, where they are generated
+            return self.HttpResponse(
+                f"<script>window.location.href='{minute.get_absolute_url()}'</script>"
+            )
+        messages.success(self.request, _("Changes saved."))
+        return self.HttpResponse(RELOAD_PAGE)

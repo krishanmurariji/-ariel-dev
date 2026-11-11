@@ -1,71 +1,65 @@
 {% extends "index.html" %}
 {% load i18n %}
 {% block content %}
-<style>
-  .rr-card { background:#fff; border:1px solid #ebebeb; border-radius:10px; padding:1.1rem 1.25rem; margin-bottom:1rem; }
-  .rr-label { color:#9ca3af; font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
-  .rr-chip { display:inline-flex; align-items:center; gap:.35rem; padding:.15rem .6rem; border-radius:999px; font-size:.75rem; font-weight:600; background:#f3f4f6; }
-  .rr-row { display:flex; gap:.65rem; margin-bottom:.7rem; }
-  .rr-row--mine { flex-direction:row-reverse; }
-  .rr-bubble { max-width:80%; border-radius:14px; padding:.5rem .85rem; background:#f3f4f6; }
-  .rr-row--mine .rr-bubble { background:hsl(8,77%,56%); color:#fff; }
-</style>
-<div class="oh-wrapper" style="max-width:980px">
-  <a href="{% url 'vertex-hiring' %}" style="color:#6b7280;text-decoration:none;font-size:.85rem">&larr; {% trans "Hiring Requests" %}</a>
+{% include "vertex/_vx.html" %}
+<div class="oh-wrapper">
+<div class="vx-page" style="max-width:920px">
+  <a href="{% url 'vertex-hiring' %}" class="vx-back"><ion-icon name="arrow-back-outline"></ion-icon>{% trans "Hiring Requests" %}</a>
 
   {% if messages %}
     <div class="oh-alert-container">{% for message in messages %}<div class="oh-alert oh-alert--animated {{ message.tags }}">{{ message }}</div>{% endfor %}</div>
   {% endif %}
 
-  <div class="rr-card" style="margin-top:.6rem">
-    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
-      <div>
-        <h1 style="font-size:1.4rem;font-weight:800;margin:0">{{ rr.role_title }} <span style="color:#6b7280;font-weight:600">&times;{{ rr.count }}</span></h1>
-        <div style="color:#6b7280;font-size:.85rem;margin-top:.2rem">
-          <a href="{{ rr.project.get_absolute_url }}" style="color:inherit">{{ rr.project }}</a> &middot; {% trans "by" %} {{ rr.get_requested_by_name }} &middot; {{ rr.created_at|date:"j M Y" }}
-        </div>
-        <div style="margin-top:.5rem;display:flex;gap:.4rem;flex-wrap:wrap">
-          <span class="rr-chip">{{ rr.get_status_html }}</span>
-          <span class="rr-chip">{{ rr.get_priority_display }} {% trans "priority" %}</span>
-          {% if rr.expected_start_date %}<span class="rr-chip">{% trans "Start" %}: {{ rr.expected_start_date }}</span>{% endif %}
+  <div class="vx-stack">
+    <div class="vx-card vx-card--pad">
+      <div class="vx-ident">
+        <div class="vx-icon" style="width:52px;height:52px;border-radius:14px;font-size:1.5rem"><ion-icon name="person-add-outline"></ion-icon></div>
+        <div style="min-width:0">
+          <h1 class="vx-title">{{ rr.role_title }} <span style="color:var(--vx-muted);font-weight:600">&times;{{ rr.count }}</span></h1>
+          <div class="vx-meta"><a href="{{ rr.project.get_absolute_url }}">{{ rr.project }}</a> &middot; {% trans "raised by" %} {{ rr.get_requested_by_name }} &middot; {{ rr.created_at|date:"j M Y" }}</div>
         </div>
       </div>
-    </div>
-    <div style="margin-top:1rem">
-      {% if rr.skills %}<div class="rr-label">{% trans "Skills" %}</div><p>{{ rr.skills }}</p>{% endif %}
-      <div class="rr-label">{% trans "Reason" %}</div><p>{{ rr.reason|default:"-"|linebreaksbr }}</p>
-    </div>
-  </div>
-
-  {% if can_change %}
-  <div class="rr-card">
-    <div class="rr-label" style="margin-bottom:.5rem">{% trans "Update status" %}</div>
-    <form method="post" action="{% url 'vertex-resource-request-status' rr.pk %}" style="display:grid;gap:.6rem;grid-template-columns:240px 1fr auto;align-items:end">
-      {% csrf_token %}
-      <div>{{ status_form.status }}</div>
-      <div>{{ status_form.comment }}</div>
-      <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Save" %}</button>
-    </form>
-  </div>
-  {% endif %}
-
-  <div class="rr-card">
-    <div class="rr-label" style="margin-bottom:.6rem">{% trans "Comments" %}</div>
-    {% for c in comments %}
-      <div class="rr-row {% if my_employee and c.author_id == my_employee.pk %}rr-row--mine{% endif %}">
-        <img src="{{ c.author.get_avatar }}" alt="" style="width:34px;height:34px;border-radius:50%;flex-shrink:0">
-        <div class="rr-bubble">
-          <div style="font-size:.75rem;font-weight:700">{{ c.author.get_full_name|default:"-" }}</div>
-          <div>{{ c.message|linebreaksbr }}</div>
-          <div style="font-size:.65rem;opacity:.75;margin-top:.15rem">{{ c.created_at }}</div>
-        </div>
+      <div class="vx-chips">
+        <span class="vx-chip">{{ rr.get_status_html }}</span>
+        <span class="vx-chip">{{ rr.get_priority_display }} {% trans "priority" %}</span>
+        {% if rr.expected_start_date %}<span class="vx-chip">{% trans "Start" %}: {{ rr.expected_start_date|date:"j M Y" }}</span>{% endif %}
       </div>
-    {% empty %}<p style="color:#6b7280">{% trans "No comments yet." %}</p>{% endfor %}
-    <form method="post" action="{% url 'vertex-resource-request-comment' rr.pk %}" style="display:flex;gap:.5rem;align-items:flex-end;margin-top:.8rem">
-      {% csrf_token %}
-      <div style="flex:1">{{ comment_form.message }}</div>
-      <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Post" %}</button>
-    </form>
+      <hr class="vx-divider">
+      {% if rr.skills %}<div class="vx-label">{% trans "Skills" %}</div><p class="vx-text" style="margin-bottom:.9rem">{{ rr.skills }}</p>{% endif %}
+      <div class="vx-label">{% trans "Reason" %}</div><p class="vx-text">{{ rr.reason|default:"-" }}</p>
+    </div>
+
+    {% if can_change %}
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Update status" %}</h2>
+      <form method="post" action="{% url 'vertex-resource-request-status' rr.pk %}" class="vx-inline-form" style="display:grid;gap:.75rem;grid-template-columns:240px 1fr auto;align-items:end">
+        {% csrf_token %}
+        <div>{{ status_form.status }}</div>
+        <div>{{ status_form.comment }}</div>
+        <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Save" %}</button>
+      </form>
+    </div>
+    {% endif %}
+
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Comments" %}</h2>
+      {% for c in comments %}
+        <div class="vx-row {% if my_employee and c.author_id == my_employee.pk %}vx-row--mine{% endif %}">
+          <img class="vx-avatar" style="width:34px;height:34px" src="{{ c.author.get_avatar }}" alt="">
+          <div class="vx-bubble">
+            <div class="vx-bubble__who">{{ c.author.get_full_name|default:"-" }}</div>
+            <div>{{ c.message|linebreaksbr }}</div>
+            <div class="vx-bubble__when">{{ c.created_at }}</div>
+          </div>
+        </div>
+      {% empty %}<div class="vx-empty" style="margin-bottom:1rem"><ion-icon name="chatbubbles-outline"></ion-icon>{% trans "No comments yet." %}</div>{% endfor %}
+      <form method="post" action="{% url 'vertex-resource-request-comment' rr.pk %}" class="vx-inline-form vx-composer">
+        {% csrf_token %}
+        {{ comment_form.message }}
+        <div class="vx-composer__bar"><span></span><button type="submit" class="oh-btn oh-btn--secondary"><ion-icon name="send-outline" class="me-1"></ion-icon>{% trans "Post comment" %}</button></div>
+      </form>
+    </div>
   </div>
+</div>
 </div>
 {% endblock content %}

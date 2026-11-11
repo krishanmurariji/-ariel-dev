@@ -1,58 +1,75 @@
 {% extends "index.html" %}
 {% load i18n %}
 {% block content %}
+{% include "vertex/_vx.html" %}
 <style>
-  .rv-bucket { background:#fff; border:1px solid #ebebeb; border-radius:10px; padding:.9rem 1rem; }
-  .rv-bucket b { font-size:1.6rem; display:block; margin-top:.15rem; }
-  .rv-label { color:#9ca3af; font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
-  .rv-card { display:flex; flex-wrap:wrap; gap:1rem; align-items:center; background:#fff; border:1px solid #ebebeb; border-radius:10px; padding:.85rem 1rem; margin-bottom:.6rem; }
-  .rv-card img { width:42px; height:42px; border-radius:50%; object-fit:cover; }
-  .rv-chip { display:inline-block; padding:.12rem .55rem; border-radius:999px; font-size:.72rem; font-weight:600; background:#eef2ff; color:#3730a3; margin:.15rem .25rem 0 0; }
-  .rv-meter { height:8px; border-radius:999px; background:#f3f4f6; overflow:hidden; }
-  .rv-meter > span { display:block; height:100%; border-radius:999px; }
-  .rv-tag { padding:.15rem .6rem; border-radius:999px; font-size:.72rem; font-weight:700; color:#fff; }
-  .rv-Free { background:#0ea5e9; } .rv-Partially { background:#8b5cf6; } .rv-Fully { background:#16a34a; } .rv-Overloaded { background:#dc2626; }
+  .rv-toolbar { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; margin: 0; }
+  .rv-control { height: 40px; border: 1px solid var(--vx-border); border-radius: 8px; background: var(--vx-surface); color: var(--vx-text); font-size: .86rem; padding: 0 .85rem; outline: 0; box-sizing: border-box; }
+  .rv-control:focus { border-color: var(--vx-primary); box-shadow: 0 0 0 3px var(--vx-primary-soft); }
+  .rv-search { position: relative; width: 250px; }
+  .rv-search ion-icon { position: absolute; left: .7rem; top: 50%; transform: translateY(-50%); color: var(--vx-faint); font-size: 1rem; pointer-events: none; }
+  .rv-search .rv-control { width: 100%; padding-left: 2.2rem; }
+  .rv-select { width: 190px; cursor: pointer; }
+  .rv-go { background: var(--vx-primary); border-color: var(--vx-primary); color: #fff; font-weight: 600; padding: 0 1.3rem; cursor: pointer; }
+  .rv-go:hover { filter: brightness(.93); }
+  @media (max-width: 640px) { .rv-search, .rv-select { width: 100%; } .rv-go { width: 100%; } }
+  .rv-row { display: grid; grid-template-columns: minmax(220px, 1fr) 190px 150px; gap: 1.25rem; align-items: center; padding: .9rem 1.15rem; }
+  .rv-row + .rv-row { border-top: 1px solid var(--vx-border); }
+  .rv-who { display: flex; gap: .8rem; align-items: center; min-width: 0; }
+  .rv-load { font-size: .75rem; display: flex; justify-content: space-between; margin-bottom: .3rem; color: var(--vx-muted); }
+  .rv-load b { color: var(--vx-text); }
+  .rv-projects { margin-top: .35rem; display: flex; flex-wrap: wrap; gap: .3rem; }
+  .rv-projects a { text-decoration: none; }
+  @media (max-width: 820px) { .rv-row { grid-template-columns: 1fr; gap: .6rem; } }
 </style>
 <div class="oh-wrapper">
-  <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
+<div class="vx-page">
+  <div class="vx-header">
     <div>
-      <h1 class="oh-main__titlebar-title" style="margin:0">{% trans "Resource Visibility" %}</h1>
-      <p style="color:#6b7280;margin:.2rem 0 0">{% trans "Allocation across projects: free, partial, allocated, overloaded." %}</p>
+      <h1 class="vx-h1">{% trans "Resource Visibility" %}</h1>
+      <p class="vx-sub">{% trans "Who is free, partly or fully allocated, or overloaded across projects." %}</p>
     </div>
-    <form method="get" style="display:flex;gap:.5rem;flex-wrap:wrap">
-      <input type="text" name="search" value="{{ search }}" placeholder="{% trans 'Search name or badge' %}" class="oh-input">
-      <select name="availability" class="oh-select">
+    <form method="get" class="rv-toolbar">
+      <div class="rv-search"><ion-icon name="search-outline"></ion-icon><input type="text" name="search" value="{{ search }}" placeholder="{% trans 'Search name or badge' %}" class="rv-control"></div>
+      <select name="availability" class="rv-control rv-select" onchange="this.form.submit()">
         <option value="">{% trans "All availability" %}</option>
         {% for a in availabilities %}<option value="{{ a }}" {% if a == availability %}selected{% endif %}>{{ a }}</option>{% endfor %}
       </select>
-      <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Filter" %}</button>
+      <button type="submit" class="rv-control rv-go">{% trans "Search" %}</button>
     </form>
   </div>
 
-  <div class="row" style="margin-bottom:1rem">
+  <div class="vx-stats">
     {% for b in buckets %}
-      <div class="col-6 col-lg-3" style="margin-bottom:.6rem"><div class="rv-bucket"><span class="rv-label">{{ b.name }}</span><b>{{ b.count }}</b></div></div>
+      <div class="vx-card vx-stat" style="border-left-color:{% if b.name == 'Free' %}#0ea5e9{% elif b.name == 'Partially Available' %}#8b5cf6{% elif b.name == 'Fully Allocated' %}#16a34a{% else %}#dc2626{% endif %}">
+        <span class="vx-label">{{ b.name }}</span><b>{{ b.count }}</b>
+      </div>
     {% endfor %}
   </div>
 
-  {% for r in rows %}
-    <div class="rv-card">
-      <img src="{{ r.employee.get_avatar }}" alt="">
-      <div style="flex:1;min-width:220px">
-        <div style="font-weight:600">{{ r.employee.get_full_name }}</div>
-        <div style="color:#6b7280;font-size:.78rem">{{ r.employee.get_job_position|default:"" }}</div>
-        <div>
-          {% for m in r.projects %}<a class="rv-chip" style="text-decoration:none" href="{{ m.project.get_absolute_url }}">{{ m.project.name }} &middot; {{ m.allocation_pct }}%</a>{% empty %}<span style="color:#9ca3af;font-size:.78rem">{% trans "No active allocation" %}</span>{% endfor %}
+  <div class="vx-card">
+    {% for r in rows %}
+      <div class="rv-row">
+        <div class="rv-who">
+          <img class="vx-avatar" src="{{ r.employee.get_avatar }}" alt="">
+          <div style="min-width:0">
+            <div class="vx-item__title">{{ r.employee.get_full_name }}</div>
+            <div class="vx-item__sub">{{ r.employee.get_job_position|default:"-" }}</div>
+            <div class="rv-projects">
+              {% for m in r.projects %}<a class="vx-chip vx-chip--brand" href="{{ m.project.get_absolute_url }}">{{ m.project.name }} &middot; {{ m.allocation_pct }}%</a>{% empty %}<span class="vx-item__sub" style="margin:0">{% trans "No active allocation" %}</span>{% endfor %}
+            </div>
+          </div>
         </div>
+        <div>
+          <div class="rv-load"><span>{% trans "Load" %}</span><b>{{ r.total }}%</b></div>
+          <div class="vx-meter"><span style="width:{% if r.total > 100 %}100{% else %}{{ r.total }}{% endif %}%;background:{% if r.availability == 'Overloaded' %}#dc2626{% elif r.availability == 'Fully Allocated' %}#16a34a{% elif r.availability == 'Partially Available' %}#8b5cf6{% else %}#0ea5e9{% endif %}"></span></div>
+        </div>
+        <div style="text-align:right"><span class="vx-pill" style="background:{% if r.availability == 'Free' %}#0ea5e9{% elif r.availability == 'Partially Available' %}#8b5cf6{% elif r.availability == 'Fully Allocated' %}#16a34a{% else %}#dc2626{% endif %}">{{ r.availability }}</span></div>
       </div>
-      <div style="width:170px">
-        <div style="display:flex;justify-content:space-between;font-size:.75rem"><span style="color:#6b7280">{% trans "Load" %}</span><b>{{ r.total }}%</b></div>
-        <div class="rv-meter"><span style="width:{% if r.total > 100 %}100{% else %}{{ r.total }}{% endif %}%;background:{% if r.availability == 'Overloaded' %}#dc2626{% elif r.availability == 'Fully Allocated' %}#16a34a{% elif r.availability == 'Partially Available' %}#8b5cf6{% else %}#0ea5e9{% endif %}"></span></div>
-      </div>
-      <span class="rv-tag {% if r.availability == 'Free' %}rv-Free{% elif r.availability == 'Partially Available' %}rv-Partially{% elif r.availability == 'Fully Allocated' %}rv-Fully{% else %}rv-Overloaded{% endif %}">{{ r.availability }}</span>
-    </div>
-  {% empty %}
-    <p style="color:#6b7280;text-align:center;padding:2rem">{% trans "No people to show." %}</p>
-  {% endfor %}
+    {% empty %}
+      <div class="vx-empty" style="border:0"><ion-icon name="people-outline"></ion-icon>{% trans "No people to show." %}</div>
+    {% endfor %}
+  </div>
+</div>
 </div>
 {% endblock content %}

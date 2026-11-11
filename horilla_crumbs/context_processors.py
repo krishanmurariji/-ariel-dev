@@ -57,9 +57,23 @@ BREADCRUMB_URL_NAMES = {
     "run": "Run Payroll",
     "my-finance": "My Finance",
     "cbv-pipeline": "Recruitment Pipeline",
+    "vertex": "Vertex",
+    "projects": "Projects",
+    "status-updates": "Status Updates",
+    "hiring": "Hiring Requests",
+    "resources": "Resource Visibility",
+    "reviews": "Reviews",
+    "minutes": "Meeting Minutes",
 }
 
 sidebar_urls = [
+    # Vertex pages: each one is a top-level screen, so the trail restarts on it
+    "projects",
+    "status-updates",
+    "hiring",
+    "resources",
+    "reviews",
+    "minutes",
     "dashboard",
     "ess",
     "pipeline",

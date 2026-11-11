@@ -17,6 +17,7 @@ from vertex.models import (
     ReviewRequestStatus,
 )
 from vertex.tests.test_projects import (
+    HX,
     VertexTestBase,
     grant,
     join,
@@ -56,14 +57,14 @@ class ReviewAccessTests(VertexTestBase):
         user.save()
         client = self.login(self.hr)
         self.assertEqual(client.get(reverse("vertex-reviews")).status_code, 200)
-        self.assertEqual(client.get(reverse("vertex-review-new")).status_code, 200)
+        self.assertEqual(client.get(reverse("vertex-review-new"), **HX).status_code, 200)
         self.assertEqual(client.get(self.review.get_absolute_url()).status_code, 200)
 
     def test_subject_reviewer_and_requester_see_only_their_own(self):
         for person in (self.dev, self.pm, self.hr, self.other):
             grant(person, "view_reviewrequest")
         # the subject sees the review about them, not the one about someone else
-        page = self.login(self.dev).get(reverse("vertex-reviews"))
+        page = self.login(self.dev).get(reverse("vertex-review-list"), **HX)
         self.assertContains(page, self.dev.get_full_name())
         self.assertNotContains(page, self.other.get_full_name())
         self.assertEqual(self.login(self.dev).get(self.unrelated.get_absolute_url()).status_code, 404)
@@ -100,11 +101,11 @@ class ReviewCreateTests(VertexTestBase):
 
     def test_needs_add_reviewrequest(self):
         grant(self.a, "view_reviewrequest")
-        self.login(self.a).post(reverse("vertex-review-new"), self.data())
+        self.login(self.a).post(reverse("vertex-review-new"), self.data(), **HX)
         self.assertFalse(ReviewRequest.objects.exists())
 
     def test_one_open_request_per_employee(self):
-        self.login(self.hr).post(reverse("vertex-review-new"), self.data())
+        self.login(self.hr).post(reverse("vertex-review-new"), self.data(), **HX)
         reviews = ReviewRequest.objects.all()
         self.assertEqual(reviews.count(), 2)
         self.assertEqual({r.status for r in reviews}, {ReviewRequestStatus.OPEN})
@@ -118,6 +119,7 @@ class ReviewCreateTests(VertexTestBase):
                 title="Q1 review", scheduled_at="2026-12-01T10:00", duration_minutes=45,
                 meeting_url="https://meet.example.com/x", extra_attendees="Guest@Example.com, ann@example.com",
             ),
+            **HX,
         )
         reviews = ReviewRequest.objects.all()
         self.assertEqual({r.status for r in reviews}, {ReviewRequestStatus.SCHEDULED})
@@ -132,12 +134,12 @@ class ReviewCreateTests(VertexTestBase):
 
     def test_meeting_time_needs_a_title(self):
         self.login(self.hr).post(
-            reverse("vertex-review-new"), self.data(scheduled_at="2026-12-01T10:00")
+            reverse("vertex-review-new"), self.data(scheduled_at="2026-12-01T10:00"), **HX
         )
         self.assertFalse(ReviewRequest.objects.exists())
 
     def test_subjects_and_reviewer_are_notified(self):
-        self.login(self.hr).post(reverse("vertex-review-new"), self.data())
+        self.login(self.hr).post(reverse("vertex-review-new"), self.data(), **HX)
         for person in (self.a, self.b, self.pm):
             self.assertEqual(
                 Notification.objects.filter(recipient=person.employee_user_id).count(), 1, person
@@ -145,7 +147,7 @@ class ReviewCreateTests(VertexTestBase):
         self.assertEqual(Notification.objects.filter(recipient=self.hr.employee_user_id).count(), 0)
 
     def test_at_least_one_employee_is_required(self):
-        self.login(self.hr).post(reverse("vertex-review-new"), self.data(subjects=[]))
+        self.login(self.hr).post(reverse("vertex-review-new"), self.data(subjects=[]), **HX)
         self.assertFalse(ReviewRequest.objects.exists())
 
 
