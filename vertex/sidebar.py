@@ -18,6 +18,11 @@ SUBMENUS = [
         "accessibility": "vertex.sidebar.projects_accessibility",
     },
     {
+        "menu": _("Status Updates"),
+        "redirect": reverse("vertex-status"),
+        "accessibility": "vertex.sidebar.status_accessibility",
+    },
+    {
         "menu": _("Reviews"),
         "redirect": reverse("vertex-reviews"),
         "accessibility": "vertex.sidebar.reviews_accessibility",
@@ -40,3 +45,7 @@ def reviews_accessibility(request, submenu, user_perms, *args, **kwargs):
 
 def minutes_accessibility(request, submenu, user_perms, *args, **kwargs):
     return request.user.has_perm("vertex.view_meetingminute")
+
+
+def status_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("vertex.view_statusupdate")

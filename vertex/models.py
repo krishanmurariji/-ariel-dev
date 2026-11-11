@@ -125,6 +125,45 @@ class Project(models.Model):
 
         return reverse("vertex-project", args=[self.pk])
 
+    def get_update_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-project-edit", args=[self.pk])
+
+    def redirect(self):
+        """onclick attribute that opens the project workspace (used by the list rows)."""
+        return f"onclick=\"window.location.href='{self.get_absolute_url()}'\""
+
+    def get_avatar(self):
+        return f"https://ui-avatars.com/api/?name={self.code}&background=random&bold=true"
+
+    def get_member_count(self):
+        return sum(1 for m in self.members.all() if m.is_active)
+
+    def get_health_html(self):
+        from django.utils.html import format_html
+
+        colour = {"green": "#16a34a", "amber": "#f59e0b", "red": "#dc2626"}.get(self.health, "#6b7280")
+        return format_html(
+            '<span style="display:inline-flex;align-items:center;gap:6px">'
+            '<span style="width:9px;height:9px;border-radius:50%;background:{}"></span>{}</span>',
+            colour,
+            self.get_health_display(),
+        )
+
+    def get_card_view_subtitle(self):
+        from django.utils.html import format_html
+
+        return format_html(
+            '<div class="my-2">{}: <span class="font-semibold">{}</span></div>'
+            '<div class="mb-2">{}: {}</div>'
+            "<div>{}: <span class=\"font-semibold\">{}</span> &middot; {}: {}</div>",
+            _("Status"), self.get_status_display(),
+            _("Health"), self.get_health_html(),
+            _("Priority"), self.get_priority_display(),
+            _("Team"), self.get_member_count(),
+        )
+
     @property
     def tag_list(self):
         return [t.strip() for t in self.tags.split(",") if t.strip()]
@@ -453,3 +492,80 @@ class MeetingMinute(models.Model):
 
     def __str__(self):
         return self.title
+
+
+# ---------------------------------------------------------------------------
+# Status updates (ArielVertex StatusUpdate): a developer daily / weekly update on a project
+# the person is assigned to.
+#
+# * view_statusupdate        see the Status Updates page (own updates) and the project tab
+# * add_statusupdate         submit an update (only for projects the person is a member of)
+# * view_allstatusupdates    see internal notes and the consolidated summary (proxy "Status update (all)")
+# ---------------------------------------------------------------------------
+
+
+class UpdateStatus(models.TextChoices):
+    ON_TRACK = "on_track", _("On track")
+    AT_RISK = "at_risk", _("At risk")
+    BLOCKED = "blocked", _("Blocked")
+
+
+class StatusUpdate(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="status_updates")
+    employee = models.ForeignKey(
+        "employee.Employee", on_delete=models.CASCADE, related_name="vertex_status_updates"
+    )
+    update_date = models.DateField(verbose_name=_("Date"))
+    work_completed = models.TextField(verbose_name=_("Work completed"), max_length=4000)
+    next_planned_work = models.TextField(blank=True, default="", verbose_name=_("Next planned work"))
+    blockers = models.TextField(blank=True, default="")
+    dependencies = models.TextField(blank=True, default="")
+    hours_spent = models.DecimalField(
+        max_digits=4, decimal_places=1, default=8,
+        validators=[MinValueValidator(0), MaxValueValidator(24)], verbose_name=_("Hours"),
+    )
+    status = models.CharField(
+        max_length=10, choices=UpdateStatus.choices, default=UpdateStatus.ON_TRACK
+    )
+    internal_note = models.TextField(
+        blank=True, default="", verbose_name=_("Internal note"),
+        help_text=_("Never shown to business people."),
+    )
+    client_shareable_summary = models.TextField(
+        blank=True, default="", max_length=2000, verbose_name=_("Client-shareable summary"),
+        help_text=_("The only part rolled into the business summary."),
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Status update")
+        verbose_name_plural = _("Status updates")
+        ordering = ["-update_date", "-created_at"]
+
+    def __str__(self):
+        return f"{self.employee} - {self.project.code} - {self.update_date}"
+
+    def get_status_html(self):
+        from django.utils.html import format_html
+
+        colour = {"on_track": "#16a34a", "at_risk": "#f59e0b", "blocked": "#dc2626"}.get(
+            self.status, "#6b7280"
+        )
+        return format_html(
+            '<span style="display:inline-flex;align-items:center;gap:6px">'
+            '<span style="width:9px;height:9px;border-radius:50%;background:{}"></span>{}</span>',
+            colour,
+            self.get_status_display(),
+        )
+
+    def get_project_code(self):
+        return self.project.code
+
+
+class AllStatusUpdates(StatusUpdate):
+    """Permission switch only: see internal notes and the consolidated summary."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Status update (all)")
+        verbose_name_plural = _("Status updates (all)")

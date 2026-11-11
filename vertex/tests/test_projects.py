@@ -32,6 +32,7 @@ from vertex.models import (
 )
 
 PASSWORD = "123qwe"
+HX = {"HTTP_HX_REQUEST": "true"}  # modal forms are loaded by HTMX
 User = get_user_model()
 
 
@@ -122,12 +123,12 @@ class NoPermissionTests(VertexTestBase):
         project = make_project("BBB")
         client = self.login(admin)
         self.assertEqual(client.get(reverse("vertex-projects")).status_code, 200)
-        self.assertEqual(client.get(reverse("vertex-project-new")).status_code, 200)
+        self.assertEqual(client.get(reverse("vertex-project-new"), **HX).status_code, 200)
         for tab in ("overview", "team", "documents", "calls", "comments"):
             response = client.get(project.get_absolute_url(), {"tab": tab})
             self.assertEqual(response.status_code, 200, tab)
         self.assertEqual(
-            client.get(reverse("vertex-project-edit", args=[project.pk])).status_code, 200
+            client.get(reverse("vertex-project-edit", args=[project.pk]), **HX).status_code, 200
         )
 
 
@@ -142,10 +143,14 @@ class DataScopingTests(VertexTestBase):
 
     def test_member_sees_only_own_projects(self):
         client = self.login(self.me)
-        response = client.get(reverse("vertex-projects"))
+        self.assertEqual(client.get(reverse("vertex-projects")).status_code, 200)
+        response = client.get(reverse("vertex-project-list"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "MINE")
         self.assertNotContains(response, "OTHER")
+        card = client.get(reverse("vertex-project-card"), **HX)
+        self.assertContains(card, "MINE")
+        self.assertNotContains(card, "OTHER")
 
     def test_a_project_of_someone_else_is_a_404(self):
         client = self.login(self.me)
@@ -159,7 +164,7 @@ class DataScopingTests(VertexTestBase):
     def test_view_allprojects_shows_everything(self):
         grant(self.me, "view_allprojects")
         client = self.login(self.me)
-        response = client.get(reverse("vertex-projects"))
+        response = client.get(reverse("vertex-project-list"))
         self.assertContains(response, "MINE")
         self.assertContains(response, "OTHER")
 
@@ -167,10 +172,10 @@ class DataScopingTests(VertexTestBase):
         grant(self.me, "view_allprojects")
         Project.objects.filter(pk=self.other.pk).update(status="completed")
         client = self.login(self.me)
-        response = client.get(reverse("vertex-projects"), {"status": "completed"})
+        response = client.get(reverse("vertex-project-list"), {"status": "completed"})
         self.assertContains(response, "OTHER")
         self.assertNotContains(response, "MINE")
-        response = client.get(reverse("vertex-projects"), {"search": "mine"})
+        response = client.get(reverse("vertex-project-list"), {"search": "mine"})
         self.assertContains(response, "MINE")
         self.assertNotContains(response, "OTHER")
 
@@ -184,6 +189,10 @@ class CreateAndManageTests(VertexTestBase):
         join(self.project, self.pm, ProjectRole.PROJECT_MANAGER)
         join(self.project, self.dev, ProjectRole.DEVELOPER)
 
+    def assertNoForm(self, response):
+        """Denied HTMX requests get Ariel HR's standard no-permission box instead of the form."""
+        self.assertNotContains(response, 'name="client_name"')
+
     def new_project_data(self, code="NEW1"):
         return {
             "code": code, "name": "Brand new", "status": "active", "health": "green",
@@ -193,15 +202,12 @@ class CreateAndManageTests(VertexTestBase):
     def test_create_needs_add_project_and_makes_creator_the_pm(self):
         grant(self.dev, "view_project")
         response = self.login(self.dev).post(
-            reverse("vertex-project-new"), self.new_project_data()
+            reverse("vertex-project-new"), self.new_project_data(), **HX
         )
         self.assertFalse(Project.objects.filter(code="NEW1").exists())
 
         grant(self.dev, "add_project")
-        response = self.login(self.dev).post(
-            reverse("vertex-project-new"), self.new_project_data()
-        )
-        self.assertEqual(response.status_code, 302)
+        self.login(self.dev).post(reverse("vertex-project-new"), self.new_project_data(), **HX)
         created = Project.objects.get(code="NEW1")
         member = ProjectMember.objects.get(project=created, employee=self.dev)
         self.assertEqual(member.role_on_project, ProjectRole.PROJECT_MANAGER)
@@ -209,7 +215,7 @@ class CreateAndManageTests(VertexTestBase):
     def test_duplicate_code_is_refused(self):
         grant(self.pm, "view_project", "add_project")
         self.login(self.pm).post(
-            reverse("vertex-project-new"), self.new_project_data(code="deliv")
+            reverse("vertex-project-new"), self.new_project_data(code="deliv"), **HX
         )
         self.assertEqual(Project.objects.filter(code="DELIV").count(), 1)
 
@@ -217,24 +223,26 @@ class CreateAndManageTests(VertexTestBase):
         grant(self.pm, "view_project", "change_project")
         grant(self.dev, "view_project", "change_project")
         edit = reverse("vertex-project-edit", args=[self.project.pk])
-        self.assertEqual(self.login(self.pm).get(edit).status_code, 200)
-        self.assertNotEqual(self.login(self.dev).get(edit).status_code, 200)
+        self.assertContains(self.login(self.pm).get(edit, **HX), 'name="client_name"')
+        self.assertNoForm(self.login(self.dev).get(edit, **HX))
 
     def test_pm_without_change_permission_cannot_edit(self):
         grant(self.pm, "view_project")
         edit = reverse("vertex-project-edit", args=[self.project.pk])
-        self.assertNotEqual(self.login(self.pm).get(edit).status_code, 200)
+        self.assertNoForm(self.login(self.pm).get(edit, **HX))
 
     def test_change_allprojects_edits_any_project(self):
         grant(self.dev, "view_allprojects", "change_allprojects", "view_project")
         edit = reverse("vertex-project-edit", args=[self.project.pk])
-        self.assertEqual(self.login(self.dev).get(edit).status_code, 200)
+        self.assertContains(self.login(self.dev).get(edit, **HX), 'name="client_name"')
 
     def test_project_code_cannot_be_changed_on_edit(self):
         grant(self.pm, "view_project", "change_project")
         data = self.new_project_data(code="HACKED")
         data["name"] = "Renamed"
-        self.login(self.pm).post(reverse("vertex-project-edit", args=[self.project.pk]), data)
+        self.login(self.pm).post(
+            reverse("vertex-project-edit", args=[self.project.pk]), data, **HX
+        )
         self.project.refresh_from_db()
         self.assertEqual((self.project.code, self.project.name), ("DELIV", "Renamed"))
 
@@ -246,17 +254,17 @@ class CreateAndManageTests(VertexTestBase):
             "employee": newcomer.pk, "role_on_project": "qa", "allocation_pct": 50,
             "start_date": "2026-03-01",
         }
-        client.post(reverse("vertex-member-add", args=[self.project.pk]), data)
+        client.post(reverse("vertex-member-add", args=[self.project.pk]), data, **HX)
         member = ProjectMember.objects.get(project=self.project, employee=newcomer)
         self.assertTrue(member.is_active)
         # adding twice is refused
-        client.post(reverse("vertex-member-add", args=[self.project.pk]), data)
+        client.post(reverse("vertex-member-add", args=[self.project.pk]), data, **HX)
         self.assertEqual(ProjectMember.objects.filter(employee=newcomer).count(), 1)
         client.post(reverse("vertex-member-remove", args=[self.project.pk, member.pk]))
         member.refresh_from_db()
         self.assertFalse(member.is_active)
         # re-adding reactivates the same row
-        client.post(reverse("vertex-member-add", args=[self.project.pk]), data)
+        client.post(reverse("vertex-member-add", args=[self.project.pk]), data, **HX)
         member.refresh_from_db()
         self.assertTrue(member.is_active)
         self.assertEqual(ProjectMember.objects.filter(employee=newcomer).count(), 1)
@@ -268,6 +276,7 @@ class CreateAndManageTests(VertexTestBase):
             reverse("vertex-member-add", args=[self.project.pk]),
             {"employee": newcomer.pk, "role_on_project": "qa", "allocation_pct": 50,
              "start_date": "2026-03-01"},
+            **HX,
         )
         self.assertFalse(ProjectMember.objects.filter(employee=newcomer).exists())
 
@@ -278,6 +287,7 @@ class CreateAndManageTests(VertexTestBase):
             reverse("vertex-member-add", args=[self.project.pk]),
             {"employee": newcomer.pk, "role_on_project": "qa", "allocation_pct": 150,
              "start_date": "2026-03-01"},
+            **HX,
         )
         self.assertFalse(ProjectMember.objects.filter(employee=newcomer).exists())
 
@@ -332,10 +342,10 @@ class CommentsAndCallsTests(VertexTestBase):
         }
         url = reverse("vertex-call-add", args=[self.project.pk])
         grant(self.dev, "add_projectcall")
-        self.login(self.dev).post(url, data)  # a developer is not PM/PC
+        self.login(self.dev).post(url, data, **HX)  # a developer is not PM/PC
         self.assertFalse(self.project.calls.exists())
         grant(self.pm, "add_projectcall", "change_project")
-        self.login(self.pm).post(url, data)
+        self.login(self.pm).post(url, data, **HX)
         self.assertEqual(self.project.calls.count(), 1)
 
 
@@ -406,6 +416,7 @@ class DocumentTests(VertexTestBase):
             url,
             {"title": "Bad", "category": "other", "visibility": 0,
              "file": SimpleUploadedFile("page.html", b"<script>1</script>")},
+            **HX,
         )
         self.assertEqual(ProjectDocument.objects.count(), before)
 
@@ -415,6 +426,7 @@ class DocumentTests(VertexTestBase):
             url,
             {"title": "Notes", "category": "meeting_notes", "visibility": 1,
              "file": SimpleUploadedFile("notes.txt", b"abc")},
+            **HX,
         )
         document = ProjectDocument.objects.get(title="Notes")
         self.assertEqual((document.file_name, document.size_bytes), ("notes.txt", 3))
@@ -428,12 +440,85 @@ class DocumentTests(VertexTestBase):
         url = reverse("vertex-document-add", args=[self.project.pk])
         before = ProjectDocument.objects.count()
         self.login(self.pm).post(
-            url, {"title": "Demo", "category": "demo", "visibility": 0, "is_video_link": "on"}
+            url, {"title": "Demo", "category": "demo", "visibility": 0, "is_video_link": "on"}, **HX
         )
         self.assertEqual(ProjectDocument.objects.count(), before)
         self.login(self.pm).post(
             url,
             {"title": "Demo", "category": "demo", "visibility": 0, "is_video_link": "on",
              "video_url": "https://example.com/v"},
+            **HX,
         )
         self.assertEqual(ProjectDocument.objects.count(), before + 1)
+
+
+class WorkspaceTests(VertexTestBase):
+    """The workspace tabs render for the right people, and the modals open only for managers."""
+
+    TABS = ("overview", "team", "documents", "calls", "status", "reviews", "comments")
+
+    def setUp(self):
+        super().setUp()
+        self.pm = make_employee("Pm", "pm@example.com", "9000000061")
+        self.dev = make_employee("Dev", "dev@example.com", "9000000062")
+        self.project = make_project("WORK", client_name="Acme", tags="a, b")
+        join(self.project, self.pm, ProjectRole.PROJECT_MANAGER)
+        join(self.project, self.dev)
+        for person in (self.pm, self.dev):
+            grant(person, "view_project", "view_statusupdate", "view_reviewrequest")
+        grant(self.pm, "change_project", "add_projectmember", "add_projectdocument", "add_projectcall")
+
+    def test_every_tab_renders(self):
+        client = self.login(self.pm)
+        for tab in self.TABS:
+            response = client.get(self.project.get_absolute_url(), {"tab": tab})
+            self.assertEqual(response.status_code, 200, tab)
+        self.assertContains(client.get(self.project.get_absolute_url()), "Acme")
+
+    def test_unknown_tab_falls_back_to_overview(self):
+        response = self.login(self.dev).get(self.project.get_absolute_url(), {"tab": "nope"})
+        self.assertEqual(response.status_code, 200)
+
+    def test_buttons_follow_permissions(self):
+        manager = self.login(self.pm).get(self.project.get_absolute_url(), {"tab": "team"})
+        self.assertContains(manager, reverse("vertex-member-add", args=[self.project.pk]))
+        self.assertContains(manager, reverse("vertex-project-edit", args=[self.project.pk]))
+        member = self.login(self.dev).get(self.project.get_absolute_url(), {"tab": "team"})
+        self.assertNotContains(member, reverse("vertex-member-add", args=[self.project.pk]))
+        self.assertNotContains(member, reverse("vertex-project-edit", args=[self.project.pk]))
+
+    def test_modals_open_for_a_manager_and_not_for_a_member(self):
+        for name in ("vertex-member-add", "vertex-document-add", "vertex-call-add"):
+            url = reverse(name, args=[self.project.pk])
+            self.assertContains(self.login(self.pm).get(url, **HX), "<form")
+            denied = self.login(self.dev).get(url, **HX)
+            self.assertNotContains(denied, "<form")
+
+    def test_document_modal_does_not_need_manage_rights(self):
+        grant(self.dev, "add_projectdocument")
+        url = reverse("vertex-document-add", args=[self.project.pk])
+        self.assertContains(self.login(self.dev).get(url, **HX), "<form")
+
+    def test_modal_of_a_project_the_user_cannot_see_is_refused(self):
+        other = make_project("HIDDEN")
+        grant(self.pm, "add_projectmember")
+        url = reverse("vertex-member-add", args=[other.pk])
+        self.assertNotContains(self.login(self.pm).get(url, **HX), "<form")
+
+    def test_start_date_after_end_date_is_refused(self):
+        grant(self.pm, "add_project")
+        self.login(self.pm).post(
+            reverse("vertex-project-new"),
+            {"code": "BADD", "name": "x", "status": "active", "health": "green",
+             "priority": 1, "start_date": "2026-05-01", "expected_end_date": "2026-04-01"},
+            **HX,
+        )
+        self.assertFalse(Project.objects.filter(code="BADD").exists())
+
+    def test_card_view_and_filters_work(self):
+        client = self.login(self.pm)
+        card = client.get(reverse("vertex-project-card"), **HX)
+        self.assertContains(card, "WORK")
+        self.assertEqual(client.get(reverse("vertex-project-nav"), **HX).status_code, 200)
+        listing = client.get(reverse("vertex-project-list"), {"health": "red"}, **HX)
+        self.assertNotContains(listing, "WORK")

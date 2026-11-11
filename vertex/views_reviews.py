@@ -67,7 +67,7 @@ def review_list(request):
 @login_required
 @permission_required("vertex.add_reviewrequest")
 def review_create(request):
-    form = ReviewRequestForm(request.POST or None)
+    form = ReviewRequestForm(request.POST or None, initial={"project": request.GET.get("project")})
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
         me = access.employee_of(request.user)

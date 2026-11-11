@@ -5,8 +5,10 @@ vertex/forms.py
 import os
 
 from django import forms
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from base.forms import ModelForm
 from employee.models import Employee
 from vertex.models import (
     Project,
@@ -14,6 +16,7 @@ from vertex.models import (
     ProjectComment,
     ProjectDocument,
     ProjectMember,
+    StatusUpdate,
 )
 
 MAX_UPLOAD_BYTES = 30 * 1000 * 1000  # same limit as ArielVertex
@@ -26,7 +29,9 @@ _DATE = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
 _DATETIME = forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M")
 
 
-class ProjectForm(forms.ModelForm):
+class ProjectForm(ModelForm):
+    cols = {"description": 12, "notes": 12}
+
     class Meta:
         model = Project
         fields = [
@@ -49,8 +54,15 @@ class ProjectForm(forms.ModelForm):
     def clean_code(self):
         return self.cleaned_data["code"].strip().upper()
 
+    def clean(self):
+        data = super().clean()
+        start, end = data.get("start_date"), data.get("expected_end_date")
+        if start and end and end < start:
+            self.add_error("expected_end_date", _("The end date cannot be before the start date."))
+        return data
 
-class MemberForm(forms.ModelForm):
+
+class MemberForm(ModelForm):
     class Meta:
         model = ProjectMember
         fields = ["employee", "role_on_project", "allocation_pct", "start_date", "end_date"]
@@ -69,7 +81,7 @@ class MemberForm(forms.ModelForm):
         return value
 
 
-class DocumentForm(forms.ModelForm):
+class DocumentForm(ModelForm):
     class Meta:
         model = ProjectDocument
         fields = ["title", "description", "category", "visibility", "is_video_link", "video_url", "file"]
@@ -93,7 +105,7 @@ class DocumentForm(forms.ModelForm):
         return data
 
 
-class CommentForm(forms.ModelForm):
+class CommentForm(ModelForm):
     class Meta:
         model = ProjectComment
         fields = ["message"]
@@ -106,7 +118,7 @@ class CommentForm(forms.ModelForm):
         return message
 
 
-class CallForm(forms.ModelForm):
+class CallForm(ModelForm):
     class Meta:
         model = ProjectCall
         fields = [
@@ -114,3 +126,55 @@ class CallForm(forms.ModelForm):
             "attendees", "meeting_url",
         ]
         widgets = {"scheduled_at": _DATETIME, "agenda": forms.Textarea(attrs={"rows": 2})}
+
+
+class StatusUpdateForm(ModelForm):
+    """Submit a status update; only for projects the person is an active member of."""
+
+    cols = {
+        "work_completed": 12, "next_planned_work": 12, "blockers": 12,
+        "dependencies": 12, "client_shareable_summary": 12, "internal_note": 12,
+    }
+
+    class Meta:
+        model = StatusUpdate
+        fields = [
+            "project", "update_date", "hours_spent", "status", "work_completed",
+            "next_planned_work", "blockers", "dependencies", "client_shareable_summary",
+            "internal_note",
+        ]
+        widgets = {
+            "update_date": _DATE,
+            **{
+                name: forms.Textarea(attrs={"rows": 2})
+                for name in (
+                    "work_completed", "next_planned_work", "blockers", "dependencies",
+                    "client_shareable_summary", "internal_note",
+                )
+            },
+        }
+
+    def __init__(self, *args, **kwargs):
+        from horilla.horilla_middlewares import _thread_locals
+        from vertex import access
+
+        super().__init__(*args, **kwargs)
+        request = getattr(_thread_locals, "request", None)
+        user = getattr(request, "user", None)
+        self.fields["project"].queryset = (
+            access.assignable_projects(user) if user is not None else Project.objects.none()
+        )
+        if not self.instance.pk:
+            self.fields["update_date"].initial = timezone.localdate()
+
+    def clean_update_date(self):
+        value = self.cleaned_data["update_date"]
+        if value > timezone.localdate():
+            raise forms.ValidationError(_("The date cannot be in the future."))
+        return value
+
+    def clean_work_completed(self):
+        value = self.cleaned_data["work_completed"].strip()
+        if not value:
+            raise forms.ValidationError(_("Describe the work completed."))
+        return value

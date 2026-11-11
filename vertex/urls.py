@@ -5,22 +5,25 @@ vertex/urls.py
 from django.urls import path
 from django.views.generic import RedirectView
 
-from vertex import views, views_minutes, views_reviews
+from vertex import cbv, views, views_minutes, views_reviews
 
 urlpatterns = [
     path("", RedirectView.as_view(pattern_name="vertex-projects"), name="vertex-home"),
-    path("projects/", views.project_list, name="vertex-projects"),
-    path("projects/new/", views.project_create, name="vertex-project-new"),
+    path("projects/", cbv.ProjectsView.as_view(), name="vertex-projects"),
+    path("projects/nav/", cbv.ProjectsNavView.as_view(), name="vertex-project-nav"),
+    path("projects/list/", cbv.ProjectsList.as_view(), name="vertex-project-list"),
+    path("projects/card/", cbv.ProjectsCard.as_view(), name="vertex-project-card"),
+    path("projects/new/", cbv.ProjectFormView.as_view(), name="vertex-project-new"),
     path("projects/<int:pk>/", views.project_detail, name="vertex-project"),
-    path("projects/<int:pk>/edit/", views.project_edit, name="vertex-project-edit"),
-    path("projects/<int:pk>/members/add/", views.member_add, name="vertex-member-add"),
+    path("projects/<int:pk>/edit/", cbv.ProjectFormView.as_view(), name="vertex-project-edit"),
+    path("projects/<int:project_id>/members/add/", cbv.ProjectMemberFormView.as_view(), name="vertex-member-add"),
     path(
         "projects/<int:pk>/members/<int:member_id>/remove/",
         views.member_remove,
         name="vertex-member-remove",
     ),
     path("projects/<int:pk>/comments/add/", views.comment_add, name="vertex-comment-add"),
-    path("projects/<int:pk>/documents/add/", views.document_add, name="vertex-document-add"),
+    path("projects/<int:project_id>/documents/add/", cbv.ProjectDocumentFormView.as_view(), name="vertex-document-add"),
     path(
         "projects/<int:pk>/documents/<int:doc_id>/download/",
         views.document_download,
@@ -31,7 +34,12 @@ urlpatterns = [
         views.document_delete,
         name="vertex-document-delete",
     ),
-    path("projects/<int:pk>/calls/add/", views.call_add, name="vertex-call-add"),
+    path("projects/<int:project_id>/calls/add/", cbv.ProjectCallFormView.as_view(), name="vertex-call-add"),
+    # status updates
+    path("status-updates/", cbv.StatusUpdatesView.as_view(), name="vertex-status"),
+    path("status-updates/nav/", cbv.StatusUpdatesNavView.as_view(), name="vertex-status-nav"),
+    path("status-updates/list/", cbv.StatusUpdatesList.as_view(), name="vertex-status-list"),
+    path("status-updates/new/", cbv.StatusUpdateFormView.as_view(), name="vertex-status-new"),
     # reviews
     path("reviews/", views_reviews.review_list, name="vertex-reviews"),
     path("reviews/new/", views_reviews.review_create, name="vertex-review-new"),

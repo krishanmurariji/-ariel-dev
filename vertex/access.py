@@ -141,3 +141,68 @@ def can_submit_review(user, review):
     return (
         employee is not None and review.assigned_to_id == employee.pk
     ) or user.has_perm("vertex.view_allreviewrequests")
+
+
+# ---------------------------------------------------------------------------
+# Status updates (ArielVertex StatusUpdatesController)
+# ---------------------------------------------------------------------------
+
+
+def assignable_projects(user):
+    """Projects the person may submit a status update for: those they are an active member of."""
+    employee = employee_of(user)
+    if employee is None:
+        return Project.objects.none()
+    return Project.objects.filter(
+        members__employee=employee, members__is_active=True
+    ).distinct()
+
+
+def can_see_internal_status(user, project):
+    """Internal notes and the consolidated summary: see-all holders and the project managers."""
+    return user.has_perm("vertex.view_allstatusupdates") or can_manage(user, project)
+
+
+def visible_status_updates(user, project):
+    """
+    Updates of a project as the user may see them. Business people get only a business-safe
+    projection (see ``business_view``); everyone else sees the full update.
+    """
+    if not user.has_perm("vertex.view_statusupdate"):
+        return project.status_updates.none()
+    return project.status_updates.select_related("employee", "project")
+
+
+def business_view(user, project):
+    """True when status updates must be shown stripped (no internal note, blockers or detail)."""
+    return is_business_only(user, project) and not can_see_internal_status(user, project)
+
+
+def consolidated_summary(project, days=7):
+    """
+    Business-ready summary of the last ``days`` days: the client-shareable updates, and who
+    of the developers / QA on the project has not reported (ArielVertex Consolidated).
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    days = max(1, min(int(days), 60))
+    start = timezone.localdate() - timedelta(days=days)
+    updates = list(
+        project.status_updates.filter(update_date__gte=start).select_related("employee")
+    )
+    expected = list(
+        project.members.filter(
+            is_active=True, role_on_project__in=[ProjectRole.DEVELOPER, ProjectRole.QA]
+        ).select_related("employee")
+    )
+    reporting_ids = {u.employee_id for u in updates}
+    return {
+        "days": days,
+        "start": start,
+        "updates": updates,
+        "reporting": len(reporting_ids),
+        "expected": len(expected),
+        "missing": [m.employee.get_full_name() for m in expected if m.employee_id not in reporting_ids],
+    }

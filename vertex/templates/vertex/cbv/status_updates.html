@@ -1,0 +1,17 @@
+{% extends "index.html" %}
+{% load i18n static %}
+
+{% block content %}
+<style>
+    .on_track--dot { background-color: #16a34a; }
+    .at_risk--dot { background-color: #f59e0b; }
+    .blocked--dot { background-color: #dc2626; }
+    .status-on_track { border-left: 3.4px solid #16a34a !important; border-radius: 4px 0 0 4px; }
+    .status-at_risk { border-left: 3.4px solid #f59e0b !important; border-radius: 4px 0 0 4px; }
+    .status-blocked { border-left: 3.4px solid #dc2626 !important; border-radius: 4px 0 0 4px; }
+</style>
+<div hx-get="{% url 'vertex-status-nav' %}?{{request.GET.urlencode}}" hx-trigger="load"></div>
+<div class="oh-wrapper" id="listContainer">
+    <div class="animated-background"></div>
+</div>
+{% endblock %}
