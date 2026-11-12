@@ -1123,3 +1123,266 @@ class VertexSetting(models.Model):
 
     def __str__(self):
         return f"{self.key} = {self.value}"
+
+
+# ---------------------------------------------------------------------------
+# Appraisals: cycles, appraisals (self -> manager -> release) and goals
+#
+# * view_appraisalcycle / add_appraisalcycle / change_appraisalcycle   HR runs the cycles
+# * view_appraisal      your own appraisals, plus your reports' when you may evaluate
+# * change_appraisal    evaluate the appraisals of the people who report to you
+# * view_allappraisals  every appraisal                  (proxy "Appraisals - all")
+# * change_appraisalrelease  release the final rating    (proxy "Appraisal release")
+# * view_goal / add_goal / change_goal / delete_goal     goals and KRAs
+# * view_allgoals       every goal                       (proxy "Goals - all")
+# ---------------------------------------------------------------------------
+
+
+class CycleStatus(models.TextChoices):
+    DRAFT = "draft", _("Draft")
+    ACTIVE = "active", _("Active")
+    CLOSED = "closed", _("Closed")
+
+
+class AppraisalCycle(models.Model):
+    """An appraisal round, for example "H1 2027 appraisal"; HR activates it to open every appraisal."""
+
+    name = models.CharField(max_length=150, unique=True)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    status = models.CharField(max_length=10, choices=CycleStatus.choices, default=CycleStatus.DRAFT)
+    created_by = models.ForeignKey(
+        "employee.Employee", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Appraisal cycle")
+        verbose_name_plural = _("Appraisal cycles")
+        ordering = ["-start_date", "-id"]
+
+    def __str__(self):
+        return self.name
+
+    def get_update_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-cycle-edit", args=[self.pk])
+
+    def get_appraisals_url(self):
+        from django.urls import reverse
+
+        return f"{reverse('vertex-appraisals')}?cycle={self.pk}"
+
+    def get_activate_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-cycle-activate", args=[self.pk])
+
+    def get_close_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-cycle-close", args=[self.pk])
+
+    def get_period_display(self):
+        return f"{self.start_date:%d %b %Y} - {self.end_date:%d %b %Y}"
+
+    def get_progress_display(self):
+        total = self.appraisals.count()
+        if not total:
+            return "-"
+        return f"{self.appraisals.filter(stage=AppraisalStage.RELEASED).count()} / {total} released"
+
+    def get_status_html(self):
+        colour = {"draft": "#6b7280", "active": "#16a34a", "closed": "#475569"}.get(self.status, "#6b7280")
+        return _colour_html(colour, self.get_status_display())
+
+
+class AppraisalStage(models.TextChoices):
+    SELF_PENDING = "self_pending", _("Self assessment pending")
+    SELF_SUBMITTED = "self_submitted", _("Awaiting manager")
+    MANAGER_COMPLETED = "manager_completed", _("Awaiting release")
+    RELEASED = "released", _("Released")
+
+
+RATING_VALIDATORS = [MinValueValidator(1), MaxValueValidator(5)]
+
+
+class Appraisal(models.Model):
+    """One person's appraisal in one cycle: self assessment, manager evaluation, then HR releases it."""
+
+    cycle = models.ForeignKey(AppraisalCycle, on_delete=models.CASCADE, related_name="appraisals")
+    employee = models.ForeignKey(
+        "employee.Employee", on_delete=models.CASCADE, related_name="vertex_appraisals"
+    )
+    manager = models.ForeignKey(
+        "employee.Employee", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="vertex_appraisals_to_evaluate",
+    )
+    stage = models.CharField(max_length=20, choices=AppraisalStage.choices, default=AppraisalStage.SELF_PENDING)
+
+    self_rating = models.DecimalField(max_digits=2, decimal_places=1, null=True, blank=True, validators=RATING_VALIDATORS)
+    self_comments = models.TextField(blank=True, default="")
+    self_submitted_at = models.DateTimeField(null=True, blank=True)
+
+    manager_rating = models.DecimalField(max_digits=2, decimal_places=1, null=True, blank=True, validators=RATING_VALIDATORS)
+    manager_comments = models.TextField(blank=True, default="")
+    manager_reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    final_rating = models.DecimalField(max_digits=2, decimal_places=1, null=True, blank=True, validators=RATING_VALIDATORS)
+    final_comments = models.TextField(blank=True, default="")
+    released_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Appraisal")
+        verbose_name_plural = _("Appraisals")
+        ordering = ["-cycle__start_date", "employee__employee_first_name"]
+        constraints = [
+            models.UniqueConstraint(fields=["cycle", "employee"], name="vertex_one_appraisal_per_cycle")
+        ]
+
+    def __str__(self):
+        return f"{self.employee} - {self.cycle}"
+
+    def get_absolute_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-appraisal", args=[self.pk])
+
+    def get_self_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-appraisal-self", args=[self.pk])
+
+    def get_manager_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-appraisal-manager", args=[self.pk])
+
+    def get_release_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-appraisal-release", args=[self.pk])
+
+    def get_employee_name(self):
+        return self.employee.get_full_name()
+
+    def get_manager_name(self):
+        return self.manager.get_full_name() if self.manager_id else "-"
+
+    def get_cycle_name(self):
+        return self.cycle.name
+
+    def get_self_rating_display(self):
+        return f"{self.self_rating} / 5" if self.self_rating is not None else "-"
+
+    def get_final_rating_display(self):
+        return f"{self.final_rating} / 5" if self.final_rating is not None else "-"
+
+    def get_stage_html(self):
+        colour = {
+            "self_pending": "#6b7280", "self_submitted": "#3b82f6",
+            "manager_completed": "#f59e0b", "released": "#16a34a",
+        }.get(self.stage, "#6b7280")
+        return _colour_html(colour, self.get_stage_display())
+
+
+class AllAppraisals(Appraisal):
+    """Permission switch only: ``view_allappraisals`` shows everyone's appraisals."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Appraisals (all)")
+        verbose_name_plural = _("Appraisals (all)")
+
+
+class AppraisalRelease(Appraisal):
+    """Permission switch only: ``change_appraisalrelease`` may release the final rating."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Appraisal release")
+        verbose_name_plural = _("Appraisal release")
+
+
+class GoalStatus(models.TextChoices):
+    NOT_STARTED = "not_started", _("Not started")
+    IN_PROGRESS = "in_progress", _("In progress")
+    COMPLETED = "completed", _("Completed")
+    CANCELLED = "cancelled", _("Cancelled")
+
+
+class Goal(models.Model):
+    """A goal / KRA for one employee with a weight (share of the whole) and a progress percentage."""
+
+    employee = models.ForeignKey(
+        "employee.Employee", on_delete=models.CASCADE, related_name="vertex_goals"
+    )
+    assigned_by = models.ForeignKey(
+        "employee.Employee", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    cycle = models.ForeignKey(
+        AppraisalCycle, null=True, blank=True, on_delete=models.SET_NULL, related_name="goals"
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    category = models.CharField(max_length=80, blank=True, default="", help_text=_("KRA category"))
+    weightage = models.PositiveSmallIntegerField(
+        default=10, validators=[MinValueValidator(1), MaxValueValidator(100)],
+        help_text=_("Share of the whole, in percent. Active goals of one person in one cycle add up to at most 100."),
+    )
+    progress = models.PositiveSmallIntegerField(default=0, validators=[MaxValueValidator(100)])
+    target_date = models.DateField()
+    status = models.CharField(max_length=15, choices=GoalStatus.choices, default=GoalStatus.NOT_STARTED)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Goal")
+        verbose_name_plural = _("Goals")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.title
+
+    def get_update_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-goal-edit", args=[self.pk])
+
+    def get_progress_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-goal-progress", args=[self.pk])
+
+    def get_delete_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-goal-delete", args=[self.pk])
+
+    def get_employee_name(self):
+        return self.employee.get_full_name()
+
+    def get_cycle_name(self):
+        return self.cycle.name if self.cycle_id else "-"
+
+    def get_weight_display(self):
+        return f"{self.weightage}%"
+
+    def get_progress_display(self):
+        return f"{self.progress}%"
+
+    def get_status_html(self):
+        colour = {
+            "not_started": "#6b7280", "in_progress": "#f59e0b", "completed": "#16a34a", "cancelled": "#dc2626",
+        }.get(self.status, "#6b7280")
+        return _colour_html(colour, self.get_status_display())
+
+
+class AllGoals(Goal):
+    """Permission switch only: ``view_allgoals`` shows everyone's goals."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Goals (all)")
+        verbose_name_plural = _("Goals (all)")

@@ -9,7 +9,10 @@ from django.utils.translation import gettext_lazy as _
 
 from horilla.filters import HorillaFilterSet
 from vertex.models import (
+    Appraisal,
+    AppraisalCycle,
     Feedback,
+    Goal,
     MeetingMinute,
     PerformanceReport,
     Pip,
@@ -199,4 +202,48 @@ class PipFilter(HorillaFilterSet):
             Q(subject__employee_first_name__icontains=value)
             | Q(subject__employee_last_name__icontains=value)
             | Q(reason__icontains=value)
+        )
+
+
+class CycleFilter(HorillaFilterSet):
+    search = django_filters.CharFilter(method="filter_search")
+
+    class Meta:
+        model = AppraisalCycle
+        fields = ["status"]
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(name__icontains=value)
+
+
+class AppraisalFilter(HorillaFilterSet):
+    search = django_filters.CharFilter(method="filter_search")
+
+    class Meta:
+        model = Appraisal
+        fields = ["cycle", "stage"]
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(employee__employee_first_name__icontains=value)
+            | Q(employee__employee_last_name__icontains=value)
+            | Q(manager__employee_first_name__icontains=value)
+            | Q(manager__employee_last_name__icontains=value)
+            | Q(cycle__name__icontains=value)
+        )
+
+
+class GoalFilter(HorillaFilterSet):
+    search = django_filters.CharFilter(method="filter_search")
+
+    class Meta:
+        model = Goal
+        fields = ["status", "cycle", "category"]
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(title__icontains=value)
+            | Q(category__icontains=value)
+            | Q(employee__employee_first_name__icontains=value)
+            | Q(employee__employee_last_name__icontains=value)
         )

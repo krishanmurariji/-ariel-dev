@@ -16,7 +16,7 @@ from django.db import transaction
 
 from employee.models import Employee
 from vertex.models import Project, ProjectMember
-from vertex.roles import DEMO_PASSWORD, DEMO_PROJECT_CODE, DEMO_USERS, ROLES, build_groups
+from vertex.roles import REPORTING, DEMO_PASSWORD, DEMO_PROJECT_CODE, DEMO_USERS, ROLES, build_groups
 
 
 class Command(BaseCommand):
@@ -58,7 +58,20 @@ class Command(BaseCommand):
                               "allocation_pct": 50},
                 )
             self.stdout.write(f"  {username:10} {group_name or '(no group)'}")
+        self.set_reporting_managers()
         self.stdout.write(self.style.SUCCESS(f"{len(DEMO_USERS)} demo users ready; project {DEMO_PROJECT_CODE}."))
+
+    def set_reporting_managers(self):
+        """Appraisals and goals follow the reporting manager: developers report to the PM, the PM and lead to HR."""
+        from employee.models import EmployeeWorkInformation
+
+        def employee(username):
+            return Employee.objects.get(employee_user_id__username=username)
+
+        for username, manager in REPORTING:
+            EmployeeWorkInformation.objects.update_or_create(
+                employee_id=employee(username), defaults={"reporting_manager_id": employee(manager)}
+            )
 
     def remove(self):
         User = get_user_model()

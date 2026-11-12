@@ -1,0 +1,17 @@
+{% extends "index.html" %}
+{% load i18n static %}
+
+{% block content %}
+<style>
+    .draft--dot { background-color: #6b7280; }
+    .active--dot { background-color: #16a34a; }
+    .closed--dot { background-color: #475569; }
+    .status-draft { border-left: 3.4px solid #6b7280 !important; border-radius: 4px 0 0 4px; }
+    .status-active { border-left: 3.4px solid #16a34a !important; border-radius: 4px 0 0 4px; }
+    .status-closed { border-left: 3.4px solid #475569 !important; border-radius: 4px 0 0 4px; }
+</style>
+<div hx-get="{% url 'vertex-cycle-nav' %}?{{request.GET.urlencode}}" hx-trigger="load"></div>
+<div class="oh-wrapper" id="listContainer">
+    <div class="animated-background"></div>
+</div>
+{% endblock %}

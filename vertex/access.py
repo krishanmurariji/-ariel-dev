@@ -395,3 +395,170 @@ def visible_pips(user):
     if not user.has_perm("vertex.view_pip"):
         return Pip.objects.none()
     return Pip.objects.select_related("subject", "created_by")
+
+
+# ---------------------------------------------------------------------------
+# Appraisals and goals
+# ---------------------------------------------------------------------------
+
+
+def reports_of(user):
+    """Active employees whose reporting manager is this user."""
+    from employee.models import Employee
+
+    me = employee_of(user)
+    if me is None:
+        return Employee.objects.none()
+    return Employee.objects.filter(employee_work_info__reporting_manager_id=me, is_active=True)
+
+
+def is_manager_of(user, employee):
+    me = employee_of(user)
+    return bool(me is not None and employee.get_reporting_manager() == me)
+
+
+def can_release_appraisals(user):
+    return user.has_perm("vertex.change_appraisalrelease")
+
+
+def sees_all_appraisals(user):
+    return user.has_perm("vertex.view_allappraisals") or can_release_appraisals(user)
+
+
+def visible_appraisals(user):
+    """Everyone's for HR / leadership, your own plus your reports' when you evaluate, else only your own."""
+    from django.db.models import Q
+
+    from vertex.models import Appraisal
+
+    if not user.has_perm("vertex.view_appraisal"):
+        return Appraisal.objects.none()
+    appraisals = Appraisal.objects.select_related("cycle", "employee", "manager")
+    if sees_all_appraisals(user):
+        return appraisals
+    me = employee_of(user)
+    if me is None:
+        return appraisals.none()
+    if user.has_perm("vertex.change_appraisal"):
+        return appraisals.filter(Q(employee=me) | Q(manager=me))
+    return appraisals.filter(employee=me)
+
+
+def can_self_assess(user, appraisal):
+    from vertex.models import AppraisalStage, CycleStatus
+
+    me = employee_of(user)
+    return bool(
+        user.has_perm("vertex.view_appraisal")
+        and me is not None
+        and appraisal.employee_id == me.pk
+        and appraisal.stage == AppraisalStage.SELF_PENDING
+        and appraisal.cycle.status == CycleStatus.ACTIVE
+    )
+
+
+def can_evaluate(user, appraisal):
+    """The assigned manager (or HR / leadership) once the self assessment is in; never for your own appraisal."""
+    from vertex.models import AppraisalStage, CycleStatus
+
+    me = employee_of(user)
+    if me is None or not user.has_perm("vertex.change_appraisal"):
+        return False
+    if appraisal.employee_id == me.pk or appraisal.cycle.status != CycleStatus.ACTIVE:
+        return False
+    if appraisal.stage not in (AppraisalStage.SELF_SUBMITTED, AppraisalStage.MANAGER_COMPLETED):
+        return False
+    return appraisal.manager_id == me.pk or sees_all_appraisals(user)
+
+
+def can_release(user, appraisal):
+    from vertex.models import AppraisalStage, CycleStatus
+
+    me = employee_of(user)
+    return bool(
+        can_release_appraisals(user)
+        and me is not None
+        and appraisal.employee_id != me.pk
+        and appraisal.stage == AppraisalStage.MANAGER_COMPLETED
+        and appraisal.cycle.status == CycleStatus.ACTIVE
+    )
+
+
+def can_see_manager_part(user, appraisal):
+    """The employee reads the manager's rating and comments only once the appraisal is released."""
+    from vertex.models import AppraisalStage
+
+    me = employee_of(user)
+    if me is not None and appraisal.employee_id == me.pk and not sees_all_appraisals(user):
+        return appraisal.stage == AppraisalStage.RELEASED
+    return True
+
+
+def my_released_appraisals(user):
+    from vertex.models import Appraisal, AppraisalStage
+
+    me = employee_of(user)
+    if me is None:
+        return Appraisal.objects.none()
+    return Appraisal.objects.filter(employee=me, stage=AppraisalStage.RELEASED).select_related("cycle")
+
+
+def sees_all_goals(user):
+    return user.has_perm("vertex.view_allgoals")
+
+
+def visible_goals(user):
+    from django.db.models import Q
+
+    from vertex.models import Goal
+
+    if not user.has_perm("vertex.view_goal"):
+        return Goal.objects.none()
+    goals = Goal.objects.select_related("employee", "assigned_by", "cycle")
+    if sees_all_goals(user):
+        return goals
+    me = employee_of(user)
+    if me is None:
+        return goals.none()
+    return goals.filter(Q(employee=me) | Q(employee__employee_work_info__reporting_manager_id=me))
+
+
+def assignable_employees(user):
+    """Who this person may set goals for: anyone for HR / leadership, otherwise the people who report to them."""
+    from employee.models import Employee
+
+    if not user.has_perm("vertex.add_goal"):
+        return Employee.objects.none()
+    if sees_all_goals(user):
+        return Employee.objects.filter(is_active=True)
+    return reports_of(user)
+
+
+def can_edit_goal(user, goal):
+    return user.has_perm("vertex.change_goal") and (
+        sees_all_goals(user) or is_manager_of(user, goal.employee)
+    )
+
+
+def can_update_goal_progress(user, goal):
+    me = employee_of(user)
+    owner = me is not None and goal.employee_id == me.pk
+    return user.has_perm("vertex.view_goal") and (owner or can_edit_goal(user, goal))
+
+
+def can_delete_goal(user, goal):
+    return user.has_perm("vertex.delete_goal") and (
+        sees_all_goals(user) or is_manager_of(user, goal.employee)
+    )
+
+
+def weight_used(employee, cycle, exclude_pk=None):
+    """Weight already given to the person's goals (not cancelled) in a cycle (or the no-cycle group)."""
+    from django.db.models import Sum
+
+    from vertex.models import Goal, GoalStatus
+
+    goals = Goal.objects.filter(employee=employee, cycle=cycle).exclude(status=GoalStatus.CANCELLED)
+    if exclude_pk:
+        goals = goals.exclude(pk=exclude_pk)
+    return goals.aggregate(total=Sum("weightage"))["total"] or 0

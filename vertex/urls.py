@@ -7,8 +7,10 @@ from django.views.generic import RedirectView
 
 from vertex import (
     cbv,
+    cbv_appraisals,
     cbv_performance,
     views,
+    views_appraisals,
     views_minutes,
     views_performance,
     views_resources,
@@ -101,6 +103,30 @@ urlpatterns = [
     path("improvement-plans/list/", cbv_performance.PipList.as_view(), name="vertex-pip-list"),
     path("improvement-plans/new/", cbv_performance.PipFormView.as_view(), name="vertex-pip-new"),
     path("improvement-plans/<int:pk>/edit/", cbv_performance.PipFormView.as_view(), name="vertex-pip-edit"),
+    # appraisal cycles
+    path("appraisal-cycles/", cbv_appraisals.CyclesView.as_view(), name="vertex-cycles"),
+    path("appraisal-cycles/nav/", cbv_appraisals.CyclesNavView.as_view(), name="vertex-cycle-nav"),
+    path("appraisal-cycles/list/", cbv_appraisals.CyclesList.as_view(), name="vertex-cycle-list"),
+    path("appraisal-cycles/new/", cbv_appraisals.CycleFormView.as_view(), name="vertex-cycle-new"),
+    path("appraisal-cycles/<int:pk>/edit/", cbv_appraisals.CycleFormView.as_view(), name="vertex-cycle-edit"),
+    path("appraisal-cycles/<int:pk>/activate/", views_appraisals.cycle_activate, name="vertex-cycle-activate"),
+    path("appraisal-cycles/<int:pk>/close/", views_appraisals.cycle_close, name="vertex-cycle-close"),
+    # appraisals
+    path("appraisals/", cbv_appraisals.AppraisalsView.as_view(), name="vertex-appraisals"),
+    path("appraisals/nav/", cbv_appraisals.AppraisalsNavView.as_view(), name="vertex-appraisal-nav"),
+    path("appraisals/list/", cbv_appraisals.AppraisalsList.as_view(), name="vertex-appraisal-list"),
+    path("appraisals/<int:pk>/", views_appraisals.appraisal_detail, name="vertex-appraisal"),
+    path("appraisals/<int:pk>/self/", cbv_appraisals.SelfAppraisalFormView.as_view(), name="vertex-appraisal-self"),
+    path("appraisals/<int:pk>/manager/", cbv_appraisals.ManagerAppraisalFormView.as_view(), name="vertex-appraisal-manager"),
+    path("appraisals/<int:pk>/release/", cbv_appraisals.ReleaseAppraisalFormView.as_view(), name="vertex-appraisal-release"),
+    # goals
+    path("goals/", cbv_appraisals.GoalsView.as_view(), name="vertex-goals"),
+    path("goals/nav/", cbv_appraisals.GoalsNavView.as_view(), name="vertex-goal-nav"),
+    path("goals/list/", cbv_appraisals.GoalsList.as_view(), name="vertex-goal-list"),
+    path("goals/new/", cbv_appraisals.GoalFormView.as_view(), name="vertex-goal-new"),
+    path("goals/<int:pk>/edit/", cbv_appraisals.GoalFormView.as_view(), name="vertex-goal-edit"),
+    path("goals/<int:pk>/progress/", cbv_appraisals.GoalProgressFormView.as_view(), name="vertex-goal-progress"),
+    path("goals/<int:pk>/delete/", views_appraisals.goal_delete, name="vertex-goal-delete"),
     # the employee's own view
     path("my-performance/", views_performance.my_performance, name="vertex-my-performance"),
 ]

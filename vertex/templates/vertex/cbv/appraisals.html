@@ -1,0 +1,19 @@
+{% extends "index.html" %}
+{% load i18n static %}
+
+{% block content %}
+<style>
+    .self_pending--dot { background-color: #6b7280; }
+    .self_submitted--dot { background-color: #3b82f6; }
+    .manager_completed--dot { background-color: #f59e0b; }
+    .released--dot { background-color: #16a34a; }
+    .status-self_pending { border-left: 3.4px solid #6b7280 !important; border-radius: 4px 0 0 4px; }
+    .status-self_submitted { border-left: 3.4px solid #3b82f6 !important; border-radius: 4px 0 0 4px; }
+    .status-manager_completed { border-left: 3.4px solid #f59e0b !important; border-radius: 4px 0 0 4px; }
+    .status-released { border-left: 3.4px solid #16a34a !important; border-radius: 4px 0 0 4px; }
+</style>
+<div hx-get="{% url 'vertex-appraisal-nav' %}?{{request.GET.urlencode}}" hx-trigger="load"></div>
+<div class="oh-wrapper" id="listContainer">
+    <div class="animated-background"></div>
+</div>
+{% endblock %}

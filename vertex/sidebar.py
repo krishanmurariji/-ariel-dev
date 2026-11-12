@@ -58,6 +58,21 @@ SUBMENUS = [
         "accessibility": "vertex.sidebar.pip_accessibility",
     },
     {
+        "menu": _("Appraisal Cycles"),
+        "redirect": reverse("vertex-cycles"),
+        "accessibility": "vertex.sidebar.cycles_accessibility",
+    },
+    {
+        "menu": _("Appraisals"),
+        "redirect": reverse("vertex-appraisals"),
+        "accessibility": "vertex.sidebar.appraisals_accessibility",
+    },
+    {
+        "menu": _("Goals"),
+        "redirect": reverse("vertex-goals"),
+        "accessibility": "vertex.sidebar.goals_accessibility",
+    },
+    {
         "menu": _("My Performance"),
         "redirect": reverse("vertex-my-performance"),
         "accessibility": "vertex.sidebar.my_performance_accessibility",
@@ -103,3 +118,15 @@ def pip_accessibility(request, submenu, user_perms, *args, **kwargs):
 
 def my_performance_accessibility(request, submenu, user_perms, *args, **kwargs):
     return request.user.has_perm("vertex.view_myperformance")
+
+
+def cycles_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("vertex.view_appraisalcycle")
+
+
+def appraisals_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("vertex.view_appraisal")
+
+
+def goals_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("vertex.view_goal")

@@ -279,6 +279,7 @@ def my_performance(request):
             "trend": trend,
             "feedback": feedback,
             "pips": access.my_pips(request.user),
+            "appraisals": access.my_released_appraisals(request.user),
             "employee": access.employee_of(request.user),
         },
     )

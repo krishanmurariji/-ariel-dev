@@ -29,6 +29,9 @@ ROLES = {
         "change_performancepublication",
         "view_pip", "add_pip", "change_pip",
         "view_myperformance",
+        "view_appraisalcycle", "add_appraisalcycle", "change_appraisalcycle",
+        "view_appraisal", "change_appraisal", "view_allappraisals", "change_appraisalrelease",
+        "view_goal", "add_goal", "change_goal", "delete_goal", "view_allgoals",
     ],
     "Vertex - Project Manager": [
         *PROJECTS_VIEW, "change_project", "add_projectmember", "delete_projectmember",
@@ -39,6 +42,8 @@ ROLES = {
         "view_meetingminute", "add_meetingminute", "change_meetingminute", "delete_meetingminute",
         "view_feedback", "add_feedback", "change_feedback",
         "view_myperformance",
+        "view_appraisal", "change_appraisal",
+        "view_goal", "add_goal", "change_goal", "delete_goal",
     ],
     "Vertex - Technical Lead": [
         *PROJECTS_VIEW, "add_projectdocument",
@@ -46,12 +51,14 @@ ROLES = {
         "view_reviewrequest", "add_codereview", "add_projectreview",
         "view_feedback", "add_feedback", "change_feedback",
         "view_myperformance",
+        "view_appraisal", "view_goal",
     ],
     "Vertex - Developer": [
         *PROJECTS_VIEW, "add_projectdocument",
         "view_statusupdate", "add_statusupdate",
         "view_reviewrequest",
         "view_myperformance",
+        "view_appraisal", "view_goal",
     ],
     "Vertex - Business Person": [
         *PROJECTS_VIEW, "view_statusupdate",
@@ -59,6 +66,7 @@ ROLES = {
     "Vertex - Leadership (read only)": [
         *PROJECTS_VIEW, "view_allprojects", "view_statusupdate", "view_resourcevisibility",
         "view_allreviewrequests", "view_reviewrequest",
+        "view_appraisalcycle", "view_appraisal", "view_allappraisals", "view_goal", "view_allgoals",
     ],
 }
 
@@ -73,6 +81,8 @@ DEMO_USERS = [
     ("vx.boss", "Lakshmi", "Iyer", "Vertex - Leadership (read only)", None),
     ("vx.none", "Nina", "Nobody", None, "member"),
 ]
+# (employee, their reporting manager): appraisals and goals follow this
+REPORTING = [("vx.dev", "vx.pm"), ("vx.dev2", "vx.pm"), ("vx.pm", "vx.hr"), ("vx.lead", "vx.pm"), ("vx.biz", "vx.hr")]
 DEMO_PROJECT_CODE = "VXDEMO"
 DEMO_PASSWORD = "Vx-Demo-4827!"  # local test accounts only; removed with `vertex_demo_users --remove`
 

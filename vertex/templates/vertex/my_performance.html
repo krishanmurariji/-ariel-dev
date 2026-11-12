@@ -70,6 +70,18 @@
       {% endfor %}
     </div>
 
+    {% if appraisals %}
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Appraisals" %}</h2>
+      {% for a in appraisals %}
+        <a href="{{ a.get_absolute_url }}" class="vx-item vx-item--block" style="display:flex;justify-content:space-between;gap:1rem;margin-bottom:.6rem;text-decoration:none;color:inherit">
+          <div><div style="font-weight:600">{{ a.cycle.name }}</div><div class="vx-item__sub">{% trans "Released" %} {{ a.released_at|date:"j M Y" }}</div></div>
+          <div class="vx-big" style="font-size:1.4rem">{{ a.final_rating }}<span style="font-size:.9rem;color:var(--vx-muted)"> / 5</span></div>
+        </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     {% if pips %}
     <div class="vx-card vx-card--pad">
       <h2 class="vx-section-title">{% trans "Improvement plan" %}</h2>
