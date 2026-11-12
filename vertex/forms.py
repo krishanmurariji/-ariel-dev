@@ -8,7 +8,7 @@ from django import forms
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from base.forms import ModelForm
+from base.forms import ModelForm as AppModelForm
 from employee.models import Employee
 from vertex.models import (
     Project,
@@ -30,6 +30,16 @@ BLOCKED_EXTENSIONS = {
 
 _DATE = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
 _DATETIME = forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M")
+
+
+class ModelForm(AppModelForm):
+    """Vertex model form: optional dates start empty (Ariel HR's base form pre-fills every date with today)."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            if isinstance(field.widget, forms.DateInput) and not field.required:
+                field.initial = None
 
 
 class ProjectForm(ModelForm):

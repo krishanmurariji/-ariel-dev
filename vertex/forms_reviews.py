@@ -5,8 +5,8 @@ vertex/forms_reviews.py - review and minutes forms.
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
-from base.forms import ModelForm
 from employee.models import Employee
+from vertex.forms import ModelForm
 from vertex.models import (
     CodeReview,
     MeetingMinute,
@@ -76,8 +76,13 @@ class ReviewRequestForm(ModelForm):
 
 
 class ScheduleForm(forms.Form):
+    # layout on the review page: a 6-column grid, see spans
+    spans = {
+        "title": 3, "scheduled_at": 3, "duration_minutes": 2, "meeting_url": 4,
+        "assigned_to": 3, "extra_attendees": 3, "description": 6,
+    }
+
     title = forms.CharField(max_length=200, label=_("Meeting title"))
-    description = forms.CharField(widget=forms.Textarea(attrs={"rows": 2}), required=False, label=_("Description"))
     scheduled_at = forms.DateTimeField(widget=_DATETIME, label=_("Meeting time"))
     duration_minutes = forms.IntegerField(min_value=5, max_value=480, initial=30, label=_("Minutes"))
     meeting_url = forms.URLField(required=False, label=_("Meeting link"))
@@ -85,23 +90,47 @@ class ScheduleForm(forms.Form):
         queryset=Employee.objects.none(), required=False, label=_("Reviewer")
     )
     extra_attendees = forms.CharField(required=False, label=_("Extra attendee emails"))
+    description = forms.CharField(widget=forms.Textarea(attrs={"rows": 2}), required=False, label=_("Description"))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["assigned_to"].queryset = _people()
 
 
-class ProjectReviewForm(forms.ModelForm):
+class _RatingsMixin:
+    """The model field is a PositiveSmallIntegerField, whose form field forces min=0; ratings start at 1."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            if name.endswith("_rating"):
+                field.widget.attrs.update({"min": 1, "max": 5})
+
+
+class ProjectReviewForm(_RatingsMixin, forms.ModelForm):
+    spans = {
+        "delivery_rating": 2, "ownership_rating": 2, "collaboration_rating": 2,
+        "strengths": 3, "observations": 3, "action_items": 6,
+    }
+
     class Meta:
         model = ProjectReview
         fields = [
             "delivery_rating", "ownership_rating", "collaboration_rating",
             "strengths", "observations", "action_items",
         ]
-        widgets = {f: forms.Textarea(attrs={"rows": 2}) for f in ("strengths", "observations", "action_items")}
+        widgets = {
+            **{f: forms.Textarea(attrs={"rows": 2}) for f in ("strengths", "observations", "action_items")},
+            **{f: forms.NumberInput(attrs={"min": 1, "max": 5, "placeholder": "1 to 5"}) for f in ("delivery_rating", "ownership_rating", "collaboration_rating")},
+        }
 
 
-class CodeReviewForm(forms.ModelForm):
+class CodeReviewForm(_RatingsMixin, forms.ModelForm):
+    spans = {
+        "code_quality_rating": 2, "architecture_rating": 2, "testing_rating": 2,
+        "strengths": 3, "observations": 3, "blockers": 3, "action_items": 3,
+    }
+
     class Meta:
         model = CodeReview
         fields = [
@@ -109,8 +138,8 @@ class CodeReviewForm(forms.ModelForm):
             "strengths", "observations", "blockers", "action_items",
         ]
         widgets = {
-            f: forms.Textarea(attrs={"rows": 2})
-            for f in ("strengths", "observations", "blockers", "action_items")
+            **{f: forms.Textarea(attrs={"rows": 2}) for f in ("strengths", "observations", "blockers", "action_items")},
+            **{f: forms.NumberInput(attrs={"min": 1, "max": 5, "placeholder": "1 to 5"}) for f in ("code_quality_rating", "architecture_rating", "testing_rating")},
         }
 
 

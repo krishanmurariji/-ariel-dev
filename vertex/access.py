@@ -202,7 +202,8 @@ def consolidated_summary(project, days=7):
         "days": days,
         "start": start,
         "updates": updates,
-        "reporting": len(reporting_ids),
+        # only people the project expects an update from count, so "reporting" never exceeds "expected"
+        "reporting": sum(1 for m in expected if m.employee_id in reporting_ids),
         "expected": len(expected),
         "missing": [m.employee.get_full_name() for m in expected if m.employee_id not in reporting_ids],
     }

@@ -102,7 +102,14 @@
   /* ---- forms inside pages ------------------------------------------------ */
   .vx-fields { display: grid; gap: .85rem; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); align-items: start; }
   .vx-fields .vx-full { grid-column: 1 / -1; }
-  .vx-fields input:not([type=checkbox]):not([type=radio]), .vx-fields select, .vx-fields textarea { width: 100%; }
+  .vx-fields--6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .vx-fields--6 > * { grid-column: span 6; }
+  @media (min-width: 760px) { .vx-fields--6 > .vx-s2 { grid-column: span 2; } .vx-fields--6 > .vx-s3 { grid-column: span 3; } .vx-fields--6 > .vx-s4 { grid-column: span 4; } }
+  .vx-fields input:not([type=checkbox]):not([type=radio]), .vx-fields select, .vx-fields textarea,
+  .vx-inline-form textarea { width: 100%; border: 1px solid var(--vx-border); border-radius: 8px; background: var(--vx-surface); color: var(--vx-text); padding: .5rem .75rem; font-size: .88rem; outline: 0; box-sizing: border-box; }
+  .vx-fields input:not([type=checkbox]):not([type=radio]), .vx-fields select { height: 40px; }
+  .vx-fields textarea { min-height: 76px; resize: vertical; }
+  .vx-fields input:focus, .vx-fields select:focus, .vx-fields textarea:focus, .vx-inline-form textarea:focus { border-color: var(--vx-primary); box-shadow: 0 0 0 3px var(--vx-primary-soft); }
   .vx-fields label, .vx-inline-form label { display: block; font-size: .75rem; font-weight: 600; color: var(--vx-muted); margin-bottom: .25rem; }
   .vx-inline-form textarea { width: 100%; min-height: 84px; resize: vertical; overflow: auto; }
   .vx-composer { margin-top: 1rem; border: 1px solid var(--vx-border); border-radius: 12px; padding: .75rem; background: var(--vx-surface); }
@@ -119,6 +126,14 @@
   .vx-row--mine .vx-bubble { background: var(--vx-primary); color: #fff; }
   .vx-bubble__who { font-size: .74rem; font-weight: 700; }
   .vx-bubble__when { font-size: .66rem; opacity: .7; margin-top: .15rem; }
+
+  /* ---- generated minutes ---------------------------------------------------- */
+  .vx-minutes { font-size: .92rem; line-height: 1.65; color: var(--vx-text); }
+  .vx-min-h1 { font-size: 1.1rem; font-weight: 700; margin: 0 0 .75rem; }
+  .vx-min-h2 { font-size: .74rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--vx-muted); margin: 1.2rem 0 .4rem; padding-bottom: .3rem; border-bottom: 1px solid var(--vx-border); }
+  .vx-min-p { margin: 0 0 .3rem; }
+  .vx-min-list { margin: 0 0 .3rem; padding-left: 1.2rem; list-style: disc; }
+  .vx-min-list li { margin: .15rem 0; }
 
   /* ---- empty state ------------------------------------------------------- */
   .vx-empty { text-align: center; padding: 2.2rem 1rem; color: var(--vx-muted); font-size: .88rem; border: 1px dashed var(--vx-border); border-radius: 12px; background: var(--vx-subtle); }

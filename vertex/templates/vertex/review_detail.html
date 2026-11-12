@@ -1,5 +1,5 @@
 {% extends "index.html" %}
-{% load i18n %}
+{% load i18n generic_template_filters %}
 {% block content %}
 {% include "vertex/_vx.html" %}
 <div class="oh-wrapper">
@@ -56,9 +56,9 @@
         <hr class="vx-divider">
         <form method="post" action="{% url 'vertex-review-schedule' review.pk %}">
           {% csrf_token %}
-          <div class="vx-fields">
+          <div class="vx-fields vx-fields--6">
             {% for field in schedule_form %}
-              <div {% if field.name == "description" or field.name == "extra_attendees" %}class="vx-full"{% endif %}>
+              <div class="vx-s{{ schedule_form.spans|get_item:field.name }}">
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
               </div>
             {% endfor %}
@@ -93,9 +93,9 @@
         {% if submitted %}<hr class="vx-divider">{% endif %}
         <form method="post" action="{% url 'vertex-review-submit' review.pk %}">
           {% csrf_token %}
-          <div class="vx-fields">
+          <div class="vx-fields vx-fields--6">
             {% for field in submit_form %}
-              <div {% if "rating" not in field.name %}class="vx-full"{% endif %}>
+              <div class="vx-s{{ submit_form.spans|get_item:field.name }}">
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
               </div>
             {% endfor %}

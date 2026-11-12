@@ -32,11 +32,13 @@
     {% if can_change %}
     <div class="vx-card vx-card--pad">
       <h2 class="vx-section-title">{% trans "Update status" %}</h2>
-      <form method="post" action="{% url 'vertex-resource-request-status' rr.pk %}" class="vx-inline-form" style="display:grid;gap:.75rem;grid-template-columns:240px 1fr auto;align-items:end">
+      <form method="post" action="{% url 'vertex-resource-request-status' rr.pk %}">
         {% csrf_token %}
-        <div>{{ status_form.status }}</div>
-        <div>{{ status_form.comment }}</div>
-        <button type="submit" class="oh-btn oh-btn--secondary">{% trans "Save" %}</button>
+        <div class="vx-fields">
+          <div><label for="{{ status_form.status.id_for_label }}">{% trans "New status" %}</label>{{ status_form.status }}</div>
+          <div class="vx-full"><label for="{{ status_form.comment.id_for_label }}">{% trans "Comment (optional)" %}</label>{{ status_form.comment }}</div>
+        </div>
+        <div class="vx-btnrow" style="justify-content:flex-end"><button type="submit" class="oh-btn oh-btn--secondary">{% trans "Update status" %}</button></div>
       </form>
     </div>
     {% endif %}

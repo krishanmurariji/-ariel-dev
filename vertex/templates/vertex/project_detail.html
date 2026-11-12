@@ -122,7 +122,8 @@
     <div class="vx-tabs">
       {% for t in tabs %}
         <a href="?tab={{ t }}" class="vx-tab {% if t == tab %}vx-tab--active{% endif %}"
-           hx-get="?tab={{ t }}" hx-target="#vxTabs" hx-select="#vxTabs" hx-swap="outerHTML show:none" hx-push-url="true" hx-indicator="#vxTabs">
+           hx-get="?tab={{ t }}" hx-target="#vxTabs" hx-select="#vxTabs" hx-swap="outerHTML show:none" hx-push-url="true" hx-indicator="#vxTabs"
+           hx-on::response-error="window.location.href=this.getAttribute('href')" hx-on::send-error="window.location.href=this.getAttribute('href')">
           {% if t == "overview" %}{% trans "Overview" %}
           {% elif t == "team" %}{% trans "Team" %}{% if counts.team %}<span class="vx-count">{{ counts.team }}</span>{% endif %}
           {% elif t == "documents" %}{% trans "Documents" %}{% if counts.documents %}<span class="vx-count">{{ counts.documents }}</span>{% endif %}
