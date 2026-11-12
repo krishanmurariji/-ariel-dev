@@ -135,6 +135,28 @@
   .vx-min-list { margin: 0 0 .3rem; padding-left: 1.2rem; list-style: disc; }
   .vx-min-list li { margin: .15rem 0; }
 
+  /* ---- score bars and workflow steps ----------------------------------------- */
+  .vx-bars > div { padding: .7rem 0; }
+  .vx-bars > div + div { border-top: 1px solid var(--vx-border); }
+  .vx-bar-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: .4rem; font-size: .88rem; }
+  .vx-bar-head b { font-size: .95rem; }
+  .vx-bar-head small { color: var(--vx-muted); font-size: .72rem; margin-left: .4rem; }
+  .vx-bar-note { color: var(--vx-muted); font-size: .76rem; margin-top: .35rem; }
+  .vx-big { font-size: 2.6rem; font-weight: 700; line-height: 1; }
+  .vx-steps { display: flex; gap: .35rem; flex-wrap: wrap; align-items: center; margin-top: 1rem; }
+  .vx-step { display: inline-flex; align-items: center; gap: .4rem; font-size: .76rem; font-weight: 600; color: var(--vx-faint); }
+  .vx-step i { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: .68rem; background: var(--vx-chip); color: var(--vx-muted); }
+  .vx-step--done { color: var(--vx-text); } .vx-step--done i { background: var(--vx-ok); color: #fff; }
+  .vx-step--now { color: var(--vx-primary); } .vx-step--now i { background: var(--vx-primary); color: #fff; }
+  .vx-step-line { width: 28px; height: 2px; background: var(--vx-border); border-radius: 2px; }
+  .vx-banner { border: 1px solid #fde68a; background: #fffbeb; color: #92400e; border-radius: 10px; padding: .75rem 1rem; font-size: .86rem; }
+  body.dark .vx-banner { background: #3a2e12; border-color: #5b4a1c; color: #fcd34d; }
+  .vx-trend { display: flex; align-items: flex-end; gap: .6rem; height: 130px; padding-top: .5rem; }
+  .vx-trend > div { flex: 1; min-width: 38px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+  .vx-trend span { display: block; width: 100%; max-width: 46px; border-radius: 6px 6px 0 0; }
+  .vx-trend em { font-style: normal; font-size: .68rem; color: var(--vx-muted); margin-top: .3rem; white-space: nowrap; }
+  .vx-trend b { font-size: .72rem; margin-bottom: .2rem; }
+
   /* ---- empty state ------------------------------------------------------- */
   .vx-empty { text-align: center; padding: 2.2rem 1rem; color: var(--vx-muted); font-size: .88rem; border: 1px dashed var(--vx-border); border-radius: 12px; background: var(--vx-subtle); }
   .vx-empty ion-icon { font-size: 1.8rem; color: var(--vx-faint); display: block; margin: 0 auto .4rem; }

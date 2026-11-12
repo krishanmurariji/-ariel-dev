@@ -8,7 +8,16 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from horilla.filters import HorillaFilterSet
-from vertex.models import MeetingMinute, Project, ResourceRequest, ReviewRequest, StatusUpdate
+from vertex.models import (
+    Feedback,
+    MeetingMinute,
+    PerformanceReport,
+    Pip,
+    Project,
+    ResourceRequest,
+    ReviewRequest,
+    StatusUpdate,
+)
 
 
 class VertexProjectFilter(HorillaFilterSet):
@@ -142,4 +151,52 @@ class MeetingMinuteFilter(HorillaFilterSet):
             Q(title__icontains=value)
             | Q(location__icontains=value)
             | Q(attendees__icontains=value)
+        )
+
+
+class FeedbackFilter(HorillaFilterSet):
+    search = django_filters.CharFilter(method="filter_search")
+
+    class Meta:
+        model = Feedback
+        fields = ["status", "project", "period"]
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(subject__employee_first_name__icontains=value)
+            | Q(subject__employee_last_name__icontains=value)
+            | Q(author__employee_first_name__icontains=value)
+            | Q(author__employee_last_name__icontains=value)
+            | Q(period__icontains=value)
+            | Q(constructive_summary__icontains=value)
+        )
+
+
+class PerformanceReportFilter(HorillaFilterSet):
+    search = django_filters.CharFilter(method="filter_search")
+
+    class Meta:
+        model = PerformanceReport
+        fields = ["period_type", "rating", "is_published"]
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(subject__employee_first_name__icontains=value)
+            | Q(subject__employee_last_name__icontains=value)
+            | Q(period__icontains=value)
+        )
+
+
+class PipFilter(HorillaFilterSet):
+    search = django_filters.CharFilter(method="filter_search")
+
+    class Meta:
+        model = Pip
+        fields = ["status", "outcome", "is_auto"]
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(subject__employee_first_name__icontains=value)
+            | Q(subject__employee_last_name__icontains=value)
+            | Q(reason__icontains=value)
         )

@@ -42,6 +42,26 @@ SUBMENUS = [
         "redirect": reverse("vertex-minutes"),
         "accessibility": "vertex.sidebar.minutes_accessibility",
     },
+    {
+        "menu": _("Feedback"),
+        "redirect": reverse("vertex-feedback"),
+        "accessibility": "vertex.sidebar.feedback_accessibility",
+    },
+    {
+        "menu": _("Performance Reports"),
+        "redirect": reverse("vertex-performance"),
+        "accessibility": "vertex.sidebar.performance_accessibility",
+    },
+    {
+        "menu": _("Improvement Plans"),
+        "redirect": reverse("vertex-pip"),
+        "accessibility": "vertex.sidebar.pip_accessibility",
+    },
+    {
+        "menu": _("My Performance"),
+        "redirect": reverse("vertex-my-performance"),
+        "accessibility": "vertex.sidebar.my_performance_accessibility",
+    },
 ]
 
 
@@ -67,3 +87,19 @@ def hiring_accessibility(request, submenu, user_perms, *args, **kwargs):
 
 def resources_accessibility(request, submenu, user_perms, *args, **kwargs):
     return request.user.has_perm("vertex.view_resourcevisibility")
+
+
+def feedback_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("vertex.view_feedback")
+
+
+def performance_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("vertex.view_performancereport")
+
+
+def pip_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("vertex.view_pip")
+
+
+def my_performance_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("vertex.view_myperformance")

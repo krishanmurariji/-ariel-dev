@@ -1,0 +1,21 @@
+{% extends "index.html" %}
+{% load i18n static %}
+
+{% block content %}
+<style>
+    .draft--dot { background-color: #6b7280; }
+    .submitted--dot { background-color: #3b82f6; }
+    .revision_requested--dot { background-color: #f59e0b; }
+    .approved--dot { background-color: #8b5cf6; }
+    .published--dot { background-color: #16a34a; }
+    .status-draft { border-left: 3.4px solid #6b7280 !important; border-radius: 4px 0 0 4px; }
+    .status-submitted { border-left: 3.4px solid #3b82f6 !important; border-radius: 4px 0 0 4px; }
+    .status-revision_requested { border-left: 3.4px solid #f59e0b !important; border-radius: 4px 0 0 4px; }
+    .status-approved { border-left: 3.4px solid #8b5cf6 !important; border-radius: 4px 0 0 4px; }
+    .status-published { border-left: 3.4px solid #16a34a !important; border-radius: 4px 0 0 4px; }
+</style>
+<div hx-get="{% url 'vertex-feedback-nav' %}?{{request.GET.urlencode}}" hx-trigger="load"></div>
+<div class="oh-wrapper" id="listContainer">
+    <div class="animated-background"></div>
+</div>
+{% endblock %}

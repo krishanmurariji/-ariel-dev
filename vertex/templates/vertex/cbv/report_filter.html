@@ -1,0 +1,28 @@
+{% load i18n %}
+<div class="oh-dropdown__filter-body">
+    <div class="oh-accordion">
+        <div class="oh-accordion-header"
+            onclick="event.stopImmediatePropagation();$(this).parent().toggleClass('oh-accordion--show');"
+        >{% trans "Report" %}</div>
+        <div class="oh-accordion-body">
+            <div class="row">
+                <div class="col-sm-12 col-md-12 col-lg-6">
+                    <div class="oh-input-group">
+                        <label class="oh-label" for="{{form.period_type.id_for_label}}">{{ form.period_type.label }}</label>
+                        {{form.period_type}}
+                    </div>
+                    <div class="oh-input-group">
+                        <label class="oh-label" for="{{form.rating.id_for_label}}">{{ form.rating.label }}</label>
+                        {{form.rating}}
+                    </div>
+                </div>
+                <div class="col-sm-12 col-md-12 col-lg-6">
+                    <div class="oh-input-group">
+                        <label class="oh-label" for="{{form.is_published.id_for_label}}">{{ form.is_published.label }}</label>
+                        {{form.is_published}}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

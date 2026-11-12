@@ -1,0 +1,19 @@
+{% extends "index.html" %}
+{% load i18n static %}
+
+{% block content %}
+<style>
+    .open--dot { background-color: #3b82f6; }
+    .in_progress--dot { background-color: #f59e0b; }
+    .completed--dot { background-color: #16a34a; }
+    .closed--dot { background-color: #6b7280; }
+    .status-open { border-left: 3.4px solid #3b82f6 !important; border-radius: 4px 0 0 4px; }
+    .status-in_progress { border-left: 3.4px solid #f59e0b !important; border-radius: 4px 0 0 4px; }
+    .status-completed { border-left: 3.4px solid #16a34a !important; border-radius: 4px 0 0 4px; }
+    .status-closed { border-left: 3.4px solid #6b7280 !important; border-radius: 4px 0 0 4px; }
+</style>
+<div hx-get="{% url 'vertex-pip-nav' %}?{{request.GET.urlencode}}" hx-trigger="load"></div>
+<div class="oh-wrapper" id="listContainer">
+    <div class="animated-background"></div>
+</div>
+{% endblock %}

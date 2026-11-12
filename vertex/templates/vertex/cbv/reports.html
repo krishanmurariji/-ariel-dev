@@ -1,0 +1,14 @@
+{% extends "index.html" %}
+{% load i18n static %}
+
+{% block content %}
+<style>
+
+    .status-True { border-left: 3.4px solid #16a34a !important; border-radius: 4px 0 0 4px; }
+    .status-False { border-left: 3.4px solid #6b7280 !important; border-radius: 4px 0 0 4px; }
+</style>
+<div hx-get="{% url 'vertex-performance-nav' %}?{{request.GET.urlencode}}" hx-trigger="load"></div>
+<div class="oh-wrapper" id="listContainer">
+    <div class="animated-background"></div>
+</div>
+{% endblock %}

@@ -294,3 +294,104 @@ def visible_resource_requests(user):
     if employee is None:
         return requests.none()
     return requests.filter(requested_by=employee)
+
+
+# ---------------------------------------------------------------------------
+# Performance: feedback, reports, improvement plans
+# ---------------------------------------------------------------------------
+
+
+def can_approve_feedback(user):
+    return user.has_perm("vertex.change_feedbackapproval")
+
+
+def sees_all_feedback(user):
+    return user.has_perm("vertex.view_allfeedback") or can_approve_feedback(user)
+
+
+def visible_feedback(user):
+    """Feedback a manager may open: everyone's for HR / approvers, otherwise what they wrote."""
+    from vertex.models import Feedback
+
+    if not user.has_perm("vertex.view_feedback"):
+        return Feedback.objects.none()
+    feedback = Feedback.objects.select_related("subject", "author", "project").prefetch_related(
+        "category_scores"
+    )
+    if sees_all_feedback(user):
+        return feedback
+    employee = employee_of(user)
+    return feedback.filter(author=employee) if employee else feedback.none()
+
+
+def can_edit_feedback(user, feedback):
+    """The author may edit their own feedback while it is a draft or sent back for revision."""
+    from vertex.models import FeedbackStatus
+
+    employee = employee_of(user)
+    return bool(
+        user.has_perm("vertex.change_feedback")
+        and employee is not None
+        and feedback.author_id == employee.pk
+        and feedback.status in (FeedbackStatus.DRAFT, FeedbackStatus.REVISION_REQUESTED)
+    )
+
+
+def visible_reports(user):
+    """Performance reports: all of them (drafts too) with the all-reports switch, else only your own published ones."""
+    from vertex.models import PerformanceReport
+
+    if not user.has_perm("vertex.view_performancereport"):
+        return PerformanceReport.objects.none()
+    reports = PerformanceReport.objects.select_related("subject").prefetch_related("category_scores")
+    if user.has_perm("vertex.view_allperformancereports"):
+        return reports
+    employee = employee_of(user)
+    return reports.filter(subject=employee, is_published=True) if employee else reports.none()
+
+
+def can_publish_reports(user):
+    return user.has_perm("vertex.change_performancepublication")
+
+
+def my_published_reports(user):
+    from vertex.models import PerformanceReport
+
+    employee = employee_of(user)
+    if employee is None:
+        return PerformanceReport.objects.none()
+    return (
+        PerformanceReport.objects.filter(subject=employee, is_published=True)
+        .prefetch_related("category_scores")
+        .order_by("period")
+    )
+
+
+def my_published_feedback(user):
+    """What the employee may read: published feedback only, never the internal notes."""
+    from vertex.models import Feedback, FeedbackStatus
+
+    employee = employee_of(user)
+    if employee is None:
+        return Feedback.objects.none()
+    return (
+        Feedback.objects.filter(subject=employee, status=FeedbackStatus.PUBLISHED)
+        .select_related("project", "author")
+        .prefetch_related("category_scores")
+        .order_by("-published_at")
+    )
+
+
+def my_pips(user):
+    from vertex.models import Pip
+
+    employee = employee_of(user)
+    return Pip.objects.filter(subject=employee) if employee else Pip.objects.none()
+
+
+def visible_pips(user):
+    from vertex.models import Pip
+
+    if not user.has_perm("vertex.view_pip"):
+        return Pip.objects.none()
+    return Pip.objects.select_related("subject", "created_by")

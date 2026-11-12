@@ -64,6 +64,10 @@ BREADCRUMB_URL_NAMES = {
     "resources": "Resource Visibility",
     "reviews": "Reviews",
     "minutes": "Meeting Minutes",
+    "performance-feedback": "Feedback",
+    "performance-reports": "Performance Reports",
+    "improvement-plans": "Improvement Plans",
+    "my-performance": "My Performance",
 }
 
 sidebar_urls = [
@@ -74,6 +78,10 @@ sidebar_urls = [
     "resources",
     "reviews",
     "minutes",
+    "performance-feedback",
+    "performance-reports",
+    "improvement-plans",
+    "my-performance",
     "dashboard",
     "ess",
     "pipeline",

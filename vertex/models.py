@@ -778,3 +778,348 @@ class ResourceVisibility(ProjectMember):
         proxy = True
         verbose_name = _("Resource visibility")
         verbose_name_plural = _("Resource visibility")
+
+
+# ---------------------------------------------------------------------------
+# Performance: structured feedback, calculated performance reports, improvement plans
+# (ArielVertex Feedback, PerformanceReport, Pip). Nothing is employee-visible until it
+# has been approved / published.
+#
+# * view_feedback / add_feedback / change_feedback   author their own feedback
+# * view_allfeedback                                  see every author's feedback   (proxy "Feedback (all)")
+# * change_feedbackapproval                           request revision, approve, publish (proxy "Feedback approval")
+# * view_performancereport / add_performancereport    open the page / generate a report
+# * view_allperformancereports                        see every report, drafts included
+# * change_performancepublication                     publish a report (proxy "Performance publication")
+# * view_myperformance                                the employee "My Performance" page (proxy)
+# * view_pip / add_pip / change_pip                   improvement plans
+# ---------------------------------------------------------------------------
+
+
+def _colour_html(colour, label):
+    from django.utils.html import format_html
+
+    return format_html(
+        '<span style="display:inline-flex;align-items:center;gap:6px">'
+        '<span style="width:9px;height:9px;border-radius:50%;background:{}"></span>{}</span>',
+        colour,
+        label,
+    )
+
+
+class FeedbackStatus(models.TextChoices):
+    DRAFT = "draft", _("Draft")
+    SUBMITTED = "submitted", _("Submitted")
+    REVISION_REQUESTED = "revision_requested", _("Revision requested")
+    APPROVED = "approved", _("Approved")
+    PUBLISHED = "published", _("Published")
+
+
+class Feedback(models.Model):
+    """Structured quarterly feedback about one employee, with an approval lifecycle."""
+
+    subject = models.ForeignKey(
+        "employee.Employee", on_delete=models.CASCADE, related_name="vertex_feedback_about"
+    )
+    author = models.ForeignKey(
+        "employee.Employee", on_delete=models.CASCADE, related_name="vertex_feedback_written"
+    )
+    project = models.ForeignKey(
+        Project, null=True, blank=True, on_delete=models.SET_NULL, related_name="feedback"
+    )
+    period = models.CharField(max_length=20, help_text=_("For example 2026-Q4"))
+    status = models.CharField(
+        max_length=20, choices=FeedbackStatus.choices, default=FeedbackStatus.DRAFT
+    )
+    constructive_summary = models.TextField(
+        verbose_name=_("Summary for the employee"),
+        help_text=_("Constructive and safe to publish: this is what the employee sees."),
+    )
+    strengths = models.TextField(blank=True, default="")
+    improvement_areas = models.TextField(blank=True, default="")
+    action_plan = models.TextField(blank=True, default="")
+    internal_notes = models.TextField(
+        blank=True, default="", help_text=_("Confidential management notes. Never shown to the employee.")
+    )
+    approved_by = models.ForeignKey(
+        "employee.Employee", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    revision_reason = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Feedback")
+        verbose_name_plural = _("Feedback")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Feedback on {self.subject} ({self.period})"
+
+    def get_absolute_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-feedback-detail", args=[self.pk])
+
+    def get_update_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-feedback-edit", args=[self.pk])
+
+    def redirect(self):
+        return f"onclick=\"window.location.href='{self.get_absolute_url()}'\""
+
+    def get_subject_name(self):
+        return self.subject.get_full_name()
+
+    def get_author_name(self):
+        return self.author.get_full_name()
+
+    def get_project_code(self):
+        return self.project.code if self.project else "-"
+
+    def get_status_html(self):
+        colour = {
+            "draft": "#6b7280", "submitted": "#3b82f6", "revision_requested": "#f59e0b",
+            "approved": "#8b5cf6", "published": "#16a34a",
+        }.get(self.status, "#6b7280")
+        return _colour_html(colour, self.get_status_display())
+
+    def get_average_score(self):
+        scores = [c.score for c in self.category_scores.all() if not c.not_applicable]
+        return round(sum(scores) / len(scores)) if scores else None
+
+    def get_average_display(self):
+        average = self.get_average_score()
+        return f"{average}%" if average is not None else "-"
+
+
+class AllFeedback(Feedback):
+    """Permission switch only: ``view_allfeedback`` shows every author's feedback."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Feedback (all)")
+        verbose_name_plural = _("Feedback (all)")
+
+
+class FeedbackApproval(Feedback):
+    """Permission switch only: ``change_feedbackapproval`` may request revision, approve and publish."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Feedback approval")
+        verbose_name_plural = _("Feedback approval")
+
+
+class FeedbackCategoryScore(models.Model):
+    feedback = models.ForeignKey(Feedback, on_delete=models.CASCADE, related_name="category_scores")
+    category = models.CharField(max_length=30)
+    score = models.PositiveSmallIntegerField(default=0, validators=[MaxValueValidator(100)])
+    not_applicable = models.BooleanField(default=False)
+    comment = models.TextField(blank=True, default="")
+
+    class Meta:
+        verbose_name = _("Feedback category score")
+        verbose_name_plural = _("Feedback category scores")
+        constraints = [
+            models.UniqueConstraint(fields=["feedback", "category"], name="vertex_one_score_per_category")
+        ]
+
+
+class PerformancePeriodType(models.TextChoices):
+    MONTHLY = "monthly", _("Monthly")
+    QUARTERLY = "quarterly", _("Quarterly")
+
+
+class PerformanceRating(models.TextChoices):
+    OUTSTANDING = "outstanding", _("Outstanding")
+    EXCEEDS = "exceeds_expectations", _("Exceeds Expectations")
+    MEETS = "meets_expectations", _("Meets Expectations")
+    NEEDS_IMPROVEMENT = "needs_improvement", _("Needs Improvement")
+    ATTENTION = "attention_required", _("Performance Attention Required")
+
+
+class PerformanceReport(models.Model):
+    """Calculated monthly / quarterly summary. Stays a draft until it is published."""
+
+    subject = models.ForeignKey(
+        "employee.Employee", on_delete=models.CASCADE, related_name="vertex_performance_reports"
+    )
+    period_type = models.CharField(
+        max_length=10, choices=PerformancePeriodType.choices, default=PerformancePeriodType.MONTHLY
+    )
+    period = models.CharField(max_length=10, help_text=_("2026-07 or 2026-Q3"))
+    overall_score = models.DecimalField(max_digits=4, decimal_places=1, default=0)
+    rating = models.CharField(
+        max_length=25, choices=PerformanceRating.choices, default=PerformanceRating.MEETS
+    )
+    strengths = models.TextField(blank=True, default="")
+    improvement_areas = models.TextField(blank=True, default="")
+    recommended_actions = models.TextField(blank=True, default="")
+    data_sources = models.TextField(blank=True, default="")
+    is_published = models.BooleanField(default=False)
+    approved_by = models.ForeignKey(
+        "employee.Employee", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    published_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Performance report")
+        verbose_name_plural = _("Performance reports")
+        ordering = ["-period", "subject__employee_first_name"]
+        constraints = [
+            models.UniqueConstraint(fields=["subject", "period"], name="vertex_one_report_per_period")
+        ]
+
+    def __str__(self):
+        return f"{self.subject} {self.period}"
+
+    def get_absolute_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-performance-report", args=[self.pk])
+
+    def redirect(self):
+        return f"onclick=\"window.location.href='{self.get_absolute_url()}'\""
+
+    def get_subject_name(self):
+        return self.subject.get_full_name()
+
+    def get_score_display(self):
+        return f"{self.overall_score}%"
+
+    def get_rating_html(self):
+        colour = {
+            "outstanding": "#15803d", "exceeds_expectations": "#16a34a", "meets_expectations": "#3b82f6",
+            "needs_improvement": "#f59e0b", "attention_required": "#dc2626",
+        }.get(self.rating, "#6b7280")
+        return _colour_html(colour, self.get_rating_display())
+
+    def get_published_html(self):
+        if self.is_published:
+            return _colour_html("#16a34a", _("Published"))
+        return _colour_html("#6b7280", _("Draft"))
+
+
+class AllPerformanceReports(PerformanceReport):
+    """Permission switch only: ``view_allperformancereports`` shows every report, drafts included."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Performance report (all)")
+        verbose_name_plural = _("Performance reports (all)")
+
+
+class PerformancePublication(PerformanceReport):
+    """Permission switch only: ``change_performancepublication`` may publish a report."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Performance publication")
+        verbose_name_plural = _("Performance publication")
+
+
+class MyPerformance(PerformanceReport):
+    """Permission switch only: ``view_myperformance`` opens the employee's own performance page."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("My performance")
+        verbose_name_plural = _("My performance")
+
+
+class PerformanceCategoryScore(models.Model):
+    report = models.ForeignKey(PerformanceReport, on_delete=models.CASCADE, related_name="category_scores")
+    category = models.CharField(max_length=30)
+    score = models.PositiveSmallIntegerField(default=0)
+    weight = models.DecimalField(max_digits=5, decimal_places=1, default=0)
+    not_applicable = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = _("Performance category score")
+        verbose_name_plural = _("Performance category scores")
+
+
+class PipStatus(models.TextChoices):
+    OPEN = "open", _("Open")
+    IN_PROGRESS = "in_progress", _("In progress")
+    COMPLETED = "completed", _("Completed")
+    CLOSED = "closed", _("Closed")
+
+
+class PipOutcome(models.TextChoices):
+    PENDING = "pending", _("Pending")
+    IMPROVED = "improved", _("Improved")
+    NOT_IMPROVED = "not_improved", _("Not improved")
+
+
+class Pip(models.Model):
+    """Performance Improvement Plan: created by HR, or automatically when a published score is low."""
+
+    subject = models.ForeignKey(
+        "employee.Employee", on_delete=models.CASCADE, related_name="vertex_pips"
+    )
+    reason = models.TextField()
+    expected_improvement = models.TextField(blank=True, default="")
+    support_provided = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=15, choices=PipStatus.choices, default=PipStatus.OPEN)
+    outcome = models.CharField(max_length=15, choices=PipOutcome.choices, default=PipOutcome.PENDING)
+    review_notes = models.TextField(blank=True, default="")
+    start_date = models.DateField()
+    is_auto = models.BooleanField(default=False)
+    trigger_score = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True)
+    trigger_period = models.CharField(max_length=10, blank=True, default="")
+    created_by = models.ForeignKey(
+        "employee.Employee", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Improvement plan")
+        verbose_name_plural = _("Improvement plans")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"PIP for {self.subject}"
+
+    def get_update_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-pip-edit", args=[self.pk])
+
+    def get_subject_name(self):
+        return self.subject.get_full_name()
+
+    def get_source_display(self):
+        return _("Automatic") if self.is_auto else _("Manual")
+
+    def get_status_html(self):
+        colour = {
+            "open": "#3b82f6", "in_progress": "#f59e0b", "completed": "#16a34a", "closed": "#6b7280",
+        }.get(self.status, "#6b7280")
+        return _colour_html(colour, self.get_status_display())
+
+    def get_outcome_html(self):
+        colour = {"pending": "#6b7280", "improved": "#16a34a", "not_improved": "#dc2626"}.get(
+            self.outcome, "#6b7280"
+        )
+        return _colour_html(colour, self.get_outcome_display())
+
+
+class VertexSetting(models.Model):
+    """Small key / value store for Vertex rules (for example the PIP threshold)."""
+
+    key = models.CharField(max_length=100, unique=True)
+    value = models.CharField(max_length=500, blank=True, default="")
+
+    class Meta:
+        verbose_name = _("Vertex setting")
+        verbose_name_plural = _("Vertex settings")
+
+    def __str__(self):
+        return f"{self.key} = {self.value}"

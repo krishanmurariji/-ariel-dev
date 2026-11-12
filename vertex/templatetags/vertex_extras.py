@@ -43,3 +43,16 @@ def minutes_html(text):
     if in_list:
         out.append("</ul>")
     return mark_safe("\n".join(out))
+
+
+@register.filter
+def section_title(value):
+    """"Title|details" -> "Title"."""
+    return str(value).split("|", 1)[0]
+
+
+@register.filter
+def section_hint(value):
+    """"Title|details" -> "details" (empty when there is none)."""
+    parts = str(value).split("|", 1)
+    return parts[1] if len(parts) > 1 else ""

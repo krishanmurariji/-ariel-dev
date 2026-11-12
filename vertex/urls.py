@@ -5,7 +5,15 @@ vertex/urls.py
 from django.urls import path
 from django.views.generic import RedirectView
 
-from vertex import cbv, views, views_minutes, views_resources, views_reviews
+from vertex import (
+    cbv,
+    cbv_performance,
+    views,
+    views_minutes,
+    views_performance,
+    views_resources,
+    views_reviews,
+)
 
 urlpatterns = [
     path("", RedirectView.as_view(pattern_name="vertex-projects"), name="vertex-home"),
@@ -69,4 +77,30 @@ urlpatterns = [
     path("minutes/<int:pk>/approve/", views_minutes.minutes_approve, name="vertex-minute-approve"),
     path("minutes/<int:pk>/send/", views_minutes.minutes_send, name="vertex-minute-send"),
     path("minutes/<int:pk>/delete/", views_minutes.minutes_delete, name="vertex-minute-delete"),
+    # performance: feedback
+    path("performance-feedback/", cbv_performance.FeedbackView.as_view(), name="vertex-feedback"),
+    path("performance-feedback/nav/", cbv_performance.FeedbackNavView.as_view(), name="vertex-feedback-nav"),
+    path("performance-feedback/list/", cbv_performance.FeedbackList.as_view(), name="vertex-feedback-list"),
+    path("performance-feedback/new/", cbv_performance.FeedbackFormView.as_view(), name="vertex-feedback-new"),
+    path("performance-feedback/<int:pk>/", views_performance.feedback_detail, name="vertex-feedback-detail"),
+    path("performance-feedback/<int:pk>/edit/", cbv_performance.FeedbackFormView.as_view(), name="vertex-feedback-edit"),
+    path("performance-feedback/<int:pk>/submit/", views_performance.feedback_submit, name="vertex-feedback-submit"),
+    path("performance-feedback/<int:pk>/revision/", views_performance.feedback_request_revision, name="vertex-feedback-revision"),
+    path("performance-feedback/<int:pk>/approve/", views_performance.feedback_approve, name="vertex-feedback-approve"),
+    path("performance-feedback/<int:pk>/publish/", views_performance.feedback_publish, name="vertex-feedback-publish"),
+    # performance reports
+    path("performance-reports/", cbv_performance.ReportsView.as_view(), name="vertex-performance"),
+    path("performance-reports/nav/", cbv_performance.ReportsNavView.as_view(), name="vertex-performance-nav"),
+    path("performance-reports/list/", cbv_performance.ReportsList.as_view(), name="vertex-performance-list"),
+    path("performance-reports/generate/", cbv_performance.GenerateReportFormView.as_view(), name="vertex-performance-generate"),
+    path("performance-reports/<int:pk>/", views_performance.performance_report, name="vertex-performance-report"),
+    path("performance-reports/<int:pk>/publish/", views_performance.performance_report_publish, name="vertex-performance-publish"),
+    # improvement plans
+    path("improvement-plans/", cbv_performance.PipView.as_view(), name="vertex-pip"),
+    path("improvement-plans/nav/", cbv_performance.PipNavView.as_view(), name="vertex-pip-nav"),
+    path("improvement-plans/list/", cbv_performance.PipList.as_view(), name="vertex-pip-list"),
+    path("improvement-plans/new/", cbv_performance.PipFormView.as_view(), name="vertex-pip-new"),
+    path("improvement-plans/<int:pk>/edit/", cbv_performance.PipFormView.as_view(), name="vertex-pip-edit"),
+    # the employee's own view
+    path("my-performance/", views_performance.my_performance, name="vertex-my-performance"),
 ]

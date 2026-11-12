@@ -1,0 +1,74 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+{% include "vertex/_vx.html" %}
+<div class="oh-wrapper">
+<div class="vx-page" style="max-width:980px">
+  <a href="{% url 'vertex-performance' %}" class="vx-back"><ion-icon name="arrow-back-outline"></ion-icon>{% trans "Performance Reports" %}</a>
+
+  {% if messages %}
+    <div class="oh-alert-container">{% for message in messages %}<div class="oh-alert oh-alert--animated {{ message.tags }}">{{ message }}</div>{% endfor %}</div>
+  {% endif %}
+
+  <div class="vx-stack">
+    <div class="vx-card vx-card--pad">
+      <div style="display:flex;justify-content:space-between;gap:1.25rem;flex-wrap:wrap;align-items:center">
+        <div class="vx-ident">
+          <img class="vx-avatar" style="width:52px;height:52px" src="{{ report.subject.get_avatar }}" alt="">
+          <div style="min-width:0">
+            <h1 class="vx-title">{{ report.subject.get_full_name }}</h1>
+            <div class="vx-meta">{{ report.get_period_type_display }} {% trans "report" %} &middot; {{ report.period }}</div>
+            <div class="vx-chips"><span class="vx-chip">{{ report.get_rating_html }}</span><span class="vx-chip">{{ report.get_published_html }}</span></div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div class="vx-big">{{ report.overall_score }}<span style="font-size:1.2rem;color:var(--vx-muted)">%</span></div>
+          <div class="vx-meta">{% trans "Overall score" %}</div>
+        </div>
+      </div>
+      {% if can_publish or can_regenerate %}
+        <div class="vx-btnrow">
+          {% if can_publish %}
+            <form method="post" action="{% url 'vertex-performance-publish' report.pk %}" onsubmit="return confirm('{% trans "Publish this report to the employee?"|escapejs %}');">{% csrf_token %}<button type="submit" class="oh-btn oh-btn--secondary"><ion-icon name="eye-outline" class="me-1"></ion-icon>{% trans "Publish to employee" %}</button></form>
+          {% endif %}
+          {% if can_regenerate and not report.is_published %}
+            <button type="button" class="oh-btn oh-btn--light" hx-get="{% url 'vertex-performance-generate' %}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal"><ion-icon name="refresh-outline" class="me-1"></ion-icon>{% trans "Regenerate" %}</button>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "How the score is built" %}</h2>
+      <div class="vx-bars">
+        {% for r in rows %}
+          <div>
+            <div class="vx-bar-head"><span>{{ r.name }}{% if r.weight %}<small>{% trans "weight" %} {{ r.weight }}%</small>{% endif %}</span>
+              {% if r.not_applicable %}<b style="color:var(--vx-muted)">{% trans "Not applicable" %}</b>{% else %}<b>{{ r.score }}%</b>{% endif %}
+            </div>
+            {% if not r.not_applicable %}<div class="vx-meter"><span style="width:{{ r.score }}%;background:{{ r.colour }}"></span></div>{% endif %}
+            <div class="vx-bar-note">{{ r.factors }}</div>
+          </div>
+        {% endfor %}
+      </div>
+      {% for r in rows %}{% if r.not_applicable %}<div class="vx-bar-note" style="margin-top:.6rem">{% trans "A category that does not apply is left out and its weight is shared across the others." %}</div>{% endif %}{% endfor %}
+    </div>
+
+    <div class="vx-card vx-card--pad">
+      <div class="row">
+        <div class="col-md-4" style="margin-bottom:1rem"><div class="vx-label">{% trans "Strengths" %}</div><p class="vx-text">{{ report.strengths|default:"-" }}</p></div>
+        <div class="col-md-4" style="margin-bottom:1rem"><div class="vx-label">{% trans "Improvement areas" %}</div><p class="vx-text">{{ report.improvement_areas|default:"-" }}</p></div>
+        <div class="col-md-4" style="margin-bottom:1rem"><div class="vx-label">{% trans "Recommended actions" %}</div><p class="vx-text">{{ report.recommended_actions|default:"-" }}</p></div>
+      </div>
+      <hr class="vx-divider">
+      <div class="vx-label">{% trans "Evidence used" %}</div>
+      <p class="vx-text" style="color:var(--vx-muted)">{{ report.data_sources|default:"-" }}</p>
+      <div class="vx-bar-note">
+        {% trans "Ratings" %}:
+        {% for minimum, rating in bands %}{{ minimum }}+ {{ rating.label }}{% if not forloop.last %} &middot; {% endif %}{% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock content %}

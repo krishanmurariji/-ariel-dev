@@ -1,4 +1,4 @@
-{% load widget_tweaks i18n generic_template_filters horillafilters %}
+{% load widget_tweaks i18n generic_template_filters horillafilters vertex_extras %}
 {% get_company as theme_obj %}
 {% comment %}
   Vertex modal form (create / edit). Rendered through form.structured by
@@ -27,8 +27,9 @@
   .vm__body { padding: 1.35rem 1.5rem; overflow-y: auto; flex: 1; }
   .vm__grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 1rem 1.1rem; }
   .vm__field { grid-column: span 12; min-width: 0; }
-  @media (min-width: 640px) { .vm__field--6 { grid-column: span 6; } .vm__field--4 { grid-column: span 4; } .vm__field--8 { grid-column: span 8; } .vm__field--3 { grid-column: span 3; } }
+  @media (min-width: 640px) { .vm__field--2 { grid-column: span 2; } .vm__field--3 { grid-column: span 3; } .vm__field--4 { grid-column: span 4; } .vm__field--5 { grid-column: span 5; } .vm__field--6 { grid-column: span 6; } .vm__field--7 { grid-column: span 7; } .vm__field--8 { grid-column: span 8; } .vm__field--9 { grid-column: span 9; } .vm__field--10 { grid-column: span 10; } }
   .vm__section { grid-column: span 12; margin-top: .35rem; padding-top: .9rem; border-top: 1px solid var(--vm-border); font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--vm-muted); }
+  .vm__section small { display: block; margin-top: .2rem; font-size: .72rem; font-weight: 400; letter-spacing: 0; text-transform: none; }
   .vm__label { display: block; font-size: .78rem; font-weight: 600; color: var(--vm-text); margin: 0 0 .35rem; }
   .vm__label.required-star::after { content: " *"; color: var(--vm-bad); }
   .vm__help { font-size: .72rem; color: var(--vm-muted); margin: .3rem 0 0; }
@@ -82,7 +83,7 @@
     {% if form.non_field_errors %}<div class="vm__nonfield">{{ form.non_field_errors }}</div>{% endif %}
     <div class="vm__grid">
       {% for field in form.visible_fields %}
-        {% with section=form.vm_sections|get_item:field.name %}{% if section %}<div class="vm__section">{{ section }}</div>{% endif %}{% endwith %}
+        {% with section=form.vm_sections|get_item:field.name %}{% if section %}<div class="vm__section">{{ section|section_title }}{% if section|section_hint %}<small>{{ section|section_hint }}</small>{% endif %}</div>{% endif %}{% endwith %}
         <div class="vm__field vm__field--{{ field|col }}" id="id_{{ field.name }}_parent_div">
           <label class="vm__label {% if field.field.required %}required-star{% endif %}" for="{{ field.id_for_label }}">{% trans field.label %}</label>
           {% if field.field.widget.input_type == 'checkbox' %}
