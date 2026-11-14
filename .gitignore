@@ -179,3 +179,7 @@ TestDB.sqlite3
 # Local scratch / load-test files
 mail_preview_tmp.html
 locustfile.py
+
+# Oracle deployment secrets/backups
+.env.oracle
+backups/

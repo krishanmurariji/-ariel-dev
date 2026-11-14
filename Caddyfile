@@ -1,0 +1,5 @@
+# Automatic Let's Encrypt HTTPS for $DOMAIN (e.g. arielhr.duckdns.org).
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy nginx:80
+}

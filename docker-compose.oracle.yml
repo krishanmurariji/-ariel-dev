@@ -1,0 +1,90 @@
+# Oracle Cloud Always Free deployment (replaces Render).
+# Run on the VM with:  docker compose -f docker-compose.oracle.yml --env-file .env.oracle up -d --build
+# Needs only: web (Django/ASGI), db (Postgres), redis (chat channel layer),
+# nginx (static/media + hardening), caddy (automatic HTTPS). No Ollama (too heavy; optional).
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    env_file: .env.oracle
+    environment:
+      DEBUG: "False"
+      DATABASE_URL: postgres://horilla:${POSTGRES_PASSWORD}@db:5432/horilla
+      CHANNEL_LAYER_BACKEND: redis
+      CHANNEL_LAYER_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+    volumes:
+      - staticfiles:/app/staticfiles
+      - media:/app/media
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 30s
+      start_period: 90s
+      retries: 3
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: horilla
+      POSTGRES_USER: horilla
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U horilla -d horilla"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      - staticfiles:/static:ro
+      - media:/media:ro
+      - ./docker/nginx.oracle.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      web: {condition: service_healthy}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - nginx
+
+volumes:
+  staticfiles:
+  media:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
