@@ -18,7 +18,7 @@ services:
     depends_on:
       db: {condition: service_healthy}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      test: ["CMD", "curl", "-f", "-H", "Host: ${DOMAIN}", "http://localhost:8000/health/"]
       interval: 60s
       timeout: 30s
       start_period: 180s
