@@ -14,14 +14,14 @@ At duckdns.org create a subdomain (e.g. `arielhr`) and point it to the VM's publ
 ## 3. Bootstrap the VM
 ```bash
 ssh ubuntu@<VM_PUBLIC_IP>
-git clone -b render https://github.com/krishanmurariji/-ariel-dev.git && cd -ariel-dev
+git clone -b render https://github.com/krishanmurariji/-ariel-dev.git && cd ~/-ariel-dev
 ./scripts/oracle-bootstrap.sh      # installs Docker, opens 80/443 in iptables, adds swap
 exit                                # log back in so the docker group applies
 ```
 
 ## 4. Configure and start
 ```bash
-cd -ariel-dev
+cd ~/-ariel-dev
 cp .env.oracle.example .env.oracle && nano .env.oracle   # set domain + generate the 4 secrets
 docker compose -f docker-compose.oracle.yml --env-file .env.oracle up -d --build
 docker compose -f docker-compose.oracle.yml --env-file .env.oracle logs -f web
