@@ -1,0 +1,22 @@
+{$DOMAIN} {
+	encode gzip
+	request_body {
+		max_size 50MB
+	}
+
+	# Uploaded files: same hardening as docker/nginx.conf (script-capable types
+	# are forced to download and sandboxed).
+	handle /media/* {
+		root * /srv
+		header X-Content-Type-Options nosniff
+		@active path_regexp active (?i)\.(svg|svgz|xml|xsl|xslt|xht|xhtml|html|htm|shtml|mht|mhtml|rdf|mathml|js|mjs|swf)$
+		header @active Content-Disposition attachment
+		header @active Content-Security-Policy "default-src 'none'; sandbox"
+		file_server
+	}
+
+	# Everything else (including /static via Whitenoise and /ws/ WebSocket)
+	handle {
+		reverse_proxy web:8000
+	}
+}

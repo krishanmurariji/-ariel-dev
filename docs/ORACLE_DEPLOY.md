@@ -44,3 +44,11 @@ Copy `backups/` off the VM occasionally (e.g. `scp`).
 - Stay on Always Free shapes only (A1.Flex totalling <= 4 OCPU/24 GB, or the AMD Micro).
 - Oracle can reclaim Always Free VMs that sit idle for 7 days (CPU, network and memory all under ~20% at the 95th percentile). A real HR app with users won't trip it; if it is a quiet demo, keep light traffic going or convert the account to Pay-As-You-Go (still free within limits; this also removes the idle reclaim).
 - Ollama is intentionally not in the stack. The A1 can run it, but leave it out unless you need the AI intake feature.
+
+## 1 GB AMD Micro VM (VM.Standard.E2.1.Micro) instead of A1
+Works, but it is slow and tight. Differences from the steps above:
+- Bootstrap with more swap: `SWAP_GB=4 ./scripts/oracle-bootstrap.sh`
+- Use the lean files: `docker compose -f docker-compose.oracle-micro.yml --env-file .env.oracle up -d --build` (single worker, no Redis/nginx; only `DOMAIN`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `SECRET_KEY`, `POSTGRES_PASSWORD`, `DB_INIT_PASSWORD` are needed in `.env.oracle`).
+- The first image build can take 20-40 minutes because of swap; later rebuilds are faster thanks to layer cache.
+- Use `-f docker-compose.oracle-micro.yml` in `scripts/oracle-backup.sh` too (edit the filename).
+- Better: retry creating an **A1.Flex** instance in Mumbai every so often (capacity frees up); it has 12-24x the RAM and is still free.
