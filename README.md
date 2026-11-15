@@ -78,10 +78,11 @@ What the connected mailbox is used for:
 5. **The LLM reads the email and resume text** and returns the candidate's name, email, mobile,
    the best-matching open job and a confidence value.
 6. **The candidate is created** in that job's *Applied* stage (or its first stage), duplicates are
-   detected, and managers are notified.
+   detected, and the poll is recorded in the intake log.
 7. **Every email is logged** (`CandidateIntakeLog`) with a status: created, duplicate, no resume,
    invalid format, attachment too large, no job match, parse failed, daily cap exceeded, or error.
    Temporary failures (LLM timeout, daily cap) are retried on the next poll, and any entry can be retried by hand.
+   Admins are notified when a mailbox hits its daily cap or starts failing to poll (once, not every 5 minutes).
 
 Safety and scale details: a **database-level lock** (`IntakePollLock`) ensures only one poll runs
 even with several web workers; each poll has a message limit (200) and a time budget (20 min); the
@@ -125,9 +126,10 @@ polling cursor is not advanced past messages that were not processed.
     and downgraded.
   - If the candidate's **name is not found in the resume** (wrong file attached), the score is
     **capped at 50**, a warning is shown first, and the result is flagged.
-- **Where you see it:** the candidate grid, the pipeline cards, sorting by score, the dashboard and
-  an *AI Score* tab with a manual *re-score* button.
-- The latest score is stored on the candidate (`latest_ai_score`), so lists and sorting stay fast.
+- **Where you see it:** the candidate grid and pipeline cards, an *AI Score* tab with a manual
+  *re-score* button, and an *AI Effectiveness* panel on the recruitment dashboard (average score,
+  email-intake and job-match counts).
+- The latest score is stored on the candidate (`latest_ai_score`), so lists and cards do not need to query score history.
 
 ## 5. Better-job match recommender
 
