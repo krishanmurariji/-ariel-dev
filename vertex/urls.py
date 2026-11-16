@@ -45,6 +45,7 @@ urlpatterns = [
         name="vertex-document-delete",
     ),
     path("projects/<int:project_id>/calls/add/", cbv.ProjectCallFormView.as_view(), name="vertex-call-add"),
+    path("projects/<int:project_id>/calls/<int:pk>/link/", views.call_generate_link, name="vertex-call-link"),
     # status updates
     path("status-updates/", cbv.StatusUpdatesView.as_view(), name="vertex-status"),
     path("status-updates/nav/", cbv.StatusUpdatesNavView.as_view(), name="vertex-status-nav"),

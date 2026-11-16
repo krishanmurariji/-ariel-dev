@@ -16,7 +16,7 @@ from django.utils.translation import gettext_lazy as _
 from horilla.decorators import login_required, permission_required
 from horilla.methods import handle_no_permission
 from horilla.post_only import post_only
-from vertex import access
+from vertex import access, meetings
 from vertex.forms import CommentForm
 from vertex.models import ProjectMember, ProjectRole
 
@@ -184,3 +184,19 @@ def document_delete(request, pk, doc_id):
     get_object_or_404(project.documents, pk=doc_id).delete()
     messages.success(request, _("Document removed."))
     return _back(project, "documents")
+
+
+@login_required
+@permission_required("vertex.add_projectcall")
+@post_only
+def call_generate_link(request, project_id, pk):
+    """Generate (or refresh) the meeting link of a call: the one-click retry when it failed the first time."""
+    project = _project_or_404(request, project_id)
+    if not access.can_manage(request.user, project):
+        return handle_no_permission(request)
+    call = get_object_or_404(project.calls, pk=pk)
+    result = meetings.generate_call_meeting(call, request)
+    meetings.report(request, call, result)
+    if result.get("needs_auth") and result.get("redirect"):
+        return redirect(result["redirect"])
+    return redirect(f"{project.get_absolute_url()}?tab=calls")

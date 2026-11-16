@@ -199,6 +199,18 @@ class CreateAndManageTests(VertexTestBase):
             "priority": 1, "start_date": "2026-02-01",
         }
 
+    def test_description_and_notes_are_capped(self):
+        grant(self.pm, "view_project", "add_project")
+        client = self.login(self.pm)
+        page = client.get(reverse("vertex-project-new"), **HX)
+        self.assertContains(page, 'maxlength="1000"')
+        self.assertContains(page, 'maxlength="2000"')
+        client.post(reverse("vertex-project-new"), {**self.new_project_data("CAP1"), "description": "x" * 1001}, **HX)
+        client.post(reverse("vertex-project-new"), {**self.new_project_data("CAP2"), "notes": "x" * 2001}, **HX)
+        self.assertFalse(Project.objects.filter(code__in=["CAP1", "CAP2"]).exists())
+        client.post(reverse("vertex-project-new"), {**self.new_project_data("CAP3"), "description": "x" * 1000, "notes": "y" * 2000}, **HX)
+        self.assertTrue(Project.objects.filter(code="CAP3").exists())
+
     def test_create_needs_add_project_and_makes_creator_the_pm(self):
         grant(self.dev, "view_project")
         response = self.login(self.dev).post(
@@ -435,6 +447,17 @@ class DocumentTests(VertexTestBase):
             reverse("vertex-document-delete", args=[self.project.pk, document.pk])
         )
         self.assertFalse(ProjectDocument.objects.filter(title="Notes").exists())
+
+    def test_document_description_is_capped(self):
+        url = reverse("vertex-document-add", args=[self.project.pk])
+        page = self.login(self.pm).get(url, **HX)
+        self.assertContains(page, 'maxlength="500"')
+        base = {"title": "Demo", "category": "demo", "visibility": 0, "is_video_link": "on",
+                "video_url": "https://example.com/v"}
+        self.login(self.pm).post(url, {**base, "description": "x" * 501}, **HX)
+        self.assertFalse(ProjectDocument.objects.filter(title="Demo").exists())
+        self.login(self.pm).post(url, {**base, "description": "x" * 500}, **HX)
+        self.assertTrue(ProjectDocument.objects.filter(title="Demo").exists())
 
     def test_video_link_needs_a_url(self):
         url = reverse("vertex-document-add", args=[self.project.pk])

@@ -166,16 +166,6 @@
             hx-target="#reloadMessages"
         >
         </button>
-        {% if messages %}
-            <div class="oh-alert-container">
-                {% for message in messages %}
-                    <div class="oh-alert oh-alert--animated {{message.tags}}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
-
         <!-- Include Sidebar (sidebar.html owns id="sidebar" itself) -->
         {% include "horilla_theme/components/sidebar.html" %}
 

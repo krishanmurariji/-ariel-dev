@@ -71,9 +71,6 @@
 <div class="vx-page">
   <a href="{% url 'vertex-projects' %}" class="vx-back"><ion-icon name="arrow-back-outline"></ion-icon>{% trans "Projects" %}</a>
 
-  {% if messages %}
-    <div class="oh-alert-container">{% for message in messages %}<div class="oh-alert oh-alert--animated {{ message.tags }}">{{ message }}</div>{% endfor %}</div>
-  {% endif %}
 
   {# ---------------- header ---------------- #}
   <div class="vx-card" style="margin-bottom:1.1rem">
@@ -289,9 +286,20 @@
             <div class="pw-row__title">{{ c.title }}</div>
             <div class="pw-row__meta">{{ c.scheduled_at|date:"D, j M Y" }} &middot; {{ c.scheduled_at|date:"H:i" }} &middot; {{ c.duration_minutes }} {% trans "min" %}</div>
             {% if c.agenda %}<div class="pw-row__meta" style="white-space:normal">{{ c.agenda|truncatechars:160 }}</div>{% endif %}
+            {% if not c.meeting_url and c.meeting_error %}<div class="pw-row__meta" style="white-space:normal;color:#b45309"><ion-icon name="warning-outline"></ion-icon> {% trans "No meeting link yet:" %} {{ c.meeting_error }}</div>{% endif %}
           </div>
           <div class="pw-row__chips"><span class="vx-chip">{{ c.get_call_type_display }}</span></div>
-          {% if c.meeting_url %}<a class="oh-btn oh-btn--light" href="{{ c.meeting_url }}" target="_blank" rel="noopener noreferrer"><ion-icon name="videocam-outline" class="me-1"></ion-icon>{% trans "Join" %}</a>{% endif %}
+          <div class="vx-actions" style="align-items:center">
+            {% if c.meeting_url %}
+              <a class="oh-btn oh-btn--light" href="{{ c.meeting_url }}" target="_blank" rel="noopener noreferrer"><ion-icon name="videocam-outline" class="me-1"></ion-icon>{% trans "Join" %}</a>
+              <button type="button" class="oh-btn oh-btn--light" title="{% trans 'Copy the meeting link' %}" onclick="navigator.clipboard.writeText('{{ c.meeting_url|escapejs }}');this.innerText='{% trans 'Copied' %}'"><ion-icon name="copy-outline"></ion-icon></button>
+            {% endif %}
+            {% if can_add_call %}
+              <form method="post" action="{% url 'vertex-call-link' project.pk c.pk %}">{% csrf_token %}
+                <button type="submit" class="oh-btn oh-btn--light" title="{% if c.meeting_url %}{% trans 'Refresh the meeting and notify attendees' %}{% else %}{% trans 'Create the meeting link' %}{% endif %}"><ion-icon name="refresh-outline" class="me-1"></ion-icon>{% if c.meeting_url %}{% trans "Update link" %}{% else %}{% trans "Generate link" %}{% endif %}</button>
+              </form>
+            {% endif %}
+          </div>
         </div>
         {% endfor %}
       </div>

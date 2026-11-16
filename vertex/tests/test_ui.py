@@ -279,3 +279,47 @@ class VertexRegressionTests(VertexTestBase):
         self.assertIn('min="1"', html)
         self.assertIn('max="5"', html)
         self.assertIn('max="5"', str(CodeReviewForm()["testing_rating"]))
+
+
+class ToastTests(VertexTestBase):
+    """A saved message is shown once: not twice from the reply, and not twice from the page."""
+
+    def shown(self, response, text):
+        """How many times a message text is drawn on the page."""
+        return response.content.decode().count(text)
+
+    def setUp(self):
+        super().setUp()
+        self.pm = make_employee("Pm", "pm@toast.example", "9500000001")
+        grant(self.pm, "view_project", "add_project", "change_project", "view_reviewrequest", "view_goal")
+        self.client_pm = self.login(self.pm)
+        self.data = {"code": "TST1", "name": "Toast", "status": "active", "health": "green", "priority": 1,
+                     "start_date": "2026-02-01"}
+
+    def test_the_modal_reply_does_not_ask_for_the_toast_a_second_time(self):
+        reply = self.client_pm.post(reverse("vertex-project-new"), self.data, **HX).content.decode()
+        self.assertNotIn("reloadMessagesButton", reply)
+        self.assertIn(".reload-record", reply)  # the list reload shows the toast
+
+    def test_save_and_add_another_reopens_the_form_without_a_second_toast_request(self):
+        reply = self.client_pm.post(
+            reverse("vertex-project-new"), {**self.data, "save_and_add_another": "true"}, **HX
+        ).content.decode()
+        self.assertNotIn("reloadMessagesButton", reply)
+        self.assertIn("htmx.ajax", reply)
+
+    def test_a_full_page_shows_the_toast_once(self):
+        self.client_pm.post(reverse("vertex-project-new"), self.data, **HX)
+        project = Project.objects.get(code="TST1")
+        self.data["name"] = "Toast 2"
+        self.client_pm.post(
+            reverse("vertex-project-edit", args=[project.pk]), self.data,
+            HTTP_REFERER=f"http://testserver/vertex/projects/{project.pk}/", **HX,
+        )
+        page = self.client_pm.get(project.get_absolute_url())
+        self.assertEqual(self.shown(page, "Project created."), 1)
+        self.assertEqual(self.shown(page, "Project updated."), 1)
+
+    def test_the_list_page_shows_the_toast_once(self):
+        self.client_pm.post(reverse("vertex-project-new"), self.data, **HX)
+        self.assertEqual(self.shown(self.client_pm.get(reverse("vertex-projects")), "Project created."), 1)

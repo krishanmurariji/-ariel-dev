@@ -24,7 +24,7 @@ from horilla_views.generic.cbv.views import (
     HorillaNavView,
     TemplateView,
 )
-from vertex import access
+from vertex import access, meetings
 from vertex.filters import (
     MeetingMinuteFilter,
     ResourceRequestFilter,
@@ -69,8 +69,49 @@ def vertex_structured(self):
     return render_to_string("vertex/modal_form.html", {"form": self}, request=request)
 
 
+class VertexResponse:
+    """
+    Reply of a Vertex modal after a successful save: close the modal and refresh the list.
+
+    Ariel HR's stock reply also clicks "reload messages", and so does the list when it reloads, so a
+    toast was fetched twice at the same moment and shown twice. The list (or the page reload) already
+    shows the toast, so this reply never asks for it a second time.
+    """
+
+    def __new__(cls, content="", targets_to_reload=None, script=""):
+        import json
+
+        from django.http import HttpResponse as DjangoResponse
+
+        from horilla.horilla_middlewares import _thread_locals
+        from horilla_views.cbv_methods import get_short_uuid
+
+        request = getattr(_thread_locals, "request", None)
+        script_id = get_short_uuid(4)
+        targets = [t for t in set(targets_to_reload or []) if t != "#reloadMessagesButton"]
+        clicks = "".join(f"$(`{t}`).click();" for t in targets)
+        again = bool(request and request.method == "POST" and request.POST.get("save_and_add_another") == "true")
+        if again:
+            reopen = request.path + (f"?{request.META['QUERY_STRING']}" if request.META.get("QUERY_STRING") else "")
+            target = request.META.get("HTTP_HX_TARGET", "genericModalBody")
+            script += (
+                f"setTimeout(function(){{if(window.htmx){{htmx.ajax('GET',{json.dumps(reopen)},"
+                f"{{target:{json.dumps('#' + target)},swap:'innerHTML'}});}}}},50);"
+            )
+            close = ""
+        else:
+            close = f"$('#scriptTarget{script_id}').closest('.oh-modal--show').first().removeClass('oh-modal--show');"
+        body = (
+            f"<script id='scriptTarget{script_id}'>{clicks}{close}"
+            f"$('.reload-record').click();$('.reload-field').click();{script}</script>"
+        )
+        return DjangoResponse(body + (content or ""))
+
+
 class VertexModal:
     """Mixin for Vertex modal form views: swaps the form body for the Vertex modal design."""
+
+    HttpResponse = VertexResponse
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -417,7 +458,13 @@ class ProjectCallFormView(_ProjectChildFormView):
         call.project = self.project
         call.scheduled_by = access.employee_of(self.request.user)
         call.save()
-        return self.saved(_("Call scheduled."))
+        # the call is saved first; a meeting provider problem never undoes it
+        result = meetings.generate_call_meeting(call, self.request)
+        if result.get("success"):
+            messages.success(self.request, _("Call scheduled and meeting link generated."))
+        else:
+            meetings.report(self.request, call, result, scheduled=True)
+        return self.HttpResponse(RELOAD_PAGE)
 
 
 # ---------------------------------------------------------------------------

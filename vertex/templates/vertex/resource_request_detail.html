@@ -6,9 +6,6 @@
 <div class="vx-page" style="max-width:920px">
   <a href="{% url 'vertex-hiring' %}" class="vx-back"><ion-icon name="arrow-back-outline"></ion-icon>{% trans "Hiring Requests" %}</a>
 
-  {% if messages %}
-    <div class="oh-alert-container">{% for message in messages %}<div class="oh-alert oh-alert--animated {{ message.tags }}">{{ message }}</div>{% endfor %}</div>
-  {% endif %}
 
   <div class="vx-stack">
     <div class="vx-card vx-card--pad">

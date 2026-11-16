@@ -5,6 +5,7 @@ vertex/forms.py
 import os
 
 from django import forms
+from django.core.validators import MaxLengthValidator
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -42,6 +43,20 @@ class ModelForm(AppModelForm):
                 field.initial = None
 
 
+DESCRIPTION_LIMIT = 1000
+NOTES_LIMIT = 2000
+DOCUMENT_DESCRIPTION_LIMIT = 500
+
+
+def cap_text(form, name, limit):
+    """Limit a text field: the browser stops typing at ``limit`` and the server refuses anything longer."""
+    field = form.fields[name]
+    field.max_length = limit
+    field.validators.append(MaxLengthValidator(limit))
+    field.widget.attrs["maxlength"] = limit
+    field.help_text = _("Up to %(limit)s characters.") % {"limit": limit}
+
+
 class ProjectForm(ModelForm):
     vm_icon = "folder-open-outline"
     vm_hint = "Code, dates and ownership of the project."
@@ -62,6 +77,8 @@ class ProjectForm(ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        cap_text(self, "description", DESCRIPTION_LIMIT)
+        cap_text(self, "notes", NOTES_LIMIT)
         if self.instance.pk:
             # the project code is its identity, as in ArielVertex (update does not change it)
             self.fields["code"].disabled = True
@@ -112,6 +129,10 @@ class DocumentForm(ModelForm):
 
     cols = {"title": 12, "description": 12, "file": 12, "video_url": 12}
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        cap_text(self, "description", DOCUMENT_DESCRIPTION_LIMIT)
+
     def clean(self):
         data = super().clean()
         if data.get("is_video_link"):
@@ -143,20 +164,57 @@ class CommentForm(ModelForm):
         return message
 
 
+CALL_TITLE_LIMIT = 120
+CALL_AGENDA_LIMIT = 500
+MAX_ATTENDEES = 20
+
+
 class CallForm(ModelForm):
     vm_icon = "calendar-outline"
-    vm_hint = "Schedule a customer or internal call."
+    vm_hint = "Schedule a customer or internal call. The meeting link is created for you."
 
     class Meta:
         model = ProjectCall
-        fields = [
-            "title", "agenda", "call_type", "scheduled_at", "duration_minutes",
-            "attendees", "meeting_url",
-        ]
+        fields = ["title", "agenda", "call_type", "scheduled_at", "duration_minutes", "attendees"]
         widgets = {"scheduled_at": _DATETIME, "agenda": forms.Textarea(attrs={"rows": 2})}
-        labels = {"duration_minutes": _("Duration (min)"), "meeting_url": _("Meeting link"), "scheduled_at": _("Date and time")}
+        labels = {
+            "duration_minutes": _("Duration (min)"), "scheduled_at": _("Date and time"),
+            "agenda": _("Description"),
+        }
 
-    cols = {"title": 12, "agenda": 12, "call_type": 4, "scheduled_at": 4, "duration_minutes": 4, "attendees": 12, "meeting_url": 12}
+    cols = {"title": 12, "agenda": 12, "call_type": 4, "scheduled_at": 4, "duration_minutes": 4, "attendees": 12}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        cap_text(self, "title", CALL_TITLE_LIMIT)
+        cap_text(self, "agenda", CALL_AGENDA_LIMIT)
+        self.fields["attendees"].help_text = _("Comma separated emails (up to %(n)s). They get the invitation.") % {"n": MAX_ATTENDEES}
+
+    def clean_title(self):
+        title = self.cleaned_data["title"].strip()
+        if not title:
+            raise forms.ValidationError(_("Give the call a title."))
+        return title
+
+    def clean_duration_minutes(self):
+        minutes = self.cleaned_data["duration_minutes"]
+        if not 5 <= minutes <= 480:
+            raise forms.ValidationError(_("Duration must be between 5 and 480 minutes."))
+        return minutes
+
+    def clean_attendees(self):
+        from django.core.exceptions import ValidationError
+        from django.core.validators import validate_email
+
+        mails = [m.strip() for m in self.cleaned_data["attendees"].replace(";", ",").split(",") if m.strip()]
+        if len(mails) > MAX_ATTENDEES:
+            raise forms.ValidationError(_("At most %(n)s attendees.") % {"n": MAX_ATTENDEES})
+        for mail in mails:
+            try:
+                validate_email(mail)
+            except ValidationError:
+                raise forms.ValidationError(_("%(mail)s is not a valid email address.") % {"mail": mail})
+        return ", ".join(dict.fromkeys(mails))
 
 
 class StatusUpdateForm(ModelForm):
