@@ -6,7 +6,7 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 
 from employee.models import Employee
-from vertex.forms import ModelForm
+from vertex.forms import CALL_AGENDA_LIMIT, CALL_TITLE_LIMIT, ModelForm, cap_text, clean_email_list
 from vertex.models import (
     CodeReview,
     MeetingMinute,
@@ -47,7 +47,6 @@ class ReviewRequestForm(ModelForm):
     duration_minutes = forms.IntegerField(
         min_value=5, max_value=480, initial=30, required=False, label=_("Minutes")
     )
-    meeting_url = forms.URLField(required=False, label=_("Meeting link"))
     extra_attendees = forms.CharField(required=False, label=_("Extra attendee emails"))
 
     class Meta:
@@ -58,7 +57,7 @@ class ReviewRequestForm(ModelForm):
 
     field_order = [
         "project", "review_type", "subjects", "assigned_to", "due_date", "notes",
-        "title", "scheduled_at", "duration_minutes", "meeting_url", "extra_attendees",
+        "title", "scheduled_at", "duration_minutes", "extra_attendees",
     ]
 
     def __init__(self, *args, **kwargs):
@@ -67,6 +66,7 @@ class ReviewRequestForm(ModelForm):
         self.fields["subjects"].queryset = _people()
         self.fields["assigned_to"].queryset = _people()
         self.fields["assigned_to"].required = False
+        cap_text(self, "title", CALL_TITLE_LIMIT)
 
     def clean(self):
         data = super().clean()
@@ -74,18 +74,20 @@ class ReviewRequestForm(ModelForm):
             self.add_error("title", _("Give the meeting a title."))
         return data
 
+    def clean_extra_attendees(self):
+        return clean_email_list(self.cleaned_data["extra_attendees"])
+
 
 class ScheduleForm(forms.Form):
     # layout on the review page: a 6-column grid, see spans
     spans = {
-        "title": 3, "scheduled_at": 3, "duration_minutes": 2, "meeting_url": 4,
-        "assigned_to": 3, "extra_attendees": 3, "description": 6,
+        "title": 3, "scheduled_at": 3, "duration_minutes": 2,
+        "assigned_to": 4, "extra_attendees": 6, "description": 6,
     }
 
     title = forms.CharField(max_length=200, label=_("Meeting title"))
     scheduled_at = forms.DateTimeField(widget=_DATETIME, label=_("Meeting time"))
     duration_minutes = forms.IntegerField(min_value=5, max_value=480, initial=30, label=_("Minutes"))
-    meeting_url = forms.URLField(required=False, label=_("Meeting link"))
     assigned_to = forms.ModelChoiceField(
         queryset=Employee.objects.none(), required=False, label=_("Reviewer")
     )
@@ -95,6 +97,11 @@ class ScheduleForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["assigned_to"].queryset = _people()
+        cap_text(self, "title", CALL_TITLE_LIMIT)
+        cap_text(self, "description", CALL_AGENDA_LIMIT)
+
+    def clean_extra_attendees(self):
+        return clean_email_list(self.cleaned_data["extra_attendees"])
 
 
 class _RatingsMixin:

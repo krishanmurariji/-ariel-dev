@@ -68,6 +68,7 @@ urlpatterns = [
     path("reviews/<int:pk>/", views_reviews.review_detail, name="vertex-review"),
     path("reviews/<int:pk>/schedule/", views_reviews.review_schedule, name="vertex-review-schedule"),
     path("reviews/<int:pk>/respond/", views_reviews.review_respond, name="vertex-review-respond"),
+    path("reviews/<int:pk>/link/", views_reviews.review_generate_link, name="vertex-review-link"),
     path("reviews/<int:pk>/submit/", views_reviews.review_submit, name="vertex-review-submit"),
     # minutes
     path("minutes/", cbv.MinutesView.as_view(), name="vertex-minutes"),

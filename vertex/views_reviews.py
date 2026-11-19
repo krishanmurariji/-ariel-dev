@@ -14,7 +14,7 @@ from django.utils.translation import gettext_lazy as _
 from horilla.decorators import login_required, permission_required
 from horilla.methods import handle_no_permission
 from horilla.post_only import post_only
-from vertex import access
+from vertex import access, meetings
 from vertex.forms_reviews import (
     CodeReviewForm,
     ProjectReviewForm,
@@ -98,7 +98,6 @@ def review_schedule(request, pk):
     meeting.description = data["description"]
     meeting.scheduled_at = data["scheduled_at"]
     meeting.duration_minutes = data["duration_minutes"]
-    meeting.meeting_url = data["meeting_url"]
     meeting.attendees = _attendees([review.subject], assignee, me, data["extra_attendees"])
     meeting.scheduled_by = me
     meeting.save()
@@ -106,10 +105,34 @@ def review_schedule(request, pk):
         review.assigned_to = data["assigned_to"]
     review.status = ReviewRequestStatus.SCHEDULED
     review.save(update_fields=["assigned_to", "status"])
+    # the review is saved first; a meeting provider problem never undoes it
+    result = meetings.generate_review_meeting(meeting, request)
     notify_employees(
         me, [review.subject, assignee], str(_("A review has been scheduled.")), review.get_absolute_url()
     )
-    messages.success(request, _("Review scheduled."))
+    if result.get("success"):
+        messages.success(request, _("Review scheduled and meeting link generated."))
+    else:
+        meetings.report(request, meeting, result, scheduled=True, what="review")
+    return redirect(review.get_absolute_url())
+
+
+@login_required
+@permission_required("vertex.change_reviewrequest")
+@post_only
+def review_generate_link(request, pk):
+    """Generate (or refresh) the meeting link of a scheduled review: the one-click retry."""
+    review = _review_or_404(request, pk)
+    if not access.can_schedule_review(request.user, review):
+        return handle_no_permission(request)
+    meeting = getattr(review, "meeting", None)
+    if meeting is None or review.status == ReviewRequestStatus.COMPLETED:
+        messages.error(request, _("Schedule the review first."))
+        return redirect(review.get_absolute_url())
+    result = meetings.generate_review_meeting(meeting, request)
+    meetings.report(request, meeting, result, what="review")
+    if result.get("needs_auth") and result.get("redirect"):
+        return redirect(result["redirect"])
     return redirect(review.get_absolute_url())
 
 

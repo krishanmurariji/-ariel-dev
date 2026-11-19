@@ -117,7 +117,7 @@ class ReviewCreateTests(VertexTestBase):
             reverse("vertex-review-new"),
             self.data(
                 title="Q1 review", scheduled_at="2026-12-01T10:00", duration_minutes=45,
-                meeting_url="https://meet.example.com/x", extra_attendees="Guest@Example.com, ann@example.com",
+                extra_attendees="Guest@Example.com, ann@example.com",
             ),
             **HX,
         )

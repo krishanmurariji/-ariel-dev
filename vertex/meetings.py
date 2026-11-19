@@ -89,49 +89,94 @@ def _via_google(call, request, data):
     return {"success": True, "created": created, "provider": GOOGLE, "object_id": meeting.pk, "url": meeting.meet_url}
 
 
+def _generate(obj, request, data, what):
+    """Create (or update) the online meeting of ``obj`` (a call or a review meeting) and keep its link on it.
+
+    ``obj`` needs meeting_provider, meeting_object_id, meeting_url and meeting_error. Never raises: a
+    provider problem must never undo the saved record."""
+    try:
+        provider = _provider(request)
+        result = (_via_teams if provider == TEAMS else _via_google)(obj, request, data)
+        if result.get("success") and not result.get("url"):
+            result = {"error": _t("The provider did not return a meeting link. Try again.")}
+    except Exception as error:
+        logger.exception("Vertex %s meeting failed for %s", what, obj.pk)
+        result = {"error": str(error) or error.__class__.__name__}
+
+    if result.get("success"):
+        obj.meeting_provider = result["provider"]
+        obj.meeting_object_id = result["object_id"]
+        obj.meeting_url = result["url"]
+        obj.meeting_error = ""
+    else:
+        obj.meeting_error = (result.get("error") or result.get("message") or "")[:300]
+    obj.save(update_fields=["meeting_provider", "meeting_object_id", "meeting_url", "meeting_error"])
+    return result
+
+
+def _start(moment):
+    # local wall-clock time, as Recruitment passes it: the providers add the time zone themselves
+    return timezone.localtime(moment).replace(tzinfo=None)
+
+
 def generate_call_meeting(call, request):
-    """Create (or update) the online meeting of a call and keep its link on the call; never raises."""
+    """The meeting link of a project call."""
     data = {
         "title": call.title,
         "description": _description(call),
-        # local wall-clock time, as Recruitment passes it: the providers add the time zone themselves
-        "start_time": timezone.localtime(call.scheduled_at).replace(tzinfo=None),
+        "start_time": _start(call.scheduled_at),
         "duration": call.duration_minutes,
         "attendees": attendee_emails(call),
         "is_online": True,
     }
-    try:
-        provider = _provider(request)
-        result = (_via_teams if provider == TEAMS else _via_google)(call, request, data)
-        if result.get("success") and not result.get("url"):
-            result = {"error": _t("The provider did not return a meeting link. Try again.")}
-    except Exception as error:  # a provider problem must never undo the saved call
-        logger.exception("Vertex call meeting failed for call %s", call.pk)
-        result = {"error": str(error) or error.__class__.__name__}
-
-    if result.get("success"):
-        call.meeting_provider = result["provider"]
-        call.meeting_object_id = result["object_id"]
-        call.meeting_url = result["url"]
-        call.meeting_error = ""
-    else:
-        call.meeting_error = (result.get("error") or result.get("message") or "")[:300]
-    call.save(update_fields=["meeting_provider", "meeting_object_id", "meeting_url", "meeting_error"])
-    return result
+    return _generate(call, request, data, "call")
 
 
-def report(request, call, result, scheduled=False):
-    """Tell the user what happened, in plain words, without ever blocking the saved call."""
+def generate_review_meeting(meeting, request):
+    """The meeting link of a review: invites the person reviewed, the reviewer and the scheduler."""
+    review = meeting.review_request
+    lines = [
+        f"{_t('Project')}: {review.project.name}",
+        f"{_t('Review')}: {review.get_review_type_display()} - {review.subject.get_full_name()}",
+    ]
+    if meeting.description:
+        lines.append(meeting.description)
+    data = {
+        "title": meeting.title,
+        "description": (chr(10) * 2).join(lines),
+        "start_time": _start(meeting.scheduled_at),
+        "duration": meeting.duration_minutes,
+        "attendees": attendee_emails(meeting),
+        "is_online": True,
+    }
+    return _generate(meeting, request, data, "review")
+
+
+def share_meeting(source, others):
+    """Group reviews share ONE calendar event: copy its link to the other reviews' meetings."""
+    for other in others:
+        other.meeting_provider = source.meeting_provider
+        other.meeting_object_id = source.meeting_object_id
+        other.meeting_url = source.meeting_url
+        other.meeting_error = source.meeting_error
+        other.save(update_fields=["meeting_provider", "meeting_object_id", "meeting_url", "meeting_error"])
+
+
+def report(request, obj, result, scheduled=False, what="call"):
+    """Tell the user what happened, in plain words, without ever blocking the saved record."""
     from django.contrib import messages
 
+    noun = _t(what)
+    retry = _t("Use 'Generate link' on the %(what)s to try again.") % {"what": noun}
     if result.get("success"):
         messages.success(
             request,
             _t("Meeting link generated.") if result.get("created") else _t("Meeting updated and attendees notified."),
         )
-    elif result.get("needs_auth"):
-        prefix = _t("Call scheduled, but the meeting link could not be generated: ") if scheduled else ""
-        messages.warning(request, prefix + result["message"] + " " + _t("Use 'Generate link' on the call to try again."))
+        return
+    reason = result.get("message") if result.get("needs_auth") else (result.get("error") or "")
+    if scheduled:
+        prefix = _t("Scheduled, but the meeting link could not be generated: ")
     else:
-        prefix = _t("Call scheduled, but the meeting link could not be generated: ") if scheduled else _t("The meeting link could not be generated: ")
-        messages.warning(request, prefix + (result.get("error") or "") + " " + _t("Use 'Generate link' on the call to try again."))
+        prefix = "" if result.get("needs_auth") else _t("The meeting link could not be generated: ")
+    messages.warning(request, f"{prefix}{reason} {retry}")

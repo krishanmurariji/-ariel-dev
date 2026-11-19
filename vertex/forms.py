@@ -169,6 +169,22 @@ CALL_AGENDA_LIMIT = 500
 MAX_ATTENDEES = 20
 
 
+def clean_email_list(raw, limit=MAX_ATTENDEES):
+    """Comma / semicolon separated emails: each one valid, no duplicates, at most ``limit``."""
+    from django.core.exceptions import ValidationError
+    from django.core.validators import validate_email
+
+    mails = [m.strip() for m in (raw or "").replace(";", ",").split(",") if m.strip()]
+    if len(mails) > limit:
+        raise forms.ValidationError(_("At most %(n)s attendees.") % {"n": limit})
+    for mail in mails:
+        try:
+            validate_email(mail)
+        except ValidationError:
+            raise forms.ValidationError(_("%(mail)s is not a valid email address.") % {"mail": mail})
+    return ", ".join(dict.fromkeys(mails))
+
+
 class CallForm(ModelForm):
     vm_icon = "calendar-outline"
     vm_hint = "Schedule a customer or internal call. The meeting link is created for you."
@@ -203,18 +219,7 @@ class CallForm(ModelForm):
         return minutes
 
     def clean_attendees(self):
-        from django.core.exceptions import ValidationError
-        from django.core.validators import validate_email
-
-        mails = [m.strip() for m in self.cleaned_data["attendees"].replace(";", ",").split(",") if m.strip()]
-        if len(mails) > MAX_ATTENDEES:
-            raise forms.ValidationError(_("At most %(n)s attendees.") % {"n": MAX_ATTENDEES})
-        for mail in mails:
-            try:
-                validate_email(mail)
-            except ValidationError:
-                raise forms.ValidationError(_("%(mail)s is not a valid email address.") % {"mail": mail})
-        return ", ".join(dict.fromkeys(mails))
+        return clean_email_list(self.cleaned_data["attendees"])
 
 
 class StatusUpdateForm(ModelForm):

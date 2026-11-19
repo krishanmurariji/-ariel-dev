@@ -36,9 +36,20 @@
             <div style="font-weight:600">{{ meeting.title }}</div>
             <div class="vx-meta">{{ meeting.scheduled_at|date:"j M Y, H:i" }} &middot; {{ meeting.duration_minutes }} {% trans "min" %}</div>
             <div class="vx-meta">{% trans "Attendees" %}: {{ meeting.attendees|default:"-" }}</div>
+            {% if not meeting.meeting_url and meeting.meeting_error %}<div class="vx-banner" style="margin-top:.5rem"><b>{% trans "No meeting link yet:" %}</b> {{ meeting.meeting_error }}</div>{% endif %}
             <div class="vx-chips"><span class="vx-chip vx-chip--brand">{% trans "Response" %}: {{ meeting.get_response_status_display }}</span></div>
           </div>
-          {% if meeting.meeting_url %}<a class="oh-btn oh-btn--light" href="{{ meeting.meeting_url }}" target="_blank" rel="noopener noreferrer"><ion-icon name="videocam-outline" class="me-1"></ion-icon>{% trans "Join" %}</a>{% endif %}
+          <div class="vx-actions" style="align-items:center">
+            {% if meeting.meeting_url %}
+              <a class="oh-btn oh-btn--light" href="{{ meeting.meeting_url }}" target="_blank" rel="noopener noreferrer"><ion-icon name="videocam-outline" class="me-1"></ion-icon>{% trans "Join" %}</a>
+              <button type="button" class="oh-btn oh-btn--light" title="{% trans 'Copy the meeting link' %}" onclick="navigator.clipboard.writeText('{{ meeting.meeting_url|escapejs }}');this.innerText='{% trans 'Copied' %}'"><ion-icon name="copy-outline"></ion-icon></button>
+            {% endif %}
+            {% if can_schedule %}
+              <form method="post" action="{% url 'vertex-review-link' review.pk %}">{% csrf_token %}
+                <button type="submit" class="oh-btn oh-btn--light" title="{% if meeting.meeting_url %}{% trans 'Refresh the meeting and notify attendees' %}{% else %}{% trans 'Create the meeting link' %}{% endif %}"><ion-icon name="refresh-outline" class="me-1"></ion-icon>{% if meeting.meeting_url %}{% trans "Update link" %}{% else %}{% trans "Generate link" %}{% endif %}</button>
+              </form>
+            {% endif %}
+          </div>
         </div>
         {% if can_respond %}
           <form method="post" action="{% url 'vertex-review-respond' review.pk %}" class="vx-btnrow">

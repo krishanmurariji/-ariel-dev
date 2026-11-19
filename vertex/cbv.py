@@ -872,6 +872,7 @@ class ReviewRequestFormView(VertexModal, HorillaFormView):
         assignee = data["assigned_to"]
         scheduled_at = data["scheduled_at"]
         attendees = _attendees(subjects, assignee, me, data["extra_attendees"])
+        created_meetings = []
         for subject in subjects:
             review = ReviewRequest.objects.create(
                 project=data["project"],
@@ -886,15 +887,21 @@ class ReviewRequestFormView(VertexModal, HorillaFormView):
                 ),
             )
             if scheduled_at:
-                ReviewMeeting.objects.create(
-                    review_request=review,
-                    title=data["title"],
-                    scheduled_at=scheduled_at,
-                    duration_minutes=data["duration_minutes"] or 30,
-                    attendees=attendees,
-                    meeting_url=data["meeting_url"],
-                    scheduled_by=me,
+                created_meetings.append(
+                    ReviewMeeting.objects.create(
+                        review_request=review,
+                        title=data["title"],
+                        scheduled_at=scheduled_at,
+                        duration_minutes=data["duration_minutes"] or 30,
+                        attendees=attendees,
+                        scheduled_by=me,
+                    )
                 )
+        result = None
+        if created_meetings:
+            # one calendar event for the whole group, shared by every review's meeting
+            result = meetings.generate_review_meeting(created_meetings[0], self.request)
+            meetings.share_meeting(created_meetings[0], created_meetings[1:])
         verb = (
             _("A review has been scheduled for you.")
             if scheduled_at
@@ -905,7 +912,14 @@ class ReviewRequestFormView(VertexModal, HorillaFormView):
             notify_employees(
                 me, [assignee], str(_("You have been asked to run a review.")), reverse("vertex-reviews")
             )
-        messages.success(self.request, _("%(n)d review(s) created.") % {"n": len(subjects)})
+        if result is not None and result.get("success"):
+            messages.success(
+                self.request, _("%(n)d review(s) created and the meeting link generated.") % {"n": len(subjects)}
+            )
+        else:
+            messages.success(self.request, _("%(n)d review(s) created.") % {"n": len(subjects)})
+            if result is not None:
+                meetings.report(self.request, created_meetings[0], result, scheduled=True, what="review")
         return self.HttpResponse()
 
 
