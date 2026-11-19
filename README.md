@@ -1,8 +1,8 @@
 <div align="center">
 
-# Ariel HRMS
+# Horilla AI Recruitment (Ariel HRMS)
 
-### Open-source HR software with an **AI-powered recruitment (ATS)** module
+### Open-source HR software (a Horilla HRMS fork) with an **AI-powered recruitment (ATS)** module
 
 Read candidate applications straight from **Gmail / Outlook**, **score every resume with AI**,
 spot a **better-fitting job** automatically, and schedule **Microsoft Teams / Google Meet** interviews in one click.
@@ -199,8 +199,8 @@ LinkedIn post drafting, and a plain-language narrative of a candidate's history.
 Requires Docker and Docker Compose.
 
 ```bash
-git clone -b oracle https://github.com/krishanmurariji/-ariel-dev.git
-cd -- -ariel-dev
+git clone https://github.com/krishanmurariji/horilla-ai-recruitment.git
+cd horilla-ai-recruitment
 make dev            # web + PostgreSQL + Redis, at http://localhost:8000
 ```
 
@@ -237,6 +237,9 @@ Gunicorn + Uvicorn · Microsoft Graph API · Gmail API · Google Calendar / Meet
 
 Built on [Horilla HRMS](https://github.com/horilla-opensource/horilla). See the upstream project for its
 license terms, which apply to the original code in this repository.
+
+This project is an independent fork and is **not affiliated with or endorsed by** Horilla or its maintainers.
+"Horilla" is used only to describe the software this project is based on.
 
 ---
 

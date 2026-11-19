@@ -14,14 +14,14 @@ At duckdns.org create a subdomain (e.g. `arielhr`) and point it to the VM's publ
 ## 3. Bootstrap the VM
 ```bash
 ssh ubuntu@<VM_PUBLIC_IP>
-git clone -b oracle https://github.com/krishanmurariji/-ariel-dev.git && cd ~/-ariel-dev
+git clone https://github.com/krishanmurariji/horilla-ai-recruitment.git && cd ~/horilla-ai-recruitment
 ./scripts/oracle-bootstrap.sh      # installs Docker, opens 80/443 in iptables, adds swap
 exit                                # log back in so the docker group applies
 ```
 
 ## 4. Configure and start
 ```bash
-cd ~/-ariel-dev
+cd ~/horilla-ai-recruitment
 cp .env.oracle.example .env.oracle && nano .env.oracle   # set domain + generate the 4 secrets
 docker compose -f docker-compose.oracle.yml --env-file .env.oracle up -d --build
 docker compose -f docker-compose.oracle.yml --env-file .env.oracle logs -f web
@@ -36,7 +36,7 @@ git pull && docker compose -f docker-compose.oracle.yml --env-file .env.oracle u
 ## 6. Backups (do this, the VM is your only copy)
 ```bash
 crontab -e   # add:
-0 2 * * * /home/ubuntu/-ariel-dev/scripts/oracle-backup.sh
+0 2 * * * /home/ubuntu/horilla-ai-recruitment/scripts/oracle-backup.sh
 ```
 Copy `backups/` off the VM occasionally (e.g. `scp`).
 
