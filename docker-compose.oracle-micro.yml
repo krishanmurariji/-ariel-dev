@@ -3,6 +3,15 @@
 # no nginx (Whitenoise serves static, Caddy serves hardened /media).
 # Run: docker compose -f docker-compose.oracle-micro.yml --env-file .env.oracle up -d --build
 services:
+  # The media volume is created owned by root, but the app runs as uid 1000.
+  # Without this, every upload (resumes, logos, photos) fails with "Permission denied".
+  media-perms:
+    image: alpine:3
+    command: chown -R 1000:1000 /app/media
+    volumes:
+      - media:/app/media
+    restart: "no"
+
   web:
     build: .
     restart: unless-stopped
@@ -16,6 +25,7 @@ services:
     volumes:
       - media:/app/media
     depends_on:
+      media-perms: {condition: service_completed_successfully}
       db: {condition: service_healthy}
     healthcheck:
       test: ["CMD", "curl", "-f", "-H", "Host: ${DOMAIN}", "http://localhost:8000/health/"]
