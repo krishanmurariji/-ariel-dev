@@ -1,0 +1,68 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+{% include "vertex/_vx.html" %}
+<div class="oh-wrapper">
+<div class="vx-page" style="max-width:980px">
+  <a href="{% url 'vertex-promotions' %}" class="vx-back"><ion-icon name="arrow-back-outline"></ion-icon>{% trans "Promotions" %}</a>
+
+  <div class="vx-stack">
+    <div class="vx-card vx-card--pad">
+      <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+        <div class="vx-ident">
+          <img class="vx-avatar" style="width:52px;height:52px" src="{{ promotion.employee.get_avatar }}" alt="">
+          <div style="min-width:0">
+            <h1 class="vx-title">{{ promotion.employee.get_full_name }}</h1>
+            <div class="vx-meta">{{ promotion.current_designation|default:"-" }} &rarr; <b>{{ promotion.proposed_position.job_position }}</b> &middot; {% trans "recommended by" %} {{ promotion.get_recommender_name }}</div>
+            <div class="vx-chips"><span class="vx-chip">{{ promotion.get_stage_html }}</span></div>
+          </div>
+        </div>
+        <div class="vx-actions">
+          {% if can_validate %}<button type="button" class="oh-btn oh-btn--secondary" hx-get="{{ promotion.get_validate_url }}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal"><ion-icon name="checkmark-outline" class="me-1"></ion-icon>{% trans "Validate" %}</button>{% endif %}
+          {% if can_approve %}<button type="button" class="oh-btn oh-btn--secondary" hx-get="{{ promotion.get_approve_url }}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal"><ion-icon name="checkmark-done-outline" class="me-1"></ion-icon>{% trans "Approve" %}</button>{% endif %}
+          {% if can_complete %}<button type="button" class="oh-btn oh-btn--secondary" hx-get="{{ promotion.get_complete_url }}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal"><ion-icon name="ribbon-outline" class="me-1"></ion-icon>{% trans "Complete" %}</button>{% endif %}
+          {% if can_reject %}<button type="button" class="oh-btn oh-btn--light" hx-get="{{ promotion.get_reject_url }}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal"><ion-icon name="close-circle-outline" class="me-1"></ion-icon>{% trans "Reject" %}</button>{% endif %}
+        </div>
+      </div>
+
+      {% if rejected %}
+        <div class="vx-banner" style="margin-top:1rem"><b>{% trans "Rejected" %}:</b> {{ promotion.decision_note }}</div>
+      {% else %}
+      <div class="vx-steps">
+        <span class="vx-step {% if stage_index == 0 %}vx-step--now{% else %}vx-step--done{% endif %}"><i>1</i>{% trans "Recommended" %}</span><span class="vx-step-line"></span>
+        <span class="vx-step {% if stage_index == 1 %}vx-step--now{% elif stage_index > 1 %}vx-step--done{% endif %}"><i>2</i>{% trans "HR validated" %}</span><span class="vx-step-line"></span>
+        <span class="vx-step {% if stage_index == 2 %}vx-step--now{% elif stage_index > 2 %}vx-step--done{% endif %}"><i>3</i>{% trans "Leadership approved" %}</span><span class="vx-step-line"></span>
+        <span class="vx-step {% if stage_index == 3 %}vx-step--done{% endif %}"><i>4</i>{% trans "Completed" %}</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Why" %}</h2>
+      <p class="vx-text">{{ promotion.justification }}</p>
+      {% if show_salary and promotion.proposed_salary %}
+        <hr class="vx-divider">
+        <div class="vx-label">{% trans "Proposed salary" %}</div>
+        <p class="vx-text">{{ promotion.proposed_salary }}</p>
+      {% endif %}
+      {% if payroll_note %}
+        <div class="vx-banner" style="margin-top:.75rem">{% trans "The designation is updated. The salary is not changed automatically: record the new salary in Payroll Pro on the Pay Revisions page." %}</div>
+      {% endif %}
+    </div>
+
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "History" %}</h2>
+      {% for step in steps %}
+        <div class="vx-item vx-item--block" style="margin-bottom:.6rem">
+          <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+            <div style="font-weight:600">{{ step.get_to_stage_display }}</div>
+            <div class="vx-item__sub">{{ step.actor.get_full_name|default:"-" }} &middot; {{ step.at|date:"j M Y, H:i" }}</div>
+          </div>
+          {% if step.note %}<p class="vx-text" style="margin-top:.4rem">{{ step.note }}</p>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+</div>
+{% endblock content %}

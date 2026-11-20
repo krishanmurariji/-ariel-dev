@@ -70,6 +70,8 @@ BREADCRUMB_URL_NAMES = {
     "appraisal-cycles": "Appraisal Cycles",
     "appraisals": "Appraisals",
     "goals": "Goals",
+    "promotions": "Promotions",
+    "learning": "Learning",
     "my-performance": "My Performance",
 }
 
@@ -87,6 +89,8 @@ sidebar_urls = [
     "appraisal-cycles",
     "appraisals",
     "goals",
+    "promotions",
+    "learning",
     "my-performance",
     "dashboard",
     "ess",

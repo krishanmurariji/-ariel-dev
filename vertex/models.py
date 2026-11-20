@@ -1392,3 +1392,227 @@ class AllGoals(Goal):
         proxy = True
         verbose_name = _("Goals (all)")
         verbose_name_plural = _("Goals (all)")
+
+
+# ---------------------------------------------------------------------------
+# Promotions and learning (ArielVertex Promotions / Learning controllers)
+#
+# * view_promotion / add_promotion   your own outcome and your reports' requests / recommend a promotion
+# * view_allpromotions               every promotion                    (proxy "Promotions - all")
+# * change_promotionvalidation       HR: validate, complete, reject     (proxy "Promotion validation")
+# * change_promotionapproval         leadership: approve, reject        (proxy "Promotion approval")
+# * view/add/change/delete_trainingrecommendation   training for your reports (or your own, read)
+# * view_alltraining                 everyone's training                (proxy "Training - all")
+# ---------------------------------------------------------------------------
+
+
+class PromotionStage(models.TextChoices):
+    RECOMMENDED = "recommended", _("Recommended")
+    HR_VALIDATED = "hr_validated", _("HR validated")
+    APPROVED = "approved", _("Leadership approved")
+    COMPLETED = "completed", _("Completed")
+    REJECTED = "rejected", _("Rejected")
+
+
+OPEN_PROMOTION_STAGES = (
+    PromotionStage.RECOMMENDED, PromotionStage.HR_VALIDATED, PromotionStage.APPROVED,
+)
+
+
+class Promotion(models.Model):
+    """A promotion moving Manager -> HR -> Leadership -> HR completes it (or anyone with the right rejects it)."""
+
+    employee = models.ForeignKey(
+        "employee.Employee", on_delete=models.CASCADE, related_name="vertex_promotions"
+    )
+    recommended_by = models.ForeignKey(
+        "employee.Employee", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    current_designation = models.CharField(max_length=100, blank=True, default="")
+    proposed_position = models.ForeignKey(
+        "base.JobPosition", on_delete=models.PROTECT, related_name="+", verbose_name=_("Proposed designation")
+    )
+    current_salary = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    proposed_salary = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    justification = models.TextField()
+    stage = models.CharField(max_length=15, choices=PromotionStage.choices, default=PromotionStage.RECOMMENDED)
+    decision_note = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("Promotion")
+        verbose_name_plural = _("Promotions")
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee"],
+                condition=models.Q(stage__in=["recommended", "hr_validated", "approved"]),
+                name="vertex_one_open_promotion_per_employee",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.employee} -> {self.proposed_position}"
+
+    @property
+    def is_open(self):
+        return self.stage in OPEN_PROMOTION_STAGES
+
+    def get_absolute_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-promotion", args=[self.pk])
+
+    def get_employee_name(self):
+        return self.employee.get_full_name()
+
+    def get_recommender_name(self):
+        return self.recommended_by.get_full_name() if self.recommended_by_id else "-"
+
+    def get_designation_display(self):
+        return f"{self.current_designation or '-'} -> {self.proposed_position.job_position}"
+
+    def get_stage_html(self):
+        colour = {
+            "recommended": "#3b82f6", "hr_validated": "#8b5cf6", "approved": "#f59e0b",
+            "completed": "#16a34a", "rejected": "#dc2626",
+        }.get(self.stage, "#6b7280")
+        return _colour_html(colour, self.get_stage_display())
+
+    def get_validate_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-promotion-validate", args=[self.pk])
+
+    def get_approve_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-promotion-approve", args=[self.pk])
+
+    def get_complete_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-promotion-complete", args=[self.pk])
+
+    def get_reject_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-promotion-reject", args=[self.pk])
+
+
+class PromotionStep(models.Model):
+    """One row for every stage change: who moved it, when, and what they wrote."""
+
+    promotion = models.ForeignKey(Promotion, on_delete=models.CASCADE, related_name="steps")
+    from_stage = models.CharField(max_length=15, blank=True, default="")
+    to_stage = models.CharField(max_length=15, choices=PromotionStage.choices)
+    actor = models.ForeignKey(
+        "employee.Employee", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    note = models.TextField(blank=True, default="")
+    at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["at", "id"]
+
+
+class AllPromotions(Promotion):
+    """Permission switch only: ``view_allpromotions`` shows every promotion."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Promotions (all)")
+        verbose_name_plural = _("Promotions (all)")
+
+
+class PromotionValidation(Promotion):
+    """Permission switch only: ``change_promotionvalidation`` may validate, complete and reject (HR)."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Promotion validation")
+        verbose_name_plural = _("Promotion validation")
+
+
+class PromotionApproval(Promotion):
+    """Permission switch only: ``change_promotionapproval`` may approve and reject (leadership)."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Promotion approval")
+        verbose_name_plural = _("Promotion approval")
+
+
+class TrainingStatus(models.TextChoices):
+    RECOMMENDED = "recommended", _("Recommended")
+    IN_PROGRESS = "in_progress", _("In progress")
+    COMPLETED = "completed", _("Completed")
+
+
+class TrainingSource(models.TextChoices):
+    MANUAL = "manual", _("Manual")
+    SUGGESTED = "suggested", _("Suggested")
+
+
+class TrainingRecommendation(models.Model):
+    """Training for one employee, assigned by hand or suggested from goal progress and performance scores."""
+
+    employee = models.ForeignKey(
+        "employee.Employee", on_delete=models.CASCADE, related_name="vertex_training"
+    )
+    skill_gap = models.CharField(max_length=200)
+    recommended_training = models.CharField(max_length=200)
+    duration_months = models.PositiveSmallIntegerField(
+        default=3, validators=[MinValueValidator(1), MaxValueValidator(24)]
+    )
+    status = models.CharField(max_length=15, choices=TrainingStatus.choices, default=TrainingStatus.RECOMMENDED)
+    source = models.CharField(max_length=10, choices=TrainingSource.choices, default=TrainingSource.MANUAL)
+    created_by = models.ForeignKey(
+        "employee.Employee", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Training recommendation")
+        verbose_name_plural = _("Training recommendations")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.employee}: {self.recommended_training}"
+
+    def get_status_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-training-status", args=[self.pk])
+
+    def get_update_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-training-edit", args=[self.pk])
+
+    def get_delete_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-training-delete", args=[self.pk])
+
+    def get_employee_name(self):
+        return self.employee.get_full_name()
+
+    def get_duration_display(self):
+        return _("%(n)s month(s)") % {"n": self.duration_months}
+
+    def get_status_html(self):
+        colour = {"recommended": "#3b82f6", "in_progress": "#f59e0b", "completed": "#16a34a"}.get(
+            self.status, "#6b7280"
+        )
+        return _colour_html(colour, self.get_status_display())
+
+
+class AllTraining(TrainingRecommendation):
+    """Permission switch only: ``view_alltraining`` shows everyone's training."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Training (all)")
+        verbose_name_plural = _("Training (all)")

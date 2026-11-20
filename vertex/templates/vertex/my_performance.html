@@ -82,6 +82,33 @@
     </div>
     {% endif %}
 
+    {% if promotions %}
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Promotions" %}</h2>
+      {% for p in promotions %}
+        <div class="vx-item vx-item--block" style="margin-bottom:.6rem">
+          <div style="font-weight:600">{{ p.current_designation|default:"-" }} &rarr; {{ p.proposed_position.job_position }}</div>
+          <div class="vx-item__sub">{% trans "Completed" %} {{ p.completed_at|date:"j M Y" }}</div>
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if training %}
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "My training" %}</h2>
+      {% for t in training %}
+        <div class="vx-item vx-item--block" style="margin-bottom:.6rem">
+          <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+            <div style="font-weight:600">{{ t.recommended_training }}</div>
+            <div class="vx-chips" style="margin-top:0"><span class="vx-chip">{{ t.get_status_html }}</span></div>
+          </div>
+          <div class="vx-item__sub">{{ t.skill_gap }} &middot; {{ t.get_duration_display }}</div>
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     {% if pips %}
     <div class="vx-card vx-card--pad">
       <h2 class="vx-section-title">{% trans "Improvement plan" %}</h2>

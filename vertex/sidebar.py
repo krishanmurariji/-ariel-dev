@@ -73,6 +73,16 @@ SUBMENUS = [
         "accessibility": "vertex.sidebar.goals_accessibility",
     },
     {
+        "menu": _("Promotions"),
+        "redirect": reverse("vertex-promotions"),
+        "accessibility": "vertex.sidebar.promotions_accessibility",
+    },
+    {
+        "menu": _("Learning"),
+        "redirect": reverse("vertex-training"),
+        "accessibility": "vertex.sidebar.training_accessibility",
+    },
+    {
         "menu": _("My Performance"),
         "redirect": reverse("vertex-my-performance"),
         "accessibility": "vertex.sidebar.my_performance_accessibility",
@@ -130,3 +140,11 @@ def appraisals_accessibility(request, submenu, user_perms, *args, **kwargs):
 
 def goals_accessibility(request, submenu, user_perms, *args, **kwargs):
     return request.user.has_perm("vertex.view_goal")
+
+
+def promotions_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("vertex.view_promotion")
+
+
+def training_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("vertex.view_trainingrecommendation")

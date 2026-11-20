@@ -280,6 +280,8 @@ def my_performance(request):
             "feedback": feedback,
             "pips": access.my_pips(request.user),
             "appraisals": access.my_released_appraisals(request.user),
+            "promotions": access.my_final_promotions(request.user),
+            "training": access.my_training(request.user),
             "employee": access.employee_of(request.user),
         },
     )

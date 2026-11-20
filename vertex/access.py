@@ -562,3 +562,158 @@ def weight_used(employee, cycle, exclude_pk=None):
     if exclude_pk:
         goals = goals.exclude(pk=exclude_pk)
     return goals.aggregate(total=Sum("weightage"))["total"] or 0
+
+
+# ---------------------------------------------------------------------------
+# Promotions and training
+# ---------------------------------------------------------------------------
+
+
+def can_validate_promotions(user):
+    return user.has_perm("vertex.change_promotionvalidation")
+
+
+def can_approve_promotions(user):
+    return user.has_perm("vertex.change_promotionapproval")
+
+
+def sees_all_promotions(user):
+    return user.has_perm("vertex.view_allpromotions") or can_validate_promotions(user) or can_approve_promotions(user)
+
+
+def visible_promotions(user):
+    """Everyone's for HR / leadership; otherwise the ones you recommended or for people who report to you,
+    plus your own once it is completed (the employee never sees a request that is still being decided
+    or that did not go ahead)."""
+    from django.db.models import Q
+
+    from vertex.models import Promotion, PromotionStage
+
+    if not user.has_perm("vertex.view_promotion"):
+        return Promotion.objects.none()
+    promotions = Promotion.objects.select_related("employee", "recommended_by", "proposed_position")
+    if sees_all_promotions(user):
+        return promotions
+    me = employee_of(user)
+    if me is None:
+        return promotions.none()
+    return promotions.filter(
+        Q(recommended_by=me)
+        | Q(employee__employee_work_info__reporting_manager_id=me)
+        | (Q(employee=me) & Q(stage=PromotionStage.COMPLETED))
+    )
+
+
+def can_see_salary(user, promotion):
+    """Salary figures: HR, leadership and the person who recommended; everyone else sees designations only."""
+    me = employee_of(user)
+    return bool(
+        sees_all_promotions(user) or (me is not None and promotion.recommended_by_id == me.pk)
+    )
+
+
+def recommendable_employees(user):
+    """Who may be put forward: anyone for HR / leadership, otherwise the people who report to you."""
+    from employee.models import Employee
+
+    if not user.has_perm("vertex.add_promotion"):
+        return Employee.objects.none()
+    if sees_all_promotions(user):
+        return Employee.objects.filter(is_active=True)
+    return reports_of(user)
+
+
+def _not_own(user, promotion):
+    me = employee_of(user)
+    return me is not None and promotion.employee_id != me.pk
+
+
+def can_validate(user, promotion):
+    from vertex.models import PromotionStage
+
+    return bool(can_validate_promotions(user) and promotion.stage == PromotionStage.RECOMMENDED and _not_own(user, promotion))
+
+
+def can_approve(user, promotion):
+    from vertex.models import PromotionStage
+
+    return bool(can_approve_promotions(user) and promotion.stage == PromotionStage.HR_VALIDATED and _not_own(user, promotion))
+
+
+def can_complete(user, promotion):
+    from vertex.models import PromotionStage
+
+    return bool(can_validate_promotions(user) and promotion.stage == PromotionStage.APPROVED and _not_own(user, promotion))
+
+
+def can_reject(user, promotion):
+    return bool(
+        promotion.is_open
+        and (can_validate_promotions(user) or can_approve_promotions(user))
+        and _not_own(user, promotion)
+    )
+
+
+def my_final_promotions(user):
+    from vertex.models import Promotion, PromotionStage
+
+    me = employee_of(user)
+    if me is None:
+        return Promotion.objects.none()
+    return Promotion.objects.filter(employee=me, stage=PromotionStage.COMPLETED).select_related("proposed_position")
+
+
+def my_training(user):
+    """Your own training, whether or not you may manage training for others."""
+    from vertex.models import TrainingRecommendation
+
+    me = employee_of(user)
+    return TrainingRecommendation.objects.filter(employee=me) if me else TrainingRecommendation.objects.none()
+
+
+def sees_all_training(user):
+    return user.has_perm("vertex.view_alltraining")
+
+
+def visible_training(user):
+    from django.db.models import Q
+
+    from vertex.models import TrainingRecommendation
+
+    if not user.has_perm("vertex.view_trainingrecommendation"):
+        return TrainingRecommendation.objects.none()
+    training = TrainingRecommendation.objects.select_related("employee", "created_by")
+    if sees_all_training(user):
+        return training
+    me = employee_of(user)
+    if me is None:
+        return training.none()
+    return training.filter(Q(employee=me) | Q(employee__employee_work_info__reporting_manager_id=me))
+
+
+def training_employees(user):
+    from employee.models import Employee
+
+    if not user.has_perm("vertex.add_trainingrecommendation"):
+        return Employee.objects.none()
+    if sees_all_training(user):
+        return Employee.objects.filter(is_active=True)
+    return reports_of(user)
+
+
+def can_edit_training(user, training):
+    return user.has_perm("vertex.change_trainingrecommendation") and (
+        sees_all_training(user) or is_manager_of(user, training.employee)
+    )
+
+
+def can_update_training_status(user, training):
+    me = employee_of(user)
+    owner = me is not None and training.employee_id == me.pk
+    return user.has_perm("vertex.view_trainingrecommendation") and (owner or can_edit_training(user, training))
+
+
+def can_delete_training(user, training):
+    return user.has_perm("vertex.delete_trainingrecommendation") and (
+        sees_all_training(user) or is_manager_of(user, training.employee)
+    )

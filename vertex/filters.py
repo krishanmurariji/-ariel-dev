@@ -17,9 +17,11 @@ from vertex.models import (
     PerformanceReport,
     Pip,
     Project,
+    Promotion,
     ResourceRequest,
     ReviewRequest,
     StatusUpdate,
+    TrainingRecommendation,
 )
 
 
@@ -246,4 +248,36 @@ class GoalFilter(HorillaFilterSet):
             | Q(category__icontains=value)
             | Q(employee__employee_first_name__icontains=value)
             | Q(employee__employee_last_name__icontains=value)
+        )
+
+
+class PromotionFilter(HorillaFilterSet):
+    search = django_filters.CharFilter(method="filter_search")
+
+    class Meta:
+        model = Promotion
+        fields = ["stage", "proposed_position"]
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(employee__employee_first_name__icontains=value)
+            | Q(employee__employee_last_name__icontains=value)
+            | Q(proposed_position__job_position__icontains=value)
+            | Q(current_designation__icontains=value)
+        )
+
+
+class TrainingFilter(HorillaFilterSet):
+    search = django_filters.CharFilter(method="filter_search")
+
+    class Meta:
+        model = TrainingRecommendation
+        fields = ["status", "source"]
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(employee__employee_first_name__icontains=value)
+            | Q(employee__employee_last_name__icontains=value)
+            | Q(skill_gap__icontains=value)
+            | Q(recommended_training__icontains=value)
         )

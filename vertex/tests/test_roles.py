@@ -33,13 +33,14 @@ from vertex.models import (
     StatusUpdate,
     Visibility,
 )
-from vertex.roles import DEMO_USERS, ROLES, build_groups
+from employee.models import EmployeeWorkInformation
+from vertex.roles import DEMO_USERS, REPORTING, ROLES, build_groups
 from vertex.tests.test_projects import HX, VertexTestBase, make_employee
 
 DENIED = "You Dont Have Permission"
-ALL = {"hr", "pm", "lead", "dev", "dev2", "biz", "boss", "none"}
+ALL = {"hr", "pm", "lead", "dev", "dev2", "biz", "boss", "ceo", "none"}
 SHORT = {"vx.hr": "hr", "vx.pm": "pm", "vx.lead": "lead", "vx.dev": "dev", "vx.dev2": "dev2",
-         "vx.biz": "biz", "vx.boss": "boss", "vx.none": "none"}
+         "vx.biz": "biz", "vx.boss": "boss", "vx.ceo": "ceo", "vx.none": "none"}
 
 
 class RoleMatrixBase(VertexTestBase):
@@ -55,6 +56,12 @@ class RoleMatrixBase(VertexTestBase):
             if group:
                 employee.employee_user_id.groups.add(groups[group])
             cls.people[SHORT[username]] = employee
+        # the reporting lines of the demo users: appraisals, goals and promotions follow them
+        for username, manager in REPORTING:
+            EmployeeWorkInformation.objects.update_or_create(
+                employee_id=cls.people[SHORT[username]],
+                defaults={"reporting_manager_id": cls.people[SHORT[f"vx.{manager.split('.')[1]}"]]},
+            )
         cls.project = Project.objects.create(code="DEMO", name="Demo", start_date=date(2026, 1, 1))
         cls.other = Project.objects.create(code="OTHER", name="Other", start_date=date(2026, 1, 1))
         for username, first, last, group, role in DEMO_USERS:
@@ -107,7 +114,7 @@ class ScreenAccessTests(RoleMatrixBase):
         self.check_matrix("project list", reverse("vertex-project-list"), everyone_with_view, hx=True)
         self.check_matrix("project page", self.project.get_absolute_url(), everyone_with_view)
         # members only: HR and leadership see every project, the others only their own
-        self.check_matrix("other project", self.other.get_absolute_url(), {"hr", "boss", "pm"})
+        self.check_matrix("other project", self.other.get_absolute_url(), {"hr", "boss", "ceo", "pm"})
         self.check_matrix("new project", reverse("vertex-project-new"), {"hr"}, hx=True, marker="vm__head")
         self.check_matrix(
             "edit project", reverse("vertex-project-edit", args=[self.project.pk]), {"hr", "pm"},
@@ -134,7 +141,7 @@ class ScreenAccessTests(RoleMatrixBase):
         )
         self.check_matrix("hiring list", reverse("vertex-hiring-list"), {"hr", "pm"}, hx=True)
         self.check_matrix("raise request", reverse("vertex-hiring-new"), {"hr", "pm"}, hx=True, marker="vm__head")
-        self.check_matrix("resource visibility", reverse("vertex-resources"), {"hr", "pm", "boss"})
+        self.check_matrix("resource visibility", reverse("vertex-resources"), {"hr", "pm", "boss", "ceo"})
 
     def test_reviews_and_minutes(self):
         self.check_matrix("review list", reverse("vertex-review-list"), {"hr", "pm", "lead", "dev", "dev2", "boss"}, hx=True)
@@ -150,6 +157,27 @@ class ScreenAccessTests(RoleMatrixBase):
         self.check_matrix("pip list", reverse("vertex-pip-list"), {"hr"}, hx=True)
         self.check_matrix("new pip", reverse("vertex-pip-new"), {"hr"}, hx=True, marker="vm__head")
         self.check_matrix("my performance", reverse("vertex-my-performance"), {"hr", "pm", "lead", "dev", "dev2"})
+
+    def test_appraisals_and_goals(self):
+        self.check_matrix("cycle list", reverse("vertex-cycle-list"), {"hr", "boss"}, hx=True)
+        self.check_matrix("new cycle", reverse("vertex-cycle-new"), {"hr"}, hx=True, marker="vm__head")
+        self.check_matrix(
+            "appraisal list", reverse("vertex-appraisal-list"), {"hr", "pm", "lead", "dev", "dev2", "boss", "ceo"}, hx=True
+        )
+        self.check_matrix(
+            "goal list", reverse("vertex-goal-list"), {"hr", "pm", "lead", "dev", "dev2", "boss", "ceo"}, hx=True
+        )
+        # HR may assign to anyone; the PM only to people who report to them (the demo reporting lines)
+        self.check_matrix("assign goal", reverse("vertex-goal-new"), {"hr", "pm"}, hx=True, marker="vm__head")
+
+    def test_promotions_and_learning(self):
+        self.check_matrix("promotion list", reverse("vertex-promotion-list"), {"hr", "pm", "boss", "ceo"}, hx=True)
+        self.check_matrix("recommend promotion", reverse("vertex-promotion-new"), {"hr", "pm"}, hx=True, marker="vm__head")
+        self.check_matrix(
+            "training list", reverse("vertex-training-list"), {"hr", "pm", "lead", "dev", "dev2", "boss", "ceo"}, hx=True
+        )
+        self.check_matrix("assign training", reverse("vertex-training-new"), {"hr", "pm"}, hx=True, marker="vm__head")
+        self.check_matrix("suggest training", reverse("vertex-training-suggest"), {"hr", "pm"}, hx=True, marker="vm__head")
 
     def test_the_sidebar_shows_each_person_only_their_own_screens(self):
         wanted = {

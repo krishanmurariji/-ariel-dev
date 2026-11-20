@@ -32,6 +32,9 @@ ROLES = {
         "view_appraisalcycle", "add_appraisalcycle", "change_appraisalcycle",
         "view_appraisal", "change_appraisal", "view_allappraisals", "change_appraisalrelease",
         "view_goal", "add_goal", "change_goal", "delete_goal", "view_allgoals",
+        "view_promotion", "add_promotion", "view_allpromotions", "change_promotionvalidation",
+        "view_trainingrecommendation", "add_trainingrecommendation", "change_trainingrecommendation",
+        "delete_trainingrecommendation", "view_alltraining",
     ],
     "Vertex - Project Manager": [
         *PROJECTS_VIEW, "change_project", "add_projectmember", "delete_projectmember",
@@ -44,6 +47,9 @@ ROLES = {
         "view_myperformance",
         "view_appraisal", "change_appraisal",
         "view_goal", "add_goal", "change_goal", "delete_goal",
+        "view_promotion", "add_promotion",
+        "view_trainingrecommendation", "add_trainingrecommendation", "change_trainingrecommendation",
+        "delete_trainingrecommendation",
     ],
     "Vertex - Technical Lead": [
         *PROJECTS_VIEW, "add_projectdocument",
@@ -51,14 +57,14 @@ ROLES = {
         "view_reviewrequest", "add_codereview", "add_projectreview",
         "view_feedback", "add_feedback", "change_feedback",
         "view_myperformance",
-        "view_appraisal", "view_goal",
+        "view_appraisal", "view_goal", "view_trainingrecommendation",
     ],
     "Vertex - Developer": [
         *PROJECTS_VIEW, "add_projectdocument",
         "view_statusupdate", "add_statusupdate",
         "view_reviewrequest",
         "view_myperformance",
-        "view_appraisal", "view_goal",
+        "view_appraisal", "view_goal", "view_trainingrecommendation",
     ],
     "Vertex - Business Person": [
         *PROJECTS_VIEW, "view_statusupdate",
@@ -67,6 +73,13 @@ ROLES = {
         *PROJECTS_VIEW, "view_allprojects", "view_statusupdate", "view_resourcevisibility",
         "view_allreviewrequests", "view_reviewrequest",
         "view_appraisalcycle", "view_appraisal", "view_allappraisals", "view_goal", "view_allgoals",
+        "view_promotion", "view_allpromotions", "view_trainingrecommendation", "view_alltraining",
+    ],
+    "Vertex - Leadership Approver": [
+        *PROJECTS_VIEW, "view_allprojects", "view_statusupdate", "view_resourcevisibility",
+        "view_appraisal", "view_allappraisals", "view_goal", "view_allgoals",
+        "view_promotion", "view_allpromotions", "change_promotionapproval",
+        "view_trainingrecommendation", "view_alltraining",
     ],
 }
 
@@ -79,6 +92,7 @@ DEMO_USERS = [
     ("vx.dev2", "Divya", "Nair", "Vertex - Developer", "developer"),
     ("vx.biz", "Bhavna", "Shah", "Vertex - Business Person", "business_person"),
     ("vx.boss", "Lakshmi", "Iyer", "Vertex - Leadership (read only)", None),
+    ("vx.ceo", "Chitra", "Rao", "Vertex - Leadership Approver", None),
     ("vx.none", "Nina", "Nobody", None, "member"),
 ]
 # (employee, their reporting manager): appraisals and goals follow this

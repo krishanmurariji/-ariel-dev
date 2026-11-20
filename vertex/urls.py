@@ -9,10 +9,12 @@ from vertex import (
     cbv,
     cbv_appraisals,
     cbv_performance,
+    cbv_promotions,
     views,
     views_appraisals,
     views_minutes,
     views_performance,
+    views_promotions,
     views_resources,
     views_reviews,
 )
@@ -129,6 +131,25 @@ urlpatterns = [
     path("goals/<int:pk>/edit/", cbv_appraisals.GoalFormView.as_view(), name="vertex-goal-edit"),
     path("goals/<int:pk>/progress/", cbv_appraisals.GoalProgressFormView.as_view(), name="vertex-goal-progress"),
     path("goals/<int:pk>/delete/", views_appraisals.goal_delete, name="vertex-goal-delete"),
+    # promotions
+    path("promotions/", cbv_promotions.PromotionsView.as_view(), name="vertex-promotions"),
+    path("promotions/nav/", cbv_promotions.PromotionsNavView.as_view(), name="vertex-promotion-nav"),
+    path("promotions/list/", cbv_promotions.PromotionsList.as_view(), name="vertex-promotion-list"),
+    path("promotions/new/", cbv_promotions.PromotionFormView.as_view(), name="vertex-promotion-new"),
+    path("promotions/<int:pk>/", views_promotions.promotion_detail, name="vertex-promotion"),
+    path("promotions/<int:pk>/validate/", cbv_promotions.PromotionValidateFormView.as_view(), name="vertex-promotion-validate"),
+    path("promotions/<int:pk>/approve/", cbv_promotions.PromotionApproveFormView.as_view(), name="vertex-promotion-approve"),
+    path("promotions/<int:pk>/complete/", cbv_promotions.PromotionCompleteFormView.as_view(), name="vertex-promotion-complete"),
+    path("promotions/<int:pk>/reject/", cbv_promotions.PromotionRejectFormView.as_view(), name="vertex-promotion-reject"),
+    # learning
+    path("learning/", cbv_promotions.TrainingView.as_view(), name="vertex-training"),
+    path("learning/nav/", cbv_promotions.TrainingNavView.as_view(), name="vertex-training-nav"),
+    path("learning/list/", cbv_promotions.TrainingList.as_view(), name="vertex-training-list"),
+    path("learning/new/", cbv_promotions.TrainingFormView.as_view(), name="vertex-training-new"),
+    path("learning/suggest/", cbv_promotions.TrainingSuggestFormView.as_view(), name="vertex-training-suggest"),
+    path("learning/<int:pk>/edit/", cbv_promotions.TrainingFormView.as_view(), name="vertex-training-edit"),
+    path("learning/<int:pk>/status/", cbv_promotions.TrainingStatusFormView.as_view(), name="vertex-training-status"),
+    path("learning/<int:pk>/delete/", views_promotions.training_delete, name="vertex-training-delete"),
     # the employee's own view
     path("my-performance/", views_performance.my_performance, name="vertex-my-performance"),
 ]

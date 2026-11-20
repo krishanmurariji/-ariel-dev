@@ -1,0 +1,21 @@
+{% extends "index.html" %}
+{% load i18n static %}
+
+{% block content %}
+<style>
+    .recommended--dot { background-color: #3b82f6; }
+    .hr_validated--dot { background-color: #8b5cf6; }
+    .approved--dot { background-color: #f59e0b; }
+    .completed--dot { background-color: #16a34a; }
+    .rejected--dot { background-color: #dc2626; }
+    .status-recommended { border-left: 3.4px solid #3b82f6 !important; border-radius: 4px 0 0 4px; }
+    .status-hr_validated { border-left: 3.4px solid #8b5cf6 !important; border-radius: 4px 0 0 4px; }
+    .status-approved { border-left: 3.4px solid #f59e0b !important; border-radius: 4px 0 0 4px; }
+    .status-completed { border-left: 3.4px solid #16a34a !important; border-radius: 4px 0 0 4px; }
+    .status-rejected { border-left: 3.4px solid #dc2626 !important; border-radius: 4px 0 0 4px; }
+</style>
+<div hx-get="{% url 'vertex-promotion-nav' %}?{{request.GET.urlencode}}" hx-trigger="load"></div>
+<div class="oh-wrapper" id="listContainer">
+    <div class="animated-background"></div>
+</div>
+{% endblock %}

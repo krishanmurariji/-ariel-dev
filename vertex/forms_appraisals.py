@@ -208,7 +208,7 @@ class GoalProgressForm(ModelForm):
         data = super().clean()
         progress, status = data.get("progress"), data.get("status")
         if progress is None or not status:
-            return data
+            return data     
         if status == GoalStatus.COMPLETED:
             data["progress"] = 100
         elif progress >= 100 and status != GoalStatus.CANCELLED:
