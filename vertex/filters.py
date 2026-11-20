@@ -11,6 +11,7 @@ from horilla.filters import HorillaFilterSet
 from vertex.models import (
     Appraisal,
     AppraisalCycle,
+    Expense,
     Feedback,
     Goal,
     MeetingMinute,
@@ -280,4 +281,23 @@ class TrainingFilter(HorillaFilterSet):
             | Q(employee__employee_last_name__icontains=value)
             | Q(skill_gap__icontains=value)
             | Q(recommended_training__icontains=value)
+        )
+
+
+class ExpenseFilter(HorillaFilterSet):
+    search = django_filters.CharFilter(method="filter_search")
+    date_from = django_filters.DateFilter(field_name="expense_date", lookup_expr="gte", widget=forms.DateInput(attrs={"type": "date"}), label=_("From"))
+    date_to = django_filters.DateFilter(field_name="expense_date", lookup_expr="lte", widget=forms.DateInput(attrs={"type": "date"}), label=_("To"))
+
+    class Meta:
+        model = Expense
+        fields = ["status", "category", "payment_method", "approval_required"]
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(title__icontains=value)
+            | Q(vendor__icontains=value)
+            | Q(invoice_number__icontains=value)
+            | Q(raised_by__employee_first_name__icontains=value)
+            | Q(raised_by__employee_last_name__icontains=value)
         )

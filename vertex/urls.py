@@ -8,10 +8,12 @@ from django.views.generic import RedirectView
 from vertex import (
     cbv,
     cbv_appraisals,
+    cbv_expenses,
     cbv_performance,
     cbv_promotions,
     views,
     views_appraisals,
+    views_expenses,
     views_minutes,
     views_performance,
     views_promotions,
@@ -150,6 +152,20 @@ urlpatterns = [
     path("learning/<int:pk>/edit/", cbv_promotions.TrainingFormView.as_view(), name="vertex-training-edit"),
     path("learning/<int:pk>/status/", cbv_promotions.TrainingStatusFormView.as_view(), name="vertex-training-status"),
     path("learning/<int:pk>/delete/", views_promotions.training_delete, name="vertex-training-delete"),
+    # expenses
+    path("expenses/", cbv_expenses.ExpensesView.as_view(), name="vertex-expenses"),
+    path("expenses/nav/", cbv_expenses.ExpensesNavView.as_view(), name="vertex-expense-nav"),
+    path("expenses/list/", cbv_expenses.ExpensesList.as_view(), name="vertex-expense-list"),
+    path("expenses/new/", cbv_expenses.ExpenseFormView.as_view(), name="vertex-expense-new"),
+    path("expenses/<int:pk>/", views_expenses.expense_detail, name="vertex-expense"),
+    path("expenses/<int:pk>/invoice/", cbv_expenses.ExpenseInvoiceFormView.as_view(), name="vertex-expense-invoice"),
+    path("expenses/<int:pk>/invoice/download/", views_expenses.expense_download, name="vertex-expense-download"),
+    path("expenses/<int:pk>/approve/", cbv_expenses.ExpenseApproveFormView.as_view(), name="vertex-expense-approve"),
+    path("expenses/<int:pk>/reject/", cbv_expenses.ExpenseRejectFormView.as_view(), name="vertex-expense-reject"),
+    path("expenses/<int:pk>/pay/", views_expenses.expense_pay, name="vertex-expense-pay"),
+    path("expense-settings/", views_expenses.expense_settings, name="vertex-expense-settings"),
+    path("expense-settings/<int:pk>/edit/", cbv_expenses.ExpenseSettingFormView.as_view(), name="vertex-expense-settings-edit"),
+    path("expense-settings/send/<str:kind>/", views_expenses.expense_summary_now, name="vertex-expense-summary-now"),
     # the employee's own view
     path("my-performance/", views_performance.my_performance, name="vertex-my-performance"),
 ]

@@ -18,6 +18,7 @@ Superusers (admin) always pass every permission check, as in the rest of Ariel H
 """
 
 import os
+from decimal import Decimal
 
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
@@ -1616,3 +1617,178 @@ class AllTraining(TrainingRecommendation):
         proxy = True
         verbose_name = _("Training (all)")
         verbose_name_plural = _("Training (all)")
+
+
+# ---------------------------------------------------------------------------
+# Expenses (ArielVertex Expenses controller): front desk raises a payment request, an approver
+# decides when approval is needed, the person who raised it marks it paid.
+#
+# * view_expense / add_expense        your own expenses / raise one
+# * change_expense                    upload an invoice and mark your own expense paid
+# * view_allexpenses                  every expense                      (proxy "Expenses - all")
+# * change_expenseapproval            approve or reject                  (proxy "Expense approval")
+# * view_expensesetting / change_expensesetting   the expense settings screen
+# ---------------------------------------------------------------------------
+
+
+class ExpenseCategory(models.TextChoices):
+    OFFICE_SUPPLIES = "office_supplies", _("Office supplies")
+    UTILITIES = "utilities", _("Utilities")
+    TRAVEL = "travel", _("Travel")
+    REFRESHMENTS = "refreshments", _("Refreshments")
+    MAINTENANCE = "maintenance", _("Maintenance")
+    SOFTWARE = "software", _("Software")
+    COURIER = "courier", _("Courier")
+    OTHER = "other", _("Other")
+
+
+class ExpenseStatus(models.TextChoices):
+    PAYMENT_REQUESTED = "payment_requested", _("Payment requested")
+    APPROVED = "approved", _("Approved")
+    REJECTED = "rejected", _("Rejected")
+    PAID = "paid", _("Paid")
+
+
+class PaymentMethod(models.TextChoices):
+    CASH = "cash", _("Cash")
+    UPI = "upi", _("UPI")
+    CARD = "card", _("Card")
+    BANK_TRANSFER = "bank_transfer", _("Bank transfer")
+    CHEQUE = "cheque", _("Cheque")
+    OTHER = "other", _("Other")
+
+
+def invoice_path(instance, filename):
+    import uuid
+
+    extension = os.path.splitext(filename)[1].lower()
+    return f"vertex/expense/invoice/{uuid.uuid4().hex}{extension}"
+
+
+class Expense(models.Model):
+    """One payment request. Amounts are in rupees."""
+
+    title = models.CharField(max_length=120)
+    description = models.TextField(blank=True, default="")
+    category = models.CharField(max_length=20, choices=ExpenseCategory.choices, default=ExpenseCategory.OTHER)
+    amount = models.DecimalField(
+        max_digits=12, decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01")), MaxValueValidator(Decimal("99999999.99"))],
+    )
+    vendor = models.CharField(max_length=120, blank=True, default="")
+    expense_date = models.DateField()
+    payment_method = models.CharField(max_length=15, choices=PaymentMethod.choices, default=PaymentMethod.CASH)
+    invoice_number = models.CharField(max_length=60, blank=True, default="")
+    invoice = models.FileField(upload_to=invoice_path, blank=True, null=True)
+    invoice_name = models.CharField(max_length=255, blank=True, default="")
+    invoice_size = models.BigIntegerField(default=0)
+    status = models.CharField(max_length=20, choices=ExpenseStatus.choices, default=ExpenseStatus.PAYMENT_REQUESTED)
+    approval_required = models.BooleanField(default=True)
+    raised_by = models.ForeignKey(
+        "employee.Employee", on_delete=models.CASCADE, related_name="vertex_expenses_raised"
+    )
+    approver = models.ForeignKey(
+        "employee.Employee", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decision_note = models.TextField(blank=True, default="")
+    paid_by = models.ForeignKey(
+        "employee.Employee", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    paid_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Expense")
+        verbose_name_plural = _("Expenses")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.title} ({self.amount})"
+
+    def get_absolute_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-expense", args=[self.pk])
+
+    def get_raiser_name(self):
+        return self.raised_by.get_full_name()
+
+    def get_amount_display(self):
+        return f"₹{self.amount:,.2f}"
+
+    def get_approval_display(self):
+        return _("Needed") if self.approval_required else _("Not needed")
+
+    def get_status_html(self):
+        colour = {
+            "payment_requested": "#3b82f6", "approved": "#8b5cf6", "rejected": "#dc2626", "paid": "#16a34a",
+        }.get(self.status, "#6b7280")
+        return _colour_html(colour, self.get_status_display())
+
+    def get_invoice_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-expense-invoice", args=[self.pk])
+
+    def get_download_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-expense-download", args=[self.pk])
+
+    def get_approve_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-expense-approve", args=[self.pk])
+
+    def get_reject_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-expense-reject", args=[self.pk])
+
+    def get_pay_url(self):
+        from django.urls import reverse
+
+        return reverse("vertex-expense-pay", args=[self.pk])
+
+
+class AllExpenses(Expense):
+    """Permission switch only: ``view_allexpenses`` shows every expense."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Expenses (all)")
+        verbose_name_plural = _("Expenses (all)")
+
+
+class ExpenseApproval(Expense):
+    """Permission switch only: ``change_expenseapproval`` may approve and reject expenses."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Expense approval")
+        verbose_name_plural = _("Expense approval")
+
+
+class ExpenseSetting(models.Model):
+    """The one row of expense settings: approval rule and who gets the daily and weekly summaries."""
+
+    approval_required_by_default = models.BooleanField(
+        default=True,
+        help_text=_("When on, every expense needs approval before it can be marked paid."),
+    )
+    daily_recipients = models.TextField(blank=True, default="", help_text=_("Comma separated emails"))
+    weekly_recipients = models.TextField(blank=True, default="", help_text=_("Comma separated emails"))
+    teams_webhook_url = models.URLField(max_length=500, blank=True, default="")
+
+    class Meta:
+        verbose_name = _("Expense setting")
+        verbose_name_plural = _("Expense settings")
+
+    def __str__(self):
+        return "Expense settings"
+
+    @classmethod
+    def current(cls):
+        setting, _created = cls.objects.get_or_create(pk=1)
+        return setting

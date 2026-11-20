@@ -83,6 +83,16 @@ SUBMENUS = [
         "accessibility": "vertex.sidebar.training_accessibility",
     },
     {
+        "menu": _("Expenses"),
+        "redirect": reverse("vertex-expenses"),
+        "accessibility": "vertex.sidebar.expenses_accessibility",
+    },
+    {
+        "menu": _("Expense Settings"),
+        "redirect": reverse("vertex-expense-settings"),
+        "accessibility": "vertex.sidebar.expense_settings_accessibility",
+    },
+    {
         "menu": _("My Performance"),
         "redirect": reverse("vertex-my-performance"),
         "accessibility": "vertex.sidebar.my_performance_accessibility",
@@ -148,3 +158,11 @@ def promotions_accessibility(request, submenu, user_perms, *args, **kwargs):
 
 def training_accessibility(request, submenu, user_perms, *args, **kwargs):
     return request.user.has_perm("vertex.view_trainingrecommendation")
+
+
+def expenses_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("vertex.view_expense")
+
+
+def expense_settings_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("vertex.view_expensesetting")

@@ -1,0 +1,29 @@
+{% extends "index.html" %}
+{% load i18n static %}
+
+{% block content %}
+{% include "vertex/_vx.html" %}
+<style>
+    .payment_requested--dot { background-color: #3b82f6; }
+    .approved--dot { background-color: #8b5cf6; }
+    .rejected--dot { background-color: #dc2626; }
+    .paid--dot { background-color: #16a34a; }
+    .status-payment_requested { border-left: 3.4px solid #3b82f6 !important; border-radius: 4px 0 0 4px; }
+    .status-approved { border-left: 3.4px solid #8b5cf6 !important; border-radius: 4px 0 0 4px; }
+    .status-rejected { border-left: 3.4px solid #dc2626 !important; border-radius: 4px 0 0 4px; }
+    .status-paid { border-left: 3.4px solid #16a34a !important; border-radius: 4px 0 0 4px; }
+</style>
+<div class="oh-wrapper" style="padding-bottom:0">
+  <div class="vx-chips" style="margin:0 0 .25rem;gap:.6rem;flex-wrap:wrap">
+    <span class="vx-chip">{% trans "Expenses" %}: <b>{{ summary.expense_count }}</b></span>
+    <span class="vx-chip">{% trans "Waiting for approval" %}: <b>{{ summary.pending_count }}</b></span>
+    <span class="vx-chip">{% trans "Paid" %}: <b>{{ summary.paid_count }}</b></span>
+    <span class="vx-chip">{% trans "Total" %}: <b>&#8377;{{ summary.total_amount|default:0 }}</b></span>
+    <span class="vx-chip">{% trans "Paid amount" %}: <b>&#8377;{{ summary.paid_amount|default:0 }}</b></span>
+  </div>
+</div>
+<div hx-get="{% url 'vertex-expense-nav' %}?{{request.GET.urlencode}}" hx-trigger="load"></div>
+<div class="oh-wrapper" id="listContainer">
+    <div class="animated-background"></div>
+</div>
+{% endblock %}

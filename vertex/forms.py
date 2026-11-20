@@ -182,7 +182,10 @@ def clean_email_list(raw, limit=MAX_ATTENDEES):
             validate_email(mail)
         except ValidationError:
             raise forms.ValidationError(_("%(mail)s is not a valid email address.") % {"mail": mail})
-    return ", ".join(dict.fromkeys(mails))
+    unique = {}
+    for mail in mails:  # the same address in different letter case counts once; the first spelling stays
+        unique.setdefault(mail.lower(), mail)
+    return ", ".join(unique.values())
 
 
 class CallForm(ModelForm):

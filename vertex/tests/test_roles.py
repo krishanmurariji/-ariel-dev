@@ -38,9 +38,9 @@ from vertex.roles import DEMO_USERS, REPORTING, ROLES, build_groups
 from vertex.tests.test_projects import HX, VertexTestBase, make_employee
 
 DENIED = "You Dont Have Permission"
-ALL = {"hr", "pm", "lead", "dev", "dev2", "biz", "boss", "ceo", "none"}
+ALL = {"hr", "pm", "lead", "dev", "dev2", "biz", "boss", "ceo", "acct", "desk", "none"}
 SHORT = {"vx.hr": "hr", "vx.pm": "pm", "vx.lead": "lead", "vx.dev": "dev", "vx.dev2": "dev2",
-         "vx.biz": "biz", "vx.boss": "boss", "vx.ceo": "ceo", "vx.none": "none"}
+         "vx.biz": "biz", "vx.boss": "boss", "vx.ceo": "ceo", "vx.acct": "acct", "vx.desk": "desk", "vx.none": "none"}
 
 
 class RoleMatrixBase(VertexTestBase):
@@ -110,9 +110,10 @@ class ScreenAccessTests(RoleMatrixBase):
     """Which roles can open which screens, one row per screen."""
 
     def test_projects(self):
-        everyone_with_view = ALL - {"none"}
+        everyone_with_view = ALL - {"none"}  # accountant and front desk have view_project too
         self.check_matrix("project list", reverse("vertex-project-list"), everyone_with_view, hx=True)
-        self.check_matrix("project page", self.project.get_absolute_url(), everyone_with_view)
+        # accountant and front desk may open the list, but they are not members of the project
+        self.check_matrix("project page", self.project.get_absolute_url(), everyone_with_view - {"acct", "desk"})
         # members only: HR and leadership see every project, the others only their own
         self.check_matrix("other project", self.other.get_absolute_url(), {"hr", "boss", "ceo", "pm"})
         self.check_matrix("new project", reverse("vertex-project-new"), {"hr"}, hx=True, marker="vm__head")
@@ -135,7 +136,7 @@ class ScreenAccessTests(RoleMatrixBase):
         self.check_matrix("schedule call", reverse("vertex-call-add", args=[pk]), {"hr", "pm"}, hx=True, marker="vm__head")
 
     def test_status_updates_hiring_and_resources(self):
-        self.check_matrix("status list", reverse("vertex-status-list"), ALL - {"none"}, hx=True)
+        self.check_matrix("status list", reverse("vertex-status-list"), ALL - {"none", "acct", "desk"}, hx=True)
         self.check_matrix(
             "new status update", reverse("vertex-status-new"), {"pm", "lead", "dev", "dev2"}, hx=True, marker="vm__head"
         )
@@ -178,6 +179,12 @@ class ScreenAccessTests(RoleMatrixBase):
         )
         self.check_matrix("assign training", reverse("vertex-training-new"), {"hr", "pm"}, hx=True, marker="vm__head")
         self.check_matrix("suggest training", reverse("vertex-training-suggest"), {"hr", "pm"}, hx=True, marker="vm__head")
+
+    def test_expenses(self):
+        seeing = {"hr", "boss", "ceo", "acct", "desk"}
+        self.check_matrix("expense list", reverse("vertex-expense-list"), seeing, hx=True)
+        self.check_matrix("raise expense", reverse("vertex-expense-new"), {"desk"}, hx=True, marker="vm__head")
+        self.check_matrix("expense settings", reverse("vertex-expense-settings"), {"hr", "acct"})
 
     def test_the_sidebar_shows_each_person_only_their_own_screens(self):
         wanted = {

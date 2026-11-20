@@ -1,0 +1,43 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+{% include "vertex/_vx.html" %}
+<div class="oh-wrapper">
+<div class="vx-page" style="max-width:820px">
+  <div class="vx-header">
+    <div>
+      <h1 class="vx-h1">{% trans "Expense settings" %}</h1>
+      <p class="vx-sub">{% trans "The approval rule and who gets the daily and weekly summaries." %}</p>
+    </div>
+    {% if can_change %}
+      <button type="button" class="oh-btn oh-btn--secondary" hx-get="{% url 'vertex-expense-settings-edit' setting.pk %}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal"><ion-icon name="create-outline" class="me-1"></ion-icon>{% trans "Edit settings" %}</button>
+    {% endif %}
+  </div>
+
+  <div class="vx-stack">
+    <div class="vx-card vx-card--pad">
+      <div class="vx-label">{% trans "Approval" %}</div>
+      <p class="vx-text">{% if setting.approval_required_by_default %}{% trans "Every expense needs approval before it can be marked paid." %}{% else %}{% trans "Approval is optional: the person raising an expense chooses." %}{% endif %}</p>
+      <hr class="vx-divider">
+      <div class="vx-label">{% trans "Daily summary (every evening after 18:00)" %}</div>
+      <p class="vx-text">{{ setting.daily_recipients|default:"-" }}</p>
+      <div class="vx-label">{% trans "Weekly summary (Fridays after 18:00)" %}</div>
+      <p class="vx-text">{{ setting.weekly_recipients|default:"-" }}</p>
+      <div class="vx-label">{% trans "Teams channel" %}</div>
+      <p class="vx-text">{% if setting.teams_webhook_url %}{% trans "A webhook is set. Summaries are also posted to the channel." %}{% else %}{% trans "Not set." %}{% endif %}</p>
+    </div>
+
+    {% if can_change %}
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Send a summary now" %}</h2>
+      <p class="vx-text" style="color:var(--vx-muted)">{% trans "Sends to the recipients above straight away. The automatic summaries still go out at their usual time." %}</p>
+      <div class="vx-btnrow">
+        <form method="post" action="{% url 'vertex-expense-summary-now' 'daily' %}">{% csrf_token %}<button type="submit" class="oh-btn oh-btn--light"><ion-icon name="paper-plane-outline" class="me-1"></ion-icon>{% trans "Daily summary" %}</button></form>
+        <form method="post" action="{% url 'vertex-expense-summary-now' 'weekly' %}">{% csrf_token %}<button type="submit" class="oh-btn oh-btn--light"><ion-icon name="paper-plane-outline" class="me-1"></ion-icon>{% trans "Weekly summary" %}</button></form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+</div>
+{% endblock content %}

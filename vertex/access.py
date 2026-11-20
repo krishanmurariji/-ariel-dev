@@ -717,3 +717,89 @@ def can_delete_training(user, training):
     return user.has_perm("vertex.delete_trainingrecommendation") and (
         sees_all_training(user) or is_manager_of(user, training.employee)
     )
+
+
+# ---------------------------------------------------------------------------
+# Expenses
+# ---------------------------------------------------------------------------
+
+
+def sees_all_expenses(user):
+    return user.has_perm("vertex.view_allexpenses") or user.has_perm("vertex.change_expenseapproval")
+
+
+def visible_expenses(user):
+    """Everyone's for accountants / approvers / HR; otherwise only the ones you raised."""
+    from vertex.models import Expense
+
+    if not user.has_perm("vertex.view_expense"):
+        return Expense.objects.none()
+    expenses = Expense.objects.select_related("raised_by", "approver", "paid_by")
+    if sees_all_expenses(user):
+        return expenses
+    me = employee_of(user)
+    return expenses.filter(raised_by=me) if me else expenses.none()
+
+
+def _mine_or_all(user, expense):
+    me = employee_of(user)
+    return sees_all_expenses(user) or (me is not None and expense.raised_by_id == me.pk)
+
+
+def can_raise_expense(user):
+    return user.has_perm("vertex.add_expense") and employee_of(user) is not None
+
+
+def can_approve_expense(user, expense):
+    """An approver decides a pending request that needs approval, never one they raised themselves."""
+    from vertex.models import ExpenseStatus
+
+    me = employee_of(user)
+    return bool(
+        user.has_perm("vertex.change_expenseapproval")
+        and me is not None
+        and expense.approval_required
+        and expense.status == ExpenseStatus.PAYMENT_REQUESTED
+        and expense.raised_by_id != me.pk
+    )
+
+
+def can_pay_expense(user, expense):
+    """Paid once approved, or at once when no approval is needed; by whoever raised it (or an accountant)."""
+    from vertex.models import ExpenseStatus
+
+    ready = (expense.approval_required and expense.status == ExpenseStatus.APPROVED) or (
+        not expense.approval_required and expense.status == ExpenseStatus.PAYMENT_REQUESTED
+    )
+    return bool(user.has_perm("vertex.change_expense") and ready and _mine_or_all(user, expense))
+
+
+def can_upload_invoice(user, expense):
+    from vertex.models import ExpenseStatus
+
+    return bool(
+        user.has_perm("vertex.change_expense")
+        and expense.status in (ExpenseStatus.PAYMENT_REQUESTED, ExpenseStatus.APPROVED)
+        and _mine_or_all(user, expense)
+    )
+
+
+def can_download_invoice(user, expense):
+    return bool(expense.invoice and user.has_perm("vertex.view_expense") and _mine_or_all(user, expense))
+
+
+def expense_summary(user):
+    """Counts and totals for the expenses this person sees (the strip above the list)."""
+    from django.db.models import Count, Q, Sum
+
+    from vertex.models import ExpenseStatus
+
+    expenses = visible_expenses(user)
+    # the names must differ from the model's own fields, or Django cannot compute Sum("amount")
+    return expenses.aggregate(
+        expense_count=Count("pk"),
+        pending_count=Count("pk", filter=Q(status=ExpenseStatus.PAYMENT_REQUESTED, approval_required=True)),
+        paid_count=Count("pk", filter=Q(status=ExpenseStatus.PAID)),
+        total_amount=Sum("amount"),
+        paid_amount=Sum("amount", filter=Q(status=ExpenseStatus.PAID)),
+    )

@@ -35,6 +35,7 @@ ROLES = {
         "view_promotion", "add_promotion", "view_allpromotions", "change_promotionvalidation",
         "view_trainingrecommendation", "add_trainingrecommendation", "change_trainingrecommendation",
         "delete_trainingrecommendation", "view_alltraining",
+        "view_expense", "view_allexpenses", "view_expensesetting",
     ],
     "Vertex - Project Manager": [
         *PROJECTS_VIEW, "change_project", "add_projectmember", "delete_projectmember",
@@ -74,13 +75,21 @@ ROLES = {
         "view_allreviewrequests", "view_reviewrequest",
         "view_appraisalcycle", "view_appraisal", "view_allappraisals", "view_goal", "view_allgoals",
         "view_promotion", "view_allpromotions", "view_trainingrecommendation", "view_alltraining",
+        "view_expense", "view_allexpenses",
     ],
     "Vertex - Leadership Approver": [
         *PROJECTS_VIEW, "view_allprojects", "view_statusupdate", "view_resourcevisibility",
         "view_appraisal", "view_allappraisals", "view_goal", "view_allgoals",
         "view_promotion", "view_allpromotions", "change_promotionapproval",
         "view_trainingrecommendation", "view_alltraining",
+        "view_expense", "view_allexpenses",
     ],
+    # finance: approves and sees every expense, and can read the expense settings
+    "Vertex - Accountant": [
+        *PROJECTS_VIEW, "view_expense", "view_allexpenses", "change_expenseapproval", "view_expensesetting",
+    ],
+    # front desk: raises payment requests, uploads the invoice and marks its own expenses paid
+    "Vertex - Front Desk": [*PROJECTS_VIEW, "view_expense", "add_expense", "change_expense"],
 }
 
 # (username, first name, last name, group or None, role on the demo project or None)
@@ -93,6 +102,8 @@ DEMO_USERS = [
     ("vx.biz", "Bhavna", "Shah", "Vertex - Business Person", "business_person"),
     ("vx.boss", "Lakshmi", "Iyer", "Vertex - Leadership (read only)", None),
     ("vx.ceo", "Chitra", "Rao", "Vertex - Leadership Approver", None),
+    ("vx.acct", "Anita", "Desai", "Vertex - Accountant", None),
+    ("vx.desk", "Farhan", "Khan", "Vertex - Front Desk", None),
     ("vx.none", "Nina", "Nobody", None, "member"),
 ]
 # (employee, their reporting manager): appraisals and goals follow this
