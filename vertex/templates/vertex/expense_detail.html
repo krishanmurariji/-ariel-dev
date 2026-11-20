@@ -1,0 +1,67 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+{% include "vertex/_vx.html" %}
+<div class="oh-wrapper">
+<div class="vx-page" style="max-width:980px">
+  <a href="{% url 'vertex-expenses' %}" class="vx-back"><ion-icon name="arrow-back-outline"></ion-icon>{% trans "Expenses" %}</a>
+
+  <div class="vx-stack">
+    <div class="vx-card vx-card--pad">
+      <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+        <div style="min-width:0">
+          <h1 class="vx-title">{{ expense.title }}</h1>
+          <div class="vx-meta">{{ expense.get_category_display }} &middot; {{ expense.expense_date|date:"j M Y" }} &middot; {% trans "raised by" %} {{ expense.get_raiser_name }}</div>
+          <div class="vx-chips"><span class="vx-chip">{{ expense.get_status_html }}</span><span class="vx-chip">{% trans "Approval" %}: {{ expense.get_approval_display }}</span></div>
+        </div>
+        <div style="text-align:right"><div class="vx-big">{{ expense.get_amount_display }}</div></div>
+      </div>
+      <div class="vx-actions" style="margin-top:1rem">
+        {% if can_approve %}
+          <button type="button" class="oh-btn oh-btn--secondary" hx-get="{{ expense.get_approve_url }}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal"><ion-icon name="checkmark-done-outline" class="me-1"></ion-icon>{% trans "Approve" %}</button>
+          <button type="button" class="oh-btn oh-btn--light" hx-get="{{ expense.get_reject_url }}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal"><ion-icon name="close-circle-outline" class="me-1"></ion-icon>{% trans "Reject" %}</button>
+        {% endif %}
+        {% if can_pay %}
+          <form method="post" action="{{ expense.get_pay_url }}" onsubmit="return confirm('{% trans "Mark this expense as paid?"|escapejs %}');">{% csrf_token %}<button type="submit" class="oh-btn oh-btn--secondary"><ion-icon name="cash-outline" class="me-1"></ion-icon>{% trans "Mark paid" %}</button></form>
+        {% endif %}
+        {% if can_upload %}
+          <button type="button" class="oh-btn oh-btn--light" hx-get="{{ expense.get_invoice_url }}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal"><ion-icon name="document-attach-outline" class="me-1"></ion-icon>{% if expense.invoice %}{% trans "Replace invoice" %}{% else %}{% trans "Upload invoice" %}{% endif %}</button>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Details" %}</h2>
+      <div class="row">
+        <div class="col-md-4" style="margin-bottom:1rem"><div class="vx-label">{% trans "Vendor" %}</div><p class="vx-text">{{ expense.vendor|default:"-" }}</p></div>
+        <div class="col-md-4" style="margin-bottom:1rem"><div class="vx-label">{% trans "Payment method" %}</div><p class="vx-text">{{ expense.get_payment_method_display }}</p></div>
+        <div class="col-md-4" style="margin-bottom:1rem"><div class="vx-label">{% trans "Invoice number" %}</div><p class="vx-text">{{ expense.invoice_number|default:"-" }}</p></div>
+      </div>
+      {% if expense.description %}<div class="vx-label">{% trans "Description" %}</div><p class="vx-text">{{ expense.description }}</p>{% endif %}
+      <hr class="vx-divider">
+      <div class="vx-label">{% trans "Invoice" %}</div>
+      {% if expense.invoice %}
+        {% if can_download %}<a class="oh-btn oh-btn--light" href="{{ expense.get_download_url }}"><ion-icon name="download-outline" class="me-1"></ion-icon>{{ expense.invoice_name }}</a>{% else %}<p class="vx-text">{{ expense.invoice_name }}</p>{% endif %}
+      {% else %}
+        <p class="vx-text" style="color:var(--vx-muted)">{% trans "No invoice uploaded." %}</p>
+      {% endif %}
+    </div>
+
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "History" %}</h2>
+      <div class="vx-item vx-item--block" style="margin-bottom:.6rem"><div style="font-weight:600">{% trans "Raised" %}</div><div class="vx-item__sub">{{ expense.raised_by.get_full_name }} &middot; {{ expense.created_at|date:"j M Y, H:i" }}</div></div>
+      {% if expense.decided_at %}
+        <div class="vx-item vx-item--block" style="margin-bottom:.6rem">
+          <div style="font-weight:600">{% if rejected %}{% trans "Rejected" %}{% else %}{% trans "Approved" %}{% endif %}</div>
+          <div class="vx-item__sub">{{ expense.approver.get_full_name|default:"-" }} &middot; {{ expense.decided_at|date:"j M Y, H:i" }}</div>
+          {% if expense.decision_note %}<p class="vx-text" style="margin-top:.4rem">{{ expense.decision_note }}</p>{% endif %}
+        </div>
+      {% endif %}
+      {% if expense.paid_at %}
+        <div class="vx-item vx-item--block"><div style="font-weight:600">{% trans "Paid" %}</div><div class="vx-item__sub">{{ expense.paid_by.get_full_name|default:"-" }} &middot; {{ expense.paid_at|date:"j M Y, H:i" }}</div></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+</div>
+{% endblock content %}

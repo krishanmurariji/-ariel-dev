@@ -1,0 +1,98 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+{% include "vertex/_vx.html" %}
+<div class="oh-wrapper">
+<div class="vx-page" style="max-width:980px">
+  <a href="{% url 'vertex-appraisals' %}" class="vx-back"><ion-icon name="arrow-back-outline"></ion-icon>{% trans "Appraisals" %}</a>
+
+
+  <div class="vx-stack">
+    <div class="vx-card vx-card--pad">
+      <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+        <div class="vx-ident">
+          <img class="vx-avatar" style="width:52px;height:52px" src="{{ appraisal.employee.get_avatar }}" alt="">
+          <div style="min-width:0">
+            <h1 class="vx-title">{{ appraisal.employee.get_full_name }}</h1>
+            <div class="vx-meta">{{ appraisal.cycle.name }} &middot; {{ appraisal.cycle.get_period_display }} &middot; {% trans "Manager" %}: {{ appraisal.get_manager_name }}</div>
+            <div class="vx-chips"><span class="vx-chip">{{ appraisal.get_stage_html }}</span></div>
+          </div>
+        </div>
+        <div class="vx-actions">
+          {% if can_self %}
+            <button type="button" class="oh-btn oh-btn--secondary" hx-get="{{ appraisal.get_self_url }}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal"><ion-icon name="person-circle-outline" class="me-1"></ion-icon>{% trans "Submit self assessment" %}</button>
+          {% endif %}
+          {% if can_evaluate %}
+            <button type="button" class="oh-btn oh-btn--secondary" hx-get="{{ appraisal.get_manager_url }}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal"><ion-icon name="ribbon-outline" class="me-1"></ion-icon>{% if appraisal.stage == 'manager_completed' %}{% trans "Revise evaluation" %}{% else %}{% trans "Evaluate" %}{% endif %}</button>
+          {% endif %}
+          {% if can_release %}
+            <button type="button" class="oh-btn oh-btn--secondary" hx-get="{{ appraisal.get_release_url }}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal"><ion-icon name="checkmark-done-outline" class="me-1"></ion-icon>{% trans "Release rating" %}</button>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="vx-steps">
+        <span class="vx-step {% if stage_index == 0 %}vx-step--now{% else %}vx-step--done{% endif %}"><i>1</i>{% trans "Self assessment" %}</span><span class="vx-step-line"></span>
+        <span class="vx-step {% if stage_index == 1 %}vx-step--now{% elif stage_index > 1 %}vx-step--done{% endif %}"><i>2</i>{% trans "Manager evaluation" %}</span><span class="vx-step-line"></span>
+        <span class="vx-step {% if stage_index == 2 %}vx-step--now{% elif stage_index > 2 %}vx-step--done{% endif %}"><i>3</i>{% trans "Release" %}</span>
+      </div>
+    </div>
+
+    {% if released %}
+    <div class="vx-card vx-card--pad">
+      <div style="display:flex;justify-content:space-between;gap:1.25rem;flex-wrap:wrap;align-items:center">
+        <div>
+          <div class="vx-label">{% trans "Final rating" %}</div>
+          <div class="vx-meta">{% trans "Released" %} {{ appraisal.released_at|date:"j M Y" }}</div>
+        </div>
+        <div class="vx-big">{{ appraisal.final_rating }}<span style="font-size:1.2rem;color:var(--vx-muted)"> / 5</span></div>
+      </div>
+      {% if appraisal.final_comments %}<hr class="vx-divider"><p class="vx-text">{{ appraisal.final_comments }}</p>{% endif %}
+    </div>
+    {% endif %}
+
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Self assessment" %}</h2>
+      {% if appraisal.self_submitted_at %}
+        <div class="vx-chips" style="margin-top:0"><span class="vx-chip vx-chip--brand">{{ appraisal.self_rating }} / 5</span></div>
+        <p class="vx-text" style="margin-top:.6rem">{{ appraisal.self_comments }}</p>
+        <div class="vx-bar-note">{% trans "Submitted" %} {{ appraisal.self_submitted_at|date:"j M Y" }}</div>
+      {% else %}
+        <div class="vx-empty"><ion-icon name="hourglass-outline"></ion-icon>{% trans "The self assessment has not been submitted yet." %}</div>
+      {% endif %}
+    </div>
+
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Manager evaluation" %}</h2>
+      {% if appraisal.manager_reviewed_at %}
+        {% if show_manager %}
+          <div class="vx-chips" style="margin-top:0"><span class="vx-chip vx-chip--brand">{{ appraisal.manager_rating }} / 5</span></div>
+          <p class="vx-text" style="margin-top:.6rem">{{ appraisal.manager_comments }}</p>
+          <div class="vx-bar-note">{% trans "Evaluated" %} {{ appraisal.manager_reviewed_at|date:"j M Y" }}</div>
+        {% else %}
+          <div class="vx-empty"><ion-icon name="lock-closed-outline"></ion-icon>{% trans "Your manager has evaluated this. You will see the evaluation when HR releases the final rating." %}</div>
+        {% endif %}
+      {% else %}
+        <div class="vx-empty"><ion-icon name="hourglass-outline"></ion-icon>{% trans "Not evaluated yet." %}</div>
+      {% endif %}
+    </div>
+
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Goals in this cycle" %}</h2>
+      {% for g in goals %}
+        <div class="vx-item vx-item--block" style="margin-bottom:.6rem">
+          <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+            <div style="font-weight:600">{{ g.title }}{% if g.category %} <span class="vx-item__sub">&middot; {{ g.category }}</span>{% endif %}</div>
+            <div class="vx-chips" style="margin-top:0"><span class="vx-chip">{{ g.get_status_html }}</span></div>
+          </div>
+          <div class="vx-bar-head" style="margin-top:.4rem"><span>{% trans "Weight" %} {{ g.weightage }}%</span><b>{{ g.progress }}%</b></div>
+          <div class="vx-meter"><span style="width:{{ g.progress }}%;background:var(--vx-primary)"></span></div>
+        </div>
+      {% empty %}
+        <div class="vx-empty"><ion-icon name="flag-outline"></ion-icon>{% trans "No goals were set for this cycle." %}</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+</div>
+{% endblock content %}

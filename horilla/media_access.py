@@ -97,6 +97,14 @@ RULES = {
         "onboardingcandidatedetail",
         "offer_letter",
     ): _candidate_file(lambda detail: detail.candidate_id),
+    # Vertex expense invoices open only for the person who raised the expense and the people who see all
+    ("vertex", "expense", "invoice"): lambda user, expense: __import__(
+        "vertex.access", fromlist=["can_download_invoice"]
+    ).can_download_invoice(user, expense),
+    # Vertex project documents open only for people who can see that project (and document)
+    ("vertex", "projectdocument", "file"): lambda user, document: __import__(
+        "vertex.access", fromlist=["can_open_document"]
+    ).can_open_document(user, document),
 }
 
 

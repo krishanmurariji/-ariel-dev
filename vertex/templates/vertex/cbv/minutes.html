@@ -1,0 +1,19 @@
+{% extends "index.html" %}
+{% load i18n static %}
+
+{% block content %}
+<style>
+    .draft--dot { background-color: #6b7280; }
+    .preview--dot { background-color: #8b5cf6; }
+    .approved--dot { background-color: #16a34a; }
+    .sent--dot { background-color: #0ea5e9; }
+    .status-draft { border-left: 3.4px solid #6b7280 !important; border-radius: 4px 0 0 4px; }
+    .status-preview { border-left: 3.4px solid #8b5cf6 !important; border-radius: 4px 0 0 4px; }
+    .status-approved { border-left: 3.4px solid #16a34a !important; border-radius: 4px 0 0 4px; }
+    .status-sent { border-left: 3.4px solid #0ea5e9 !important; border-radius: 4px 0 0 4px; }
+</style>
+<div hx-get="{% url 'vertex-minutes-nav' %}?{{request.GET.urlencode}}" hx-trigger="load"></div>
+<div class="oh-wrapper" id="listContainer">
+    <div class="animated-background"></div>
+</div>
+{% endblock %}

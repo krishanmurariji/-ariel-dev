@@ -1,0 +1,118 @@
+{% extends "index.html" %}
+{% load i18n generic_template_filters %}
+{% block content %}
+{% include "vertex/_vx.html" %}
+<div class="oh-wrapper">
+<div class="vx-page" style="max-width:920px">
+  <a href="{% url 'vertex-reviews' %}" class="vx-back"><ion-icon name="arrow-back-outline"></ion-icon>{% trans "Reviews" %}</a>
+
+
+  <div class="vx-stack">
+    <div class="vx-card vx-card--pad">
+      <div class="vx-ident">
+        <img class="vx-avatar" style="width:52px;height:52px" src="{{ review.subject.get_avatar }}" alt="">
+        <div style="min-width:0">
+          <h1 class="vx-title">{{ review.subject.get_full_name }}</h1>
+          <div class="vx-meta">{{ review.get_review_type_display }} &middot; <a href="{{ review.project.get_absolute_url }}">{{ review.project }}</a>
+            {% if review.requested_by %}&middot; {% trans "requested by" %} {{ review.requested_by.get_full_name }}{% endif %} &middot; {{ review.created_at|date:"j M Y" }}</div>
+        </div>
+      </div>
+      <div class="vx-chips">
+        <span class="vx-chip">{{ review.get_status_html }}</span>
+        {% if review.assigned_to %}<span class="vx-chip">{% trans "Reviewer" %}: {{ review.assigned_to.get_full_name }}</span>{% endif %}
+        {% if review.due_date %}<span class="vx-chip">{% trans "Due" %}: {{ review.due_date|date:"j M Y" }}</span>{% endif %}
+      </div>
+      {% if review.notes %}
+        <hr class="vx-divider">
+        <div class="vx-label">{% trans "Notes" %}</div><p class="vx-text">{{ review.notes }}</p>
+      {% endif %}
+    </div>
+
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Meeting" %}</h2>
+      {% if meeting %}
+        <div style="display:flex;gap:1rem;justify-content:space-between;flex-wrap:wrap;align-items:flex-start">
+          <div>
+            <div style="font-weight:600">{{ meeting.title }}</div>
+            <div class="vx-meta">{{ meeting.scheduled_at|date:"j M Y, H:i" }} &middot; {{ meeting.duration_minutes }} {% trans "min" %}</div>
+            <div class="vx-meta">{% trans "Attendees" %}: {{ meeting.attendees|default:"-" }}</div>
+            {% if not meeting.meeting_url and meeting.meeting_error %}<div class="vx-banner" style="margin-top:.5rem"><b>{% trans "No meeting link yet:" %}</b> {{ meeting.meeting_error }}</div>{% endif %}
+            <div class="vx-chips"><span class="vx-chip vx-chip--brand">{% trans "Response" %}: {{ meeting.get_response_status_display }}</span></div>
+          </div>
+          <div class="vx-actions" style="align-items:center">
+            {% if meeting.meeting_url %}
+              <a class="oh-btn oh-btn--light" href="{{ meeting.meeting_url }}" target="_blank" rel="noopener noreferrer"><ion-icon name="videocam-outline" class="me-1"></ion-icon>{% trans "Join" %}</a>
+              <button type="button" class="oh-btn oh-btn--light" title="{% trans 'Copy the meeting link' %}" onclick="navigator.clipboard.writeText('{{ meeting.meeting_url|escapejs }}');this.innerText='{% trans 'Copied' %}'"><ion-icon name="copy-outline"></ion-icon></button>
+            {% endif %}
+            {% if can_schedule %}
+              <form method="post" action="{% url 'vertex-review-link' review.pk %}">{% csrf_token %}
+                <button type="submit" class="oh-btn oh-btn--light" title="{% if meeting.meeting_url %}{% trans 'Refresh the meeting and notify attendees' %}{% else %}{% trans 'Create the meeting link' %}{% endif %}"><ion-icon name="refresh-outline" class="me-1"></ion-icon>{% if meeting.meeting_url %}{% trans "Update link" %}{% else %}{% trans "Generate link" %}{% endif %}</button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+        {% if can_respond %}
+          <form method="post" action="{% url 'vertex-review-respond' review.pk %}" class="vx-btnrow">
+            {% csrf_token %}
+            {% for value, label in responses %}{% if value != "no_response" %}<button type="submit" name="response" value="{{ value }}" class="oh-btn oh-btn--light">{{ label }}</button>{% endif %}{% endfor %}
+          </form>
+        {% endif %}
+      {% else %}
+        <p class="vx-muted" style="margin:0">{% trans "Not scheduled yet." %}</p>
+      {% endif %}
+      {% if can_schedule %}
+        <hr class="vx-divider">
+        <form method="post" action="{% url 'vertex-review-schedule' review.pk %}">
+          {% csrf_token %}
+          <div class="vx-fields vx-fields--6">
+            {% for field in schedule_form %}
+              <div class="vx-s{{ schedule_form.spans|get_item:field.name }}">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
+              </div>
+            {% endfor %}
+          </div>
+          <div class="vx-btnrow"><button type="submit" class="oh-btn oh-btn--secondary">{% if meeting %}{% trans "Reschedule" %}{% else %}{% trans "Schedule meeting" %}{% endif %}</button></div>
+        </form>
+      {% endif %}
+    </div>
+
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Outcome" %}</h2>
+      {% if submitted %}
+        <div style="display:flex;gap:1.4rem;flex-wrap:wrap;margin-bottom:1rem;font-size:.88rem">
+          {% if is_code %}
+            <div>{% trans "Code quality" %} <span class="vx-rating">{{ submitted.code_quality_rating }}/5</span></div>
+            <div>{% trans "Architecture" %} <span class="vx-rating">{{ submitted.architecture_rating }}/5</span></div>
+            <div>{% trans "Testing" %} <span class="vx-rating">{{ submitted.testing_rating }}/5</span></div>
+          {% else %}
+            <div>{% trans "Delivery" %} <span class="vx-rating">{{ submitted.delivery_rating }}/5</span></div>
+            <div>{% trans "Ownership" %} <span class="vx-rating">{{ submitted.ownership_rating }}/5</span></div>
+            <div>{% trans "Collaboration" %} <span class="vx-rating">{{ submitted.collaboration_rating }}/5</span></div>
+          {% endif %}
+        </div>
+        <div class="vx-label">{% trans "Strengths" %}</div><p class="vx-text" style="margin-bottom:.8rem">{{ submitted.strengths|default:"-" }}</p>
+        <div class="vx-label">{% trans "Observations" %}</div><p class="vx-text" style="margin-bottom:.8rem">{{ submitted.observations|default:"-" }}</p>
+        {% if is_code %}<div class="vx-label">{% trans "Blockers" %}</div><p class="vx-text" style="margin-bottom:.8rem">{{ submitted.blockers|default:"-" }}</p>{% endif %}
+        <div class="vx-label">{% trans "Action items" %}</div><p class="vx-text">{{ submitted.action_items|default:"-" }}</p>
+      {% elif not can_submit %}
+        <p class="vx-muted" style="margin:0">{% trans "No outcome has been submitted yet." %}</p>
+      {% endif %}
+      {% if can_submit %}
+        {% if submitted %}<hr class="vx-divider">{% endif %}
+        <form method="post" action="{% url 'vertex-review-submit' review.pk %}">
+          {% csrf_token %}
+          <div class="vx-fields vx-fields--6">
+            {% for field in submit_form %}
+              <div class="vx-s{{ submit_form.spans|get_item:field.name }}">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
+              </div>
+            {% endfor %}
+          </div>
+          <div class="vx-btnrow"><button type="submit" class="oh-btn oh-btn--secondary">{% if submitted %}{% trans "Update outcome" %}{% else %}{% trans "Submit outcome" %}{% endif %}</button></div>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+</div>
+{% endblock content %}

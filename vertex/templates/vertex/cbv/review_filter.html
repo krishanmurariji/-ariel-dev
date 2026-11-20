@@ -1,0 +1,36 @@
+{% load i18n %}
+<div class="oh-dropdown__filter-body">
+    <div class="oh-accordion">
+        <div class="oh-accordion-header"
+            onclick="event.stopImmediatePropagation();$(this).parent().toggleClass('oh-accordion--show');"
+        >{% trans "Review" %}</div>
+        <div class="oh-accordion-body">
+            <div class="row">
+                <div class="col-sm-12 col-md-12 col-lg-6">
+                    <div class="oh-input-group">
+                        <label class="oh-label" for="{{form.project.id_for_label}}">{{ form.project.label }}</label>
+                        {{form.project}}
+                    </div>
+                    <div class="oh-input-group">
+                        <label class="oh-label" for="{{form.review_type.id_for_label}}">{{ form.review_type.label }}</label>
+                        {{form.review_type}}
+                    </div>
+                </div>
+                <div class="col-sm-12 col-md-12 col-lg-6">
+                    <div class="oh-input-group">
+                        <label class="oh-label" for="{{form.status.id_for_label}}">{{ form.status.label }}</label>
+                        {{form.status}}
+                    </div>
+                    <div class="oh-input-group">
+                        <label class="oh-label" for="{{form.due_from.id_for_label}}">{{ form.due_from.label }}</label>
+                        {{form.due_from}}
+                    </div>
+                    <div class="oh-input-group">
+                        <label class="oh-label" for="{{form.due_till.id_for_label}}">{{ form.due_till.label }}</label>
+                        {{form.due_till}}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,64 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+{% include "vertex/_vx.html" %}
+<div class="oh-wrapper">
+<div class="vx-page" style="max-width:920px">
+  <a href="{% url 'vertex-hiring' %}" class="vx-back"><ion-icon name="arrow-back-outline"></ion-icon>{% trans "Hiring Requests" %}</a>
+
+
+  <div class="vx-stack">
+    <div class="vx-card vx-card--pad">
+      <div class="vx-ident">
+        <div class="vx-icon" style="width:52px;height:52px;border-radius:14px;font-size:1.5rem"><ion-icon name="person-add-outline"></ion-icon></div>
+        <div style="min-width:0">
+          <h1 class="vx-title">{{ rr.role_title }} <span style="color:var(--vx-muted);font-weight:600">&times;{{ rr.count }}</span></h1>
+          <div class="vx-meta"><a href="{{ rr.project.get_absolute_url }}">{{ rr.project }}</a> &middot; {% trans "raised by" %} {{ rr.get_requested_by_name }} &middot; {{ rr.created_at|date:"j M Y" }}</div>
+        </div>
+      </div>
+      <div class="vx-chips">
+        <span class="vx-chip">{{ rr.get_status_html }}</span>
+        <span class="vx-chip">{{ rr.get_priority_display }} {% trans "priority" %}</span>
+        {% if rr.expected_start_date %}<span class="vx-chip">{% trans "Start" %}: {{ rr.expected_start_date|date:"j M Y" }}</span>{% endif %}
+      </div>
+      <hr class="vx-divider">
+      {% if rr.skills %}<div class="vx-label">{% trans "Skills" %}</div><p class="vx-text" style="margin-bottom:.9rem">{{ rr.skills }}</p>{% endif %}
+      <div class="vx-label">{% trans "Reason" %}</div><p class="vx-text">{{ rr.reason|default:"-" }}</p>
+    </div>
+
+    {% if can_change %}
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Update status" %}</h2>
+      <form method="post" action="{% url 'vertex-resource-request-status' rr.pk %}">
+        {% csrf_token %}
+        <div class="vx-fields">
+          <div><label for="{{ status_form.status.id_for_label }}">{% trans "New status" %}</label>{{ status_form.status }}</div>
+          <div class="vx-full"><label for="{{ status_form.comment.id_for_label }}">{% trans "Comment (optional)" %}</label>{{ status_form.comment }}</div>
+        </div>
+        <div class="vx-btnrow" style="justify-content:flex-end"><button type="submit" class="oh-btn oh-btn--secondary">{% trans "Update status" %}</button></div>
+      </form>
+    </div>
+    {% endif %}
+
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Comments" %}</h2>
+      {% for c in comments %}
+        <div class="vx-row {% if my_employee and c.author_id == my_employee.pk %}vx-row--mine{% endif %}">
+          <img class="vx-avatar" style="width:34px;height:34px" src="{{ c.author.get_avatar }}" alt="">
+          <div class="vx-bubble">
+            <div class="vx-bubble__who">{{ c.author.get_full_name|default:"-" }}</div>
+            <div>{{ c.message|linebreaksbr }}</div>
+            <div class="vx-bubble__when">{{ c.created_at }}</div>
+          </div>
+        </div>
+      {% empty %}<div class="vx-empty" style="margin-bottom:1rem"><ion-icon name="chatbubbles-outline"></ion-icon>{% trans "No comments yet." %}</div>{% endfor %}
+      <form method="post" action="{% url 'vertex-resource-request-comment' rr.pk %}" class="vx-inline-form vx-composer">
+        {% csrf_token %}
+        {{ comment_form.message }}
+        <div class="vx-composer__bar"><span></span><button type="submit" class="oh-btn oh-btn--secondary"><ion-icon name="send-outline" class="me-1"></ion-icon>{% trans "Post comment" %}</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock content %}

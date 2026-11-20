@@ -1,0 +1,131 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+{% include "vertex/_vx.html" %}
+<div class="oh-wrapper">
+<div class="vx-page" style="max-width:980px">
+  <div class="vx-header">
+    <div>
+      <h1 class="vx-h1">{% trans "My Performance" %}</h1>
+      <p class="vx-sub">{% trans "Only approved and published results are shown here." %}</p>
+    </div>
+  </div>
+
+  <div class="vx-stack">
+    {% if latest %}
+    <div class="vx-card vx-card--pad">
+      <div style="display:flex;justify-content:space-between;gap:1.25rem;flex-wrap:wrap;align-items:center">
+        <div>
+          <div class="vx-label">{% trans "Latest report" %} &middot; {{ latest.period }}</div>
+          <div class="vx-chips" style="margin-top:.2rem"><span class="vx-chip">{{ latest.get_rating_html }}</span></div>
+        </div>
+        <div style="text-align:right"><div class="vx-big">{{ latest.overall_score }}<span style="font-size:1.2rem;color:var(--vx-muted)">%</span></div></div>
+      </div>
+      <hr class="vx-divider">
+      <div class="vx-bars">
+        {% for r in rows %}
+          <div>
+            <div class="vx-bar-head"><span>{{ r.name }}</span>{% if r.not_applicable %}<b style="color:var(--vx-muted)">{% trans "Not applicable" %}</b>{% else %}<b>{{ r.score }}%</b>{% endif %}</div>
+            {% if not r.not_applicable %}<div class="vx-meter"><span style="width:{{ r.score }}%;background:{{ r.colour }}"></span></div>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+      <hr class="vx-divider">
+      <div class="row">
+        <div class="col-md-4"><div class="vx-label">{% trans "Strengths" %}</div><p class="vx-text">{{ latest.strengths|default:"-" }}</p></div>
+        <div class="col-md-4"><div class="vx-label">{% trans "Focus area" %}</div><p class="vx-text">{{ latest.improvement_areas|default:"-" }}</p></div>
+        <div class="col-md-4"><div class="vx-label">{% trans "Next steps" %}</div><p class="vx-text">{{ latest.recommended_actions|default:"-" }}</p></div>
+      </div>
+    </div>
+
+    {% if trend|length > 1 %}
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Trend" %}</h2>
+      <div class="vx-trend">
+        {% for t in trend %}
+          <div title="{{ t.rating }}"><b>{{ t.score }}%</b><span style="height:{{ t.score }}%;background:var(--vx-primary)"></span><em>{{ t.period }}</em></div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    {% else %}
+      <div class="vx-empty"><ion-icon name="analytics-outline"></ion-icon>{% trans "No performance report has been published for you yet." %}</div>
+    {% endif %}
+
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Feedback" %}</h2>
+      {% for f in feedback %}
+        <div class="vx-item vx-item--block" style="margin-bottom:.7rem">
+          <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:.4rem">
+            <div style="font-weight:600">{{ f.period }}{% if f.project %} &middot; {{ f.project }}{% endif %}</div>
+            <div class="vx-item__sub">{% trans "From" %} {{ f.author.get_full_name }} &middot; {{ f.published_at|date:"j M Y" }}</div>
+          </div>
+          <p class="vx-text">{{ f.constructive_summary }}</p>
+          {% if f.strengths %}<div class="vx-label" style="margin-top:.6rem">{% trans "Strengths" %}</div><p class="vx-text">{{ f.strengths }}</p>{% endif %}
+          {% if f.improvement_areas %}<div class="vx-label" style="margin-top:.6rem">{% trans "Improvement areas" %}</div><p class="vx-text">{{ f.improvement_areas }}</p>{% endif %}
+          {% if f.action_plan %}<div class="vx-label" style="margin-top:.6rem">{% trans "Action plan" %}</div><p class="vx-text">{{ f.action_plan }}</p>{% endif %}
+        </div>
+      {% empty %}
+        <div class="vx-empty"><ion-icon name="chatbubble-ellipses-outline"></ion-icon>{% trans "No published feedback yet." %}</div>
+      {% endfor %}
+    </div>
+
+    {% if appraisals %}
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Appraisals" %}</h2>
+      {% for a in appraisals %}
+        <a href="{{ a.get_absolute_url }}" class="vx-item vx-item--block" style="display:flex;justify-content:space-between;gap:1rem;margin-bottom:.6rem;text-decoration:none;color:inherit">
+          <div><div style="font-weight:600">{{ a.cycle.name }}</div><div class="vx-item__sub">{% trans "Released" %} {{ a.released_at|date:"j M Y" }}</div></div>
+          <div class="vx-big" style="font-size:1.4rem">{{ a.final_rating }}<span style="font-size:.9rem;color:var(--vx-muted)"> / 5</span></div>
+        </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if promotions %}
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Promotions" %}</h2>
+      {% for p in promotions %}
+        <div class="vx-item vx-item--block" style="margin-bottom:.6rem">
+          <div style="font-weight:600">{{ p.current_designation|default:"-" }} &rarr; {{ p.proposed_position.job_position }}</div>
+          <div class="vx-item__sub">{% trans "Completed" %} {{ p.completed_at|date:"j M Y" }}</div>
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if training %}
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "My training" %}</h2>
+      {% for t in training %}
+        <div class="vx-item vx-item--block" style="margin-bottom:.6rem">
+          <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+            <div style="font-weight:600">{{ t.recommended_training }}</div>
+            <div class="vx-chips" style="margin-top:0"><span class="vx-chip">{{ t.get_status_html }}</span></div>
+          </div>
+          <div class="vx-item__sub">{{ t.skill_gap }} &middot; {{ t.get_duration_display }}</div>
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if pips %}
+    <div class="vx-card vx-card--pad">
+      <h2 class="vx-section-title">{% trans "Improvement plan" %}</h2>
+      {% for p in pips %}
+        <div class="vx-item vx-item--block" style="margin-bottom:.7rem">
+          <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+            <div class="vx-chips" style="margin-top:0"><span class="vx-chip">{{ p.get_status_html }}</span><span class="vx-chip">{{ p.get_outcome_html }}</span></div>
+            <div class="vx-item__sub">{% trans "Started" %} {{ p.start_date|date:"j M Y" }}</div>
+          </div>
+          <p class="vx-text" style="margin-top:.6rem">{{ p.reason }}</p>
+          {% if p.expected_improvement %}<div class="vx-label" style="margin-top:.6rem">{% trans "Expected improvement" %}</div><p class="vx-text">{{ p.expected_improvement }}</p>{% endif %}
+          {% if p.support_provided %}<div class="vx-label" style="margin-top:.6rem">{% trans "Support" %}</div><p class="vx-text">{{ p.support_provided }}</p>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+</div>
+{% endblock content %}

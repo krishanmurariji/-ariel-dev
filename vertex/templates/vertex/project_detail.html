@@ -1,0 +1,406 @@
+{% extends "index.html" %}
+{% load i18n %}
+{% block content %}
+{% include "vertex/_vx.html" %}
+<style>
+  /* project workspace only */
+  .pw-top { display: flex; justify-content: space-between; gap: 1.25rem; flex-wrap: wrap; align-items: flex-start; padding: 1.4rem 1.6rem 1.2rem; }
+  .pw-title-line { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+  .pw-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--vx-border); background: var(--vx-subtle); border-radius: 0 0 12px 12px; }
+  .pw-kpi { padding: .9rem 1.6rem; min-width: 0; }
+  .pw-kpi + .pw-kpi { border-left: 1px solid var(--vx-border); }
+  .pw-kpi .vx-label { margin-bottom: .3rem; }
+  .pw-kpi__v { font-size: .95rem; font-weight: 600; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; color: var(--vx-text); }
+  .pw-kpi__sub { color: var(--vx-muted); font-size: .74rem; margin-top: .25rem; }
+  .pw-progress { height: 6px; border-radius: 999px; background: var(--vx-chip); overflow: hidden; margin-top: .5rem; }
+  .pw-progress span { display: block; height: 100%; border-radius: 999px; background: var(--vx-primary); }
+  .pw-progress--late span { background: var(--vx-bad); }
+
+  .pw-cols { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+  .pw-panel { border: 1px solid var(--vx-border); border-radius: 12px; padding: 1.1rem 1.25rem; background: var(--vx-surface); }
+  .pw-panel + .pw-panel { margin-top: 1.25rem; }
+  .pw-panel h3 { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--vx-faint); margin: 0 0 .75rem; display: flex; justify-content: space-between; align-items: center; }
+  .pw-panel h3 a { text-transform: none; letter-spacing: 0; font-weight: 600; font-size: .78rem; color: var(--vx-primary); text-decoration: none; }
+  .pw-rows > div { display: flex; justify-content: space-between; gap: 1rem; padding: .55rem 0; font-size: .86rem; }
+  .pw-rows > div + div { border-top: 1px solid var(--vx-border); }
+  .pw-rows span:first-child { color: var(--vx-muted); }
+  .pw-rows b { font-weight: 600; text-align: right; }
+  .pw-people { display: flex; align-items: center; gap: .7rem; padding: .45rem 0; }
+  .pw-people + .pw-people { border-top: 1px solid var(--vx-border); }
+  .pw-people img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; }
+
+  /* rows used by documents, calls, reviews */
+  .pw-list { border: 1px solid var(--vx-border); border-radius: 12px; overflow: hidden; background: var(--vx-surface); }
+  .pw-row { display: flex; align-items: center; gap: 1rem; padding: .95rem 1.15rem; text-decoration: none; color: var(--vx-text); }
+  .pw-row + .pw-row { border-top: 1px solid var(--vx-border); }
+  a.pw-row:hover { background: var(--vx-subtle); color: var(--vx-text); }
+  .pw-row__main { min-width: 0; flex: 1; }
+  .pw-row__title { font-weight: 600; font-size: .92rem; }
+  .pw-row__meta { color: var(--vx-muted); font-size: .78rem; margin-top: .15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pw-row__chips { display: flex; gap: .35rem; flex-wrap: wrap; justify-content: flex-end; }
+  .pw-row__end { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; }
+  .pw-date { width: 50px; text-align: center; border: 1px solid var(--vx-border); border-radius: 10px; overflow: hidden; flex-shrink: 0; background: var(--vx-surface); }
+  .pw-date b { display: block; font-size: 1.15rem; line-height: 1.5; font-weight: 700; }
+  .pw-date span { display: block; background: var(--vx-primary-soft); color: var(--vx-primary-ink); font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: .1rem 0; }
+  .pw-btn-ico { width: 34px; height: 34px; border: 1px solid var(--vx-border); border-radius: 8px; background: var(--vx-surface); display: inline-grid; place-items: center; color: var(--vx-muted); cursor: pointer; font-size: 1.05rem; text-decoration: none; padding: 0; }
+  .pw-btn-ico:hover { color: var(--vx-primary); border-color: var(--vx-primary); }
+  .pw-btn-ico--danger:hover { color: var(--vx-bad); border-color: var(--vx-bad); }
+
+  .pw-people-grid { display: grid; gap: .85rem; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+  .pw-person { display: flex; gap: .9rem; align-items: center; border: 1px solid var(--vx-border); border-radius: 12px; padding: 1rem 1.1rem; background: var(--vx-surface); }
+  .pw-person img { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+
+  .pw-update { border: 1px solid var(--vx-border); border-left-width: 4px; border-radius: 12px; padding: 1rem 1.2rem; background: var(--vx-surface); }
+  .pw-update + .pw-update { margin-top: .85rem; }
+  .pw-update--on_track { border-left-color: var(--vx-ok); } .pw-update--at_risk { border-left-color: var(--vx-warn); } .pw-update--blocked { border-left-color: var(--vx-bad); }
+  .pw-update__head { display: flex; gap: .7rem; align-items: center; margin-bottom: .75rem; }
+  .pw-update__head img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+  .pw-update__cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .9rem 1.5rem; }
+  .pw-summary { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; border: 1px solid var(--vx-border); border-radius: 12px; padding: .9rem 1.2rem; background: var(--vx-subtle); margin-bottom: 1.1rem; }
+  .pw-segment { display: inline-flex; border: 1px solid var(--vx-border); border-radius: 8px; overflow: hidden; }
+  .pw-segment a { padding: .35rem .8rem; font-size: .78rem; font-weight: 600; color: var(--vx-muted); text-decoration: none; background: var(--vx-surface); }
+  .pw-segment a + a { border-left: 1px solid var(--vx-border); }
+  .pw-segment a.is-on { background: var(--vx-primary); color: #fff; }
+
+  @media (max-width: 1100px) { .pw-kpis { grid-template-columns: repeat(3, 1fr); } .pw-kpi:nth-child(4) { border-left: 0; } .pw-kpi:nth-child(n+4) { border-top: 1px solid var(--vx-border); } }
+  @media (max-width: 900px) { .pw-cols { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) { .pw-kpis { grid-template-columns: repeat(2, 1fr); } .pw-kpi { padding: .8rem 1rem; } .pw-kpi + .pw-kpi { border-left: 0; } .pw-kpi:nth-child(even) { border-left: 1px solid var(--vx-border); } .pw-kpi:nth-child(n+3) { border-top: 1px solid var(--vx-border); } .pw-top { padding: 1.1rem; } .pw-row { flex-wrap: wrap; } .pw-row__chips { justify-content: flex-start; } }
+</style>
+
+<div class="oh-wrapper">
+<div class="vx-page">
+  <a href="{% url 'vertex-projects' %}" class="vx-back"><ion-icon name="arrow-back-outline"></ion-icon>{% trans "Projects" %}</a>
+
+
+  {# ---------------- header ---------------- #}
+  <div class="vx-card" style="margin-bottom:1.1rem">
+    <div class="pw-top">
+      <div class="vx-ident" style="align-items:flex-start">
+        <div class="vx-tile" style="width:60px;height:60px;font-size:1.2rem">{{ project.get_initials }}</div>
+        <div style="min-width:0">
+          <div class="pw-title-line"><h1 class="vx-title">{{ project.name }}</h1><span class="vx-code" style="margin:0">{{ project.code }}</span></div>
+          <div class="vx-meta">{{ project.client_name|default:_("Internal project") }}{% if project.business_owner %} &middot; {% trans "Owner" %}: {{ project.business_owner }}{% endif %}</div>
+          {% if my_role or project.tag_list %}
+          <div class="vx-chips">
+            {% if my_role %}<span class="vx-chip vx-chip--brand">{% trans "You" %}: {{ my_role_label }}</span>{% endif %}
+            {% for tag in project.tag_list %}<span class="vx-chip">#{{ tag }}</span>{% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% if can_manage %}
+        <button type="button" class="oh-btn oh-btn--secondary"
+          hx-get="{% url 'vertex-project-edit' project.pk %}" hx-target="#genericModalBody"
+          data-toggle="oh-modal-toggle" data-target="#genericModal">
+          <ion-icon name="create-outline" class="me-1"></ion-icon>{% trans "Edit project" %}
+        </button>
+      {% endif %}
+    </div>
+    <div class="pw-kpis">
+      <div class="pw-kpi"><div class="vx-label">{% trans "Status" %}</div><div class="pw-kpi__v">{{ project.get_status_display }}</div></div>
+      <div class="pw-kpi"><div class="vx-label">{% trans "Health" %}</div><div class="pw-kpi__v">{{ project.get_health_html }}</div></div>
+      <div class="pw-kpi"><div class="vx-label">{% trans "Priority" %}</div><div class="pw-kpi__v">{{ project.get_priority_display }}</div></div>
+      <div class="pw-kpi"><div class="vx-label">{% trans "Team" %}</div><div class="pw-kpi__v">{{ counts.team }} <span class="pw-kpi__sub" style="margin:0">{% trans "people" %}</span></div></div>
+      <div class="pw-kpi">
+        <div class="vx-label">{% trans "Timeline" %}</div>
+        <div class="pw-kpi__v" style="font-size:.85rem">{{ project.start_date|date:"j M Y" }} &rarr; {{ project.expected_end_date|date:"j M Y"|default:"?" }}</div>
+        {% if timeline %}
+          <div class="pw-progress {% if timeline.overdue %}pw-progress--late{% endif %}"><span style="width:{{ timeline.percent }}%"></span></div>
+          <div class="pw-kpi__sub" {% if timeline.overdue %}style="color:var(--vx-bad)"{% endif %}>
+            {% if timeline.overdue %}{{ timeline.days_left|cut:"-" }} {% trans "days overdue" %}{% elif timeline.days_left == 0 %}{% trans "Due today" %}{% elif timeline.days_left > 0 %}{{ timeline.days_left }} {% trans "days left" %}{% else %}{{ timeline.percent }}%{% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ---------------- tabs ---------------- #}
+  <div class="vx-card" id="vxTabs">
+    <div class="vx-tabs">
+      {% for t in tabs %}
+        <a href="?tab={{ t }}" class="vx-tab {% if t == tab %}vx-tab--active{% endif %}"
+           hx-get="?tab={{ t }}" hx-target="#vxTabs" hx-select="#vxTabs" hx-swap="outerHTML show:none" hx-push-url="true" hx-indicator="#vxTabs"
+           hx-on::response-error="window.location.href=this.getAttribute('href')" hx-on::send-error="window.location.href=this.getAttribute('href')">
+          {% if t == "overview" %}{% trans "Overview" %}
+          {% elif t == "team" %}{% trans "Team" %}{% if counts.team %}<span class="vx-count">{{ counts.team }}</span>{% endif %}
+          {% elif t == "documents" %}{% trans "Documents" %}{% if counts.documents %}<span class="vx-count">{{ counts.documents }}</span>{% endif %}
+          {% elif t == "calls" %}{% trans "Customer Calls" %}{% if counts.calls %}<span class="vx-count">{{ counts.calls }}</span>{% endif %}
+          {% elif t == "status" %}{% trans "Status Updates" %}{% if counts.status %}<span class="vx-count">{{ counts.status }}</span>{% endif %}
+          {% elif t == "reviews" %}{% trans "Reviews" %}{% if counts.reviews %}<span class="vx-count">{{ counts.reviews }}</span>{% endif %}
+          {% else %}{% trans "Business Comments" %}{% if counts.comments %}<span class="vx-count">{{ counts.comments }}</span>{% endif %}{% endif %}
+        </a>
+      {% endfor %}
+    </div>
+
+    <div class="vx-body">
+
+    {% if tab == "overview" %}
+      <div class="pw-cols">
+        <div>
+          <div class="pw-panel">
+            <h3>{% trans "About this project" %}</h3>
+            <p class="vx-text">{{ project.description|default:_("No description provided.") }}</p>
+            {% if project.notes %}<hr class="vx-divider"><div class="vx-label">{% trans "Notes" %}</div><p class="vx-text" style="color:var(--vx-muted)">{{ project.notes }}</p>{% endif %}
+          </div>
+          <div class="pw-panel">
+            <h3>{% trans "Latest status update" %}<a href="?tab=status">{% trans "View all" %}</a></h3>
+            {% if latest_update %}
+              <div style="display:flex;gap:.7rem;align-items:center;margin-bottom:.6rem">
+                <img class="vx-avatar" style="width:32px;height:32px" src="{{ latest_update.employee.get_avatar }}" alt="">
+                <div style="flex:1"><div style="font-weight:600;font-size:.88rem">{{ latest_update.employee.get_full_name }}</div><div class="vx-item__sub">{{ latest_update.update_date|date:"j M Y" }}</div></div>
+                {{ latest_update.get_status_html }}
+              </div>
+              <p class="vx-text" style="color:var(--vx-muted)">{% if business_view %}{{ latest_update.client_shareable_summary|default:"-"|truncatechars:240 }}{% else %}{{ latest_update.work_completed|truncatechars:240 }}{% endif %}</p>
+            {% else %}
+              <p class="vx-muted" style="margin:0">{% trans "No updates yet." %}</p>
+            {% endif %}
+          </div>
+        </div>
+        <div>
+          <div class="pw-panel">
+            <h3>{% trans "Team" %}<a href="?tab=team">{% trans "View all" %}</a></h3>
+            {% for m in team_preview %}
+              <div class="pw-people">
+                <img src="{{ m.employee.get_avatar }}" alt="">
+                <div style="min-width:0;flex:1"><div style="font-weight:600;font-size:.86rem">{{ m.employee.get_full_name }}</div><div class="vx-item__sub">{{ m.get_role_on_project_display }}</div></div>
+                <span class="vx-item__sub" style="margin:0">{{ m.allocation_pct }}%</span>
+              </div>
+            {% empty %}<p class="vx-muted" style="margin:0">{% trans "No team members yet." %}</p>{% endfor %}
+          </div>
+          <div class="pw-panel">
+            <h3>{% trans "Next call" %}<a href="?tab=calls">{% trans "View all" %}</a></h3>
+            {% if next_call %}
+              <div style="display:flex;gap:.8rem;align-items:center">
+                <div class="pw-date"><span>{{ next_call.scheduled_at|date:"M" }}</span><b>{{ next_call.scheduled_at|date:"j" }}</b></div>
+                <div style="min-width:0"><div style="font-weight:600;font-size:.88rem">{{ next_call.title }}</div><div class="vx-item__sub">{{ next_call.scheduled_at|date:"H:i" }} &middot; {{ next_call.duration_minutes }} {% trans "min" %}</div></div>
+              </div>
+            {% else %}
+              <p class="vx-muted" style="margin:0">{% trans "No upcoming calls." %}</p>
+            {% endif %}
+          </div>
+          <div class="pw-panel">
+            <h3>{% trans "Details" %}</h3>
+            <div class="pw-rows">
+              <div><span>{% trans "Client" %}</span><b>{{ project.client_name|default:"-" }}</b></div>
+              <div><span>{% trans "Business owner" %}</span><b>{{ project.business_owner|default:"-" }}</b></div>
+              <div><span>{% trans "Created" %}</span><b>{{ project.created_at|date:"j M Y" }}</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    {% elif tab == "team" %}
+      <div class="vx-toolbar">
+        <span class="vx-muted">{{ members|length }} {% trans "people on this project" %}</span>
+        <div class="vx-actions">
+          {% if can_request_resource %}
+            <button type="button" class="oh-btn oh-btn--light" hx-get="{% url 'vertex-hiring-new' %}?project={{ project.pk }}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal">
+              <ion-icon name="people-outline" class="me-1"></ion-icon>{% trans "Request resource" %}
+            </button>
+          {% endif %}
+          {% if can_add_member %}
+            <button type="button" class="oh-btn oh-btn--secondary" hx-get="{% url 'vertex-member-add' project.pk %}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal">
+              <ion-icon name="person-add-outline" class="me-1"></ion-icon>{% trans "Add member" %}
+            </button>
+          {% endif %}
+        </div>
+      </div>
+      {% if members %}
+      <div class="pw-people-grid">
+        {% for m in members %}
+        <div class="pw-person">
+          <img src="{{ m.employee.get_avatar }}" alt="">
+          <div style="min-width:0;flex:1">
+            <div class="pw-row__title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ m.employee.get_full_name }}</div>
+            <div class="pw-row__meta">{{ m.employee.get_job_position|default:"-" }}</div>
+            <div class="vx-chips" style="margin-top:.5rem;align-items:center">
+              <span class="vx-chip vx-chip--brand">{{ m.get_role_on_project_display }}</span>
+              <span class="vx-chip">{{ m.allocation_pct }}% {% trans "allocated" %}</span>
+            </div>
+          </div>
+          {% if can_remove_member %}
+            <form method="post" action="{% url 'vertex-member-remove' project.pk m.pk %}" style="margin:0" onsubmit="return confirm('{% trans "Remove this person from the project?"|escapejs %}');">
+              {% csrf_token %}<button class="pw-btn-ico pw-btn-ico--danger" type="submit" title="{% trans 'Remove' %}"><ion-icon name="trash-outline"></ion-icon></button>
+            </form>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+        <div class="vx-empty"><ion-icon name="people-outline"></ion-icon>{% trans "No team members yet." %}</div>
+      {% endif %}
+
+    {% elif tab == "documents" %}
+      <div class="vx-toolbar">
+        <span class="vx-muted">{% trans "Requirement, technical, demo and meeting artifacts" %}</span>
+        {% if can_add_document %}
+          <button type="button" class="oh-btn oh-btn--secondary" hx-get="{% url 'vertex-document-add' project.pk %}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal">
+            <ion-icon name="add-outline" class="me-1"></ion-icon>{% trans "Add document" %}
+          </button>
+        {% endif %}
+      </div>
+      {% if documents %}
+      <div class="pw-list">
+        {% for d in documents %}
+        <div class="pw-row">
+          <div class="vx-icon"><ion-icon name="{% if d.is_video_link %}videocam-outline{% else %}document-text-outline{% endif %}"></ion-icon></div>
+          <div class="pw-row__main">
+            <div class="pw-row__title">{{ d.title }}</div>
+            <div class="pw-row__meta">{% if d.file_name %}{{ d.file_name }} &middot; {{ d.size_bytes|filesizeformat }}{% else %}{{ d.description|default:d.get_category_display }}{% endif %}{% if d.uploaded_by %} &middot; {% trans "by" %} {{ d.uploaded_by.get_full_name }}{% endif %} &middot; {{ d.created_at|date:"j M Y" }}</div>
+          </div>
+          <div class="pw-row__chips"><span class="vx-chip">{{ d.get_category_display }}</span><span class="vx-chip">{{ d.get_visibility_display }}</span></div>
+          <div class="pw-row__end">
+            {% if d.is_video_link %}
+              <a class="pw-btn-ico" href="{{ d.video_url }}" target="_blank" rel="noopener noreferrer" title="{% trans 'Open' %}"><ion-icon name="open-outline"></ion-icon></a>
+            {% else %}
+              <a class="pw-btn-ico" href="{% url 'vertex-document-download' project.pk d.pk %}" title="{% trans 'Download' %}"><ion-icon name="download-outline"></ion-icon></a>
+            {% endif %}
+            {% if can_delete_document %}
+              <form method="post" action="{% url 'vertex-document-delete' project.pk d.pk %}" style="margin:0" onsubmit="return confirm('{% trans "Remove this document?"|escapejs %}');">
+                {% csrf_token %}<button class="pw-btn-ico pw-btn-ico--danger" type="submit" title="{% trans 'Remove' %}"><ion-icon name="trash-outline"></ion-icon></button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+        <div class="vx-empty"><ion-icon name="document-text-outline"></ion-icon>{% trans "No documents yet. Upload requirements, demos and meeting notes here." %}</div>
+      {% endif %}
+
+    {% elif tab == "calls" %}
+      <div class="vx-toolbar">
+        <span class="vx-muted">{% trans "Customer and internal calls" %}</span>
+        {% if can_add_call %}
+          <button type="button" class="oh-btn oh-btn--secondary" hx-get="{% url 'vertex-call-add' project.pk %}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal">
+            <ion-icon name="calendar-outline" class="me-1"></ion-icon>{% trans "Schedule call" %}
+          </button>
+        {% endif %}
+      </div>
+      {% if calls %}
+      <div class="pw-list">
+        {% for c in calls %}
+        <div class="pw-row">
+          <div class="pw-date"><span>{{ c.scheduled_at|date:"M" }}</span><b>{{ c.scheduled_at|date:"j" }}</b></div>
+          <div class="pw-row__main">
+            <div class="pw-row__title">{{ c.title }}</div>
+            <div class="pw-row__meta">{{ c.scheduled_at|date:"D, j M Y" }} &middot; {{ c.scheduled_at|date:"H:i" }} &middot; {{ c.duration_minutes }} {% trans "min" %}</div>
+            {% if c.agenda %}<div class="pw-row__meta" style="white-space:normal">{{ c.agenda|truncatechars:160 }}</div>{% endif %}
+            {% if not c.meeting_url and c.meeting_error %}<div class="pw-row__meta" style="white-space:normal;color:#b45309"><ion-icon name="warning-outline"></ion-icon> {% trans "No meeting link yet:" %} {{ c.meeting_error }}</div>{% endif %}
+          </div>
+          <div class="pw-row__chips"><span class="vx-chip">{{ c.get_call_type_display }}</span></div>
+          <div class="vx-actions" style="align-items:center">
+            {% if c.meeting_url %}
+              <a class="oh-btn oh-btn--light" href="{{ c.meeting_url }}" target="_blank" rel="noopener noreferrer"><ion-icon name="videocam-outline" class="me-1"></ion-icon>{% trans "Join" %}</a>
+              <button type="button" class="oh-btn oh-btn--light" title="{% trans 'Copy the meeting link' %}" onclick="navigator.clipboard.writeText('{{ c.meeting_url|escapejs }}');this.innerText='{% trans 'Copied' %}'"><ion-icon name="copy-outline"></ion-icon></button>
+            {% endif %}
+            {% if can_add_call %}
+              <form method="post" action="{% url 'vertex-call-link' project.pk c.pk %}">{% csrf_token %}
+                <button type="submit" class="oh-btn oh-btn--light" title="{% if c.meeting_url %}{% trans 'Refresh the meeting and notify attendees' %}{% else %}{% trans 'Create the meeting link' %}{% endif %}"><ion-icon name="refresh-outline" class="me-1"></ion-icon>{% if c.meeting_url %}{% trans "Update link" %}{% else %}{% trans "Generate link" %}{% endif %}</button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+        <div class="vx-empty"><ion-icon name="call-outline"></ion-icon>{% trans "No calls scheduled." %}</div>
+      {% endif %}
+
+    {% elif tab == "status" %}
+      <div class="vx-toolbar">
+        <span class="vx-muted">{% if status_business_view %}{% trans "Client-ready summaries from the team" %}{% else %}{% trans "Developer updates for this project" %}{% endif %}</span>
+        {% if can_submit_status %}
+          <button type="button" class="oh-btn oh-btn--secondary" hx-get="{% url 'vertex-status-new' %}?project={{ project.pk }}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal">
+            <ion-icon name="add-outline" class="me-1"></ion-icon>{% trans "Submit update" %}
+          </button>
+        {% endif %}
+      </div>
+      {% if summary %}
+        <div class="pw-summary">
+          <div>
+            <div style="font-weight:600">{% trans "Consolidated summary" %}</div>
+            <div class="vx-chips" style="margin-top:.4rem;align-items:center">
+              <span class="vx-chip vx-chip--brand">{{ summary.reporting }}/{{ summary.expected }} {% trans "reporting" %}</span>
+              {% if summary.missing %}<span class="vx-muted">{% trans "Not reported" %}: {{ summary.missing|join:", " }}</span>{% endif %}
+            </div>
+          </div>
+          <div class="pw-segment">
+            <a href="?tab=status&days=7" class="{% if summary.days == 7 %}is-on{% endif %}">7 {% trans "days" %}</a>
+            <a href="?tab=status&days=14" class="{% if summary.days == 14 %}is-on{% endif %}">14 {% trans "days" %}</a>
+            <a href="?tab=status&days=30" class="{% if summary.days == 30 %}is-on{% endif %}">30 {% trans "days" %}</a>
+          </div>
+        </div>
+      {% endif %}
+      {% for s in status_updates %}
+        <div class="pw-update pw-update--{{ s.status }}">
+          <div class="pw-update__head">
+            <img src="{{ s.employee.get_avatar }}" alt="">
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:.9rem">{{ s.employee.get_full_name }}</div>
+              <div class="vx-item__sub">{{ s.update_date|date:"D, j M Y" }}{% if not status_business_view %} &middot; {{ s.hours_spent }}h{% endif %}</div>
+            </div>
+            {{ s.get_status_html }}
+          </div>
+          {% if status_business_view %}
+            <p class="vx-text">{{ s.client_shareable_summary|default:_("(No client summary provided.)") }}</p>
+          {% else %}
+            <div class="pw-update__cols">
+              <div><div class="vx-label">{% trans "Done" %}</div><p class="vx-text">{{ s.work_completed }}</p></div>
+              {% if s.next_planned_work %}<div><div class="vx-label">{% trans "Next" %}</div><p class="vx-text">{{ s.next_planned_work }}</p></div>{% endif %}
+              {% if s.blockers %}<div><div class="vx-label" style="color:var(--vx-bad)">{% trans "Blockers" %}</div><p class="vx-text" style="color:var(--vx-bad)">{{ s.blockers }}</p></div>{% endif %}
+              {% if s.dependencies %}<div><div class="vx-label">{% trans "Dependencies" %}</div><p class="vx-text">{{ s.dependencies }}</p></div>{% endif %}
+              {% if status_can_see_internal and s.internal_note %}<div><div class="vx-label">{% trans "Internal note" %}</div><p class="vx-text" style="color:var(--vx-muted)">{{ s.internal_note }}</p></div>{% endif %}
+            </div>
+          {% endif %}
+        </div>
+      {% empty %}<div class="vx-empty"><ion-icon name="pulse-outline"></ion-icon>{% trans "No status updates yet." %}</div>{% endfor %}
+
+    {% elif tab == "reviews" %}
+      <div class="vx-toolbar">
+        <span class="vx-muted">{% trans "Reviews requested for people on this project" %}</span>
+        {% if can_request_review %}<button type="button" class="oh-btn oh-btn--secondary" hx-get="{% url 'vertex-review-new' %}?project={{ project.pk }}" hx-target="#genericModalBody" data-toggle="oh-modal-toggle" data-target="#genericModal"><ion-icon name="add-outline" class="me-1"></ion-icon>{% trans "Request review" %}</button>{% endif %}
+      </div>
+      {% if reviews %}
+      <div class="pw-list">
+        {% for r in reviews %}
+        <a href="{{ r.get_absolute_url }}" class="pw-row">
+          <img class="vx-avatar" src="{{ r.subject.get_avatar }}" alt="">
+          <div class="pw-row__main">
+            <div class="pw-row__title">{{ r.subject.get_full_name }}</div>
+            <div class="pw-row__meta">{{ r.get_review_type_display }}{% if r.assigned_to %} &middot; {% trans "Reviewer" %}: {{ r.assigned_to.get_full_name }}{% endif %}{% if r.due_date %} &middot; {% trans "Due" %} {{ r.due_date|date:"j M Y" }}{% endif %}</div>
+          </div>
+          <div class="pw-row__end">{{ r.get_status_html }}</div>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+        <div class="vx-empty"><ion-icon name="checkmark-done-outline"></ion-icon>{% trans "No reviews for this project yet." %}</div>
+      {% endif %}
+
+    {% else %}
+      <p class="vx-muted" style="margin-bottom:1.1rem">{% trans "Shared thread between the delivery team and business stakeholders." %}</p>
+      <div style="max-width:860px">
+        {% for c in comments %}
+          <div class="vx-row {% if my_employee and c.author_id == my_employee.pk %}vx-row--mine{% endif %}">
+            <img class="vx-avatar" style="width:36px;height:36px" src="{{ c.author.get_avatar }}" alt="">
+            <div class="vx-bubble">
+              <div class="vx-bubble__who">{{ c.author.get_full_name|default:"-" }}</div>
+              <div>{{ c.message|linebreaksbr }}</div>
+              <div class="vx-bubble__when">{{ c.created_at|date:"j M Y, H:i" }}</div>
+            </div>
+          </div>
+        {% empty %}<div class="vx-empty" style="margin-bottom:1rem"><ion-icon name="chatbubbles-outline"></ion-icon>{% trans "No comments yet. Start the conversation below." %}</div>{% endfor %}
+        <form method="post" action="{% url 'vertex-comment-add' project.pk %}" class="vx-inline-form vx-composer">
+          {% csrf_token %}
+          {{ comment_form.message }}
+          <div class="vx-composer__bar"><span class="vx-muted">{% trans "Visible to the delivery team and business stakeholders." %}</span><button type="submit" class="oh-btn oh-btn--secondary"><ion-icon name="send-outline" class="me-1"></ion-icon>{% trans "Post comment" %}</button></div>
+        </form>
+      </div>
+    {% endif %}
+
+    </div>
+  </div>
+</div>
+</div>
+{% endblock content %}

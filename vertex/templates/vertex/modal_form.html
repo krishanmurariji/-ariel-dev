@@ -1,0 +1,136 @@
+{% load widget_tweaks i18n generic_template_filters horillafilters vertex_extras %}
+{% get_company as theme_obj %}
+{% comment %}
+  Vertex modal form (create / edit). Rendered through form.structured by
+  vertex.cbv.VertexModal, so it replaces only the Vertex modals and leaves the
+  rest of Ariel HR untouched.
+  Optional form attributes: vm_icon (ion-icon name), vm_hint (one line under the
+  title), vm_add_another (False hides "Save and add another").
+{% endcomment %}
+<style>
+  .oh-modal__dialog:has(.vm) { padding: 0 !important; overflow: hidden; max-width: 760px; width: 94vw; border-radius: 14px; }
+  .oh-modal__dialog:has(.vm) .oh-modal__dialog-header, .oh-modal__dialog:has(.vm) > .oh-modal__close { display: none; }
+  .vm { --vm-surface: #ffffff; --vm-subtle: #f8f9fb; --vm-border: #e2e5ea; --vm-text: #1f2937; --vm-muted: #6b7280;
+        --vm-primary: {{ theme_obj.primary_600|default:"#E54F38" }}; --vm-soft: {{ theme_obj.primary_100|default:"#FEF6F5" }};
+        --vm-ink: {{ theme_obj.primary_800|default:"#AC3B2A" }}; --vm-bad: #dc2626;
+        display: flex; flex-direction: column; max-height: 88vh; background: var(--vm-surface); color: var(--vm-text); }
+  body.dark .vm { --vm-surface: #242424; --vm-subtle: #1b1b1b; --vm-border: #3a3a3a; --vm-text: #f3f4f6; --vm-muted: #a1a1aa; --vm-soft: #3a2420; --vm-ink: #ffb4a6; }
+
+  .vm__head { display: flex; align-items: center; gap: .9rem; padding: 1.15rem 1.5rem; border-bottom: 1px solid var(--vm-border); }
+  .vm__icon { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 1.3rem; background: var(--vm-soft); color: var(--vm-ink); flex-shrink: 0; }
+  .vm__titles { flex: 1; min-width: 0; }
+  .vm__titles h2 { margin: 0; font-size: 1.05rem; font-weight: 700; line-height: 1.3; color: var(--vm-text); }
+  .vm__titles p { margin: .1rem 0 0; font-size: .78rem; color: var(--vm-muted); }
+  .vm__close { width: 34px; height: 34px; border: 0; border-radius: 8px; background: transparent; color: var(--vm-muted); display: grid; place-items: center; font-size: 1.35rem; cursor: pointer; }
+  .vm__close:hover { background: var(--vm-subtle); color: var(--vm-text); }
+
+  .vm__body { padding: 1.35rem 1.5rem; overflow-y: auto; flex: 1; }
+  .vm__grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 1rem 1.1rem; }
+  .vm__field { grid-column: span 12; min-width: 0; }
+  @media (min-width: 640px) { .vm__field--2 { grid-column: span 2; } .vm__field--3 { grid-column: span 3; } .vm__field--4 { grid-column: span 4; } .vm__field--5 { grid-column: span 5; } .vm__field--6 { grid-column: span 6; } .vm__field--7 { grid-column: span 7; } .vm__field--8 { grid-column: span 8; } .vm__field--9 { grid-column: span 9; } .vm__field--10 { grid-column: span 10; } }
+  .vm__section { grid-column: span 12; margin-top: .35rem; padding-top: .9rem; border-top: 1px solid var(--vm-border); font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--vm-muted); }
+  .vm__section small { display: block; margin-top: .2rem; font-size: .72rem; font-weight: 400; letter-spacing: 0; text-transform: none; }
+  .vm__label { display: block; font-size: .78rem; font-weight: 600; color: var(--vm-text); margin: 0 0 .35rem; }
+  .vm__label.required-star::after { content: " *"; color: var(--vm-bad); }
+  .vm__help { font-size: .72rem; color: var(--vm-muted); margin: .3rem 0 0; }
+  .vm .errorlist { list-style: none; padding: 0; margin: .3rem 0 0; color: var(--vm-bad); font-size: .74rem; }
+  .vm__nonfield .errorlist { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: .6rem .8rem; margin-bottom: 1rem; }
+
+  .vm input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden]):not(.select2-search__field), .vm select, .vm textarea, .vm .select2-container .select2-selection {
+    width: 100% !important; min-height: 40px; border: 1px solid var(--vm-border) !important; border-radius: 8px !important; background: var(--vm-surface); color: var(--vm-text);
+    padding: .5rem .75rem; font-size: .88rem; box-shadow: none; transition: border-color .15s, box-shadow .15s; }
+  .vm .select2-container .select2-selection--multiple { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; min-height: 44px; padding: .3rem .5rem; }
+  .vm .select2-selection--multiple .select2-selection__rendered { display: flex; flex-wrap: wrap; gap: .3rem; padding: 0; margin: 0; width: auto; }
+  .vm .select2-selection--multiple .select2-selection__choice { display: inline-flex; align-items: center; gap: .3rem; margin: 0 !important; padding: .2rem .6rem !important; border: 0 !important; border-radius: 999px !important; background: var(--vm-soft) !important; color: var(--vm-ink) !important; font-size: .78rem; font-weight: 600; line-height: 1.4; }
+  .vm .select2-selection--multiple .select2-selection__choice__remove { order: 2; margin: 0 !important; color: var(--vm-ink) !important; opacity: .7; position: static !important; border: 0 !important; background: transparent !important; padding: 0 !important; }
+  .vm .select2-selection--multiple .select2-selection__choice__remove:hover { opacity: 1; background: transparent !important; }
+  .vm .select2-search--inline { flex: 1; min-width: 120px; margin: 0; }
+  .vm .select2-search--inline .select2-search__field { width: 100% !important; min-height: 28px !important; height: 28px; border: 0 !important; box-shadow: none !important; background: transparent !important; padding: 0 .25rem !important; margin: 0 !important; font-size: .86rem; }
+  .vm textarea { min-height: 76px; resize: vertical; line-height: 1.5; }
+  /* a locked field (for example the project code on edit) must look locked, not editable */
+  .vm input:disabled, .vm select:disabled, .vm textarea:disabled, .vm input[readonly],
+  .vm .select2-container--disabled .select2-selection {
+    background: #eceef1 !important; color: #8b93a1 !important; -webkit-text-fill-color: #8b93a1;
+    border-style: dashed !important; cursor: not-allowed !important; opacity: 1; box-shadow: none !important;
+  }
+  .vm .select2-container--disabled .select2-selection__rendered, .vm .select2-container--disabled .select2-selection__arrow { color: #8b93a1 !important; cursor: not-allowed !important; }
+  body.dark .vm input:disabled, body.dark .vm select:disabled, body.dark .vm textarea:disabled,
+  body.dark .vm input[readonly], body.dark .vm .select2-container--disabled .select2-selection {
+    background: #2a2f38 !important; color: #7d8594 !important; -webkit-text-fill-color: #7d8594;
+  }
+  .vm input:focus, .vm select:focus, .vm textarea:focus, .vm .select2-container--open .select2-selection, .vm .select2-container--focus .select2-selection {
+    border-color: var(--vm-primary) !important; outline: 0; box-shadow: 0 0 0 3px var(--vm-soft); }
+  .vm .select2-container .select2-selection--single { display: flex; align-items: center; padding: 0 .5rem; }
+  .vm .select2-container .select2-selection--single .select2-selection__rendered { padding-left: .25rem; line-height: 1.4; }
+  .vm .select2-container .select2-selection--single .select2-selection__arrow { height: 100%; }
+  .vm .select2-container .select2-selection--multiple { padding: .2rem .4rem; }
+  .vm input[type=file] { width: 100%; padding: .5rem; border: 1px dashed var(--vm-border); border-radius: 8px; background: var(--vm-subtle); font-size: .84rem; }
+  .vm::placeholder, .vm input::placeholder, .vm textarea::placeholder { color: #9ca3af; font-size: .84rem; }
+
+  .vm__foot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: .95rem 1.5rem; border-top: 1px solid var(--vm-border); background: var(--vm-subtle); }
+  .vm__req { font-size: .74rem; color: var(--vm-muted); }
+  .vm__req b { color: var(--vm-bad); }
+  .vm__actions { display: flex; gap: .55rem; flex-wrap: wrap; margin-left: auto; }
+  .vm-btn { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; height: 40px; padding: 0 1.15rem; border-radius: 8px; font-size: .86rem; font-weight: 600; cursor: pointer; border: 1px solid var(--vm-border); background: var(--vm-surface); color: var(--vm-text); }
+  .vm-btn:hover { border-color: var(--vm-primary); color: var(--vm-primary); }
+  .vm-btn--primary { background: var(--vm-primary); border-color: var(--vm-primary); color: #fff; }
+  .vm-btn--primary:hover { filter: brightness(.93); color: #fff; }
+  @media (max-width: 520px) { .vm__actions { width: 100%; } .vm-btn { flex: 1; } }
+</style>
+
+<div class="vm">
+  <div class="vm__head">
+    <div class="vm__icon"><ion-icon name="{{ form.vm_icon|default:'create-outline' }}"></ion-icon></div>
+    <div class="vm__titles">
+      <h2 id="createTitle">{{ form.verbose_name|default:_("Details") }}</h2>
+      {% if form.vm_hint %}<p>{{ form.vm_hint }}</p>{% endif %}
+    </div>
+    <button type="button" class="vm__close" aria-label="{% trans 'Close' %}" onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')">
+      <ion-icon name="close-outline"></ion-icon>
+    </button>
+  </div>
+
+  <div class="vm__body">
+    {% if form.non_field_errors %}<div class="vm__nonfield">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="vm__grid">
+      {% for field in form.visible_fields %}
+        {% with section=form.vm_sections|get_item:field.name %}{% if section %}<div class="vm__section">{{ section|section_title }}{% if section|section_hint %}<small>{{ section|section_hint }}</small>{% endif %}</div>{% endif %}{% endwith %}
+        <div class="vm__field vm__field--{{ field|col }}" id="id_{{ field.name }}_parent_div">
+          <label class="vm__label {% if field.field.required %}required-star{% endif %}" for="{{ field.id_for_label }}">{% trans field.label %}</label>
+          {% if field.field.widget.input_type == 'checkbox' %}
+            <div class="oh-switch" style="width: 30px">{{ field|add_class:'oh-switch__checkbox' }}</div>
+          {% else %}
+            <div id="dynamic_field_{{ field.name }}">{{ field|add_class:'form-control' }}</div>
+          {% endif %}
+          {% if field.help_text %}<p class="vm__help">{{ field.help_text }}</p>{% endif %}
+          {{ field.errors }}
+        </div>
+      {% endfor %}
+    </div>
+    {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+  </div>
+
+  <div class="vm__foot">
+    <span class="vm__req"><b>*</b> {% trans "Required" %}</span>
+    <div class="vm__actions">
+      <button type="button" class="vm-btn" onclick="$(this).closest('.oh-modal--show').removeClass('oh-modal--show')">{% trans "Cancel" %}</button>
+      {% if not form.instance.pk and form.vm_add_another != False %}
+        <button type="submit" name="save_and_add_another" value="true" class="vm-btn" hx-swap="none"
+          hx-on:htmx:after-request="
+            if (event.detail.successful) {
+              const form = this.form;
+              if (form) { form.reset(); $(form).find('select').val(null).trigger('change'); }
+            }">
+          {% trans "Save and add another" %}
+        </button>
+      {% endif %}
+      <button type="submit" class="vm-btn vm-btn--primary"><ion-icon name="checkmark-outline"></ion-icon>{% if form.instance.pk %}{% trans "Save changes" %}{% else %}{% trans "Save" %}{% endif %}</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  $(document).ready(function () {
+    $(".vm select").on("select2:select", function () { this.dispatchEvent(new Event("change")); });
+  });
+</script>
